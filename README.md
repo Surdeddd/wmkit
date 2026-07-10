@@ -8,6 +8,10 @@
 [![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
 [![license](https://img.shields.io/badge/license-MIT-2dd4a8)](./LICENSE)
 
+[![wmkit — live demo desktop](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
+
+<p align="center"><em>Every window above is real — <a href="https://surdeddd.github.io/wmkit/">open the demo</a> and drag one.</em></p>
+
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
 - ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `@surdeddd/wmkit/vue`, `@surdeddd/wmkit/svelte`, `@surdeddd/wmkit/solid`, all thin sugar over one core
@@ -183,6 +187,12 @@ function Desktop() {
   )
 }
 ```
+
+## Snap zones in action
+
+[![Snap zones — window tiled to the left half](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/snap.png)](https://surdeddd.github.io/wmkit/)
+
+Throw a window against an edge or corner — a live preview shows the target zone, releasing tiles it. Halves, quarters, and drag-to-top maximize.
 
 ## Core API
 

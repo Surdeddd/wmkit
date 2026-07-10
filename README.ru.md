@@ -4,6 +4,10 @@
 
 [English version](./README.md) · [Живое демо](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
+[![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
+
+<p align="center"><em>Все окна выше настоящие — <a href="https://surdeddd.github.io/wmkit/">откройте демо</a> и потаскайте.</em></p>
+
 - 🪟 **Полный жизненный цикл окна** — открытие, закрытие, фокус, сворачивание, разворачивание, восстановление, drag, ресайз в 8 направлениях
 - 🧠 **Headless-ядро** — сериализуемая стейт-машина плюс DOM-контроллер; своя разметка или готовая стеклянная тема
 - ⚛️ **Родные адаптеры** — `@surdeddd/wmkit/react`, `@surdeddd/wmkit/vue`, `@surdeddd/wmkit/svelte`, `@surdeddd/wmkit/solid`, тонкий сахар над одним ядром
