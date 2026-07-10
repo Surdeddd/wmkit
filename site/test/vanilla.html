@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wmkit vanilla test page</title>
+    <style>
+      * {
+        margin: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #101218;
+        color: #eef;
+        display: flex;
+        flex-direction: column;
+      }
+      #toolbar {
+        display: flex;
+        gap: 8px;
+        padding: 8px;
+        flex-wrap: wrap;
+      }
+      #toolbar button {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #445;
+        background: #1a1e2a;
+        color: #eef;
+        cursor: pointer;
+      }
+      #desktop {
+        flex: 1;
+        min-height: 0;
+      }
+      #taskbar {
+        display: flex;
+        gap: 6px;
+        padding: 8px;
+        min-height: 44px;
+      }
+      #taskbar button {
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid #556;
+        background: #232838;
+        color: #eef;
+        cursor: pointer;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <button id="btn-open" type="button">open</button>
+      <button id="btn-open-modal" type="button">modal</button>
+      <button id="btn-open-iframe" type="button">iframe</button>
+      <button id="btn-open-fixed" type="button">fixed</button>
+      <button id="btn-stress" type="button">stress 50</button>
+      <button id="btn-clear" type="button">clear</button>
+      <span id="window-count" data-testid="window-count">0</span>
+    </div>
+    <div id="desktop"></div>
+    <div id="taskbar" role="toolbar" aria-label="Taskbar"></div>
+    <script type="module" src="./vanilla.ts"></script>
+  </body>
+</html>
