@@ -26,7 +26,8 @@
   "homepage": "https://surdeddd.github.io/wmkit/",
   "bugs": "https://github.com/Surdeddd/wmkit/issues",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "type": "module",
   "sideEffects": [
