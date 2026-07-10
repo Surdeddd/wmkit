@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: '/wmkit/',
+  base: process.env.VERCEL ? '/' : '/wmkit/',
   resolve: {
     alias: {
       '@surdeddd/wmkit/persist': fileURLToPath(new URL('../src/persist.ts', import.meta.url)),
