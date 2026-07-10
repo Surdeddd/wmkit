@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+site/dist/
+*.tsbuildinfo
+
+# tests
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# ai working context (kept local by design)
+memory-bank/
+
+# tooling caches
+.vite/
+.cache/
+.turbo/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# editors & os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+pnpm-debug.log*

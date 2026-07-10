@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "wmkit": ["./src/index.ts"],
+      "wmkit/react": ["./src/react.ts"],
+      "wmkit/vue": ["./src/vue.ts"],
+      "wmkit/svelte": ["./src/svelte.ts"],
+      "wmkit/solid": ["./src/solid.ts"],
+      "wmkit/persist": ["./src/persist.ts"],
+      "wmkit/popout": ["./src/popout.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "tests",
+    "site/src",
+    "site/test",
+    "site/vite.config.ts",
+    "tsup.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "site/dist"]
+}
