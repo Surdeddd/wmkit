@@ -2,8 +2,8 @@ export const snippets: Array<{ id: string; label: string; code: string }> = [
   {
     id: 'vanilla',
     label: 'Vanilla',
-    code: `import { createWindowManager, attachDesktop } from 'wmkit'
-import 'wmkit/themes/glass.css'
+    code: `import { createWindowManager, attachDesktop } from '@surdeddd/wmkit'
+import '@surdeddd/wmkit/themes/glass.css'
 
 const wm = createWindowManager()
 const desktop = attachDesktop(wm, document.querySelector('#desktop'))
@@ -17,7 +17,7 @@ wm.snap(win.id, 'left')`,
   {
     id: 'react',
     label: 'React',
-    code: `import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from 'wmkit/react'
+    code: `import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
 
 function Desktop() {
   const wm = useWindowManager()
@@ -51,7 +51,7 @@ function Win({ binder, win }) {
     label: 'Vue',
     code: `<script setup>
 import { ref } from 'vue'
-import { useWindowManager, useDesktop, useWmWindowEl, useWmState } from 'wmkit/vue'
+import { useWindowManager, useDesktop, useWmWindowEl, useWmState } from '@surdeddd/wmkit/vue'
 
 const wm = useWindowManager()
 const desktopEl = ref(null)
@@ -76,7 +76,7 @@ wm.open({ id: 'note', title: 'Заметка' })
     id: 'svelte',
     label: 'Svelte',
     code: `<script>
-  import { createManager, createDesktop, wmWindowStore } from 'wmkit/svelte'
+  import { createManager, createDesktop, wmWindowStore } from '@surdeddd/wmkit/svelte'
 
   const wm = createManager()
   const dk = createDesktop(wm)
@@ -95,7 +95,7 @@ wm.open({ id: 'note', title: 'Заметка' })
     id: 'solid',
     label: 'Solid',
     code: `import { For } from 'solid-js'
-import { useWindowManager, createDesktop, useWmState } from 'wmkit/solid'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
 
 function Desktop() {
   const wm = useWindowManager()

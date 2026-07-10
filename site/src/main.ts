@@ -1,5 +1,10 @@
-import { attachDesktop, createWindowManager, prefersReducedMotion, type WindowInit } from 'wmkit'
-import 'wmkit/themes/glass.css'
+import {
+  attachDesktop,
+  createWindowManager,
+  prefersReducedMotion,
+  type WindowInit,
+} from '@surdeddd/wmkit'
+import '@surdeddd/wmkit/themes/glass.css'
 import './landing.css'
 import { type Dict, dictionaries, type Lang } from './i18n'
 import { highlight, snippets } from './snippets'
@@ -101,7 +106,7 @@ function fillWelcome(content: HTMLElement): void {
 }
 
 const terminalScript = [
-  { cmd: 'pnpm add wmkit', out: '+ wmkit · 0 dependencies' },
+  { cmd: 'pnpm add @surdeddd/wmkit', out: '+ wmkit · 0 dependencies' },
   { cmd: "wm.open({ title: 'hello' })", out: '→ focused · draggable · snappable' },
   { cmd: 'wm.serialize()', out: '{ version: 1, windows: [...] } → localStorage' },
 ]

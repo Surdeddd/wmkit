@@ -1,8 +1,8 @@
+import type { DesktopBinder, WindowManager, WindowState } from '@surdeddd/wmkit'
+import { useDesktop, useWindowManager, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { DesktopBinder, WindowManager, WindowState } from 'wmkit'
-import { useDesktop, useWindowManager, useWmState, useWmWindowRef } from 'wmkit/react'
-import 'wmkit/themes/glass.css'
+import '@surdeddd/wmkit/themes/glass.css'
 
 function Win({ binder, win }: { binder: DesktopBinder; win: WindowState }) {
   const ref = useWmWindowRef(binder, win.id)

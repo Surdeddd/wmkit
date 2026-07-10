@@ -21,13 +21,13 @@
     "noEmit": true,
     "types": ["node"],
     "paths": {
-      "wmkit": ["./src/index.ts"],
-      "wmkit/react": ["./src/react.ts"],
-      "wmkit/vue": ["./src/vue.ts"],
-      "wmkit/svelte": ["./src/svelte.ts"],
-      "wmkit/solid": ["./src/solid.ts"],
-      "wmkit/persist": ["./src/persist.ts"],
-      "wmkit/popout": ["./src/popout.ts"]
+      "@surdeddd/wmkit": ["./src/index.ts"],
+      "@surdeddd/wmkit/react": ["./src/react.ts"],
+      "@surdeddd/wmkit/vue": ["./src/vue.ts"],
+      "@surdeddd/wmkit/svelte": ["./src/svelte.ts"],
+      "@surdeddd/wmkit/solid": ["./src/solid.ts"],
+      "@surdeddd/wmkit/persist": ["./src/persist.ts"],
+      "@surdeddd/wmkit/popout": ["./src/popout.ts"]
     }
   },
   "include": [

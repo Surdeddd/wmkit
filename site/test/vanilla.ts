@@ -1,6 +1,11 @@
-import { attachDesktop, createWindowManager, type WindowInit, type WindowState } from 'wmkit'
-import { persist } from 'wmkit/persist'
-import 'wmkit/themes/glass.css'
+import {
+  attachDesktop,
+  createWindowManager,
+  type WindowInit,
+  type WindowState,
+} from '@surdeddd/wmkit'
+import { persist } from '@surdeddd/wmkit/persist'
+import '@surdeddd/wmkit/themes/glass.css'
 
 function must<T>(value: T | null): T {
   if (!value) throw new Error('test page markup missing')

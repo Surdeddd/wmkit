@@ -5,11 +5,11 @@ export default defineConfig({
   base: '/wmkit/',
   resolve: {
     alias: {
-      'wmkit/persist': fileURLToPath(new URL('../src/persist.ts', import.meta.url)),
-      'wmkit/popout': fileURLToPath(new URL('../src/popout.ts', import.meta.url)),
-      'wmkit/react': fileURLToPath(new URL('../src/react.ts', import.meta.url)),
-      'wmkit/themes': fileURLToPath(new URL('../src/themes', import.meta.url)),
-      wmkit: fileURLToPath(new URL('../src/index.ts', import.meta.url)),
+      '@surdeddd/wmkit/persist': fileURLToPath(new URL('../src/persist.ts', import.meta.url)),
+      '@surdeddd/wmkit/popout': fileURLToPath(new URL('../src/popout.ts', import.meta.url)),
+      '@surdeddd/wmkit/react': fileURLToPath(new URL('../src/react.ts', import.meta.url)),
+      '@surdeddd/wmkit/themes': fileURLToPath(new URL('../src/themes', import.meta.url)),
+      '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },
   build: {

@@ -3,13 +3,13 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      'wmkit/persist': new URL('./src/persist.ts', import.meta.url).pathname,
-      'wmkit/popout': new URL('./src/popout.ts', import.meta.url).pathname,
-      'wmkit/react': new URL('./src/react.ts', import.meta.url).pathname,
-      'wmkit/vue': new URL('./src/vue.ts', import.meta.url).pathname,
-      'wmkit/svelte': new URL('./src/svelte.ts', import.meta.url).pathname,
-      'wmkit/solid': new URL('./src/solid.ts', import.meta.url).pathname,
-      wmkit: new URL('./src/index.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/persist': new URL('./src/persist.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/popout': new URL('./src/popout.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/react': new URL('./src/react.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/vue': new URL('./src/vue.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/svelte': new URL('./src/svelte.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/solid': new URL('./src/solid.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit': new URL('./src/index.ts', import.meta.url).pathname,
     },
   },
   test: {

@@ -5,12 +5,12 @@
 [Русская версия](./README.ru.md) · [Live demo](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![CI](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/wmkit)](https://www.npmjs.com/package/wmkit)
+[![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
 [![license](https://img.shields.io/badge/license-MIT-2dd4a8)](./LICENSE)
 
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
-- ⚛️ **Official adapters** — `wmkit/react`, `wmkit/vue`, `wmkit/svelte`, `wmkit/solid`, all thin sugar over one core
+- ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `@surdeddd/wmkit/vue`, `@surdeddd/wmkit/svelte`, `@surdeddd/wmkit/solid`, all thin sugar over one core
 - ⊞ **Snap zones** — halves, quarters and drag-to-top maximize with a live preview
 - ⌨️ **Accessible** — keyboard move/resize, F6 window cycling, focus-trapped modals, `aria-live` announcements
 - ⚡ **Fast** — `transform`-only positioning, rAF-batched pointer input, structural sharing; 50 windows drag at 60fps
@@ -21,16 +21,16 @@
 ## Install
 
 ```bash
-npm install wmkit
+npm install @surdeddd/wmkit
 # or
-pnpm add wmkit
+pnpm add @surdeddd/wmkit
 ```
 
 ## Quick start (vanilla)
 
 ```js
-import { createWindowManager, attachDesktop } from 'wmkit'
-import 'wmkit/themes/glass.css'
+import { createWindowManager, attachDesktop } from '@surdeddd/wmkit'
+import '@surdeddd/wmkit/themes/glass.css'
 
 const wm = createWindowManager()
 const desktop = attachDesktop(wm, document.querySelector('#desktop'))
@@ -67,8 +67,8 @@ The controller adds resize handles (`[data-wm-resize]`), a snap preview (`[data-
 ## React
 
 ```tsx
-import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from 'wmkit/react'
-import 'wmkit/themes/glass.css'
+import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
+import '@surdeddd/wmkit/themes/glass.css'
 
 function Desktop() {
   const wm = useWindowManager()
@@ -111,8 +111,8 @@ function Win({ binder, win }) {
 ```vue
 <script setup>
 import { ref } from 'vue'
-import { useWindowManager, useDesktop, useWmWindowEl, useWmState } from 'wmkit/vue'
-import 'wmkit/themes/glass.css'
+import { useWindowManager, useDesktop, useWmWindowEl, useWmState } from '@surdeddd/wmkit/vue'
+import '@surdeddd/wmkit/themes/glass.css'
 
 const wm = useWindowManager()
 const desktopEl = ref(null)
@@ -138,8 +138,8 @@ wm.open({ id: 'note', title: 'Note' })
 
 ```svelte
 <script>
-  import { createManager, createDesktop, wmWindowStore } from 'wmkit/svelte'
-  import 'wmkit/themes/glass.css'
+  import { createManager, createDesktop, wmWindowStore } from '@surdeddd/wmkit/svelte'
+  import '@surdeddd/wmkit/themes/glass.css'
 
   const wm = createManager()
   const dk = createDesktop(wm)
@@ -159,7 +159,7 @@ wm.open({ id: 'note', title: 'Note' })
 
 ```tsx
 import { For } from 'solid-js'
-import { useWindowManager, createDesktop, useWmState } from 'wmkit/solid'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
 
 function Desktop() {
   const wm = useWindowManager()
@@ -237,10 +237,10 @@ interface DesktopOptions {
 
 Keyboard defaults: arrows move the focused window (16 px), `Alt` for 1 px steps, `Shift+arrows` resize, `F6` / `Shift+F6` cycle windows, `Escape` cancels an in-flight drag or resize.
 
-### `persist(wm, options?)` — `wmkit/persist`
+### `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 
 ```js
-import { persist } from 'wmkit/persist'
+import { persist } from '@surdeddd/wmkit/persist'
 
 const store = persist(wm, { key: 'my-desktop' })  // auto-restores, then debounce-saves on change
 store.clear()
@@ -248,13 +248,13 @@ store.clear()
 
 Storage defaults to `localStorage` (probed safely — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation.
 
-### `popout(wm, id, contentEl, options?)` — `wmkit/popout` *(experimental)*
+### `popout(wm, id, contentEl, options?)` — `@surdeddd/wmkit/popout` *(experimental)*
 
 Moves a window's content into a [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) always-on-top OS window, keeping the same JS context and state. Feature-detect with `isPopoutSupported()`.
 
 ## Theming
 
-`wmkit/themes/glass.css` styles the `data-wm-*` attributes and exposes CSS variables:
+`@surdeddd/wmkit/themes/glass.css` styles the `data-wm-*` attributes and exposes CSS variables:
 
 ```css
 [data-wm-desktop] {
