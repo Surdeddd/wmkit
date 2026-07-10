@@ -1,0 +1,203 @@
+[data-wm-desktop] {
+  --wm-radius: 14px;
+  --wm-bg: rgba(22, 24, 34, 0.55);
+  --wm-bg-focused: rgba(26, 28, 40, 0.68);
+  --wm-border: rgba(255, 255, 255, 0.09);
+  --wm-border-focused: rgba(255, 255, 255, 0.22);
+  --wm-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --wm-shadow-focused: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --wm-titlebar-bg: rgba(255, 255, 255, 0.04);
+  --wm-text: rgba(240, 242, 250, 0.92);
+  --wm-text-dim: rgba(240, 242, 250, 0.55);
+  --wm-accent: #7c6cff;
+  --wm-blur: 22px;
+  --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-wm-window] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  color: var(--wm-text);
+  background: var(--wm-bg);
+  -webkit-backdrop-filter: blur(var(--wm-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--wm-blur)) saturate(1.4);
+  border: 1px solid var(--wm-border);
+  border-radius: var(--wm-radius);
+  box-shadow: var(--wm-shadow);
+  outline: none;
+  contain: layout style;
+  will-change: transform;
+  transition:
+    transform var(--wm-transition),
+    width var(--wm-transition),
+    height var(--wm-transition),
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    opacity 180ms ease;
+  animation: wm-window-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-wm-window][hidden] {
+  display: none;
+}
+
+[data-wm-window][data-wm-focused] {
+  background: var(--wm-bg-focused);
+  border-color: var(--wm-border-focused);
+  box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-dragging],
+[data-wm-window][data-wm-resizing] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-stage="maximized"],
+[data-wm-window][data-wm-stage="snapped"] {
+  border-radius: 0;
+}
+
+[data-wm-window][data-wm-flash] {
+  animation: wm-flash 320ms ease;
+}
+
+[data-wm-window] [data-wm-drag] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--wm-titlebar-bg);
+  border-bottom: 1px solid var(--wm-border);
+  border-radius: var(--wm-radius) var(--wm-radius) 0 0;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+}
+
+[data-wm-window][data-wm-stage="maximized"] [data-wm-drag],
+[data-wm-window][data-wm-stage="snapped"] [data-wm-drag] {
+  border-radius: 0;
+}
+
+[data-wm-window] [data-wm-title] {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--wm-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-wm-window] [data-wm-controls] {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+[data-wm-window] [data-wm-close],
+[data-wm-window] [data-wm-minimize],
+[data-wm-window] [data-wm-maximize] {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    transform 120ms ease;
+}
+
+[data-wm-window] [data-wm-close]:hover,
+[data-wm-window] [data-wm-minimize]:hover,
+[data-wm-window] [data-wm-maximize]:hover {
+  filter: brightness(1.25);
+  transform: scale(1.12);
+}
+
+[data-wm-window] [data-wm-close]:focus-visible,
+[data-wm-window] [data-wm-minimize]:focus-visible,
+[data-wm-window] [data-wm-maximize]:focus-visible {
+  outline: 2px solid var(--wm-accent);
+  outline-offset: 2px;
+}
+
+[data-wm-window] [data-wm-close] {
+  background: #ff5f57;
+}
+
+[data-wm-window] [data-wm-minimize] {
+  background: #febc2e;
+}
+
+[data-wm-window] [data-wm-maximize] {
+  background: #28c840;
+}
+
+[data-wm-window] [data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+[data-wm-snap-preview] {
+  background: color-mix(in srgb, var(--wm-accent) 18%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--wm-accent) 55%, transparent);
+  border-radius: var(--wm-radius);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  transition:
+    transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 140ms ease,
+    height 140ms ease;
+}
+
+@keyframes wm-window-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes wm-flash {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20% {
+    translate: -6px 0;
+  }
+  45% {
+    translate: 5px 0;
+  }
+  70% {
+    translate: -3px 0;
+  }
+  90% {
+    translate: 2px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wm-window],
+  [data-wm-snap-preview] {
+    transition: none;
+    animation: none;
+  }
+}
