@@ -2,7 +2,7 @@
 
 **Headless оконный менеджер для веба.** Перетаскиваемые окна с ресайзом, снэпом, таскбаром, клавиатурной доступностью и персистом состояния — для vanilla JS и всех основных фреймворков.
 
-[English version](./README.md) · [Живое демо](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
 

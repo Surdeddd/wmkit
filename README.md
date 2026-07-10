@@ -2,7 +2,7 @@
 
 **Headless window manager for the web.** Draggable, resizable, snappable windows with a taskbar model, keyboard accessibility and state persistence — for vanilla JS and every major framework.
 
-[Русская версия](./README.ru.md) · [Live demo](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![CI](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
