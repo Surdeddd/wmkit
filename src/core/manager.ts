@@ -6,6 +6,7 @@ import type {
   ManagerOptions,
   ManagerState,
   SerializedState,
+  SerializedWindowState,
   Size,
   SnapZone,
   WindowInit,
@@ -60,12 +61,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function commit(): void {
     snapshot = null
-    if (batchDepth > 0) {
-      batchDirty = true
-      return
-    }
-    flushEvents()
-    emitter.emit('change', { state: getState() })
+    batchDirty = true
   }
 
   function flushEvents(): void {
@@ -76,7 +72,6 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function queueEvent(emit: () => void): void {
     pendingEvents.push(emit)
-    if (batchDepth === 0) flushEvents()
   }
 
   function setWindow(next: WindowState): void {
@@ -155,7 +150,12 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function open(init: WindowInit = {}): WindowState {
-    const id = init.id ?? `${idPrefix}-${++idCounter}`
+    let id = init.id
+    if (id === undefined) {
+      do {
+        id = `${idPrefix}-${++idCounter}`
+      } while (windows[id])
+    }
     if (windows[id]) throw new Error(`wmkit: window id "${id}" already exists`)
 
     const minSize = { width: init.minWidth ?? 160, height: init.minHeight ?? 100 }
@@ -243,9 +243,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function closeAll(): void {
-    batch(() => {
-      for (const id of [...order]) close(id)
-    })
+    for (const id of [...order]) close(id)
   }
 
   function focus(id: string): boolean {
@@ -474,6 +472,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (patch.layer && patch.layer !== win.layer) {
       order = sortByLayer(order)
       queueEvent(() => emitter.emit('order', { order }))
+      if (patch.layer === 'modal' && topModalId() === id && focusedId !== id) {
+        const previous = focusedId
+        focusedId = id
+        emitFocus(finalWin, previous)
+      }
     }
     queueEvent(() => emitter.emit('update', { window: finalWin }))
     if (resized) queueEvent(() => emitter.emit('resize', { window: finalWin }))
@@ -484,7 +487,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function setViewport(next: Size): void {
     if (next.width === viewport.width && next.height === viewport.height) return
     viewport = { ...next }
-    batch(() => {
+    transact(() => {
       for (const id of order) {
         const win = windows[id] as WindowState
         if (win.stage === 'maximized') {
@@ -515,10 +518,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       .sort((a, b) => a.openedSeq - b.openedSeq)
   }
 
-  function batch(run: () => void): void {
+  function transact<T>(run: () => T): T {
     batchDepth += 1
     try {
-      run()
+      return run()
     } finally {
       batchDepth -= 1
       if (batchDepth === 0 && batchDirty) {
@@ -540,7 +543,12 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
           bounds: { ...win.bounds },
           restoreBounds: win.restoreBounds ? { ...win.restoreBounds } : null,
           minSize: { ...win.minSize },
-          maxSize: win.maxSize ? { ...win.maxSize } : null,
+          maxSize: win.maxSize
+            ? {
+                width: Number.isFinite(win.maxSize.width) ? win.maxSize.width : null,
+                height: Number.isFinite(win.maxSize.height) ? win.maxSize.height : null,
+              }
+            : null,
           meta: { ...win.meta },
         })),
       order: [...order],
@@ -565,7 +573,22 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return typeof size.width === 'number' && typeof size.height === 'number'
   }
 
-  function isSerializedWindow(value: unknown): value is WindowState {
+  function isSizeAxis(value: unknown): value is number | null {
+    return value === null || typeof value === 'number'
+  }
+
+  function readMaxSize(value: unknown): Size | null {
+    if (typeof value !== 'object' || value === null) return null
+    const size = value as Record<string, unknown>
+    if (!isSizeAxis(size.width) || !isSizeAxis(size.height)) return null
+    if (size.width === null && size.height === null) return null
+    return {
+      width: size.width ?? Number.POSITIVE_INFINITY,
+      height: size.height ?? Number.POSITIVE_INFINITY,
+    }
+  }
+
+  function isSerializedWindow(value: unknown): value is SerializedWindowState {
     if (typeof value !== 'object' || value === null) return false
     const win = value as Record<string, unknown>
     return (
@@ -597,7 +620,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         snapZone: ZONES.includes(raw.snapZone as SnapZone) ? raw.snapZone : null,
         layer: raw.layer,
         minSize: isSize(raw.minSize) ? { ...raw.minSize } : { width: 160, height: 100 },
-        maxSize: isSize(raw.maxSize) ? { ...raw.maxSize } : null,
+        maxSize: readMaxSize(raw.maxSize),
         openedSeq: typeof raw.openedSeq === 'number' ? raw.openedSeq : ++maxSeq,
         draggable: raw.draggable !== false,
         resizable: raw.resizable !== false,
@@ -631,6 +654,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     focusedId = data.focusedId && windows[data.focusedId] ? data.focusedId : null
     if (focusedId && windows[focusedId]?.stage === 'minimized') focusedId = null
     if (!focusedId) focusTop()
+    const modal = topModalId()
+    if (modal) {
+      const focusedWin = focusedId ? (windows[focusedId] as WindowState) : null
+      if (focusedWin?.layer !== 'modal') focusedId = modal
+    }
     commit()
     return true
   }
@@ -640,29 +668,29 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   return {
-    open,
-    close,
-    closeAll,
-    focus,
-    blur,
-    cycleFocus,
-    minimize,
-    maximize,
-    toggleMaximize,
-    restore,
-    restoreTo,
-    snap,
-    move,
-    moveBy,
-    resize,
-    update,
+    open: (init) => transact(() => open(init)),
+    close: (id) => transact(() => close(id)),
+    closeAll: () => transact(closeAll),
+    focus: (id) => transact(() => focus(id)),
+    blur: () => transact(blur),
+    cycleFocus: (direction) => transact(() => cycleFocus(direction)),
+    minimize: (id) => transact(() => minimize(id)),
+    maximize: (id) => transact(() => maximize(id)),
+    toggleMaximize: (id) => transact(() => toggleMaximize(id)),
+    restore: (id) => transact(() => restore(id)),
+    restoreTo: (id, bounds) => transact(() => restoreTo(id, bounds)),
+    snap: (id, zone) => transact(() => snap(id, zone)),
+    move: (id, x, y) => transact(() => move(id, x, y)),
+    moveBy: (id, dx, dy) => transact(() => moveBy(id, dx, dy)),
+    resize: (id, patch) => transact(() => resize(id, patch)),
+    update: (id, patch) => transact(() => update(id, patch)),
     get: (id) => windows[id],
     getState,
     minimized,
-    setViewport,
-    batch,
+    setViewport: (next) => transact(() => setViewport(next)),
+    batch: (run) => transact(run),
     serialize,
-    hydrate,
+    hydrate: (data) => transact(() => hydrate(data)),
     subscribe: (listener) => emitter.on('change', ({ state }) => listener(state)),
     on: (event, listener) => emitter.on(event, listener),
     destroy,

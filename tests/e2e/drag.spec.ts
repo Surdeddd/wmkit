@@ -37,6 +37,51 @@ test('escape cancels an in-flight drag', async ({ page }) => {
   expect(Math.round(after.y)).toBe(Math.round(before.y))
 })
 
+test('escape during drag restores a maximized window', async ({ page }) => {
+  await spawn(page, 'fixed')
+  const window = win(page, 'fixed')
+  const original = await boxOf(window)
+  await window.locator('[data-wm-maximize]').click()
+  await expect(window).toHaveAttribute('data-wm-stage', 'maximized')
+  const maxed = await boxOf(window)
+
+  await dragBy(page, handle(page, 'fixed'), 180, 140, { release: false })
+  await expect(window).toHaveAttribute('data-wm-stage', 'normal')
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+
+  await expect(window).toHaveAttribute('data-wm-stage', 'maximized')
+  const after = await boxOf(window)
+  expect(Math.abs(after.width - maxed.width)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.height - maxed.height)).toBeLessThanOrEqual(2)
+
+  await window.locator('[data-wm-maximize]').click()
+  await expect(window).toHaveAttribute('data-wm-stage', 'normal')
+  const restored = await boxOf(window)
+  expect(Math.round(restored.x)).toBe(Math.round(original.x))
+  expect(Math.round(restored.width)).toBe(Math.round(original.width))
+})
+
+test('escape during drag re-snaps a snapped window', async ({ page }) => {
+  await spawn(page, 'fixed')
+  const window = win(page, 'fixed')
+  const desktop = await boxOf(page.locator('#desktop'))
+  await dragTo(page, handle(page, 'fixed'), desktop.x + 4, desktop.y + desktop.height / 2)
+  await expect(window).toHaveAttribute('data-wm-stage', 'snapped')
+  const snapped = await boxOf(window)
+
+  await dragBy(page, handle(page, 'fixed'), 200, 120, { release: false })
+  await expect(window).toHaveAttribute('data-wm-stage', 'normal')
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+
+  await expect(window).toHaveAttribute('data-wm-stage', 'snapped')
+  const after = await boxOf(window)
+  expect(Math.abs(after.x - snapped.x)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.width - snapped.width)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.height - snapped.height)).toBeLessThanOrEqual(2)
+})
+
 test('drag keeps tracking across an iframe', async ({ page }) => {
   await spawn(page, 'iframe')
   await spawn(page, 'fixed')

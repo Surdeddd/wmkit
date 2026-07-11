@@ -1,5 +1,5 @@
 import { clamp, detectSnapZone, type SnapDetectOptions, zoneBounds } from '../core/geometry'
-import type { Bounds, SnapZone, WindowManager, WindowState } from '../core/types'
+import type { Bounds, SnapZone, WindowManager, WindowStage, WindowState } from '../core/types'
 import { flipToTarget } from './animate'
 import { type Announcer, type AnnouncerMessages, createAnnouncer } from './announcer'
 
@@ -65,6 +65,9 @@ interface DragSession {
   grabDY: number
   grabRatio: number
   startBounds: Bounds
+  startStage: WindowStage
+  startZone: SnapZone | null
+  startRestoreBounds: Bounds | null
   restored: boolean
   moved: boolean
   zone: SnapZone | 'maximize' | null
@@ -265,6 +268,9 @@ export function attachDesktop(
       grabDY: point.y - startBounds.y,
       grabRatio: clamp((point.x - startBounds.x) / startBounds.width, 0.05, 0.95),
       startBounds,
+      startStage: win.stage,
+      startZone: win.snapZone,
+      startRestoreBounds: win.restoreBounds,
       restored: win.stage === 'normal',
       moved: false,
       zone: null,
@@ -378,7 +384,15 @@ export function attachDesktop(
 
       if (cancelled) {
         if (session.moved && session.restored) {
-          wm.move(id, session.startBounds.x, session.startBounds.y)
+          if (session.startStage === 'maximized') {
+            wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
+            wm.maximize(id)
+          } else if (session.startStage === 'snapped' && session.startZone) {
+            wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
+            wm.snap(id, session.startZone)
+          } else {
+            wm.move(id, session.startBounds.x, session.startBounds.y)
+          }
         }
         return
       }

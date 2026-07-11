@@ -899,3 +899,169 @@ describe('subscriptions and lifecycle', () => {
     expect(onOpen).not.toHaveBeenCalled()
   })
 })
+
+describe('atomic updates (regression)', () => {
+  it('emits exactly one change per operation with the final state', () => {
+    const wm = makeWm()
+    const a = wm.open()
+    const b = wm.open()
+    const changes: Array<{ stage: string | undefined; focusedId: string | null }> = []
+    wm.subscribe((state) => {
+      changes.push({ stage: state.windows[b.id]?.stage, focusedId: state.focusedId })
+    })
+    wm.minimize(b.id)
+    expect(changes).toHaveLength(1)
+    expect(changes[0]).toEqual({ stage: 'minimized', focusedId: a.id })
+  })
+
+  it('granular events observe the fully completed state', () => {
+    const wm = makeWm()
+    const a = wm.open()
+    const b = wm.open()
+    const observedFocus: Array<string | null> = []
+    wm.on('stage', () => observedFocus.push(wm.getState().focusedId))
+    wm.minimize(b.id)
+    expect(observedFocus).toEqual([a.id])
+  })
+
+  it('open emits one change with focus already resolved', () => {
+    const wm = makeWm()
+    const changes: Array<string | null> = []
+    wm.subscribe((state) => changes.push(state.focusedId))
+    const win = wm.open()
+    expect(changes).toEqual([win.id])
+  })
+
+  it('maximize emits a single change despite the internal focus step', () => {
+    const wm = makeWm()
+    wm.open()
+    const b = wm.open()
+    wm.focus(b.id)
+    const wmChange = vi.fn()
+    wm.subscribe(wmChange)
+    const a = wm.getState().order[0] as string
+    wm.maximize(a)
+    expect(wmChange).toHaveBeenCalledTimes(1)
+    expect(wm.getState().focusedId).toBe(a)
+  })
+})
+
+describe('id generation after hydrate (regression)', () => {
+  it('skips ids already taken by restored windows', () => {
+    const donor = makeWm()
+    donor.open()
+    donor.open()
+    const wm = makeWm()
+    expect(wm.hydrate(donor.serialize())).toBe(true)
+    const next = wm.open()
+    expect(next.id).toBe('wm-3')
+    expect(wm.getState().order).toHaveLength(3)
+  })
+
+  it('keeps skipping across multiple opens', () => {
+    const donor = makeWm()
+    donor.open()
+    donor.open()
+    donor.open()
+    const wm = makeWm()
+    wm.hydrate(donor.serialize())
+    wm.close('wm-2')
+    const next = wm.open()
+    expect(next.id).toBe('wm-2')
+    const after = wm.open()
+    expect(after.id).toBe('wm-4')
+  })
+})
+
+describe('Infinity max size serialization (regression)', () => {
+  it('survives a JSON round-trip with a partial max constraint', () => {
+    const donor = makeWm()
+    donor.open({ id: 'w', width: 300, height: 200, maxWidth: 600 })
+    const json = JSON.parse(JSON.stringify(donor.serialize())) as SerializedState
+    const wm = makeWm()
+    expect(wm.hydrate(json)).toBe(true)
+    expect(wm.get('w')?.maxSize).toEqual({
+      width: 600,
+      height: Number.POSITIVE_INFINITY,
+    })
+    wm.resize('w', { width: 900, height: 900 })
+    expect(wm.get('w')?.bounds.width).toBe(600)
+    expect(wm.get('w')?.bounds.height).toBe(900)
+  })
+
+  it('collapses an all-infinite max size back to unbounded', () => {
+    const donor = makeWm()
+    donor.open({ id: 'w' })
+    donor.update('w', {
+      maxSize: { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY },
+    })
+    const json = JSON.parse(JSON.stringify(donor.serialize())) as SerializedState
+    const wm = makeWm()
+    expect(wm.hydrate(json)).toBe(true)
+    expect(wm.get('w')?.maxSize).toBeNull()
+  })
+
+  it('drops malformed max size axes', () => {
+    const donor = makeWm()
+    donor.open({ id: 'w', maxWidth: 500 })
+    const data = donor.serialize()
+    rawWindow(data).maxSize = { width: 'wide', height: 3 }
+    const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.get('w')?.maxSize).toBeNull()
+  })
+})
+
+describe('modal focus (regression)', () => {
+  it('hands focus to the top modal after hydration', () => {
+    const donor = makeWm()
+    donor.open({ id: 'doc' })
+    donor.open({ id: 'm', layer: 'modal' })
+    const data = donor.serialize()
+    data.focusedId = 'doc'
+    const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.getState().focusedId).toBe('m')
+  })
+
+  it('keeps a hydrated modal focus untouched', () => {
+    const donor = makeWm()
+    donor.open({ id: 'doc' })
+    donor.open({ id: 'm', layer: 'modal' })
+    const wm = makeWm()
+    wm.hydrate(donor.serialize())
+    expect(wm.getState().focusedId).toBe('m')
+  })
+
+  it('grabs focus when a window is promoted to the top modal', () => {
+    const wm = makeWm()
+    const a = wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    wm.update(a.id, { layer: 'modal' })
+    expect(wm.getState().focusedId).toBe(a.id)
+    expect(focused).toHaveBeenCalledWith({
+      window: expect.objectContaining({ id: a.id }),
+      previous: 'b',
+    })
+  })
+
+  it('does not steal focus when promoted below an existing modal', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.update('a', { layer: 'modal' })
+    expect(wm.getState().focusedId).toBe('m')
+  })
+
+  it('does not re-emit focus when the focused window itself becomes modal', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    wm.update('a', { layer: 'modal' })
+    expect(focused).not.toHaveBeenCalled()
+    expect(wm.getState().focusedId).toBe('a')
+  })
+})

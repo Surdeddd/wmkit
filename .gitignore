@@ -16,6 +16,11 @@ blob-report/
 
 # ai working context (kept local by design)
 memory-bank/
+.remember/
+.claude/
+.playwright-mcp/
+.cursor/
+.codex/
 
 # tooling caches
 .vite/

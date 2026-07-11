@@ -54,7 +54,13 @@ el.innerHTML = `
   <div data-wm-content>Anything you want.</div>
 `
 document.querySelector('#desktop').append(el)
-desktop.attachWindow(win.id, el)
+const detach = desktop.attachWindow(win.id, el)
+
+wm.on('close', ({ window: closed }) => {
+  if (closed.id !== win.id) return
+  detach()
+  el.remove()
+})
 ```
 
 The desktop element becomes the coordinate space. Your markup stays yours — wmkit wires behavior onto `data-wm-*` attributes:

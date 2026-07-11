@@ -50,7 +50,13 @@ el.innerHTML = `
   <div data-wm-content>Что угодно.</div>
 `
 document.querySelector('#desktop').append(el)
-desktop.attachWindow(win.id, el)
+const detach = desktop.attachWindow(win.id, el)
+
+wm.on('close', ({ window: closed }) => {
+  if (closed.id !== win.id) return
+  detach()
+  el.remove()
+})
 ```
 
 Элемент рабочего стола становится системой координат. Разметка остаётся вашей — wmkit вешает поведение на `data-wm-*` атрибуты:

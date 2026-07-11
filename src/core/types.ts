@@ -71,9 +71,18 @@ export interface ManagerState {
   viewport: Size
 }
 
+export interface SerializedMaxSize {
+  width: number | null
+  height: number | null
+}
+
+export interface SerializedWindowState extends Omit<WindowState, 'maxSize'> {
+  maxSize: SerializedMaxSize | null
+}
+
 export interface SerializedState {
   version: 1
-  windows: WindowState[]
+  windows: SerializedWindowState[]
   order: string[]
   focusedId: string | null
 }
