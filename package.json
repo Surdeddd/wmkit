@@ -1,6 +1,6 @@
 {
   "name": "@surdeddd/wmkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Headless, framework-agnostic window manager for the web — draggable, resizable, snappable windows with first-class accessibility and 60fps performance",
   "keywords": [
     "window-manager",
