@@ -4,33 +4,33 @@ import { createElement, useEffect } from 'react'
 import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, shallowRef } from 'vue'
-import { createWindowManager } from '../../src/core/manager'
-import type { WindowManager, WindowState } from '../../src/core/types'
-import type { DesktopBinder } from '../../src/dom/controller'
-import { isPopoutSupported, popout } from '../../src/popout'
 import {
   useDesktop,
   useWindowManager as useReactManager,
   useWmState as useReactState,
   useWmWindowRef,
-} from '../../src/react'
+} from '../../src/adapters/react'
 import {
   createDesktop as createSolidDesktop,
   useWindowManager as useSolidManager,
   useWmState as useSolidState,
-} from '../../src/solid'
+} from '../../src/adapters/solid'
 import {
   createManager,
   createDesktop as createSvelteDesktop,
   wmStore,
   wmWindowStore,
-} from '../../src/svelte'
+} from '../../src/adapters/svelte'
 import {
   useDesktop as useVueDesktop,
   useWindowManager as useVueManager,
   useWmState as useVueState,
   useWmWindowEl,
-} from '../../src/vue'
+} from '../../src/adapters/vue'
+import { createWindowManager } from '../../src/core/manager'
+import type { WindowManager, WindowState } from '../../src/core/types'
+import type { DesktopBinder } from '../../src/dom/binder'
+import { isPopoutSupported, popout } from '../../src/plugins/popout'
 
 const VIEWPORT = { viewport: { width: 800, height: 600 } }
 const DESKTOP_OPTIONS = { autoViewport: false, announce: false } as const
@@ -210,5 +210,25 @@ describe('popout smoke', () => {
     expect(isPopoutSupported()).toBe(false)
     await expect(popout(wm, 'p', content)).rejects.toThrow(/not supported/)
     await expect(popout(wm, 'ghost', content)).rejects.toThrow(/unknown window/)
+  })
+})
+
+describe('removeOnClose smoke', () => {
+  it('detaches the controller and removes the element on close', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    wm.open({ id: 'gone', title: 'Ephemeral' })
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.binder.bindWindow('gone', winEl, { removeOnClose: true })
+    expect(winEl.dataset.wmWindow).toBe('gone')
+
+    wm.close('gone')
+    expect(winEl.isConnected).toBe(false)
+    expect(desktopEl.querySelector('[data-wm-window]')).toBeNull()
   })
 })

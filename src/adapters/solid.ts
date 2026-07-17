@@ -1,12 +1,8 @@
 import { type Accessor, createSignal, getOwner, onCleanup } from 'solid-js'
-import { createWindowManager } from './core/manager'
-import type { ManagerOptions, ManagerState, WindowManager, WindowState } from './core/types'
-import {
-  createDesktopBinder,
-  type DesktopBinder,
-  type DesktopOptions,
-  type WindowAttachOptions,
-} from './dom/controller'
+import { createWindowManager } from '../core/manager'
+import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
+import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
+import type { DesktopOptions, WindowAttachOptions } from '../dom/shared'
 
 function disposeWithOwner(dispose: () => void): void {
   if (getOwner()) onCleanup(dispose)

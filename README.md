@@ -54,13 +54,7 @@ el.innerHTML = `
   <div data-wm-content>Anything you want.</div>
 `
 document.querySelector('#desktop').append(el)
-const detach = desktop.attachWindow(win.id, el)
-
-wm.on('close', ({ window: closed }) => {
-  if (closed.id !== win.id) return
-  detach()
-  el.remove()
-})
+desktop.attachWindow(win.id, el, { removeOnClose: true })
 ```
 
 The desktop element becomes the coordinate space. Your markup stays yours — wmkit wires behavior onto `data-wm-*` attributes:
@@ -71,6 +65,8 @@ The desktop element becomes the coordinate space. Your markup stays yours — wm
 | `data-wm-title` | window title node, linked via `aria-labelledby` |
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | control buttons, wired by delegation |
 | `data-wm-content` | scrollable content area (styled by themes) |
+
+`removeOnClose` detaches the controller and removes the element when the window closes. Touch devices get larger resize hit areas and snap thresholds automatically (`pointer: coarse`); tune via `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
 
 The controller adds resize handles (`[data-wm-resize]`), a snap preview (`[data-wm-snap-preview]`) and a visually hidden live region for screen readers.
 

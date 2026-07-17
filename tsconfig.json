@@ -22,12 +22,12 @@
     "types": ["node"],
     "paths": {
       "@surdeddd/wmkit": ["./src/index.ts"],
-      "@surdeddd/wmkit/react": ["./src/react.ts"],
-      "@surdeddd/wmkit/vue": ["./src/vue.ts"],
-      "@surdeddd/wmkit/svelte": ["./src/svelte.ts"],
-      "@surdeddd/wmkit/solid": ["./src/solid.ts"],
-      "@surdeddd/wmkit/persist": ["./src/persist.ts"],
-      "@surdeddd/wmkit/popout": ["./src/popout.ts"]
+      "@surdeddd/wmkit/react": ["./src/adapters/react.ts"],
+      "@surdeddd/wmkit/vue": ["./src/adapters/vue.ts"],
+      "@surdeddd/wmkit/svelte": ["./src/adapters/svelte.ts"],
+      "@surdeddd/wmkit/solid": ["./src/adapters/solid.ts"],
+      "@surdeddd/wmkit/persist": ["./src/plugins/persist.ts"],
+      "@surdeddd/wmkit/popout": ["./src/plugins/popout.ts"]
     }
   },
   "include": [

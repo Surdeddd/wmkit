@@ -22,8 +22,6 @@ const desktop = attachDesktop(wm, desktopEl, {
 })
 const store = persist(wm, { key: 'wmkit-e2e' })
 
-const detachers = new Map<string, () => void>()
-
 function buildWindowElement(win: WindowState, content: (body: HTMLElement) => void): HTMLElement {
   const el = document.createElement('section')
   el.dataset.testid = `window-${win.id}`
@@ -46,7 +44,7 @@ function buildWindowElement(win: WindowState, content: (body: HTMLElement) => vo
 function mountWindow(win: WindowState, content: (body: HTMLElement) => void): void {
   const el = buildWindowElement(win, content)
   desktopEl.append(el)
-  detachers.set(win.id, desktop.attachWindow(win.id, el))
+  desktop.attachWindow(win.id, el, { removeOnClose: true })
 }
 
 function spawn(init: WindowInit, content?: (body: HTMLElement) => void): WindowState {
@@ -65,12 +63,6 @@ function spawn(init: WindowInit, content?: (body: HTMLElement) => void): WindowS
   )
   return win
 }
-
-wm.on('close', ({ window: win }) => {
-  detachers.get(win.id)?.()
-  detachers.delete(win.id)
-  desktopEl.querySelector(`[data-testid="window-${win.id}"]`)?.remove()
-})
 
 function renderTaskbar(): void {
   taskbarEl.replaceChildren(

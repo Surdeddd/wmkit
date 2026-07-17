@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
-import { type PersistStorage, persist } from '../../src/persist'
+import { type PersistStorage, persist } from '../../src/plugins/persist'
 
 function memoryStorage(): PersistStorage & { data: Map<string, string> } {
   const data = new Map<string, string>()

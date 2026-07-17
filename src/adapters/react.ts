@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { createWindowManager } from './core/manager'
-import type { ManagerOptions, ManagerState, WindowManager, WindowState } from './core/types'
-import {
-  createDesktopBinder,
-  type DesktopBinder,
-  type DesktopController,
-  type DesktopOptions,
-  type WindowAttachOptions,
-} from './dom/controller'
+import { createWindowManager } from '../core/manager'
+import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
+import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
+import type { DesktopController, DesktopOptions, WindowAttachOptions } from '../dom/shared'
 
 export type ElementRef = (node: HTMLElement | null) => void
 

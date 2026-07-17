@@ -4,12 +4,12 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
-    react: 'src/react.ts',
-    vue: 'src/vue.ts',
-    svelte: 'src/svelte.ts',
-    solid: 'src/solid.ts',
-    persist: 'src/persist.ts',
-    popout: 'src/popout.ts',
+    react: 'src/adapters/react.ts',
+    vue: 'src/adapters/vue.ts',
+    svelte: 'src/adapters/svelte.ts',
+    solid: 'src/adapters/solid.ts',
+    persist: 'src/plugins/persist.ts',
+    popout: 'src/plugins/popout.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

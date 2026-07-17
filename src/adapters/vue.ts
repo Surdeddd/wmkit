@@ -10,14 +10,10 @@ import {
   toValue,
   watch,
 } from 'vue'
-import { createWindowManager } from './core/manager'
-import type { ManagerOptions, ManagerState, WindowManager, WindowState } from './core/types'
-import {
-  createDesktopBinder,
-  type DesktopBinder,
-  type DesktopOptions,
-  type WindowAttachOptions,
-} from './dom/controller'
+import { createWindowManager } from '../core/manager'
+import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
+import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
+import type { DesktopOptions, WindowAttachOptions } from '../dom/shared'
 
 function disposeWithScope(dispose: () => void): void {
   if (getCurrentScope()) onScopeDispose(dispose)

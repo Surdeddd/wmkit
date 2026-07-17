@@ -29,7 +29,6 @@
   box-shadow: var(--wm-shadow);
   outline: none;
   contain: layout style;
-  will-change: transform;
   transition:
     transform var(--wm-transition),
     width var(--wm-transition),

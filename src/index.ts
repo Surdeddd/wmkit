@@ -15,7 +15,9 @@ export type {
   ManagerEvents,
   ManagerOptions,
   ManagerState,
+  SerializedMaxSize,
   SerializedState,
+  SerializedWindowState,
   Size,
   SnapZone,
   WindowFlags,
@@ -30,12 +32,14 @@ export type { FlipGhostOptions } from './dom/animate'
 export { flipToTarget, prefersReducedMotion } from './dom/animate'
 export type { Announcer, AnnouncerMessages } from './dom/announcer'
 export { createAnnouncer, defaultMessages } from './dom/announcer'
+export type { DesktopBinder } from './dom/binder'
+export { createDesktopBinder } from './dom/binder'
+export { attachDesktop } from './dom/controller'
 export type {
-  DesktopBinder,
   DesktopController,
   DesktopKeyboardOptions,
   DesktopOptions,
   DesktopSnapOptions,
+  HitAreaOptions,
   WindowAttachOptions,
-} from './dom/controller'
-export { attachDesktop, createDesktopBinder } from './dom/controller'
+} from './dom/shared'

@@ -50,13 +50,7 @@ el.innerHTML = `
   <div data-wm-content>Что угодно.</div>
 `
 document.querySelector('#desktop').append(el)
-const detach = desktop.attachWindow(win.id, el)
-
-wm.on('close', ({ window: closed }) => {
-  if (closed.id !== win.id) return
-  detach()
-  el.remove()
-})
+desktop.attachWindow(win.id, el, { removeOnClose: true })
 ```
 
 Элемент рабочего стола становится системой координат. Разметка остаётся вашей — wmkit вешает поведение на `data-wm-*` атрибуты:
@@ -67,6 +61,8 @@ wm.on('close', ({ window: closed }) => {
 | `data-wm-title` | узел заголовка, связывается через `aria-labelledby` |
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | кнопки управления, работают через делегирование |
 | `data-wm-content` | скроллируемая область контента |
+
+`removeOnClose` сам отвязывает контроллер и удаляет элемент при закрытии окна. На тач-устройствах хит-зоны ресайза и порог снэпа автоматически крупнее (`pointer: coarse`); настраиваются через `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
 
 Контроллер добавляет ресайз-хендлы (`[data-wm-resize]`), превью снэпа (`[data-wm-snap-preview]`) и скрытый live-регион для скринридеров.
 

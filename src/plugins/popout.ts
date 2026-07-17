@@ -1,4 +1,4 @@
-import type { WindowManager } from './core/types'
+import type { WindowManager } from '../core/types'
 
 interface DocumentPictureInPictureApi {
   requestWindow(options?: {

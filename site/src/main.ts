@@ -75,11 +75,9 @@ function spawn(
   const content = must(el.querySelector<HTMLElement>('[data-wm-content]'), 'window content')
   desktopEl.append(el)
   fill(content)
-  const detach = desktop.attachWindow(init.id, el)
+  desktop.attachWindow(init.id, el, { removeOnClose: true })
   const stop = wm.on('close', ({ window: win }) => {
     if (win.id !== init.id) return
-    detach()
-    el.remove()
     mounted.delete(init.id)
     stop()
   })

@@ -1,4 +1,4 @@
-import type { SerializedState, WindowManager } from './core/types'
+import type { SerializedState, WindowManager } from '../core/types'
 
 export interface PersistStorage {
   getItem(key: string): string | null
