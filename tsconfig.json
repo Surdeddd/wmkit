@@ -27,7 +27,8 @@
       "@surdeddd/wmkit/svelte": ["./src/adapters/svelte.ts"],
       "@surdeddd/wmkit/solid": ["./src/adapters/solid.ts"],
       "@surdeddd/wmkit/persist": ["./src/plugins/persist.ts"],
-      "@surdeddd/wmkit/popout": ["./src/plugins/popout.ts"]
+      "@surdeddd/wmkit/popout": ["./src/plugins/popout.ts"],
+      "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"]
     }
   },
   "include": [

@@ -1,4 +1,4 @@
-import { clamp, detectSnapZone, zoneBounds } from '../core/geometry'
+import { clamp, detectSnapZone, magnetize, zoneBounds } from '../core/geometry'
 import type { Bounds, SnapZone, WindowStage } from '../core/types'
 import { type ActiveDrag, INTERACTIVE_SELECTOR, type SessionContext } from './shared'
 
@@ -81,7 +81,27 @@ export function createDragStarter(ctx: SessionContext) {
         return
       }
 
-      wm.move(id, session.pendingX - session.grabDX, session.pendingY - session.grabDY)
+      let nextX = session.pendingX - session.grabDX
+      let nextY = session.pendingY - session.grabDY
+      if (ctx.magnetThreshold > 0) {
+        const state = wm.getState()
+        const targets: Bounds[] = [
+          { x: 0, y: 0, width: state.viewport.width, height: state.viewport.height },
+        ]
+        for (const otherId of state.order) {
+          if (otherId === id) continue
+          const other = state.windows[otherId]
+          if (other && other.stage !== 'minimized') targets.push(other.bounds)
+        }
+        const magnet = magnetize(
+          { x: nextX, y: nextY, width: current.bounds.width, height: current.bounds.height },
+          targets,
+          ctx.magnetThreshold,
+        )
+        nextX = magnet.x
+        nextY = magnet.y
+      }
+      wm.move(id, nextX, nextY)
 
       if (ctx.snapEnabled && current.snappable) {
         const viewport = wm.getState().viewport
@@ -172,15 +192,18 @@ export function createDragStarter(ctx: SessionContext) {
             wm.move(id, session.startBounds.x, session.startBounds.y)
           }
         }
+        wm.endInteraction()
         return
       }
       if (session.moved && session.zone) {
         if (session.zone === 'maximize') wm.maximize(id)
         else wm.snap(id, session.zone)
       }
+      wm.endInteraction()
     }
 
     session.finish = finish
+    wm.beginInteraction()
     ctx.claimDrag(session)
     handle.setPointerCapture(event.pointerId)
     handle.addEventListener('pointermove', onMove)

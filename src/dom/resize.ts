@@ -26,6 +26,7 @@ export function createResizeStarter(ctx: SessionContext) {
     event.stopPropagation()
 
     const handleEl = event.currentTarget as HTMLElement
+    wm.beginInteraction()
     const releaseRect = ctx.trackRect()
     const startPoint = ctx.toLocal(event)
     const start = win.bounds
@@ -88,6 +89,7 @@ export function createResizeStarter(ctx: SessionContext) {
       }
       if (el) delete el.dataset.wmResizing
       if (cancelled) wm.resize(id, start)
+      wm.endInteraction()
     }
 
     function onUp(upEvent: PointerEvent): void {

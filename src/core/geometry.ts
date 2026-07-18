@@ -87,3 +87,52 @@ export function detectSnapZone(
   }
   return null
 }
+
+export interface MagnetResult {
+  x: number
+  y: number
+  snappedX: boolean
+  snappedY: boolean
+}
+
+function nearestEdge(low: number, high: number, targetLow: number, targetHigh: number): number[] {
+  return [targetLow - low, targetHigh - low, targetLow - high, targetHigh - high]
+}
+
+export function magnetize(
+  bounds: Bounds,
+  targets: readonly Bounds[],
+  threshold: number,
+): MagnetResult {
+  const result: MagnetResult = { x: bounds.x, y: bounds.y, snappedX: false, snappedY: false }
+  if (threshold <= 0 || targets.length === 0) return result
+  let bestX = threshold + 1
+  let bestY = threshold + 1
+  for (const target of targets) {
+    for (const delta of nearestEdge(
+      bounds.x,
+      bounds.x + bounds.width,
+      target.x,
+      target.x + target.width,
+    )) {
+      if (Math.abs(delta) <= threshold && Math.abs(delta) < Math.abs(bestX)) bestX = delta
+    }
+    for (const delta of nearestEdge(
+      bounds.y,
+      bounds.y + bounds.height,
+      target.y,
+      target.y + target.height,
+    )) {
+      if (Math.abs(delta) <= threshold && Math.abs(delta) < Math.abs(bestY)) bestY = delta
+    }
+  }
+  if (Math.abs(bestX) <= threshold) {
+    result.x = bounds.x + bestX
+    result.snappedX = true
+  }
+  if (Math.abs(bestY) <= threshold) {
+    result.y = bounds.y + bestY
+    result.snappedY = true
+  }
+  return result
+}

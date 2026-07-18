@@ -14,6 +14,8 @@ export type WindowStage = 'normal' | 'minimized' | 'maximized' | 'snapped'
 
 export type WindowLayer = 'normal' | 'floating' | 'modal'
 
+export type ArrangeMode = 'cascade' | 'tile'
+
 export type SnapZone =
   | 'left'
   | 'right'
@@ -64,6 +66,12 @@ export interface WindowInit extends Partial<WindowFlags> {
   meta?: Record<string, unknown>
 }
 
+export interface HistoryEntry {
+  windows: Readonly<Record<string, WindowState>>
+  order: readonly string[]
+  focusedId: string | null
+}
+
 export interface ManagerState {
   windows: Readonly<Record<string, WindowState>>
   order: readonly string[]
@@ -108,6 +116,7 @@ export interface ManagerOptions {
   cascadeOffset?: number
   cascadeOrigin?: { x: number; y: number }
   idPrefix?: string
+  historyLimit?: number
 }
 
 export interface WindowUpdate {
@@ -148,6 +157,21 @@ export interface WindowManager {
   batch(run: () => void): void
   serialize(): SerializedState
   hydrate(data: SerializedState): boolean
+  undo(): boolean
+  redo(): boolean
+  canUndo(): boolean
+  canRedo(): boolean
+  beginInteraction(): void
+  endInteraction(): void
+  saveLayout(name: string): SerializedState
+  loadLayout(name: string): boolean
+  getLayout(name: string): SerializedState | undefined
+  setLayout(name: string, data: SerializedState): boolean
+  deleteLayout(name: string): boolean
+  layoutNames(): string[]
+  arrange(mode: ArrangeMode): void
+  minimizeAll(): void
+  restoreAll(): void
   subscribe(listener: (state: ManagerState) => void): () => void
   on<K extends keyof ManagerEvents>(
     event: K,

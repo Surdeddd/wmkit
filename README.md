@@ -14,13 +14,17 @@
 
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
-- ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `@surdeddd/wmkit/vue`, `@surdeddd/wmkit/svelte`, `@surdeddd/wmkit/solid`, all thin sugar over one core
+- ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, all thin sugar over one core
 - ⊞ **Snap zones** — halves, quarters and drag-to-top maximize with a live preview
+- 🧲 **Magnetism** — window edges align to neighbours and the viewport while dragging
+- ↩️ **Undo/redo** — every mutation is one step; a whole drag collapses into a single history entry
+- 🗂️ **Named layouts & arrange** — save/load desktop snapshots, `cascade`/`tile` in one call
 - ⌨️ **Accessible** — keyboard move/resize, F6 window cycling, focus-trapped modals, `aria-live` announcements
 - ⚡ **Fast** — `transform`-only positioning, rAF-batched pointer input, structural sharing; 50 windows drag at 60fps
 - 💾 **Persistence** — one call to serialize the desktop, one call to restore it
+- 🎨 **Three themes** — dark glass, light glass and Win98 retro, or bring your own CSS
 - 🖼️ **Popout** *(experimental)* — send a window into Document Picture-in-Picture
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~9 kB gzip core
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~9.3 kB brotli core
 
 ## Install
 
@@ -190,6 +194,41 @@ function Desktop() {
 }
 ```
 
+## Angular
+
+```ts
+import { AfterViewInit, Component, ElementRef, ViewChild } from '@angular/core'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-desktop',
+  standalone: true,
+  template: `
+    <div #desktop style="position: relative; height: 100vh">
+      <section #hello>
+        <header data-wm-drag><span data-wm-title>Hello</span></header>
+        <div data-wm-content>signals inside</div>
+      </section>
+    </div>
+  `,
+})
+export class DesktopComponent implements AfterViewInit {
+  wm = useWindowManager()
+  dk = createDesktop(this.wm)
+  state = useWmState(this.wm)
+  @ViewChild('desktop') desktopRef!: ElementRef<HTMLElement>
+  @ViewChild('hello') helloRef!: ElementRef<HTMLElement>
+
+  ngAfterViewInit(): void {
+    this.wm.open({ id: 'hello', title: 'Hello' })
+    this.dk.desktop(this.desktopRef.nativeElement)
+    this.dk.window('hello')(this.helloRef.nativeElement)
+  }
+}
+```
+
+`useWmState` returns a read-only `Signal<ManagerState>` and `useWmWindow(wm, id)` a computed per-window signal, so templates track updates fine-grained. Hooks called in an injection context clean up through `DestroyRef` automatically; outside one they simply skip auto-cleanup.
+
 ## Snap zones in action
 
 [![Snap zones — window tiled to the left half](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/snap.png)](https://surdeddd.github.io/wmkit/)
@@ -211,6 +250,7 @@ interface ManagerOptions {
   cascadeOffset?: number        // auto-position step for new windows (default 32)
   cascadeOrigin?: { x: number; y: number }
   idPrefix?: string
+  historyLimit?: number         // undo/redo depth (default 50, 0 disables history)
 }
 ```
 
@@ -228,6 +268,10 @@ Manager methods:
 | `update(id, patch)` | title, layer, min/max size, per-window flags, `meta` |
 | `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest |
 | `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop |
+| `undo()` / `redo()` / `canUndo()` / `canRedo()` / `clearHistory()` | every mutation is one step; a whole drag or resize collapses into a single entry |
+| `saveLayout(name)` / `loadLayout(name)` / `deleteLayout(name)` / `layoutNames()` | named desktop snapshots; `getLayout`/`setLayout` for external storage |
+| `arrange('cascade' \| 'tile')` | cascade staggers restored sizes, tile fills the viewport in a grid |
+| `minimizeAll()` / `restoreAll()` | bulk stage switches in one history step |
 | `subscribe(fn)` / `on(event, fn)` | granular events: `open, close, focus, move, resize, stage, update, order, modalblocked` |
 | `batch(fn)` | coalesce many operations into one `change` notification |
 
@@ -243,7 +287,10 @@ interface DesktopOptions {
   keyboard?: boolean | { moveStep?: number; cycle?: boolean }
   announce?: boolean | Partial<AnnouncerMessages>   // localize screen-reader strings here
   autoViewport?: boolean                            // ResizeObserver → wm.setViewport (default true)
+  magnetism?: boolean | { threshold?: number }      // edge-align to neighbours + viewport while dragging (default on, 8 px / 12 px coarse)
+  hitAreas?: { edge?: number; corner?: number }     // resize handle thickness (auto-doubles on touch)
   minimizeTarget?: (win: WindowState) => Element | null  // FLIP ghost target on minimize
+  onTitlebarContextMenu?: (win: WindowState, event: MouseEvent) => void  // right-click / long-press hook for your own menu
 }
 ```
 
@@ -277,6 +324,8 @@ Moves a window's content into a [Document Picture-in-Picture](https://developer.
 }
 ```
 
+Two more ready-made themes ship alongside: `themes/light.css` (light glass) and `themes/retro.css` (pixel-perfect Win98 nostalgia). All three style the same `data-wm-*` attributes, so switching is a one-line import swap.
+
 Skip the import entirely and the library stays headless: state attributes (`data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `data-wm-flash`, `[hidden]`) are yours to style.
 
 ## SSR
@@ -289,7 +338,7 @@ The core never touches `window`/`document` — create managers and even `hydrate
 | --- | --- | --- | --- | --- | --- |
 | Maintained | ✓ 2026 | ✗ since 2023 | ✗ since 2022 | ✓ | ✓ |
 | Headless core | ✓ | ✗ | ✗ | ~ own UI | ✓ |
-| Official adapters | React·Vue·Svelte·Solid | community | ✗ | React·Vue·Angular | via Ark UI |
+| Official adapters | React·Vue·Svelte·Solid·Angular | community | ✗ | React·Vue·Angular | via Ark UI |
 | Multi-window (z-order, taskbar, modals) | ✓ | partial | partial | dock groups | ✗ single panel |
 | Snap zones + preview | ✓ | ✗ | ✗ | — | ✗ |
 | Keyboard + screen reader | ✓ | ✗ | ✗ | partial | partial |
@@ -301,8 +350,9 @@ The core never touches `window`/`document` — create managers and even `hydrate
 
 ## Quality
 
-- 121 unit tests, **100%** line/branch/function/statement coverage on the core state machine and persistence
-- 160+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans
+- 172 unit tests, **100%** line/branch/function/statement coverage on the core state machine and persistence
+- 178+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
+- performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~150 ms, a move among 50 windows costs ~1.2 µs, a full 100-step undo/redo sweep ~52 µs
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
 
 ## Development

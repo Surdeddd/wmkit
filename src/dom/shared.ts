@@ -25,13 +25,19 @@ export interface HitAreaOptions {
   corner?: number
 }
 
+export interface MagnetismOptions {
+  threshold?: number
+}
+
 export interface DesktopOptions {
   snap?: boolean | DesktopSnapOptions
   keyboard?: boolean | DesktopKeyboardOptions
   announce?: boolean | Partial<AnnouncerMessages>
   autoViewport?: boolean
   hitAreas?: HitAreaOptions
+  magnetism?: boolean | MagnetismOptions
   minimizeTarget?: (window: WindowState) => Element | null
+  onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }
 
 export interface WindowAttachOptions {
@@ -66,6 +72,7 @@ export interface SessionContext {
   topEdge: 'maximize' | 'top' | 'none'
   hitEdge: number
   hitCorner: number
+  magnetThreshold: number
   currentDrag(): ActiveDrag | null
   claimDrag(session: ActiveDrag): void
   releaseDrag(session: ActiveDrag): void

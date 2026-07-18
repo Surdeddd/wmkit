@@ -1,17 +1,20 @@
 export type { Emitter, Listener } from './core/emitter'
 export { createEmitter } from './core/emitter'
-export type { SnapDetectOptions } from './core/geometry'
+export type { MagnetResult, SnapDetectOptions } from './core/geometry'
 export {
   boundsEqual,
   clamp,
   clampSize,
   clampToViewport,
   detectSnapZone,
+  magnetize,
   zoneBounds,
 } from './core/geometry'
 export { createWindowManager } from './core/manager'
 export type {
+  ArrangeMode,
   Bounds,
+  HistoryEntry,
   ManagerEvents,
   ManagerOptions,
   ManagerState,
@@ -41,5 +44,6 @@ export type {
   DesktopOptions,
   DesktopSnapOptions,
   HitAreaOptions,
+  MagnetismOptions,
   WindowAttachOptions,
 } from './dom/shared'

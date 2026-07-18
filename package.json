@@ -94,6 +94,16 @@
         "default": "./dist/solid.cjs"
       }
     },
+    "./angular": {
+      "import": {
+        "types": "./dist/angular.d.ts",
+        "default": "./dist/angular.js"
+      },
+      "require": {
+        "types": "./dist/angular.d.cts",
+        "default": "./dist/angular.cjs"
+      }
+    },
     "./persist": {
       "import": {
         "types": "./dist/persist.d.ts",
@@ -134,9 +144,11 @@
     "publint": "publint",
     "prepublishOnly": "pnpm build",
     "verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm size && pnpm publint && pnpm attw && pnpm test:e2e",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "bench": "vitest bench --run"
   },
   "peerDependencies": {
+    "@angular/core": ">=16",
     "react": ">=18",
     "solid-js": ">=1.8",
     "svelte": ">=4",
@@ -154,9 +166,13 @@
     },
     "vue": {
       "optional": true
+    },
+    "@angular/core": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@angular/core": "^20.3.26",
     "@arethetypeswrong/cli": "^0.18.2",
     "@axe-core/playwright": "^4.10.2",
     "@biomejs/biome": "^2.0.0",
@@ -187,12 +203,12 @@
     {
       "name": "core",
       "path": "dist/index.js",
-      "limit": "8.5 kB"
+      "limit": "10 kB"
     },
     {
       "name": "react adapter",
       "path": "dist/react.js",
-      "limit": "8.5 kB",
+      "limit": "10 kB",
       "ignore": [
         "react"
       ]
@@ -200,7 +216,7 @@
     {
       "name": "vue adapter",
       "path": "dist/vue.js",
-      "limit": "8.5 kB",
+      "limit": "10 kB",
       "ignore": [
         "vue"
       ]
@@ -208,7 +224,7 @@
     {
       "name": "svelte adapter",
       "path": "dist/svelte.js",
-      "limit": "8.5 kB",
+      "limit": "10 kB",
       "ignore": [
         "svelte"
       ]
@@ -216,9 +232,17 @@
     {
       "name": "solid adapter",
       "path": "dist/solid.js",
-      "limit": "8.5 kB",
+      "limit": "10 kB",
       "ignore": [
         "solid-js"
+      ]
+    },
+    {
+      "name": "angular adapter",
+      "path": "dist/angular.js",
+      "limit": "10 kB",
+      "ignore": [
+        "@angular/core"
       ]
     },
     {
@@ -251,6 +275,9 @@
       ],
       "popout": [
         "./dist/popout.d.ts"
+      ],
+      "angular": [
+        "./dist/angular.d.ts"
       ]
     }
   }

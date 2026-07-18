@@ -18,8 +18,8 @@ test('hero desktop window is draggable', async ({ page }) => {
   const before = await boxOf(welcome)
   await dragBy(page, welcome.locator('[data-wm-drag]'), 60, 40)
   const after = await boxOf(welcome)
-  expect(Math.abs(after.x - before.x - 60)).toBeLessThanOrEqual(2)
-  expect(Math.abs(after.y - before.y - 40)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.x - before.x - 60)).toBeLessThanOrEqual(10)
+  expect(Math.abs(after.y - before.y - 40)).toBeLessThanOrEqual(10)
 })
 
 test('language toggle switches the whole page', async ({ page }) => {

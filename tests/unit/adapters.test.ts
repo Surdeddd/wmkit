@@ -5,6 +5,12 @@ import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, shallowRef } from 'vue'
 import {
+  createDesktop as createNgDesktop,
+  useWindowManager as useNgManager,
+  useWmState as useNgState,
+  useWmWindow as useNgWindow,
+} from '../../src/adapters/angular'
+import {
   useDesktop,
   useWindowManager as useReactManager,
   useWmState as useReactState,
@@ -230,5 +236,57 @@ describe('removeOnClose smoke', () => {
     wm.close('gone')
     expect(winEl.isConnected).toBe(false)
     expect(desktopEl.querySelector('[data-wm-window]')).toBeNull()
+  })
+})
+
+describe('angular adapter smoke', () => {
+  it('exposes signals and element bindings outside injection context', () => {
+    const wm = useNgManager(VIEWPORT)
+    const state = useNgState(wm)
+    wm.open({ id: 'ng', title: 'Angular', x: 7, y: 9, width: 200, height: 150 })
+    expect(state().windows.ng?.title).toBe('Angular')
+
+    const winSignal = useNgWindow(wm, 'ng')
+    expect(winSignal()?.bounds).toMatchObject({ x: 7, y: 9 })
+
+    const dk = createNgDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.window('ng')(winEl)
+
+    expect(desktopEl.dataset.wmDesktop).toBe('')
+    expect(winEl.dataset.wmWindow).toBe('ng')
+    expect(winEl.style.transform).toBe('translate3d(7px, 9px, 0)')
+
+    wm.update('ng', { title: 'Angular 2' })
+    expect(state().windows.ng?.title).toBe('Angular 2')
+  })
+})
+
+describe('titlebar context menu hook', () => {
+  it('fires the hook with the window state and suppresses the native menu', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const onMenu = vi.fn()
+    const dk = createSvelteDesktop(wm, { ...DESKTOP_OPTIONS, onTitlebarContextMenu: onMenu })
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    wm.open({ id: 'ctx', title: 'Menu' })
+    const winEl = document.createElement('section')
+    winEl.innerHTML = '<header data-wm-drag><span data-wm-title>Menu</span></header>'
+    desktopEl.append(winEl)
+    dk.window(winEl, { id: 'ctx' })
+
+    const handle = winEl.querySelector('[data-wm-drag]') as HTMLElement
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    handle.dispatchEvent(event)
+
+    expect(onMenu).toHaveBeenCalledTimes(1)
+    expect(onMenu.mock.calls[0]?.[0]).toMatchObject({ id: 'ctx', title: 'Menu' })
+    expect(event.defaultPrevented).toBe(true)
   })
 })

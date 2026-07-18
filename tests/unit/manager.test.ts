@@ -1065,3 +1065,252 @@ describe('modal focus (regression)', () => {
     expect(wm.getState().focusedId).toBe('a')
   })
 })
+
+describe('undo/redo history', () => {
+  it('undoes and redoes a move', () => {
+    const wm = makeWm()
+    const win = wm.open({ id: 'w', x: 100, y: 100 })
+    wm.move('w', 300, 250)
+    expect(wm.canUndo()).toBe(true)
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('w')?.bounds).toMatchObject({ x: 100, y: 100 })
+    expect(wm.canRedo()).toBe(true)
+    expect(wm.redo()).toBe(true)
+    expect(wm.get('w')?.bounds).toMatchObject({ x: 300, y: 250 })
+    expect(win.id).toBe('w')
+  })
+
+  it('undoes open and close', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.close('a')
+    expect(wm.get('a')).toBeUndefined()
+    wm.undo()
+    expect(wm.get('a')).toBeDefined()
+    wm.undo()
+    expect(wm.get('b')).toBeUndefined()
+    wm.undo()
+    expect(wm.getState().order).toEqual([])
+    expect(wm.undo()).toBe(false)
+  })
+
+  it('clears the redo branch on a new operation', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    wm.move('a', 200, 200)
+    wm.undo()
+    wm.move('a', 400, 300)
+    expect(wm.canRedo()).toBe(false)
+    expect(wm.redo()).toBe(false)
+  })
+
+  it('caps history at the configured limit', () => {
+    const wm = makeWm({ historyLimit: 3 })
+    wm.open({ id: 'a', x: 100, y: 100 })
+    for (let i = 1; i <= 10; i += 1) wm.move('a', 100 + i, 100)
+    let undone = 0
+    while (wm.undo()) undone += 1
+    expect(undone).toBe(3)
+  })
+
+  it('disables history entirely with limit 0', () => {
+    const wm = makeWm({ historyLimit: 0 })
+    wm.open({ id: 'a' })
+    wm.move('a', 200, 200)
+    expect(wm.canUndo()).toBe(false)
+    expect(wm.undo()).toBe(false)
+  })
+
+  it('collapses an interaction into a single history entry', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    wm.beginInteraction()
+    wm.move('a', 120, 100)
+    wm.move('a', 160, 120)
+    wm.move('a', 240, 180)
+    wm.endInteraction()
+    wm.undo()
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+  })
+
+  it('handles nested and unbalanced interaction calls', () => {
+    const wm = makeWm()
+    wm.endInteraction()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    wm.beginInteraction()
+    wm.beginInteraction()
+    wm.move('a', 150, 150)
+    wm.endInteraction()
+    wm.move('a', 200, 200)
+    wm.endInteraction()
+    wm.undo()
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+  })
+
+  it('treats a batch as one history entry', () => {
+    const wm = makeWm()
+    wm.batch(() => {
+      wm.open({ id: 'a' })
+      wm.open({ id: 'b' })
+    })
+    wm.undo()
+    expect(wm.getState().order).toEqual([])
+  })
+
+  it('drops history after hydrate', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    const donor = makeWm()
+    donor.open({ id: 'z' })
+    wm.hydrate(donor.serialize())
+    expect(wm.canUndo()).toBe(false)
+  })
+
+  it('reflows restored maximized windows against the current viewport', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.maximize('a')
+    wm.setViewport({ width: 600, height: 400 })
+    wm.undo()
+    wm.redo()
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 600, height: 400 })
+  })
+})
+
+describe('named layouts', () => {
+  it('saves and loads a layout round-trip', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    wm.saveLayout('work')
+    wm.move('a', 400, 300)
+    wm.open({ id: 'b' })
+    expect(wm.loadLayout('work')).toBe(true)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+    expect(wm.get('b')).toBeUndefined()
+  })
+
+  it('returns false for unknown layout', () => {
+    expect(makeWm().loadLayout('ghost')).toBe(false)
+  })
+
+  it('lists, exports and deletes layouts', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    const data = wm.saveLayout('one')
+    expect(data.windows).toHaveLength(1)
+    expect(wm.layoutNames()).toEqual(['one'])
+    const exported = wm.getLayout('one')
+    expect(exported?.windows).toHaveLength(1)
+    expect(wm.getLayout('missing')).toBeUndefined()
+    expect(wm.deleteLayout('one')).toBe(true)
+    expect(wm.deleteLayout('one')).toBe(false)
+    expect(wm.layoutNames()).toEqual([])
+  })
+
+  it('accepts external layouts through setLayout with validation', () => {
+    const wm = makeWm()
+    const donor = makeWm()
+    donor.open({ id: 'x', x: 50, y: 60 })
+    expect(wm.setLayout('imported', donor.serialize())).toBe(true)
+    expect(wm.loadLayout('imported')).toBe(true)
+    expect(wm.get('x')?.bounds).toMatchObject({ x: 50, y: 60 })
+    expect(wm.setLayout('bad', { version: 2 } as unknown as SerializedState)).toBe(false)
+    expect(wm.setLayout('bad', null as unknown as SerializedState)).toBe(false)
+  })
+
+  it('stored layouts are isolated from later mutations', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    const returned = wm.saveLayout('snap')
+    const raw = rawWindow(returned) as unknown as { bounds: { x: number } }
+    raw.bounds.x = 999
+    wm.move('a', 500, 300)
+    wm.loadLayout('snap')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+  })
+})
+
+describe('hydrate emits open and close', () => {
+  it('emits close for removed and open for added windows', () => {
+    const wm = makeWm()
+    wm.open({ id: 'old' })
+    const donor = makeWm()
+    donor.open({ id: 'old' })
+    donor.open({ id: 'fresh' })
+    donor.close('old')
+    const opened: string[] = []
+    const closed: string[] = []
+    wm.on('open', ({ window: win }) => opened.push(win.id))
+    wm.on('close', ({ window: win }) => closed.push(win.id))
+    wm.hydrate(donor.serialize())
+    expect(closed).toEqual(['old'])
+    expect(opened).toEqual(['fresh'])
+  })
+})
+
+describe('arrange and bulk stages', () => {
+  it('cascades all non-minimized windows', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 500, y: 500, width: 300, height: 200 })
+    wm.open({ id: 'b', x: 600, y: 100, width: 250, height: 180 })
+    wm.open({ id: 'c' })
+    wm.minimize('c')
+    wm.arrange('cascade')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 32, y: 32, width: 300, height: 200 })
+    expect(wm.get('b')?.bounds).toMatchObject({ x: 64, y: 64, width: 250, height: 180 })
+    expect(wm.get('c')?.stage).toBe('minimized')
+  })
+
+  it('cascade uses restore bounds size for maximized windows', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 10, y: 10, width: 320, height: 240 })
+    wm.maximize('a')
+    wm.arrange('cascade')
+    expect(wm.get('a')).toMatchObject({
+      stage: 'normal',
+      bounds: { x: 32, y: 32, width: 320, height: 240 },
+    })
+  })
+
+  it('tiles windows into a near-square grid', () => {
+    const wm = makeWm()
+    for (let i = 0; i < 4; i += 1) wm.open({ width: 200, height: 150 })
+    wm.arrange('tile')
+    const state = wm.getState()
+    const bounds = state.order.map((id) => state.windows[id]?.bounds)
+    expect(bounds[0]).toMatchObject({ x: 0, y: 0, width: 500, height: 400 })
+    expect(bounds[1]).toMatchObject({ x: 500, y: 0, width: 500, height: 400 })
+    expect(bounds[2]).toMatchObject({ x: 0, y: 400, width: 500, height: 400 })
+    expect(bounds[3]).toMatchObject({ x: 500, y: 400, width: 500, height: 400 })
+  })
+
+  it('tiles odd counts with a trailing partial row', () => {
+    const wm = makeWm()
+    for (let i = 0; i < 5; i += 1) wm.open()
+    wm.arrange('tile')
+    const state = wm.getState()
+    const last = state.windows[state.order[4] as string]
+    expect(last?.bounds).toMatchObject({ x: 333, y: 400 })
+  })
+
+  it('arrange on an empty manager is a no-op', () => {
+    const wm = makeWm()
+    const onChange = vi.fn()
+    wm.subscribe(onChange)
+    wm.arrange('tile')
+    wm.arrange('cascade')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('minimizeAll and restoreAll walk every window', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.minimizeAll()
+    expect(wm.minimized().map((win) => win.id)).toEqual(['a', 'b'])
+    wm.restoreAll()
+    expect(wm.minimized()).toEqual([])
+    expect(wm.get('a')?.stage).toBe('normal')
+  })
+})

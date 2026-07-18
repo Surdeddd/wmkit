@@ -1,5 +1,5 @@
 import type { Bounds, WindowManager, WindowState } from '../core/types'
-import { flipToTarget } from './animate'
+import { flipFromTarget, flipToTarget } from './animate'
 import { type Announcer, createAnnouncer } from './announcer'
 import { createDragStarter } from './drag'
 import { createResizeHandles, createResizeStarter } from './resize'
@@ -46,6 +46,11 @@ export function attachDesktop(
   const cycleEnabled = keyboardOptions.cycle !== false
   const hitEdge = options.hitAreas?.edge ?? (coarsePointer ? 16 : 8)
   const hitCorner = options.hitAreas?.corner ?? (coarsePointer ? 24 : 12)
+  const magnetThreshold =
+    options.magnetism === false
+      ? 0
+      : ((typeof options.magnetism === 'object' ? options.magnetism.threshold : undefined) ??
+        (coarsePointer ? 12 : 8))
 
   element.dataset.wmDesktop = ''
   if (view.getComputedStyle(element).position === 'static') {
@@ -123,6 +128,7 @@ export function attachDesktop(
     topEdge,
     hitEdge,
     hitCorner,
+    magnetThreshold,
     currentDrag: () => drag,
     claimDrag(session) {
       drag = session
@@ -220,10 +226,15 @@ export function attachDesktop(
 
   cleanup.push(
     wm.on('stage', ({ window: win, previous }) => {
-      if (win.stage !== 'minimized' || previous === 'minimized') return
       const attached = registry.get(win.id)
-      const target = options.minimizeTarget?.(win)
-      if (attached && target) flipToTarget(attached.element, target)
+      if (!attached) return
+      if (win.stage === 'minimized' && previous !== 'minimized') {
+        const target = options.minimizeTarget?.(win)
+        if (target) flipToTarget(attached.element, target)
+      } else if (previous === 'minimized' && win.stage !== 'minimized') {
+        const target = options.minimizeTarget?.(win)
+        if (target) flipFromTarget(attached.element, target)
+      }
     }),
   )
 
@@ -317,6 +328,17 @@ export function attachDesktop(
       }
       handle.addEventListener('dblclick', onDoubleClick)
       attached.cleanup.push(() => handle.removeEventListener('dblclick', onDoubleClick))
+
+      if (options.onTitlebarContextMenu) {
+        const onContextMenu = (event: MouseEvent) => {
+          const current = wm.get(id)
+          if (!current) return
+          event.preventDefault()
+          options.onTitlebarContextMenu?.(current, event)
+        }
+        handle.addEventListener('contextmenu', onContextMenu)
+        attached.cleanup.push(() => handle.removeEventListener('contextmenu', onContextMenu))
+      }
     }
 
     if (windowOptions.resizeHandles !== false) {

@@ -5,6 +5,7 @@ import {
   clampSize,
   clampToViewport,
   detectSnapZone,
+  magnetize,
   zoneBounds,
 } from '../../src/core/geometry'
 import type { SnapZone } from '../../src/core/types'
@@ -147,5 +148,61 @@ describe('detectSnapZone', () => {
   it('honours custom threshold and corner size', () => {
     expect(detectSnapZone(30, 400, viewport, { threshold: 40 })).toBe('left')
     expect(detectSnapZone(5, 100, viewport, { cornerSize: 200 })).toBe('top-left')
+  })
+})
+
+describe('magnetize', () => {
+  const base = { x: 100, y: 100, width: 200, height: 150 }
+
+  it('returns input untouched for zero threshold or no targets', () => {
+    expect(magnetize(base, [{ x: 305, y: 100, width: 50, height: 50 }], 0)).toEqual({
+      x: 100,
+      y: 100,
+      snappedX: false,
+      snappedY: false,
+    })
+    expect(magnetize(base, [], 8)).toEqual({ x: 100, y: 100, snappedX: false, snappedY: false })
+  })
+
+  it('snaps my right edge to a neighbour left edge', () => {
+    const result = magnetize(base, [{ x: 305, y: 400, width: 50, height: 50 }], 8)
+    expect(result.x).toBe(105)
+    expect(result.snappedX).toBe(true)
+    expect(result.snappedY).toBe(false)
+  })
+
+  it('snaps my left edge to a neighbour right edge', () => {
+    const result = magnetize(base, [{ x: 20, y: 400, width: 75, height: 50 }], 8)
+    expect(result.x).toBe(95)
+    expect(result.snappedX).toBe(true)
+  })
+
+  it('aligns matching edges on both axes at once', () => {
+    const result = magnetize(base, [{ x: 103, y: 96, width: 400, height: 400 }], 8)
+    expect(result).toEqual({ x: 103, y: 96, snappedX: true, snappedY: true })
+  })
+
+  it('picks the closest candidate among several targets', () => {
+    const result = magnetize(
+      base,
+      [
+        { x: 306, y: 100, width: 50, height: 50 },
+        { x: 302, y: 100, width: 50, height: 50 },
+      ],
+      8,
+    )
+    expect(result.x).toBe(102)
+  })
+
+  it('ignores edges beyond the threshold', () => {
+    const result = magnetize(base, [{ x: 320, y: 300, width: 50, height: 50 }], 8)
+    expect(result).toEqual({ x: 100, y: 100, snappedX: false, snappedY: false })
+  })
+
+  it('snaps vertical edges independently', () => {
+    const result = magnetize(base, [{ x: 500, y: 253, width: 50, height: 50 }], 8)
+    expect(result.y).toBe(103)
+    expect(result.snappedY).toBe(true)
+    expect(result.snappedX).toBe(false)
   })
 })

@@ -105,8 +105,8 @@ test('drag keeps tracking across an iframe', async ({ page }) => {
   const dy = Math.min(220, desktop.y + desktop.height - 52 - startY)
   await dragBy(page, handle(page, 'fixed'), dx, dy, { steps: 30 })
   const after = await boxOf(window)
-  expect(Math.abs(after.x - before.x - dx)).toBeLessThanOrEqual(2)
-  expect(Math.abs(after.y - before.y - dy)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.x - before.x - dx)).toBeLessThanOrEqual(14)
+  expect(Math.abs(after.y - before.y - dy)).toBeLessThanOrEqual(14)
 })
 
 test('buttons inside the titlebar do not start a drag', async ({ page }) => {
@@ -146,4 +146,38 @@ test('touch pointer drags the window', async ({ page, browserName, isMobile }) =
   const after = await boxOf(window)
   expect(after.x - before.x).toBeGreaterThan(80 - 4)
   expect(after.y - before.y).toBeGreaterThan(64 - 4)
+})
+
+test('dragging near a neighbour edge magnetizes the window', async ({ page }) => {
+  await spawn(page, 'fixed')
+  await page.evaluate(() => {
+    window.__spawn({ id: 'anchor', title: 'Anchor', x: 500, y: 100, width: 200, height: 160 })
+  })
+  const moving = win(page, 'fixed')
+  const before = await boxOf(moving)
+  const anchor = await boxOf(win(page, 'anchor'))
+  const targetX = anchor.x - before.width - 5 + before.width / 2
+  await dragTo(page, handle(page, 'fixed'), targetX, before.y + 20, { steps: 15 })
+  const after = await boxOf(moving)
+  expect(Math.round(after.x + after.width)).toBe(Math.round(anchor.x))
+})
+
+test('undo restores the position after a drag', async ({ page }) => {
+  await spawn(page, 'fixed')
+  const boundsOf = () =>
+    page.evaluate(() => {
+      const serialized = window.__wm.serialize()
+      const first = serialized.windows[0]
+      if (!first) throw new Error('no window serialized')
+      return first.bounds
+    })
+  const before = await boundsOf()
+  await dragBy(page, handle(page, 'fixed'), 150, 120)
+  const moved = await boundsOf()
+  expect(moved.x === before.x && moved.y === before.y).toBe(false)
+  await page.evaluate(() => {
+    window.__wm.undo()
+  })
+  const after = await boundsOf()
+  expect(after).toEqual(before)
 })

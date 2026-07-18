@@ -2,6 +2,7 @@ import { createEmitter } from './emitter'
 import { boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
 import type {
   Bounds,
+  HistoryEntry,
   ManagerEvents,
   ManagerOptions,
   ManagerState,
@@ -39,6 +40,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   const cascadeOffset = options.cascadeOffset ?? 32
   const cascadeOrigin = options.cascadeOrigin ?? { x: 32, y: 32 }
   const idPrefix = options.idPrefix ?? 'wm'
+  const historyLimit = options.historyLimit ?? 50
 
   let windows: Record<string, WindowState> = {}
   let order: string[] = []
@@ -51,6 +53,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let batchDepth = 0
   let batchDirty = false
   const pendingEvents: Array<() => void> = []
+  const past: HistoryEntry[] = []
+  let future: HistoryEntry[] = []
+  let interactionDepth = 0
+  let interactionRecorded = false
+  let skipNextHistory = false
+  let pendingHistory: HistoryEntry | null = null
+  const layouts = new Map<string, SerializedState>()
 
   function getState(): ManagerState {
     if (!snapshot) {
@@ -487,29 +496,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function setViewport(next: Size): void {
     if (next.width === viewport.width && next.height === viewport.height) return
     viewport = { ...next }
-    transact(() => {
-      for (const id of order) {
-        const win = windows[id] as WindowState
-        if (win.stage === 'maximized') {
-          const updated = { ...win, bounds: fullBounds() }
-          setWindow(updated)
-          queueEvent(() => emitter.emit('resize', { window: updated }))
-        } else if (win.stage === 'snapped' && win.snapZone) {
-          const updated = { ...win, bounds: zoneBounds(win.snapZone, viewport) }
-          setWindow(updated)
-          queueEvent(() => emitter.emit('resize', { window: updated }))
-        } else if (win.stage === 'normal' && keepInViewport) {
-          const bounds = clampToViewport(win.bounds, viewport, minVisible)
-          if (!boundsEqual(bounds, win.bounds)) {
-            const updated = { ...win, bounds }
-            setWindow(updated)
-            queueEvent(() => emitter.emit('move', { window: updated }))
-          }
-        }
-      }
-      snapshot = null
-      batchDirty = true
-    })
+    reflowViewport()
+    snapshot = null
+    batchDirty = true
   }
 
   function minimized(): readonly WindowState[] {
@@ -518,19 +507,174 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       .sort((a, b) => a.openedSeq - b.openedSeq)
   }
 
+  function captureEntry(): HistoryEntry {
+    return { windows, order, focusedId }
+  }
+
+  function recordHistory(): void {
+    if (skipNextHistory) {
+      skipNextHistory = false
+      return
+    }
+    if (historyLimit <= 0) return
+    if (interactionDepth > 0) {
+      if (interactionRecorded) return
+      interactionRecorded = true
+    }
+    past.push(pendingHistory as HistoryEntry)
+    if (past.length > historyLimit) past.shift()
+    future = []
+  }
+
   function transact<T>(run: () => T): T {
+    if (batchDepth === 0) pendingHistory = captureEntry()
     batchDepth += 1
     try {
       return run()
     } finally {
       batchDepth -= 1
-      if (batchDepth === 0 && batchDirty) {
-        batchDirty = false
-        snapshot = null
-        flushEvents()
-        emitter.emit('change', { state: getState() })
+      if (batchDepth === 0) {
+        if (batchDirty) {
+          batchDirty = false
+          recordHistory()
+          snapshot = null
+          flushEvents()
+          emitter.emit('change', { state: getState() })
+        }
+        pendingHistory = null
       }
     }
+  }
+
+  function reflowViewport(): void {
+    for (const id of order) {
+      const win = windows[id] as WindowState
+      if (win.stage === 'maximized') {
+        const updated = { ...win, bounds: fullBounds() }
+        setWindow(updated)
+        queueEvent(() => emitter.emit('resize', { window: updated }))
+      } else if (win.stage === 'snapped' && win.snapZone) {
+        const updated = { ...win, bounds: zoneBounds(win.snapZone, viewport) }
+        setWindow(updated)
+        queueEvent(() => emitter.emit('resize', { window: updated }))
+      } else if (win.stage === 'normal' && keepInViewport) {
+        const bounds = clampToViewport(win.bounds, viewport, minVisible)
+        if (!boundsEqual(bounds, win.bounds)) {
+          const updated = { ...win, bounds }
+          setWindow(updated)
+          queueEvent(() => emitter.emit('move', { window: updated }))
+        }
+      }
+    }
+  }
+
+  function applyEntry(entry: HistoryEntry): void {
+    windows = entry.windows
+    order = [...entry.order]
+    focusedId = entry.focusedId
+    reflowViewport()
+    commit()
+  }
+
+  function undo(): boolean {
+    const entry = past.pop()
+    if (!entry) return false
+    future.push(captureEntry())
+    skipNextHistory = true
+    applyEntry(entry)
+    return true
+  }
+
+  function redo(): boolean {
+    const entry = future.pop()
+    if (!entry) return false
+    past.push(captureEntry())
+    skipNextHistory = true
+    applyEntry(entry)
+    return true
+  }
+
+  function beginInteraction(): void {
+    interactionDepth += 1
+    if (interactionDepth === 1) interactionRecorded = false
+  }
+
+  function endInteraction(): void {
+    if (interactionDepth > 0) interactionDepth -= 1
+  }
+
+  function clearHistory(): void {
+    past.length = 0
+    future = []
+  }
+
+  function saveLayout(name: string): SerializedState {
+    const data = serialize()
+    layouts.set(name, structuredClone(data))
+    return data
+  }
+
+  function loadLayout(name: string): boolean {
+    const data = layouts.get(name)
+    if (!data) return false
+    return hydrate(structuredClone(data))
+  }
+
+  function getLayout(name: string): SerializedState | undefined {
+    const data = layouts.get(name)
+    return data ? structuredClone(data) : undefined
+  }
+
+  function setLayout(name: string, data: SerializedState): boolean {
+    if (!isValidSerialized(data)) return false
+    layouts.set(name, structuredClone(data))
+    return true
+  }
+
+  function deleteLayout(name: string): boolean {
+    return layouts.delete(name)
+  }
+
+  function layoutNames(): string[] {
+    return [...layouts.keys()]
+  }
+
+  function arrange(mode: 'cascade' | 'tile'): void {
+    const ids = order.filter((id) => (windows[id] as WindowState).stage !== 'minimized')
+    if (ids.length === 0) return
+    if (mode === 'cascade') {
+      ids.forEach((id, index) => {
+        const win = windows[id] as WindowState
+        const size = win.restoreBounds ?? win.bounds
+        restoreTo(id, {
+          x: cascadeOrigin.x + (index % 10) * cascadeOffset,
+          y: cascadeOrigin.y + (index % 10) * cascadeOffset,
+          width: size.width,
+          height: size.height,
+        })
+      })
+      return
+    }
+    const cols = Math.ceil(Math.sqrt(ids.length))
+    const rows = Math.ceil(ids.length / cols)
+    const cellWidth = Math.floor(viewport.width / cols)
+    const cellHeight = Math.floor(viewport.height / rows)
+    ids.forEach((id, index) => {
+      restoreTo(id, {
+        x: (index % cols) * cellWidth,
+        y: Math.floor(index / cols) * cellHeight,
+        width: cellWidth,
+        height: cellHeight,
+      })
+    })
+  }
+
+  function minimizeAll(): void {
+    for (const id of [...order]) minimize(id)
+  }
+
+  function restoreAll(): void {
+    for (const win of minimized()) restore(win.id)
   }
 
   function serialize(): SerializedState {
@@ -600,11 +744,18 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     )
   }
 
-  function hydrate(data: SerializedState): boolean {
+  function isValidSerialized(data: SerializedState): boolean {
     if (typeof data !== 'object' || data === null) return false
     if (data.version !== 1 || !Array.isArray(data.windows)) return false
     if (!data.windows.every(isSerializedWindow)) return false
+    const ids = new Set(data.windows.map((win) => win.id))
+    return ids.size === data.windows.length
+  }
 
+  function hydrate(data: SerializedState): boolean {
+    if (!isValidSerialized(data)) return false
+
+    const previousWindows = windows
     const nextWindows: Record<string, WindowState> = {}
     let maxSeq = 0
     for (const raw of data.windows) {
@@ -659,6 +810,21 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       const focusedWin = focusedId ? (windows[focusedId] as WindowState) : null
       if (focusedWin?.layer !== 'modal') focusedId = modal
     }
+    for (const id of Object.keys(previousWindows)) {
+      if (!windows[id]) {
+        const closed = previousWindows[id] as WindowState
+        queueEvent(() => emitter.emit('close', { window: closed }))
+      }
+    }
+    for (const id of order) {
+      if (!previousWindows[id]) {
+        const opened = windows[id] as WindowState
+        queueEvent(() => emitter.emit('open', { window: opened }))
+      }
+    }
+    queueEvent(() => emitter.emit('order', { order }))
+    clearHistory()
+    skipNextHistory = true
     commit()
     return true
   }
@@ -691,6 +857,21 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     batch: (run) => transact(run),
     serialize,
     hydrate: (data) => transact(() => hydrate(data)),
+    undo: () => transact(undo),
+    redo: () => transact(redo),
+    canUndo: () => past.length > 0,
+    canRedo: () => future.length > 0,
+    beginInteraction,
+    endInteraction,
+    saveLayout,
+    loadLayout: (name) => transact(() => loadLayout(name)),
+    getLayout,
+    setLayout,
+    deleteLayout,
+    layoutNames,
+    arrange: (mode) => transact(() => arrange(mode)),
+    minimizeAll: () => transact(minimizeAll),
+    restoreAll: () => transact(restoreAll),
     subscribe: (listener) => emitter.on('change', ({ state }) => listener(state)),
     on: (event, listener) => emitter.on(event, listener),
     destroy,
