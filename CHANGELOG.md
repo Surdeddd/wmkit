@@ -1,3 +1,10 @@
+## [0.4.1](https://github.com/Surdeddd/wmkit/compare/v0.4.0...v0.4.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* **dom:** stop a header drag handle from leaking a banner landmark, and document the platform contract ([3fa22ac](https://github.com/Surdeddd/wmkit/commit/3fa22acc8b889b435f3b1bba5b52f4284305361b))
+
 # [0.4.0](https://github.com/Surdeddd/wmkit/compare/v0.3.0...v0.4.0) (2026-07-26)
 
 
