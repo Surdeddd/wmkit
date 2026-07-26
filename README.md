@@ -376,7 +376,7 @@ This README is the tour. The reference lives in [`docs/`](./docs/README.md):
 
 ## Quality
 
-- 216 unit tests, **100%** line/branch/function/statement coverage on the core state machine and persistence
+- 250 unit tests: **100%** line/branch/function/statement coverage on the core state machine and persistence, with enforced floors on the DOM layer and the adapters
 - 190+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, workspaces, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
 - performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~150 ms, a move among 50 windows costs ~1.2 µs, a full 100-step undo/redo sweep ~52 µs
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
