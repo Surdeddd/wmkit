@@ -94,7 +94,7 @@ function centred(ctx: AppContext, width: number, height: number): Slot {
 const readme: AppSpec = {
   id: 'readme',
   init(ctx) {
-    return { title: 'readme.md', ...place(ctx, 384, 292, 800, 36), minWidth: 260 }
+    return { title: 'readme.md', ...place(ctx, 384, 314, 800, 30), minWidth: 260 }
   },
   render(body, ctx) {
     const draw = () => {
@@ -130,7 +130,7 @@ const terminal: AppSpec = {
   init(ctx) {
     return {
       title: 'terminal',
-      ...place(ctx, 748, 330, 800, 356),
+      ...place(ctx, 748, 322, 800, 364),
       minWidth: 260,
       minHeight: 150,
     }
@@ -271,7 +271,7 @@ const terminal: AppSpec = {
 const inspector: AppSpec = {
   id: 'inspector',
   init(ctx) {
-    return { title: 'inspector', ...place(ctx, 340, 292, 392, 36), minWidth: 240 }
+    return { title: 'inspector', ...place(ctx, 340, 314, 392, 30), minWidth: 240 }
   },
   render(body, ctx) {
     const tree = el('pre', 'state-tree')
