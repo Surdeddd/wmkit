@@ -277,6 +277,7 @@ const inspector: AppSpec = {
     const tree = el('pre', 'state-tree')
     const heading = el('p', 'app-note')
     const list = el('ul', 'evlog')
+    list.tabIndex = 0
     body.replaceChildren(tree, heading, list)
 
     const paint = () => {

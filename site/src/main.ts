@@ -426,8 +426,9 @@ function renderCompare(): void {
   const headRow = document.createElement('tr')
   data.compareHead.forEach((label, index) => {
     const th = document.createElement('th')
-    th.textContent = label
+    th.textContent = label || (data.ui['cmp.title'] ?? 'wmkit')
     th.scope = 'col'
+    if (!label) th.className = 'sr-only-text'
     if (index === 1) th.classList.add('col-wmkit')
     headRow.append(th)
   })
@@ -603,8 +604,29 @@ function boot(): void {
   step()
 }
 
+function whenSized(run: () => void): void {
+  const ready = () => desktopEl.clientWidth >= 320 && desktopEl.clientHeight >= 260
+  if (ready()) {
+    run()
+    return
+  }
+  let done = false
+  const finish = () => {
+    if (done) return
+    done = true
+    observer.disconnect()
+    clearTimeout(timer)
+    run()
+  }
+  const observer = new ResizeObserver(() => {
+    if (ready()) finish()
+  })
+  observer.observe(desktopEl)
+  const timer = setTimeout(finish, 1000)
+}
+
 function start(): void {
-  openDefaults()
+  whenSized(openDefaults)
   startFpsMeter()
 }
 

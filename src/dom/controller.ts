@@ -31,6 +31,8 @@ const SNAP_SHORTCUTS: Record<string, SnapZone> = {
   ArrowRight: 'right',
 }
 
+const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
+
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -359,6 +361,9 @@ export function attachDesktop(
         ? windowElement.querySelector<HTMLElement>(windowOptions.handle)
         : (windowOptions.handle ?? windowElement.querySelector<HTMLElement>('[data-wm-drag]'))
     attached.handle = handle
+    if (handle && !handle.hasAttribute('role') && LANDMARK_TAGS.has(handle.localName)) {
+      handle.setAttribute('role', 'presentation')
+    }
 
     const onPointerDownFocus = () => {
       wm.focus(id)

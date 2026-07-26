@@ -266,6 +266,57 @@ describe('angular adapter smoke', () => {
   })
 })
 
+describe('titlebar landmark neutralisation', () => {
+  it('stops a header handle from leaking a banner landmark out of the dialog', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    wm.open({ id: 'mark', title: 'Landmark' })
+    const winEl = document.createElement('section')
+    winEl.innerHTML = '<header data-wm-drag><span data-wm-title>Landmark</span></header>'
+    desktopEl.append(winEl)
+    dk.window(winEl, { id: 'mark' })
+
+    expect(winEl.getAttribute('role')).toBe('dialog')
+    expect(winEl.querySelector('[data-wm-drag]')?.getAttribute('role')).toBe('presentation')
+  })
+
+  it('leaves an explicit handle role alone', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    wm.open({ id: 'kept', title: 'Kept' })
+    const winEl = document.createElement('section')
+    winEl.innerHTML = '<header data-wm-drag role="toolbar"></header>'
+    desktopEl.append(winEl)
+    dk.window(winEl, { id: 'kept' })
+
+    expect(winEl.querySelector('[data-wm-drag]')?.getAttribute('role')).toBe('toolbar')
+  })
+
+  it('does not touch a plain div handle', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    wm.open({ id: 'plain', title: 'Plain' })
+    const winEl = document.createElement('section')
+    winEl.innerHTML = '<div data-wm-drag></div>'
+    desktopEl.append(winEl)
+    dk.window(winEl, { id: 'plain' })
+
+    expect(winEl.querySelector('[data-wm-drag]')?.hasAttribute('role')).toBe(false)
+  })
+})
+
 describe('binder lifecycle', () => {
   it('re-subscribes after a rebind so late windows still attach', () => {
     const wm = createWindowManager(VIEWPORT)

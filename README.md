@@ -2,7 +2,7 @@
 
 **Headless window manager for the web.** Draggable, resizable, snappable windows with a taskbar model, keyboard accessibility and state persistence — for vanilla JS and every major framework.
 
-[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [Docs](./docs/README.md) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![CI](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
@@ -345,6 +345,18 @@ Skip the import entirely and the library stays headless: state attributes (`data
 ## SSR
 
 The core never touches `window`/`document` — create managers and even `hydrate()` state on the server, then call `attachDesktop` after mount. `persist` no-ops without usable storage.
+
+## Documentation
+
+This README is the tour. The reference lives in [`docs/`](./docs/README.md):
+
+| Page | What is in it |
+| --- | --- |
+| [API reference](./docs/api.md) | every export, option, method, event and type |
+| [Adapters](./docs/adapters.md) | complete React, Vue, Svelte, Solid and Angular integrations |
+| [Theming](./docs/theming.md) | `data-wm-*` contract, CSS variables, writing a theme from scratch |
+| [Recipes](./docs/recipes.md) | taskbar, modals, persistence, workspaces, SSR, testing, performance |
+| [Browser support](./docs/browser-support.md) | baselines per entry point and what degrades where |
 
 ## Comparison
 

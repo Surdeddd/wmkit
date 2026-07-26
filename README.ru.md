@@ -2,7 +2,7 @@
 
 **Headless оконный менеджер для веба.** Перетаскиваемые окна с ресайзом, снэпом, таскбаром, клавиатурной доступностью и персистом состояния — для vanilla JS и всех основных фреймворков.
 
-[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [Документация](./docs/README.md) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
 
@@ -73,7 +73,140 @@ desktop.attachWindow(win.id, el, { removeOnClose: true })
 
 ## Адаптеры
 
-Примеры для React, Vue, Svelte, Solid и Angular — в [английском README](./README.md#react) и на [лендинге](https://surdeddd.github.io/wmkit/) (табы «Фреймворки»). Принцип один: контент окна живёт в дереве вашего фреймворка, никакого innerHTML.
+Каждый адаптер — тонкая обёртка над тем же ядром и тем же DOM-контроллером, около 60 строк. Они нужны только чтобы привязаться и отвязаться в нужный момент жизненного цикла компонента. Контент окна всегда живёт в дереве вашего фреймворка: никакого innerHTML, порталов и переноса узлов.
+
+### React
+
+```tsx
+import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
+
+function Desktop() {
+  const wm = useWindowManager()
+  const { ref, binder } = useDesktop(wm)
+  const state = useWmState(wm)
+
+  return (
+    <div ref={ref} style={{ position: 'relative', height: '100vh' }}>
+      <button type="button" onClick={() => wm.open({ title: 'Окно' })}>открыть</button>
+      {state.order.map((id) => (
+        <Win key={id} binder={binder} win={state.windows[id]} />
+      ))}
+    </div>
+  )
+}
+
+function Win({ binder, win }) {
+  const ref = useWmWindowRef(binder, win.id, { removeOnClose: true })
+  return (
+    <section ref={ref}>
+      <header data-wm-drag><span data-wm-title>{win.title}</span></header>
+      <div data-wm-content>ваше дерево компонентов</div>
+    </section>
+  )
+}
+```
+
+### Vue
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useWindowManager, useDesktop, useWmWindowEl } from '@surdeddd/wmkit/vue'
+
+const host = ref<HTMLElement>()
+const panel = ref<HTMLElement>()
+const wm = useWindowManager()
+const binder = useDesktop(wm, host)
+useWmWindowEl(binder, 'notes', panel)
+wm.open({ id: 'notes', title: 'Заметки' })
+</script>
+
+<template>
+  <div ref="host" style="position: relative; height: 100vh">
+    <section ref="panel">
+      <header data-wm-drag><span data-wm-title>Заметки</span></header>
+      <div data-wm-content>композаблы</div>
+    </section>
+  </div>
+</template>
+```
+
+### Svelte
+
+```svelte
+<script lang="ts">
+  import { createManager, createDesktop, wmWindowStore } from '@surdeddd/wmkit/svelte'
+
+  const wm = createManager()
+  const dk = createDesktop(wm)
+  wm.open({ id: 'notes', title: 'Заметки' })
+  const notes = wmWindowStore(wm, 'notes')
+</script>
+
+<div use:dk.desktop style="position: relative; height: 100vh">
+  <section use:dk.window={{ id: 'notes' }}>
+    <header data-wm-drag><span data-wm-title>{$notes?.title}</span></header>
+    <div data-wm-content>сторы и экшены</div>
+  </section>
+</div>
+```
+
+### Solid
+
+```tsx
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
+
+function Desktop() {
+  const wm = useWindowManager()
+  const dk = createDesktop(wm)
+  const state = useWmState(wm)
+  wm.open({ id: 'notes', title: 'Заметки' })
+
+  return (
+    <div ref={dk.desktop} style={{ position: 'relative', height: '100vh' }}>
+      <section ref={dk.window('notes')}>
+        <header data-wm-drag><span data-wm-title>Заметки</span></header>
+        <div data-wm-content>{state().order.length} окон</div>
+      </section>
+    </div>
+  )
+}
+```
+
+### Angular
+
+```ts
+import { Component, ElementRef, afterNextRender, viewChild } from '@angular/core'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-desktop',
+  template: `
+    <div #host style="position: relative; height: 100vh">
+      <section #panel>
+        <header data-wm-drag><span data-wm-title>Заметки</span></header>
+        <div data-wm-content>{{ state().order.length }} окон</div>
+      </section>
+    </div>`,
+})
+export class DesktopComponent {
+  private host = viewChild.required<ElementRef>('host')
+  private panel = viewChild.required<ElementRef>('panel')
+  wm = useWindowManager()
+  state = useWmState(this.wm)
+
+  constructor() {
+    const dk = createDesktop(this.wm)
+    afterNextRender(() => {
+      dk.desktop(this.host().nativeElement)
+      this.wm.open({ id: 'notes', title: 'Заметки' })
+      dk.window('notes')(this.panel().nativeElement)
+    })
+  }
+}
+```
+
+Полные примеры с таскбаром, модалками и сигнатурами всех хуков — в [docs/adapters.md](./docs/adapters.md).
 
 ## API ядра — кратко
 
