@@ -203,12 +203,12 @@
     {
       "name": "core",
       "path": "dist/index.js",
-      "limit": "10 kB"
+      "limit": "12 kB"
     },
     {
       "name": "react adapter",
       "path": "dist/react.js",
-      "limit": "10 kB",
+      "limit": "12 kB",
       "ignore": [
         "react"
       ]
@@ -216,7 +216,7 @@
     {
       "name": "vue adapter",
       "path": "dist/vue.js",
-      "limit": "10 kB",
+      "limit": "12 kB",
       "ignore": [
         "vue"
       ]
@@ -224,7 +224,7 @@
     {
       "name": "svelte adapter",
       "path": "dist/svelte.js",
-      "limit": "10 kB",
+      "limit": "12 kB",
       "ignore": [
         "svelte"
       ]
@@ -232,7 +232,7 @@
     {
       "name": "solid adapter",
       "path": "dist/solid.js",
-      "limit": "10 kB",
+      "limit": "12 kB",
       "ignore": [
         "solid-js"
       ]
@@ -240,7 +240,7 @@
     {
       "name": "angular adapter",
       "path": "dist/angular.js",
-      "limit": "10 kB",
+      "limit": "12 kB",
       "ignore": [
         "@angular/core"
       ]

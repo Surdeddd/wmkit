@@ -31,9 +31,7 @@ export function isPopoutSupported(): boolean {
 }
 
 function copyStylesInto(pipWindow: Window, source: Document): void {
-  for (const sheet of Array.from(source.styleSheets)) {
-    const owner = sheet.ownerNode
-    if (!owner) continue
+  for (const sheet of [...source.styleSheets, ...(source.adoptedStyleSheets ?? [])]) {
     try {
       const rules = Array.from(sheet.cssRules)
         .map((rule) => rule.cssText)
@@ -42,6 +40,7 @@ function copyStylesInto(pipWindow: Window, source: Document): void {
       style.textContent = rules
       pipWindow.document.head.append(style)
     } catch {
+      const owner = sheet.ownerNode
       if (owner instanceof HTMLLinkElement && owner.href) {
         const link = pipWindow.document.createElement('link')
         link.rel = 'stylesheet'
@@ -76,7 +75,8 @@ export async function popout(
   pipWindow.document.body.append(content)
   pipWindow.document.title = win.title
 
-  const minimizeWhilePopped = options.minimizeWhilePopped !== false
+  const minimizeWhilePopped =
+    options.minimizeWhilePopped !== false && wm.get(id)?.stage !== 'minimized'
   if (minimizeWhilePopped) wm.minimize(id)
 
   let closed = false

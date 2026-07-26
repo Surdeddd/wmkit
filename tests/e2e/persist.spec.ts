@@ -2,9 +2,12 @@ import { expect, type Page, test } from '@playwright/test'
 import { boxOf, dragBy, handle, openVanilla, spawn, win } from './utils'
 
 async function waitPersisted(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => localStorage.getItem('wmkit-e2e') === JSON.stringify(window.__wm.serialize()),
-  )
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem('wmkit-e2e')
+    if (!raw) return false
+    const stored = JSON.parse(raw) as { state?: unknown }
+    return JSON.stringify(stored.state) === JSON.stringify(window.__wm.serialize())
+  })
 }
 
 test.beforeEach(async ({ page }) => {

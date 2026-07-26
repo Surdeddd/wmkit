@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAspect,
   boundsEqual,
   clamp,
   clampSize,
@@ -204,5 +205,76 @@ describe('magnetize', () => {
     expect(result.y).toBe(103)
     expect(result.snappedY).toBe(true)
     expect(result.snappedX).toBe(false)
+  })
+})
+
+describe('clampToViewport with a tiny window', () => {
+  it('never pushes a window narrower than minVisible off both edges', () => {
+    const viewport = { width: 1000, height: 800 }
+    const tiny = { x: 990, y: 790, width: 20, height: 10 }
+    const clamped = clampToViewport(tiny, viewport, 48)
+    expect(clamped.x).toBeLessThanOrEqual(viewport.width - tiny.width)
+    expect(clamped.x).toBeGreaterThanOrEqual(0)
+    expect(clamped.y).toBeLessThanOrEqual(viewport.height - tiny.height)
+  })
+})
+
+describe('zoneBounds thirds', () => {
+  const viewport = { width: 1000, height: 800 }
+
+  it('tiles the viewport exactly across three columns', () => {
+    const left = zoneBounds('left-third', viewport)
+    const center = zoneBounds('center-third', viewport)
+    const right = zoneBounds('right-third', viewport)
+    expect(left).toEqual({ x: 0, y: 0, width: 333, height: 800 })
+    expect(center).toEqual({ x: 333, y: 0, width: 334, height: 800 })
+    expect(right).toEqual({ x: 667, y: 0, width: 333, height: 800 })
+    expect(left.width + center.width + right.width).toBe(viewport.width)
+  })
+})
+
+describe('applyAspect', () => {
+  const min = { width: 100, height: 50 }
+
+  it('derives height from width and width from height', () => {
+    expect(applyAspect({ width: 400, height: 999 }, 2, min, null, 'width')).toEqual({
+      width: 400,
+      height: 200,
+    })
+    expect(applyAspect({ width: 999, height: 200 }, 2, min, null, 'height')).toEqual({
+      width: 400,
+      height: 200,
+    })
+  })
+
+  it('falls back to a plain clamp for a non positive or non finite ratio', () => {
+    expect(applyAspect({ width: 40, height: 40 }, 0, min, null, 'width')).toEqual({
+      width: 100,
+      height: 50,
+    })
+    expect(
+      applyAspect({ width: 400, height: 400 }, Number.POSITIVE_INFINITY, min, null, 'height'),
+    ).toEqual({ width: 400, height: 400 })
+  })
+
+  it('keeps the ratio while honouring both minimums', () => {
+    expect(
+      applyAspect({ width: 10, height: 10 }, 2, { width: 100, height: 90 }, null, 'width'),
+    ).toEqual({ width: 180, height: 90 })
+    expect(
+      applyAspect({ width: 10, height: 10 }, 2, { width: 300, height: 50 }, null, 'height'),
+    ).toEqual({ width: 300, height: 150 })
+  })
+
+  it('keeps the ratio while honouring both maximums', () => {
+    const max = { width: 600, height: 200 }
+    expect(applyAspect({ width: 999, height: 999 }, 2, min, max, 'width')).toEqual({
+      width: 400,
+      height: 200,
+    })
+    expect(applyAspect({ width: 999, height: 999 }, 2, min, max, 'height')).toEqual({
+      width: 400,
+      height: 200,
+    })
   })
 })

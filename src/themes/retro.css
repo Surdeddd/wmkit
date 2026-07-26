@@ -7,6 +7,8 @@
   --wm-title-active-b: #1084d0;
   --wm-title-inactive: #808080;
   --wm-text: #000000;
+  --wm-text-dim: #404040;
+  --wm-accent: #000080;
   --wm-title-text: #ffffff;
   position: relative;
   overflow: hidden;

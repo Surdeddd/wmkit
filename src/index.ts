@@ -2,6 +2,7 @@ export type { Emitter, Listener } from './core/emitter'
 export { createEmitter } from './core/emitter'
 export type { MagnetResult, SnapDetectOptions } from './core/geometry'
 export {
+  applyAspect,
   boundsEqual,
   clamp,
   clampSize,
@@ -14,7 +15,6 @@ export { createWindowManager } from './core/manager'
 export type {
   ArrangeMode,
   Bounds,
-  HistoryEntry,
   ManagerEvents,
   ManagerOptions,
   ManagerState,
@@ -32,7 +32,7 @@ export type {
   WindowUpdate,
 } from './core/types'
 export type { FlipGhostOptions } from './dom/animate'
-export { flipToTarget, prefersReducedMotion } from './dom/animate'
+export { flipFromTarget, flipToTarget, prefersReducedMotion } from './dom/animate'
 export type { Announcer, AnnouncerMessages } from './dom/announcer'
 export { createAnnouncer, defaultMessages } from './dom/announcer'
 export type { DesktopBinder } from './dom/binder'

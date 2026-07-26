@@ -1,6 +1,6 @@
-import { clamp } from '../core/geometry'
+import { applyAspect, clampSize } from '../core/geometry'
 import type { Bounds } from '../core/types'
-import type { SessionContext } from './shared'
+import type { ActiveDrag, SessionContext } from './shared'
 
 export const RESIZE_DIRECTIONS = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const
 export type ResizeDirection = (typeof RESIZE_DIRECTIONS)[number]
@@ -26,12 +26,19 @@ export function createResizeStarter(ctx: SessionContext) {
     event.stopPropagation()
 
     const handleEl = event.currentTarget as HTMLElement
+    const session: ActiveDrag = { id, finish: (cancelled) => finish(cancelled) }
+    ctx.claimDrag(session)
     wm.beginInteraction()
     const releaseRect = ctx.trackRect()
     const startPoint = ctx.toLocal(event)
     const start = win.bounds
+    const startStage = win.stage
+    const startZone = win.snapZone
+    const startRestore = win.restoreBounds
     const minSize = win.minSize
     const maxSize = win.maxSize
+    const aspect = win.aspectRatio
+    const drive = direction === 'n' || direction === 's' ? 'height' : 'width'
     let raf = 0
     let pendingX = 0
     let pendingY = 0
@@ -39,30 +46,33 @@ export function createResizeStarter(ctx: SessionContext) {
     const el = ctx.windowElement(id)
     if (el) el.dataset.wmResizing = direction
 
-    function clampWidth(width: number): number {
-      return clamp(width, minSize.width, maxSize ? maxSize.width : Number.POSITIVE_INFINITY)
-    }
-
-    function clampHeight(height: number): number {
-      return clamp(height, minSize.height, maxSize ? maxSize.height : Number.POSITIVE_INFINITY)
-    }
-
     function flush(): void {
       if (!hasPending) return
       hasPending = false
       raf = 0
       const dx = pendingX - startPoint.x
       const dy = pendingY - startPoint.y
-      const next: Bounds = { ...start }
-      if (direction.includes('e')) next.width = clampWidth(start.width + dx)
-      if (direction.includes('s')) next.height = clampHeight(start.height + dy)
-      if (direction.includes('w')) {
-        next.width = clampWidth(start.width - dx)
-        next.x = start.x + (start.width - next.width)
+      const top = direction.includes('n') ? Math.max(0, start.y + dy) : start.y
+      const raw = {
+        width: direction.includes('e')
+          ? start.width + dx
+          : direction.includes('w')
+            ? start.width - dx
+            : start.width,
+        height: direction.includes('s')
+          ? start.height + dy
+          : direction.includes('n')
+            ? start.y + start.height - top
+            : start.height,
       }
-      if (direction.includes('n')) {
-        next.height = clampHeight(start.height - dy)
-        next.y = start.y + (start.height - next.height)
+      const size =
+        aspect === null
+          ? clampSize(raw, minSize, maxSize)
+          : applyAspect(raw, aspect, minSize, maxSize, drive)
+      const next: Bounds = {
+        x: direction.includes('w') ? start.x + start.width - size.width : start.x,
+        y: direction.includes('n') ? start.y + start.height - size.height : start.y,
+        ...size,
       }
       wm.resize(id, next)
     }
@@ -77,19 +87,32 @@ export function createResizeStarter(ctx: SessionContext) {
     }
 
     function finish(cancelled: boolean): void {
-      if (raf !== 0) view.cancelAnimationFrame(raf)
-      if (hasPending && !cancelled) flush()
-      releaseRect()
-      handleEl.removeEventListener('pointermove', onMove)
-      handleEl.removeEventListener('pointerup', onUp)
-      handleEl.removeEventListener('pointercancel', onCancelPointer)
-      doc.removeEventListener('keydown', onKeydown, true)
-      if (handleEl.hasPointerCapture(event.pointerId)) {
-        handleEl.releasePointerCapture(event.pointerId)
+      if (ctx.currentDrag() !== session) return
+      try {
+        if (raf !== 0) view.cancelAnimationFrame(raf)
+        if (hasPending && !cancelled) flush()
+        if (cancelled) {
+          if (startStage === 'snapped' && startZone) {
+            wm.restoreTo(id, startRestore ?? start)
+            wm.snap(id, startZone)
+          } else {
+            wm.resize(id, start)
+          }
+        }
+      } finally {
+        ctx.releaseDrag(session)
+        releaseRect()
+        handleEl.removeEventListener('pointermove', onMove)
+        handleEl.removeEventListener('pointerup', onUp)
+        handleEl.removeEventListener('pointercancel', onCancelPointer)
+        doc.removeEventListener('keydown', onKeydown, true)
+        if (handleEl.hasPointerCapture(event.pointerId)) {
+          handleEl.releasePointerCapture(event.pointerId)
+        }
+        if (el) delete el.dataset.wmResizing
+        if (cancelled) wm.abortInteraction()
+        else wm.endInteraction()
       }
-      if (el) delete el.dataset.wmResizing
-      if (cancelled) wm.resize(id, start)
-      wm.endInteraction()
     }
 
     function onUp(upEvent: PointerEvent): void {

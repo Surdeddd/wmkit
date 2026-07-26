@@ -1,4 +1,4 @@
-import type { Bounds, WindowManager, WindowState } from '../core/types'
+import type { Bounds, SnapZone, WindowManager, WindowState } from '../core/types'
 import { flipFromTarget, flipToTarget } from './animate'
 import { type Announcer, createAnnouncer } from './announcer'
 import { createDragStarter } from './drag'
@@ -22,8 +22,17 @@ interface AttachedWindow {
   handles: HTMLElement[]
   lastState: WindowState | null
   lastZ: number
+  lastWorkspace: number
   cleanup: Array<() => void>
 }
+
+const SNAP_SHORTCUTS: Record<string, SnapZone> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+}
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export function attachDesktop(
   wm: WindowManager,
@@ -44,6 +53,8 @@ export function attachDesktop(
     typeof options.keyboard === 'object' ? options.keyboard : {}
   const moveStep = keyboardOptions.moveStep ?? 16
   const cycleEnabled = keyboardOptions.cycle !== false
+  const snapShortcuts = keyboardOptions.snapShortcuts !== false
+  const historyShortcuts = keyboardOptions.historyShortcuts !== false
   const hitEdge = options.hitAreas?.edge ?? (coarsePointer ? 16 : 8)
   const hitCorner = options.hitAreas?.corner ?? (coarsePointer ? 24 : 12)
   const magnetThreshold =
@@ -53,6 +64,7 @@ export function attachDesktop(
         (coarsePointer ? 12 : 8))
 
   element.dataset.wmDesktop = ''
+  element.tabIndex = -1
   if (view.getComputedStyle(element).position === 'static') {
     element.style.position = 'relative'
   }
@@ -95,6 +107,11 @@ export function attachDesktop(
     if (preview) preview.style.display = 'none'
   }
 
+  function refreshRect(): void {
+    const rect = element.getBoundingClientRect()
+    cachedRect = { left: rect.left, top: rect.top }
+  }
+
   const ctx: SessionContext = {
     wm,
     doc,
@@ -105,8 +122,9 @@ export function attachDesktop(
     },
     trackRect() {
       if (rectUsers === 0) {
-        const rect = element.getBoundingClientRect()
-        cachedRect = { left: rect.left, top: rect.top }
+        refreshRect()
+        view.addEventListener('scroll', refreshRect, true)
+        view.addEventListener('resize', refreshRect)
       }
       rectUsers += 1
       let released = false
@@ -114,7 +132,11 @@ export function attachDesktop(
         if (released) return
         released = true
         rectUsers -= 1
-        if (rectUsers === 0) cachedRect = null
+        if (rectUsers === 0) {
+          view.removeEventListener('scroll', refreshRect, true)
+          view.removeEventListener('resize', refreshRect)
+          cachedRect = null
+        }
       }
     },
     windowElement: (id) => registry.get(id)?.element,
@@ -145,29 +167,41 @@ export function attachDesktop(
     const applyViewport = () =>
       wm.setViewport({ width: element.clientWidth, height: element.clientHeight })
     applyViewport()
-    const observer = new ResizeObserver(applyViewport)
+    const observer = new view.ResizeObserver(applyViewport)
     observer.observe(element)
     cleanup.push(() => observer.disconnect())
   }
 
-  function syncWindow(attached: AttachedWindow, win: WindowState, zIndex: number): void {
+  function syncWindow(
+    attached: AttachedWindow,
+    win: WindowState,
+    zIndex: number,
+    activeWorkspace: number,
+  ): void {
     const el = attached.element
     const firstSync = attached.lastState === null
     if (firstSync) el.style.transition = 'none'
-    if (attached.lastState !== win) {
+    if (attached.lastState !== win || attached.lastWorkspace !== activeWorkspace) {
       el.style.transform = `translate3d(${win.bounds.x}px, ${win.bounds.y}px, 0)`
       el.style.width = `${win.bounds.width}px`
       el.style.height = `${win.bounds.height}px`
       el.dataset.wmStage = win.stage
       el.dataset.wmLayer = win.layer
-      el.hidden = win.stage === 'minimized'
+      el.dataset.wmWorkspace = String(win.workspace)
+      const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace
+      if (hide && !el.hidden && el.contains(doc.activeElement)) {
+        element.focus({ preventScroll: true })
+      }
+      el.hidden = hide
       el.setAttribute('aria-label', win.title)
       if (win.layer === 'modal') el.setAttribute('aria-modal', 'true')
       else el.removeAttribute('aria-modal')
       for (const handle of attached.handles) {
-        handle.style.display = win.resizable && win.stage === 'normal' ? '' : 'none'
+        handle.style.display =
+          win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
       }
       attached.lastState = win
+      attached.lastWorkspace = activeWorkspace
     }
     if (attached.lastZ !== zIndex) {
       el.style.zIndex = String(zIndex + 1)
@@ -186,7 +220,13 @@ export function attachDesktop(
       const attached = registry.get(id)
       const win = state.windows[id]
       if (!attached || !win) return
-      if (orderChanged || attached.lastState !== win) syncWindow(attached, win, index)
+      if (
+        orderChanged ||
+        attached.lastState !== win ||
+        attached.lastWorkspace !== state.workspace
+      ) {
+        syncWindow(attached, win, index, state.workspace)
+      }
     })
     if (state.focusedId !== lastFocused) {
       if (lastFocused) {
@@ -233,16 +273,45 @@ export function attachDesktop(
         if (target) flipToTarget(attached.element, target)
       } else if (previous === 'minimized' && win.stage !== 'minimized') {
         const target = options.minimizeTarget?.(win)
-        if (target) flipFromTarget(attached.element, target)
+        if (target) view.requestAnimationFrame(() => flipFromTarget(attached.element, target))
       }
     }),
   )
 
-  if (keyboardEnabled && cycleEnabled) {
+  if (keyboardEnabled) {
     const onDesktopKeydown = (event: KeyboardEvent) => {
-      if (event.key === 'F6') {
+      if (cycleEnabled && event.key === 'F6') {
         event.preventDefault()
         wm.cycleFocus(event.shiftKey ? -1 : 1)
+        return
+      }
+      if (!event.ctrlKey && !event.metaKey) return
+      const target = event.target as Element | null
+      if (target?.closest(INTERACTIVE_SELECTOR)) return
+      if (historyShortcuts && (event.key === 'z' || event.key === 'Z')) {
+        event.preventDefault()
+        if (event.shiftKey) wm.redo()
+        else wm.undo()
+        return
+      }
+      if (!snapShortcuts || !event.altKey) return
+      const focused = wm.getState().focusedId
+      const win = focused ? wm.get(focused) : undefined
+      if (!win) return
+      const zone = SNAP_SHORTCUTS[event.key]
+      if (zone) {
+        event.preventDefault()
+        if (win.snappable) wm.snap(win.id, zone)
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        if (win.maximizable) wm.maximize(win.id)
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        if (win.stage === 'normal') {
+          if (win.minimizable) wm.minimize(win.id)
+        } else {
+          wm.restore(win.id)
+        }
       }
     }
     element.addEventListener('keydown', onDesktopKeydown)
@@ -268,6 +337,7 @@ export function attachDesktop(
       handles: [],
       lastState: null,
       lastZ: -1,
+      lastWorkspace: -1,
       cleanup: [],
     }
 
@@ -366,19 +436,20 @@ export function attachDesktop(
         ArrowUp: [0, -1],
         ArrowDown: [0, 1],
       }
+      if (event.ctrlKey || event.metaKey) return
       const vector = arrows[event.key]
       if (!vector || !keyboardEnabled) return
-      event.preventDefault()
       const step = event.altKey ? 1 : moveStep
       const [dx, dy] = vector
       if (event.shiftKey) {
-        if (current.resizable) {
-          wm.resize(id, {
-            width: current.bounds.width + dx * step,
-            height: current.bounds.height + dy * step,
-          })
-        }
+        if (!current.resizable) return
+        event.preventDefault()
+        wm.resize(id, {
+          width: current.bounds.width + dx * step,
+          height: current.bounds.height + dy * step,
+        })
       } else if (current.draggable && current.stage === 'normal') {
+        event.preventDefault()
         wm.moveBy(id, dx * step, dy * step)
       }
     }
@@ -389,13 +460,18 @@ export function attachDesktop(
       if (event.key !== 'Tab') return
       const current = wm.get(id)
       if (current?.layer !== 'modal') return
-      const focusables = windowElement.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )
+      const focusables = [
+        ...windowElement.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ].filter((node) => node.offsetParent !== null || node === doc.activeElement)
       if (focusables.length === 0) return
       const first = focusables[0]
       const last = focusables[focusables.length - 1]
       if (!first || !last) return
+      if (!windowElement.contains(doc.activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+        return
+      }
       if (event.shiftKey && doc.activeElement === first) {
         event.preventDefault()
         last.focus()
@@ -427,6 +503,9 @@ export function attachDesktop(
     lastOrder = null
     lastFocused = null
     syncAll()
+    if (wm.getState().focusedId === id && !windowElement.contains(doc.activeElement)) {
+      windowElement.focus({ preventScroll: true })
+    }
 
     return detach
   }

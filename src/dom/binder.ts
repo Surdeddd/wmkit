@@ -7,6 +7,7 @@ export interface DesktopBinder {
   controller(): DesktopController | null
   bindDesktop(element: HTMLElement): () => void
   bindWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
+  destroy(): void
 }
 
 interface PendingWindow {
@@ -21,6 +22,7 @@ export function createDesktopBinder(
   options: DesktopOptions = {},
 ): DesktopBinder {
   let controller: DesktopController | null = null
+  let stopOpen: (() => void) | null = null
   const entries = new Set<PendingWindow>()
 
   function attachEntry(entry: PendingWindow): void {
@@ -29,11 +31,13 @@ export function createDesktopBinder(
     }
   }
 
-  wm.on('open', ({ window: win }) => {
-    for (const entry of entries) {
-      if (entry.id === win.id) attachEntry(entry)
-    }
-  })
+  function unbindDesktop(): void {
+    stopOpen?.()
+    stopOpen = null
+    for (const entry of entries) entry.detach = null
+    controller?.destroy()
+    controller = null
+  }
 
   return {
     wm,
@@ -41,12 +45,13 @@ export function createDesktopBinder(
     bindDesktop(element) {
       if (controller) throw new Error('wmkit: desktop is already bound')
       controller = attachDesktop(wm, element, options)
+      stopOpen = wm.on('open', ({ window: win }) => {
+        for (const entry of entries) {
+          if (entry.id === win.id) attachEntry(entry)
+        }
+      })
       for (const entry of entries) attachEntry(entry)
-      return () => {
-        for (const entry of entries) entry.detach = null
-        controller?.destroy()
-        controller = null
-      }
+      return unbindDesktop
     },
     bindWindow(id, element, windowOptions) {
       const entry: PendingWindow = { id, element, options: windowOptions, detach: null }
@@ -57,6 +62,10 @@ export function createDesktopBinder(
         entry.detach = null
         entries.delete(entry)
       }
+    },
+    destroy() {
+      unbindDesktop()
+      entries.clear()
     },
   }
 }

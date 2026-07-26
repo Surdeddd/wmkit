@@ -25,6 +25,9 @@ export type SnapZone =
   | 'top-right'
   | 'bottom-left'
   | 'bottom-right'
+  | 'left-third'
+  | 'center-third'
+  | 'right-third'
 
 export interface WindowFlags {
   draggable: boolean
@@ -44,8 +47,10 @@ export interface WindowState extends WindowFlags {
   stage: WindowStage
   snapZone: SnapZone | null
   layer: WindowLayer
+  workspace: number
   minSize: Size
   maxSize: Size | null
+  aspectRatio: number | null
   openedSeq: number
   meta: Record<string, unknown>
 }
@@ -61,8 +66,10 @@ export interface WindowInit extends Partial<WindowFlags> {
   minHeight?: number
   maxWidth?: number
   maxHeight?: number
+  aspectRatio?: number
   stage?: WindowStage
   layer?: WindowLayer
+  workspace?: number
   meta?: Record<string, unknown>
 }
 
@@ -70,6 +77,7 @@ export interface HistoryEntry {
   windows: Readonly<Record<string, WindowState>>
   order: readonly string[]
   focusedId: string | null
+  workspace: number
 }
 
 export interface ManagerState {
@@ -77,6 +85,7 @@ export interface ManagerState {
   order: readonly string[]
   focusedId: string | null
   viewport: Size
+  workspace: number
 }
 
 export interface SerializedMaxSize {
@@ -93,6 +102,7 @@ export interface SerializedState {
   windows: SerializedWindowState[]
   order: string[]
   focusedId: string | null
+  workspace: number
 }
 
 export interface ManagerEvents {
@@ -104,6 +114,7 @@ export interface ManagerEvents {
   stage: { window: WindowState; previous: WindowStage }
   update: { window: WindowState }
   order: { order: readonly string[] }
+  workspace: { workspace: number; previous: number }
   modalblocked: { window: WindowState }
   change: { state: ManagerState }
 }
@@ -117,6 +128,7 @@ export interface ManagerOptions {
   cascadeOrigin?: { x: number; y: number }
   idPrefix?: string
   historyLimit?: number
+  workspace?: number
 }
 
 export interface WindowUpdate {
@@ -124,6 +136,7 @@ export interface WindowUpdate {
   layer?: WindowLayer
   minSize?: Size
   maxSize?: Size | null
+  aspectRatio?: number | null
   meta?: Record<string, unknown>
   draggable?: boolean
   resizable?: boolean
@@ -148,12 +161,17 @@ export interface WindowManager {
   snap(id: string, zone: SnapZone): boolean
   move(id: string, x: number, y: number): boolean
   moveBy(id: string, dx: number, dy: number): boolean
+  center(id: string): boolean
+  sendToBack(id: string): boolean
   resize(id: string, patch: Partial<Bounds>): boolean
   update(id: string, patch: WindowUpdate): boolean
   get(id: string): WindowState | undefined
   getState(): ManagerState
   minimized(): readonly WindowState[]
   setViewport(viewport: Size): void
+  workspace(): number
+  setWorkspace(workspace: number): boolean
+  moveToWorkspace(id: string, workspace: number): boolean
   batch(run: () => void): void
   serialize(): SerializedState
   hydrate(data: SerializedState): boolean
@@ -163,6 +181,8 @@ export interface WindowManager {
   canRedo(): boolean
   beginInteraction(): void
   endInteraction(): void
+  abortInteraction(): void
+  clearHistory(): void
   saveLayout(name: string): SerializedState
   loadLayout(name: string): boolean
   getLayout(name: string): SerializedState | undefined

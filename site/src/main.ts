@@ -1,18 +1,43 @@
 import {
   attachDesktop,
   createWindowManager,
+  type DesktopController,
+  type DesktopOptions,
   prefersReducedMotion,
   type WindowInit,
+  type WindowState,
 } from '@surdeddd/wmkit'
-import '@surdeddd/wmkit/themes/glass.css'
-import './landing.css'
-import { type Dict, dictionaries, type Lang } from './i18n'
-import { highlight, snippets } from './snippets'
+import glassUrl from '@surdeddd/wmkit/themes/glass.css?url'
+import lightUrl from '@surdeddd/wmkit/themes/light.css?url'
+import retroUrl from '@surdeddd/wmkit/themes/retro.css?url'
+import type { AppContext, AppInstance, AppSpec, ThemeName } from './apps'
+import { apps } from './apps'
+import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
+import './os.css'
+import './apps.css'
 
-const winAria: Record<Lang, { minimize: string; maximize: string; close: string }> = {
-  en: { minimize: 'Minimize', maximize: 'Maximize', close: 'Close' },
-  ru: { minimize: 'Свернуть', maximize: 'Развернуть', close: 'Закрыть' },
+const THEME_URLS: Record<ThemeName, string> = {
+  glass: glassUrl,
+  light: lightUrl,
+  retro: retroUrl,
 }
+
+const WORKSPACES = 3
+
+function must<T>(value: T | null, what: string): T {
+  if (!value) throw new Error(`wmkit demo: missing ${what}`)
+  return value
+}
+
+const desktopEl = must(document.querySelector<HTMLElement>('#desktop'), '#desktop')
+const dockEl = must(document.querySelector<HTMLElement>('#dock'), '#dock')
+const launcherEl = must(document.querySelector<HTMLElement>('#launcher'), '#launcher')
+const menusEl = must(document.querySelector<HTMLElement>('#menus'), '#menus')
+const workspacesEl = must(document.querySelector<HTMLElement>('#workspaces'), '#workspaces')
+const bootEl = must(document.querySelector<HTMLElement>('#boot'), '#boot')
+const bootLog = must(document.querySelector<HTMLElement>('#boot-log'), '#boot-log')
+const statWin = must(document.querySelector<HTMLElement>('#stat-win'), '#stat-win')
+const statFps = must(document.querySelector<HTMLElement>('#stat-fps'), '#stat-fps')
 
 function resolveLang(): Lang {
   const fromQuery = new URLSearchParams(location.search).get('lang')
@@ -22,331 +47,375 @@ function resolveLang(): Lang {
   return navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en'
 }
 
+function resolveTheme(): ThemeName {
+  const stored = localStorage.getItem('wmkit-theme')
+  return stored === 'light' || stored === 'retro' ? stored : 'glass'
+}
+
 let lang: Lang = resolveLang()
+let theme: ThemeName = resolveTheme()
 const dict = (): Dict => dictionaries[lang]
 
-function must<T>(value: T | null, what: string): T {
-  if (!value) throw new Error(`wmkit landing: missing ${what}`)
-  return value
+const options = { magnetism: true, snap: true, announce: true }
+const wm = createWindowManager({ historyLimit: 60 })
+
+interface Mounted {
+  element: HTMLElement
+  instance: AppInstance | null
+  spec: AppSpec | null
+  detach: (() => void) | null
 }
 
-const desktopEl = must(document.querySelector<HTMLElement>('#desktop'), '#desktop')
-const dockEl = must(document.querySelector<HTMLElement>('#dock'), '#dock')
-const dockWrap = must(dockEl.parentElement, 'dock wrapper')
-const dockPlus = must(document.querySelector<HTMLElement>('#dock-plus'), '#dock-plus')
+const mounted = new Map<string, Mounted>()
+const specById = new Map<AppId, AppSpec>(apps.map((spec) => [spec.id, spec]))
 
-const wm = createWindowManager()
-const desktop = attachDesktop(wm, desktopEl, {
-  minimizeTarget: () => dockWrap,
-})
+const themeLink = document.createElement('link')
+themeLink.rel = 'stylesheet'
+document.head.append(themeLink)
 
-const mounted = new Map<string, HTMLElement>()
-
-function buildChrome(id: string, title: string, cls?: string): HTMLElement {
-  const aria = winAria[lang]
-  const el = document.createElement('section')
-  if (cls) el.classList.add(cls)
-  el.dataset.testid = `window-${id}`
-  el.innerHTML = `
-    <header data-wm-drag>
-      <span data-wm-controls>
-        <button data-wm-close aria-label="${aria.close}" type="button"></button>
-        <button data-wm-minimize aria-label="${aria.minimize}" type="button"></button>
-        <button data-wm-maximize aria-label="${aria.maximize}" type="button"></button>
-      </span>
-      <span data-wm-title>${title}</span>
-    </header>
-    <div data-wm-content></div>
-  `
-  return el
+function applyTheme(): void {
+  themeLink.href = THEME_URLS[theme]
+  desktopEl.dataset.theme = theme
+  localStorage.setItem('wmkit-theme', theme)
 }
 
-function spawn(
-  init: WindowInit & { id: string; title: string },
-  cls: string | undefined,
-  fill: (content: HTMLElement) => void,
-): void {
-  if (wm.get(init.id)) {
-    wm.focus(init.id)
+function desktopOptions(): DesktopOptions {
+  return {
+    magnetism: options.magnetism,
+    snap: options.snap,
+    announce: options.announce,
+    minimizeTarget: (win) => dockEl.querySelector(`[data-task="${win.id}"]`) ?? dockEl,
+    onTitlebarContextMenu: (win) => {
+      wm.sendToBack(win.id)
+    },
+  }
+}
+
+let desktop: DesktopController = attachDesktop(wm, desktopEl, desktopOptions())
+
+const ctx: AppContext = {
+  wm,
+  dict,
+  open: (id) => openApp(id),
+  reset: () => resetDesktop(),
+  theme: () => theme,
+  setTheme(next) {
+    theme = next
+    applyTheme()
+    relabelAll()
+  },
+  option: (name) => options[name],
+  setOption(name, value) {
+    if (options[name] === value) return
+    options[name] = value
+    remountDesktop()
+    relabelAll()
+  },
+  size: () => ({ width: desktopEl.clientWidth, height: desktopEl.clientHeight }),
+}
+
+function remountDesktop(): void {
+  for (const entry of mounted.values()) entry.detach = null
+  desktop.destroy()
+  desktop = attachDesktop(wm, desktopEl, desktopOptions())
+  for (const [id, entry] of mounted) {
+    if (wm.get(id)) entry.detach = desktop.attachWindow(id, entry.element, { removeOnClose: true })
+  }
+}
+
+function chrome(id: string, title: string): HTMLElement {
+  const element = document.createElement('section')
+  element.dataset.testid = `window-${id}`
+  const header = document.createElement('header')
+  header.dataset.wmDrag = ''
+  const controls = document.createElement('span')
+  controls.dataset.wmControls = ''
+  for (const [attribute, label] of [
+    ['wmClose', lang === 'ru' ? 'Закрыть' : 'Close'],
+    ['wmMinimize', lang === 'ru' ? 'Свернуть' : 'Minimize'],
+    ['wmMaximize', lang === 'ru' ? 'Развернуть' : 'Maximize'],
+  ] as const) {
+    const control = document.createElement('button')
+    control.type = 'button'
+    control.dataset[attribute] = ''
+    control.setAttribute('aria-label', `${label} ${title}`)
+    controls.append(control)
+  }
+  const titleEl = document.createElement('span')
+  titleEl.dataset.wmTitle = ''
+  titleEl.textContent = title
+  header.append(controls, titleEl)
+  const content = document.createElement('div')
+  content.dataset.wmContent = ''
+  element.append(header, content)
+  return element
+}
+
+function contentOf(element: HTMLElement): HTMLElement {
+  return must(element.querySelector<HTMLElement>('[data-wm-content]'), 'window content')
+}
+
+function mount(id: string, title: string, spec: AppSpec | null): Mounted {
+  const element = chrome(id, title)
+  desktopEl.append(element)
+  const entry: Mounted = { element, instance: null, spec, detach: null }
+  mounted.set(id, entry)
+  return entry
+}
+
+function activate(id: string, entry: Mounted): void {
+  entry.detach = desktop.attachWindow(id, entry.element, { removeOnClose: true })
+  if (entry.spec) entry.instance = entry.spec.render(contentOf(entry.element), ctx) ?? null
+}
+
+function openApp(id: AppId): void {
+  const spec = specById.get(id)
+  if (!spec) return
+  if (wm.get(id)) {
+    wm.focus(id)
     return
   }
-  wm.open(init)
-  const el = buildChrome(init.id, init.title, cls)
-  const content = must(el.querySelector<HTMLElement>('[data-wm-content]'), 'window content')
-  desktopEl.append(el)
-  fill(content)
-  desktop.attachWindow(init.id, el, { removeOnClose: true })
-  const stop = wm.on('close', ({ window: win }) => {
-    if (win.id !== init.id) return
-    mounted.delete(init.id)
-    stop()
+  const init = spec.init(ctx)
+  const title = dict().apps[id].title
+  const entry = mount(id, title, spec)
+  wm.open({ ...init, id, title, workspace: wm.workspace() })
+  activate(id, entry)
+}
+
+wm.on('open', ({ window: win }) => {
+  if (mounted.has(win.id)) return
+  const entry = mount(win.id, win.title, null)
+  const body = contentOf(entry.element)
+  body.append(
+    Object.assign(document.createElement('p'), { className: 'app-note', textContent: win.id }),
+  )
+  activate(win.id, entry)
+})
+
+wm.on('close', ({ window: win }) => {
+  const entry = mounted.get(win.id)
+  if (!entry) return
+  entry.instance?.destroy?.()
+  mounted.delete(win.id)
+})
+
+function resetDesktop(): void {
+  wm.batch(() => {
+    wm.closeAll()
+    wm.setWorkspace(0)
   })
-  mounted.set(init.id, el)
+  openDefaults()
+}
+
+function openDefaults(): void {
+  const width = desktopEl.clientWidth
+  openApp('readme')
+  if (width >= 1200) openApp('inspector')
+  if (width >= 720) openApp('terminal')
+  wm.focus(width >= 720 ? 'terminal' : 'readme')
 }
 
 function renderDock(): void {
+  const minimized = wm.minimized()
   dockEl.replaceChildren(
-    ...wm.minimized().map((win) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.dataset.task = win.id
-      button.textContent = win.title
-      button.addEventListener('click', () => wm.focus(win.id))
-      return button
-    }),
-  )
-}
-
-wm.subscribe(renderDock)
-
-function fillWelcome(content: HTMLElement): void {
-  content.innerHTML = dict().windows.welcomeHtml
-}
-
-const terminalScript = [
-  { cmd: 'pnpm add @surdeddd/wmkit', out: '+ wmkit · 0 dependencies' },
-  { cmd: "wm.open({ title: 'hello' })", out: '→ focused · draggable · snappable' },
-  { cmd: 'wm.serialize()', out: '{ version: 1, windows: [...] } → localStorage' },
-]
-
-function fillTerminal(content: HTMLElement): void {
-  content.replaceChildren()
-  if (prefersReducedMotion(window)) {
-    content.innerHTML = terminalScript
-      .map((line) => `<div class="t-line">${line.cmd}</div><div class="t-out">${line.out}</div>`)
-      .join('')
-    return
-  }
-  let index = 0
-  const typeLine = () => {
-    if (!content.isConnected) return
-    const line = terminalScript[index % terminalScript.length]
-    if (!line) return
-    if (index === 0 && content.childElementCount > 8) content.replaceChildren()
-    content.querySelector('.t-cursor')?.remove()
-    const row = document.createElement('div')
-    row.className = 't-line'
-    const cursor = document.createElement('span')
-    cursor.className = 't-cursor'
-    content.append(row, cursor)
-    let pos = 0
-    const tick = () => {
-      if (!content.isConnected) return
-      row.textContent = line.cmd.slice(0, ++pos)
-      if (pos < line.cmd.length) {
-        setTimeout(tick, 34 + Math.sin(pos) * 14)
-      } else {
-        const out = document.createElement('div')
-        out.className = 't-out'
-        out.textContent = line.out
-        content.insertBefore(out, cursor)
-        index += 1
-        if (index % terminalScript.length === 0) {
-          setTimeout(() => {
-            if (content.isConnected) content.replaceChildren()
-            setTimeout(typeLine, 400)
-          }, 3200)
-        } else {
-          setTimeout(typeLine, 900)
-        }
+    ...minimized.map((win) => {
+      const node = document.createElement('button')
+      node.type = 'button'
+      node.dataset.task = win.id
+      const spec = specById.get(win.id as AppId)
+      if (spec) {
+        const icon = document.createElement('span')
+        icon.className = 'ico'
+        icon.textContent = dict().apps[win.id as AppId].icon
+        node.append(icon)
       }
-    }
-    setTimeout(tick, 300)
-  }
-  typeLine()
+      node.append(document.createTextNode(win.title))
+      node.addEventListener('click', () => wm.focus(win.id))
+      return node
+    }),
+  )
+  statWin.textContent = String(wm.getState().order.length)
 }
 
-function fillMetrics(content: HTMLElement): void {
-  content.replaceChildren(
-    ...dict().windows.metrics.map(([value, label]) => {
-      const cell = document.createElement('div')
-      cell.className = 'metric'
-      const big = document.createElement('b')
-      big.textContent = value
-      const small = document.createElement('span')
-      small.textContent = label
-      cell.append(big, small)
-      return cell
+function renderLauncher(): void {
+  launcherEl.replaceChildren(
+    ...apps.map((spec) => {
+      const copy = dict().apps[spec.id]
+      const node = document.createElement('button')
+      node.type = 'button'
+      node.dataset.app = spec.id
+      const icon = document.createElement('span')
+      icon.className = 'ico'
+      icon.textContent = copy.icon
+      node.append(icon, document.createTextNode(copy.title))
+      node.addEventListener('click', () => openApp(spec.id))
+      launcherEl.append(node)
+      return node
+    }),
+  )
+  syncLauncher()
+}
+
+function syncLauncher(): void {
+  for (const node of launcherEl.querySelectorAll<HTMLButtonElement>('button[data-app]')) {
+    const id = node.dataset.app as AppId
+    if (wm.get(id)) node.dataset.running = ''
+    else delete node.dataset.running
+  }
+}
+
+function renderWorkspaces(): void {
+  workspacesEl.replaceChildren(
+    ...Array.from({ length: WORKSPACES }, (_, index) => {
+      const node = document.createElement('button')
+      node.type = 'button'
+      node.role = 'tab'
+      node.dataset.workspace = String(index)
+      node.textContent = String(index + 1)
+      node.setAttribute('aria-label', `workspace ${index + 1}`)
+      node.addEventListener('click', () => wm.setWorkspace(index))
+      return node
+    }),
+  )
+  syncWorkspaces()
+}
+
+function syncWorkspaces(): void {
+  const state = wm.getState()
+  const populated = new Set(Object.values(state.windows).map((win) => win.workspace))
+  for (const node of workspacesEl.querySelectorAll<HTMLButtonElement>('button')) {
+    const index = Number(node.dataset.workspace)
+    node.setAttribute('aria-selected', String(index === state.workspace))
+    if (populated.has(index)) node.dataset.populated = ''
+    else delete node.dataset.populated
+  }
+}
+
+const menuActions: Record<string, () => void> = {
+  new: () => {
+    wm.open({ title: lang === 'ru' ? 'окно' : 'window', width: 300, height: 200 })
+  },
+  tile: () => wm.arrange('tile'),
+  cascade: () => wm.arrange('cascade'),
+  center: () => {
+    const id = wm.getState().focusedId
+    if (id) wm.center(id)
+  },
+  back: () => {
+    const id = wm.getState().focusedId
+    if (id) wm.sendToBack(id)
+  },
+  minimizeAll: () => wm.minimizeAll(),
+  restoreAll: () => wm.restoreAll(),
+  closeAll: () => wm.closeAll(),
+  undo: () => {
+    wm.undo()
+  },
+  redo: () => {
+    wm.redo()
+  },
+  saveLayout: () => {
+    wm.saveLayout(`layout ${wm.layoutNames().length + 1}`)
+    openApp('layouts')
+  },
+  reset: () => resetDesktop(),
+  shortcuts: () => openApp('shortcuts'),
+  readme: () => openApp('readme'),
+  github: () => window.open('https://github.com/Surdeddd/wmkit', '_blank', 'noreferrer'),
+  npm: () => window.open('https://www.npmjs.com/package/@surdeddd/wmkit', '_blank', 'noreferrer'),
+}
+
+function closeMenus(): void {
+  for (const pop of menusEl.querySelectorAll<HTMLElement>('.menu-pop')) delete pop.dataset.open
+  for (const trigger of menusEl.querySelectorAll<HTMLButtonElement>('.menu-trigger')) {
+    trigger.setAttribute('aria-expanded', 'false')
+  }
+}
+
+function renderMenus(): void {
+  menusEl.replaceChildren(
+    ...dict().menus.map((menu) => {
+      const wrap = document.createElement('div')
+      wrap.className = 'menu'
+      const trigger = document.createElement('button')
+      trigger.type = 'button'
+      trigger.className = 'menu-trigger'
+      trigger.textContent = menu.label
+      trigger.setAttribute('aria-expanded', 'false')
+      trigger.setAttribute('aria-haspopup', 'true')
+      const pop = document.createElement('div')
+      pop.className = 'menu-pop'
+      for (const item of menu.items) {
+        const node = document.createElement('button')
+        node.type = 'button'
+        node.dataset.action = item.id
+        node.append(document.createTextNode(item.label))
+        if (item.key) {
+          const key = document.createElement('kbd')
+          key.textContent = item.key
+          node.append(key)
+        }
+        node.addEventListener('click', () => {
+          closeMenus()
+          menuActions[item.id]?.()
+        })
+        pop.append(node)
+      }
+      trigger.addEventListener('click', (event) => {
+        event.stopPropagation()
+        const open = pop.dataset.open !== undefined
+        closeMenus()
+        if (!open) {
+          pop.dataset.open = ''
+          trigger.setAttribute('aria-expanded', 'true')
+          syncMenus()
+        }
+      })
+      wrap.append(trigger, pop)
+      return wrap
     }),
   )
 }
 
-let spawnCounter = 0
-
-function fillPlayground(content: HTMLElement): void {
-  const copy = dict().windows
-  content.innerHTML = `<p class="win-body">${copy.playgroundHint}</p>`
-  const actions = document.createElement('div')
-  actions.className = 'win-actions'
-  const buttons: Array<[string, () => void]> = [
-    [
-      copy.actions.open,
-      () => {
-        spawnCounter += 1
-        const id = `play-${spawnCounter}`
-        spawn(
-          { id, title: `${copy.spawnedTitle} ${spawnCounter}`, width: 280, height: 180 },
-          undefined,
-          (body) => {
-            body.innerHTML = `<p class="win-body">${copy.spawnedBody}</p>`
-          },
-        )
-      },
-    ],
-    [
-      copy.actions.modal,
-      () => {
-        spawnCounter += 1
-        spawn(
-          {
-            id: `play-modal-${spawnCounter}`,
-            title: copy.modalTitle,
-            layer: 'modal',
-            width: 320,
-            height: 190,
-          },
-          undefined,
-          (body) => {
-            body.innerHTML = `<p class="win-body">${copy.modalBody}</p>`
-          },
-        )
-      },
-    ],
-    [
-      copy.actions.stress,
-      () => {
-        wm.batch(() => {
-          for (let i = 0; i < 15; i += 1) {
-            spawnCounter += 1
-            const id = `play-${spawnCounter}`
-            spawn(
-              {
-                id,
-                title: `${copy.spawnedTitle} ${spawnCounter}`,
-                width: 220,
-                height: 140,
-                x: 16 + (i % 5) * 64,
-                y: 16 + Math.floor(i / 5) * 64,
-              },
-              undefined,
-              (body) => {
-                body.innerHTML = `<p class="win-body">#${spawnCounter}</p>`
-              },
-            )
-          }
-        })
-      },
-    ],
-    [copy.actions.snap, () => wm.snap('playground', 'left')],
-  ]
-  for (const [label, run] of buttons) {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.textContent = label
-    button.addEventListener('click', run)
-    actions.append(button)
+function syncMenus(): void {
+  for (const node of menusEl.querySelectorAll<HTMLButtonElement>('button[data-action]')) {
+    if (node.dataset.action === 'undo') node.disabled = !wm.canUndo()
+    if (node.dataset.action === 'redo') node.disabled = !wm.canRedo()
   }
-  content.append(actions)
 }
-
-function openInitialWindows(): void {
-  const width = desktopEl.clientWidth
-  const height = desktopEl.clientHeight
-  const tier: 'wide' | 'medium' | 'compact' =
-    width >= 900 ? 'wide' : width >= 480 ? 'medium' : 'compact'
-  spawn(
-    {
-      id: 'welcome',
-      title: dict().windows.welcomeTitle,
-      x: tier === 'compact' ? 12 : 26,
-      y: tier === 'compact' ? 14 : 28,
-      width: tier === 'compact' ? Math.max(240, width - 56) : 396,
-      height: tier === 'compact' ? 270 : 280,
-    },
-    undefined,
-    fillWelcome,
-  )
-  spawn(
-    {
-      id: 'terminal',
-      title: dict().windows.terminalTitle,
-      x: width - 382,
-      y: tier === 'wide' ? 60 : Math.min(330, height - 260),
-      width: 356,
-      height: 224,
-      stage: tier === 'compact' ? 'minimized' : 'normal',
-      minHeight: 150,
-    },
-    'win-terminal',
-    fillTerminal,
-  )
-  spawn(
-    {
-      id: 'metrics',
-      title: dict().windows.metricsTitle,
-      x: Math.round(width * 0.42),
-      y: Math.max(240, Math.round(height * 0.55)),
-      width: 336,
-      height: 240,
-      stage: tier === 'wide' ? 'normal' : 'minimized',
-    },
-    'win-metrics',
-    fillMetrics,
-  )
-  wm.focus('welcome')
-}
-
-dockPlus.addEventListener('click', () => {
-  spawn(
-    { id: 'playground', title: dict().windows.playgroundTitle, width: 330, height: 230 },
-    undefined,
-    fillPlayground,
-  )
-})
 
 function renderFeatures(): void {
   const grid = must(document.querySelector<HTMLElement>('#feature-grid'), '#feature-grid')
   grid.replaceChildren(
-    ...dict().features.map((feature) => {
+    ...dict().features.map((feature, index) => {
       const card = document.createElement('article')
-      card.className = 'card'
-      card.innerHTML = `<div class="icon">${feature.icon}</div><h3>${feature.title}</h3><p>${feature.text}</p>`
+      card.className = 'feature'
+      const num = document.createElement('p')
+      num.className = 'num'
+      num.textContent = String(index + 1).padStart(2, '0')
+      const title = document.createElement('h3')
+      title.textContent = feature.title
+      const text = document.createElement('p')
+      text.textContent = feature.text
+      card.append(num, title, text)
       return card
     }),
   )
 }
 
-document.addEventListener('pointermove', (event) => {
-  const card = (event.target as Element | null)?.closest<HTMLElement>('.card')
-  if (!card) return
-  const rect = card.getBoundingClientRect()
-  card.style.setProperty('--mx', `${event.clientX - rect.left}px`)
-  card.style.setProperty('--my', `${event.clientY - rect.top}px`)
-})
-
-function renderTabs(): void {
-  const tabs = must(document.querySelector<HTMLElement>('#fw-tabs'), '#fw-tabs')
-  const codeEl = must(document.querySelector<HTMLElement>('#fw-code'), '#fw-code')
-  const select = (id: string) => {
-    const snippet = snippets.find((entry) => entry.id === id) ?? snippets[0]
-    if (!snippet) return
-    codeEl.innerHTML = highlight(snippet.code)
-    for (const button of tabs.querySelectorAll('button')) {
-      button.setAttribute('aria-selected', String(button.dataset.tab === snippet.id))
-    }
-  }
-  tabs.replaceChildren(
-    ...snippets.map((snippet) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.role = 'tab'
-      button.dataset.tab = snippet.id
-      button.textContent = snippet.label
-      button.addEventListener('click', () => select(snippet.id))
-      return button
+function renderFrameworks(): void {
+  const row = must(document.querySelector<HTMLElement>('#fw-row'), '#fw-row')
+  row.replaceChildren(
+    ...dict().frameworks.map(([name, note]) => {
+      const cell = document.createElement('div')
+      const label = document.createElement('b')
+      label.textContent = name
+      const text = document.createElement('span')
+      text.textContent = note
+      cell.append(label, text)
+      return cell
     }),
   )
-  select('vanilla')
 }
 
 function renderCompare(): void {
@@ -358,6 +427,7 @@ function renderCompare(): void {
   data.compareHead.forEach((label, index) => {
     const th = document.createElement('th')
     th.textContent = label
+    th.scope = 'col'
     if (index === 1) th.classList.add('col-wmkit')
     headRow.append(th)
   })
@@ -365,9 +435,10 @@ function renderCompare(): void {
   const tbody = document.createElement('tbody')
   for (const row of data.compareRows) {
     const tr = document.createElement('tr')
-    const th = document.createElement('td')
-    th.textContent = row.label
-    tr.append(th)
+    const head = document.createElement('th')
+    head.scope = 'row'
+    head.textContent = row.label
+    tr.append(head)
     row.cells.forEach((cell, index) => {
       const td = document.createElement('td')
       td.textContent = cell.text
@@ -386,44 +457,34 @@ function applyStaticI18n(): void {
   document.documentElement.lang = lang
   document.title = data.meta.title
   document.querySelector('meta[name="description"]')?.setAttribute('content', data.meta.description)
-  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
-    const key = el.dataset.i18n
-    if (key && data.ui[key]) el.textContent = data.ui[key]
+  for (const node of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
+    const key = node.dataset.i18n
+    if (key && data.ui[key]) node.textContent = data.ui[key]
   }
-  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-aria]')) {
-    const key = el.dataset.i18nAria
-    if (key && data.ui[key]) el.setAttribute('aria-label', data.ui[key])
+  for (const node of document.querySelectorAll<HTMLElement>('[data-i18n-aria]')) {
+    const key = node.dataset.i18nAria
+    if (key && data.ui[key]) node.setAttribute('aria-label', data.ui[key])
   }
-  for (const button of document.querySelectorAll<HTMLButtonElement>('.lang button')) {
-    button.setAttribute('aria-pressed', String(button.dataset.lang === lang))
+  for (const node of document.querySelectorAll<HTMLButtonElement>('#lang button')) {
+    node.setAttribute('aria-pressed', String(node.dataset.lang === lang))
   }
 }
 
-function relabelWindows(): void {
-  const copy = dict().windows
-  const titles: Array<[string, string]> = [
-    ['welcome', copy.welcomeTitle],
-    ['terminal', copy.terminalTitle],
-    ['metrics', copy.metricsTitle],
-    ['playground', copy.playgroundTitle],
-  ]
-  for (const [id, title] of titles) {
-    if (wm.get(id)) wm.update(id, { title })
-    const titleEl = mounted.get(id)?.querySelector('[data-wm-title]')
+function relabelAll(): void {
+  for (const [id, entry] of mounted) {
+    const spec = entry.spec
+    if (!spec) continue
+    const title = dict().apps[spec.id].title
+    wm.update(id, { title })
+    const titleEl = entry.element.querySelector('[data-wm-title]')
     if (titleEl) titleEl.textContent = title
+    if (entry.instance?.relabel) {
+      entry.instance.relabel()
+    } else {
+      entry.instance?.destroy?.()
+      entry.instance = spec.render(contentOf(entry.element), ctx) ?? null
+    }
   }
-  const aria = winAria[lang]
-  for (const el of mounted.values()) {
-    el.querySelector('[data-wm-close]')?.setAttribute('aria-label', aria.close)
-    el.querySelector('[data-wm-minimize]')?.setAttribute('aria-label', aria.minimize)
-    el.querySelector('[data-wm-maximize]')?.setAttribute('aria-label', aria.maximize)
-  }
-  const welcome = mounted.get('welcome')?.querySelector<HTMLElement>('[data-wm-content]')
-  if (welcome) fillWelcome(welcome)
-  const metrics = mounted.get('metrics')?.querySelector<HTMLElement>('[data-wm-content]')
-  if (metrics) fillMetrics(metrics)
-  const playground = mounted.get('playground')?.querySelector<HTMLElement>('[data-wm-content]')
-  if (playground) fillPlayground(playground)
 }
 
 function setLang(next: Lang): void {
@@ -431,41 +492,142 @@ function setLang(next: Lang): void {
   lang = next
   localStorage.setItem('wmkit-lang', lang)
   applyStaticI18n()
+  renderMenus()
+  renderLauncher()
   renderFeatures()
+  renderFrameworks()
   renderCompare()
-  relabelWindows()
+  relabelAll()
   renderDock()
 }
 
-for (const button of document.querySelectorAll<HTMLButtonElement>('.lang button')) {
-  button.addEventListener('click', () => {
-    const next = button.dataset.lang
+wm.subscribe(() => {
+  renderDock()
+  syncLauncher()
+  syncWorkspaces()
+  syncMenus()
+})
+
+document.addEventListener('click', closeMenus)
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeMenus()
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input, textarea, [contenteditable]')) return
+  if (event.key === '?') {
+    event.preventDefault()
+    openApp('shortcuts')
+  }
+})
+
+for (const node of document.querySelectorAll<HTMLButtonElement>('#lang button')) {
+  node.addEventListener('click', () => {
+    const next = node.dataset.lang
     if (next === 'ru' || next === 'en') setLang(next)
   })
 }
 
-for (const button of document.querySelectorAll<HTMLButtonElement>('.copy')) {
-  button.addEventListener('click', async () => {
-    const text = button.dataset.copy ?? ''
+for (const node of document.querySelectorAll<HTMLButtonElement>('.copy')) {
+  node.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(text)
-      button.dataset.copied = ''
+      await navigator.clipboard.writeText(node.dataset.copy ?? '')
+      node.dataset.copied = ''
       setTimeout(() => {
-        delete button.dataset.copied
+        delete node.dataset.copied
       }, 1400)
     } catch {}
   })
 }
 
+document.querySelector('#wall-launch')?.addEventListener('click', () => {
+  const state = wm.getState()
+  if (state.order.length === 0) openDefaults()
+  else wm.arrange('tile')
+})
+
+document.querySelector('#open-code')?.addEventListener('click', () => {
+  openApp('code')
+  window.scrollTo({ top: 0, behavior: prefersReducedMotion(window) ? 'auto' : 'smooth' })
+})
+
+document.addEventListener('pointermove', (event) => {
+  const card = (event.target as Element | null)?.closest<HTMLElement>('.feature')
+  if (!card) return
+  const rect = card.getBoundingClientRect()
+  card.style.setProperty('--mx', `${event.clientX - rect.left}px`)
+  card.style.setProperty('--my', `${event.clientY - rect.top}px`)
+})
+
+function startFpsMeter(): void {
+  let frames = 0
+  let mark = performance.now()
+  const tick = (now: number) => {
+    frames += 1
+    if (now - mark >= 1000) {
+      statFps.textContent = String(Math.min(120, Math.round((frames * 1000) / (now - mark))))
+      frames = 0
+      mark = now
+    }
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+const BOOT_LINES = [
+  `wmkit ${__WMKIT_VERSION__} · headless window manager`,
+  'core .............. state machine ok',
+  'dom ............... pointer + rAF ok',
+  'a11y .............. live region ok',
+  'themes ............ glass light retro',
+  'ready.',
+]
+
+function boot(): void {
+  if (prefersReducedMotion(window)) {
+    bootEl.dataset.done = ''
+    start()
+    return
+  }
+  let index = 0
+  const step = () => {
+    bootLog.textContent = BOOT_LINES.slice(0, index + 1).join('\n')
+    index += 1
+    if (index < BOOT_LINES.length) {
+      setTimeout(step, 90)
+      return
+    }
+    setTimeout(() => {
+      bootEl.dataset.done = ''
+      start()
+    }, 260)
+  }
+  step()
+}
+
+function start(): void {
+  openDefaults()
+  startFpsMeter()
+}
+
+must(document.querySelector<HTMLElement>('#brand-ver'), '#brand-ver').textContent =
+  `v${__WMKIT_VERSION__}`
+
+applyTheme()
 applyStaticI18n()
+renderMenus()
+renderLauncher()
+renderWorkspaces()
 renderFeatures()
-renderTabs()
+renderFrameworks()
 renderCompare()
-openInitialWindows()
+renderDock()
+boot()
 
 declare global {
   interface Window {
-    __wmLanding: typeof wm
+    __wmDemo: { wm: typeof wm; open: (id: AppId) => void }
   }
 }
-window.__wmLanding = wm
+
+window.__wmDemo = { wm, open: openApp }
+
+export type { WindowInit, WindowState }

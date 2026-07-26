@@ -1,423 +1,616 @@
 export type Lang = 'en' | 'ru'
 
-export interface FeatureCopy {
-  icon: string
-  title: string
+export type AppId =
+  | 'readme'
+  | 'terminal'
+  | 'inspector'
+  | 'layouts'
+  | 'code'
+  | 'bench'
+  | 'paint'
+  | 'settings'
+  | 'shortcuts'
+
+export interface CompareCell {
   text: string
+  tone: 'good' | 'bad' | 'plain'
 }
 
-export interface CompareRow {
+export interface MenuCopy {
+  id: string
   label: string
-  cells: Array<{ text: string; tone: 'yes' | 'no' | 'warn' | 'plain' }>
+  items: Array<{ id: string; label: string; key?: string }>
 }
 
 export interface Dict {
   meta: { title: string; description: string }
   ui: Record<string, string>
-  features: FeatureCopy[]
-  compareHead: string[]
-  compareRows: CompareRow[]
-  windows: {
-    welcomeTitle: string
-    welcomeHtml: string
-    terminalTitle: string
-    metricsTitle: string
-    metrics: Array<[string, string]>
-    playgroundTitle: string
-    playgroundHint: string
-    actions: { open: string; modal: string; stress: string; snap: string }
-    spawnedTitle: string
-    spawnedBody: string
-    modalTitle: string
-    modalBody: string
+  menus: MenuCopy[]
+  apps: Record<AppId, { title: string; icon: string }>
+  readme: { lead: string; body: string; badges: Array<[string, string]> }
+  terminal: { hello: string; help: string; unknown: string; gone: string }
+  inspector: { events: string; empty: string }
+  layouts: {
+    zones: string
+    arrange: string
+    history: string
+    saved: string
+    save: string
+    none: string
   }
+  bench: { lead: string; run: string; opened: string; frame: string; note: string }
+  paint: { lead: string; clear: string }
+  settings: {
+    theme: string
+    magnetism: string
+    snap: string
+    announce: string
+    on: string
+    off: string
+  }
+  shortcuts: Array<[string, string]>
+  features: Array<{ title: string; text: string }>
+  frameworks: Array<[string, string]>
+  compareHead: string[]
+  compareRows: Array<{ label: string; cells: CompareCell[] }>
 }
 
-export const dictionaries: Record<Lang, Dict> = {
-  en: {
-    meta: {
-      title: 'wmkit — headless window manager for the web',
-      description:
-        'Draggable, resizable, snappable windows for any web app. Headless core, adapters for React, Vue, Svelte and Solid, first-class accessibility, 60fps.',
-    },
-    ui: {
-      'nav.features': 'Features',
-      'nav.frameworks': 'Frameworks',
-      'nav.compare': 'Compare',
-      'hero.eyebrow': 'headless window manager',
-      'hero.title1': 'Windows.',
-      'hero.title2': 'In your web app.',
-      'hero.title3': 'Any framework.',
-      'hero.sub':
-        'Drag, resize, snap, minimize — a full desktop experience inside the page. Headless core, zero dependencies, adapters for React, Vue, Svelte and Solid. Every window on this page is real. Grab one.',
-      'hero.copy': 'Copy install command',
-      'hero.cta1': 'Get started',
-      'hero.badge1': 'dependencies',
-      'hero.badge2': 'gzip core',
-      'hero.badge3': 'test coverage',
-      'hero.badge4': 'license',
-      'dock.plus': 'Open a new window',
-      'features.title': 'Everything a desktop has',
-      'features.sub':
-        'The core keeps state, the DOM layer moves pixels, your framework renders the content.',
-      'fw.title': 'One core, five ways to hold it',
-      'fw.sub':
-        "Window content always lives in your framework's own tree — no innerHTML, no portals into the void. Adapters are thin sugar over the same state machine.",
-      'cmp.title': 'Honest comparison',
-      'cmp.sub': "The floating-window niche went quiet years ago. That's exactly why wmkit exists.",
-      'cmp.note':
-        'Data checked on July 10, 2026: last commits, npm downloads, open feature requests.',
-      'outro.title': 'Give your app windows',
-      'outro.star': 'Star on GitHub',
-      'footer.made': 'This page runs on wmkit itself — drag the windows above.',
-    },
-    features: [
-      {
-        icon: '◲',
-        title: 'Headless by design',
-        text: 'A serializable state machine plus a DOM controller. Bring your own markup and styles — or take the glass theme.',
-      },
-      {
-        icon: '⌘',
-        title: 'First-class adapters',
-        text: 'React, Vue, Svelte, Solid and vanilla share one core. Window content stays in your framework tree.',
-      },
-      {
-        icon: '⌨',
-        title: 'Accessible for real',
-        text: 'Move and resize from the keyboard, cycle with F6, focus trapping in modals, live announcements for screen readers.',
-      },
-      {
-        icon: '⊞',
-        title: 'Snap zones',
-        text: 'Halves, quarters and drag-to-top maximize with a live preview — the FancyZones feel, in the browser.',
-      },
-      {
-        icon: '⚡',
-        title: '60fps under load',
-        text: 'transform-only positioning, rAF-batched pointer input, structural sharing. Fifty windows keep dragging smoothly.',
-      },
-      {
-        icon: '⟳',
-        title: 'Persistence built in',
-        text: 'One call serializes the whole desktop; one call restores it after reload. Storage is pluggable.',
-      },
-      {
-        icon: '⇱',
-        title: 'Pop out to real windows',
-        text: 'Send a window into Document Picture-in-Picture — an always-on-top OS window sharing the same state.',
-      },
-      {
-        icon: 'TS',
-        title: 'Strict TypeScript',
-        text: '100% typed public API, noUncheckedIndexedAccess, zero any. Validated by publint and attw.',
-      },
-    ],
-    compareHead: ['', 'wmkit', 'WinBox', 'jsPanel4', 'Dockview', 'Zag panel'],
-    compareRows: [
-      {
-        label: 'Maintained',
-        cells: [
-          { text: '✓ 2026', tone: 'yes' },
-          { text: '✗ since 2023', tone: 'no' },
-          { text: '✗ since 2022', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-      {
-        label: 'Headless core',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '~ own UI', tone: 'warn' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-      {
-        label: 'Official adapters',
-        cells: [
-          { text: 'React·Vue·Svelte·Solid', tone: 'yes' },
-          { text: 'community only', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-          { text: 'React·Vue·Angular', tone: 'yes' },
-          { text: 'via Ark UI', tone: 'warn' },
-        ],
-      },
-      {
-        label: 'Multi-window: z-order, taskbar, modals',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: 'partial', tone: 'warn' },
-          { text: 'partial', tone: 'warn' },
-          { text: 'dock groups', tone: 'warn' },
-          { text: '✗ single panel', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Snap zones',
-        cells: [
-          { text: '✓ + preview', tone: 'yes' },
-          { text: '✗ (open request)', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '—', tone: 'plain' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Keyboard + screen reader',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: 'partial', tone: 'warn' },
-          { text: 'partial', tone: 'warn' },
-        ],
-      },
-      {
-        label: 'State persistence',
-        cells: [
-          { text: '✓ built in', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Pop out (Document PiP)',
-        cells: [
-          { text: '✓ experimental', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: 'window.open', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'TypeScript',
-        cells: [
-          { text: 'strict', tone: 'yes' },
-          { text: '@types only', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-    ],
-    windows: {
-      welcomeTitle: 'welcome.app',
-      welcomeHtml:
-        '<p class="win-body"><strong>This window is real.</strong> Drag it by the titlebar, resize from any edge, throw it against the screen edge to snap, or press the yellow dot to minimize into the dock.</p><p class="win-body" style="margin-top:10px">Keyboard works too: focus me and use arrow keys, Shift+arrows to resize, F6 to cycle windows.</p>',
-      terminalTitle: 'terminal — zsh',
-      metricsTitle: 'metrics',
-      metrics: [
-        ['<10 kB', 'core, gzip'],
-        ['0', 'dependencies'],
-        ['100%', 'unit coverage'],
-        ['164', 'e2e scenarios'],
-      ],
-      playgroundTitle: 'playground',
-      playgroundHint: 'Poke the manager from here:',
-      actions: { open: '+ window', modal: 'modal', stress: 'stress ×15', snap: 'snap left' },
-      spawnedTitle: 'window',
-      spawnedBody: 'A fresh window. Drag me around.',
-      modalTitle: 'modal window',
-      modalBody: 'Focus is trapped here until you close me. Try clicking the windows behind.',
-    },
+const en: Dict = {
+  meta: {
+    title: 'wmkit — headless window manager for the web',
+    description:
+      'Draggable, resizable, snappable windows for any web app. Headless core under 12 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps.',
   },
-  ru: {
-    meta: {
-      title: 'wmkit — headless оконный менеджер для веба',
-      description:
-        'Перетаскиваемые окна с ресайзом, снэпом и таскбаром для любого веб-приложения. Headless-ядро, адаптеры для React, Vue, Svelte и Solid, полноценная доступность, 60fps.',
-    },
-    ui: {
-      'nav.features': 'Возможности',
-      'nav.frameworks': 'Фреймворки',
-      'nav.compare': 'Сравнение',
-      'hero.eyebrow': 'headless оконный менеджер',
-      'hero.title1': 'Окна.',
-      'hero.title2': 'В вашем приложении.',
-      'hero.title3': 'На любом фреймворке.',
-      'hero.sub':
-        'Перетаскивание, ресайз, снэп, сворачивание — полноценный рабочий стол внутри страницы. Headless-ядро без зависимостей, адаптеры для React, Vue, Svelte и Solid. Все окна на этой странице настоящие — хватайте любое.',
-      'hero.copy': 'Скопировать команду установки',
-      'hero.cta1': 'Начать',
-      'hero.badge1': 'зависимостей',
-      'hero.badge2': 'ядро, gzip',
-      'hero.badge3': 'покрытие тестами',
-      'hero.badge4': 'лицензия',
-      'dock.plus': 'Открыть новое окно',
-      'features.title': 'Всё, что умеет рабочий стол',
-      'features.sub':
-        'Ядро хранит состояние, DOM-слой двигает пиксели, ваш фреймворк рендерит содержимое.',
-      'fw.title': 'Одно ядро — пять способов держать его в руках',
-      'fw.sub':
-        'Содержимое окна всегда живёт в дереве вашего фреймворка — никакого innerHTML и порталов в пустоту. Адаптеры — тонкий сахар над одной стейт-машиной.',
-      'cmp.title': 'Честное сравнение',
-      'cmp.sub': 'Ниша плавающих окон затихла годы назад. Именно поэтому wmkit существует.',
-      'cmp.note':
-        'Данные проверены 10 июля 2026: последние коммиты, скачивания npm, открытые запросы фич.',
-      'outro.title': 'Дайте вашему приложению окна',
-      'outro.star': 'Звезда на GitHub',
-      'footer.made': 'Эта страница работает на самом wmkit — потаскайте окна выше.',
-    },
-    features: [
-      {
-        icon: '◲',
-        title: 'Headless по замыслу',
-        text: 'Сериализуемая стейт-машина плюс DOM-контроллер. Своя разметка и стили — или готовая стеклянная тема.',
-      },
-      {
-        icon: '⌘',
-        title: 'Родные адаптеры',
-        text: 'React, Vue, Svelte, Solid и vanilla делят одно ядро. Контент окна остаётся в дереве вашего фреймворка.',
-      },
-      {
-        icon: '⌨',
-        title: 'Доступность по-настоящему',
-        text: 'Перемещение и ресайз с клавиатуры, цикл по F6, focus-trap в модалках, живые анонсы для скринридеров.',
-      },
-      {
-        icon: '⊞',
-        title: 'Snap-зоны',
-        text: 'Половины, четверти и максимизация от верхнего края с живым превью — ощущение FancyZones в браузере.',
-      },
-      {
-        icon: '⚡',
-        title: '60fps под нагрузкой',
-        text: 'Позиционирование только через transform, rAF-батчинг ввода, structural sharing. Пятьдесят окон таскаются гладко.',
-      },
-      {
-        icon: '⟳',
-        title: 'Встроенный персист',
-        text: 'Один вызов сериализует весь рабочий стол, один — восстанавливает после перезагрузки. Хранилище подключаемое.',
-      },
-      {
-        icon: '⇱',
-        title: 'Вынос в настоящие окна',
-        text: 'Отправьте окно в Document Picture-in-Picture — always-on-top окно ОС с тем же состоянием.',
-      },
-      {
-        icon: 'TS',
-        title: 'Строгий TypeScript',
-        text: '100% типизированный публичный API, noUncheckedIndexedAccess, ноль any. Проверено publint и attw.',
-      },
-    ],
-    compareHead: ['', 'wmkit', 'WinBox', 'jsPanel4', 'Dockview', 'Zag panel'],
-    compareRows: [
-      {
-        label: 'Поддерживается',
-        cells: [
-          { text: '✓ 2026', tone: 'yes' },
-          { text: '✗ с 2023', tone: 'no' },
-          { text: '✗ с 2022', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-      {
-        label: 'Headless-ядро',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '~ свой UI', tone: 'warn' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-      {
-        label: 'Официальные адаптеры',
-        cells: [
-          { text: 'React·Vue·Svelte·Solid', tone: 'yes' },
-          { text: 'только сторонние', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-          { text: 'React·Vue·Angular', tone: 'yes' },
-          { text: 'через Ark UI', tone: 'warn' },
-        ],
-      },
-      {
-        label: 'Мультиокна: z-order, таскбар, модалки',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: 'частично', tone: 'warn' },
-          { text: 'частично', tone: 'warn' },
-          { text: 'док-группы', tone: 'warn' },
-          { text: '✗ одна панель', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Snap-зоны',
-        cells: [
-          { text: '✓ с превью', tone: 'yes' },
-          { text: '✗ (открытый запрос)', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '—', tone: 'plain' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Клавиатура + скринридер',
-        cells: [
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: 'частично', tone: 'warn' },
-          { text: 'частично', tone: 'warn' },
-        ],
-      },
-      {
-        label: 'Персист состояния',
-        cells: [
-          { text: '✓ из коробки', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'Вынос окна (Document PiP)',
-        cells: [
-          { text: '✓ experimental', tone: 'yes' },
-          { text: '✗', tone: 'no' },
-          { text: '✗', tone: 'no' },
-          { text: 'window.open', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-        ],
-      },
-      {
-        label: 'TypeScript',
-        cells: [
-          { text: 'strict', tone: 'yes' },
-          { text: 'только @types', tone: 'warn' },
-          { text: '✗', tone: 'no' },
-          { text: '✓', tone: 'yes' },
-          { text: '✓', tone: 'yes' },
-        ],
-      },
-    ],
-    windows: {
-      welcomeTitle: 'привет.app',
-      welcomeHtml:
-        '<p class="win-body"><strong>Это окно настоящее.</strong> Тащите за заголовок, ресайзьте за любую грань, бросьте к краю экрана — оно приснэпится, а жёлтая точка свернёт его в док.</p><p class="win-body" style="margin-top:10px">Клавиатура тоже работает: сфокусируйте меня и двигайте стрелками, Shift+стрелки — ресайз, F6 — цикл по окнам.</p>',
-      terminalTitle: 'терминал — zsh',
-      metricsTitle: 'метрики',
-      metrics: [
-        ['<10 кБ', 'ядро, gzip'],
-        ['0', 'зависимостей'],
-        ['100%', 'покрытие юнитами'],
-        ['164', 'e2e-сценария'],
-      ],
-      playgroundTitle: 'песочница',
-      playgroundHint: 'Потыкайте менеджер отсюда:',
-      actions: { open: '+ окно', modal: 'модалка', stress: 'стресс ×15', snap: 'снэп влево' },
-      spawnedTitle: 'окно',
-      spawnedBody: 'Свежее окно. Потаскайте меня.',
-      modalTitle: 'модальное окно',
-      modalBody: 'Фокус заперт здесь, пока не закроете. Попробуйте кликнуть окна позади.',
-    },
+  ui: {
+    skip: 'Skip to documentation',
+    'hero.eyebrow': 'headless window manager · 0 dependencies',
+    'hero.line1': 'WINDOWS',
+    'hero.line2': 'in your web app',
+    'hero.lede':
+      'Drag, resize, snap, minimize, undo — a real desktop inside the page. Every window you see is the library doing its job. Grab one.',
+    'hero.launch': 'Open the desktop',
+    'hero.docs': 'Read the docs',
+    'hero.hint':
+      'drag a titlebar to a screen edge to snap · ⌘⌥← / → snap · ⌘Z undo · F6 cycle · ? help',
+    'features.kicker': '01 — capabilities',
+    'features.title': 'Everything a desktop has',
+    'features.sub':
+      'The core keeps state, the DOM layer moves pixels, your framework renders content. Each piece is replaceable.',
+    'fw.kicker': '02 — adapters',
+    'fw.title': 'One core, six ways to hold it',
+    'fw.sub':
+      'Window content always lives in your own component tree — no innerHTML, no portals into the void. Adapters are thin sugar over the same state machine.',
+    'fw.open': 'Open code.ts in the desktop ↗',
+    'cmp.kicker': '03 — landscape',
+    'cmp.title': 'Honest comparison',
+    'cmp.sub': 'The floating-window niche went quiet years ago. That is exactly why wmkit exists.',
+    'cmp.note': 'Checked on July 26, 2026: last commits, npm downloads, open feature requests.',
+    'outro.title': 'Give your app windows',
+    'footer.made': 'This page runs on wmkit itself.',
+    'footer.back': '↑ Back to the demo',
+    'copy.aria': 'Copy install command',
   },
+  menus: [
+    {
+      id: 'window',
+      label: 'Window',
+      items: [
+        { id: 'new', label: 'New window' },
+        { id: 'tile', label: 'Tile' },
+        { id: 'cascade', label: 'Cascade' },
+        { id: 'center', label: 'Center active' },
+        { id: 'back', label: 'Send to back' },
+        { id: 'minimizeAll', label: 'Minimize all' },
+        { id: 'restoreAll', label: 'Restore all' },
+        { id: 'closeAll', label: 'Close all' },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      items: [
+        { id: 'undo', label: 'Undo', key: '⌘Z' },
+        { id: 'redo', label: 'Redo', key: '⌘⇧Z' },
+        { id: 'saveLayout', label: 'Save layout' },
+        { id: 'reset', label: 'Reset desktop' },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      items: [
+        { id: 'shortcuts', label: 'Keyboard shortcuts', key: '?' },
+        { id: 'readme', label: 'About wmkit' },
+        { id: 'github', label: 'GitHub ↗' },
+        { id: 'npm', label: 'npm ↗' },
+      ],
+    },
+  ],
+  apps: {
+    readme: { title: 'readme.md', icon: '◆' },
+    terminal: { title: 'terminal', icon: '›_' },
+    inspector: { title: 'inspector', icon: '◈' },
+    layouts: { title: 'layouts', icon: '▤' },
+    code: { title: 'code.ts', icon: '{}' },
+    bench: { title: 'bench', icon: '▲' },
+    paint: { title: 'paint', icon: '✎' },
+    settings: { title: 'settings', icon: '⚙' },
+    shortcuts: { title: 'shortcuts', icon: '⌘' },
+  },
+  readme: {
+    lead: 'A window manager with no opinion about your UI.',
+    body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid and Angular are thin wrappers over the same object — around 60 lines each.',
+    badges: [
+      ['0', 'dependencies'],
+      ['<12 kB', 'brotli core'],
+      ['100%', 'core coverage'],
+      ['MIT', 'license'],
+    ],
+  },
+  terminal: {
+    hello: 'wmkit shell — type "help" for commands',
+    help: 'open [title] · close <id> · focus <id> · snap <zone> · tile · cascade · undo · redo · workspace <n> · theme <glass|light|retro> · state · clear',
+    unknown: 'unknown command:',
+    gone: 'no such window:',
+  },
+  inspector: { events: 'event log', empty: 'no events yet — move a window' },
+  layouts: {
+    zones: 'snap the active window',
+    arrange: 'arrange',
+    history: 'history',
+    saved: 'saved layouts',
+    save: 'save current',
+    none: 'nothing saved yet',
+  },
+  bench: {
+    lead: 'Open a burst of windows in one batch and measure the commit.',
+    run: 'open 50 windows',
+    opened: 'windows opened in',
+    frame: 'state commit',
+    note: 'One batch, one re-render, one layout pass. Close them from Window → Close all.',
+  },
+  paint: {
+    lead: 'The canvas keeps its pixels through drag, resize and minimize — content is never re-parented. Aspect ratio is locked to 4:3.',
+    clear: 'clear',
+  },
+  settings: {
+    theme: 'theme',
+    magnetism: 'edge magnetism',
+    snap: 'snap zones',
+    announce: 'screen reader announcements',
+    on: 'on',
+    off: 'off',
+  },
+  shortcuts: [
+    ['drag titlebar', 'move the window'],
+    ['drag to edge', 'snap to half or quarter'],
+    ['drag to top', 'maximize'],
+    ['double click titlebar', 'toggle maximize'],
+    ['arrows', 'move by 16px'],
+    ['alt + arrows', 'move by 1px'],
+    ['shift + arrows', 'resize'],
+    ['⌘ / ctrl + alt + ← →', 'snap to half'],
+    ['⌘ / ctrl + alt + ↑ ↓', 'maximize / minimize'],
+    ['⌘ / ctrl + Z', 'undo'],
+    ['⌘ / ctrl + shift + Z', 'redo'],
+    ['F6 / shift + F6', 'cycle focus'],
+    ['escape while dragging', 'cancel the drag'],
+    ['?', 'this window'],
+  ],
+  features: [
+    {
+      title: 'Headless core',
+      text: 'A pure state machine with events. Render it with anything — or nothing, and test it in Node.',
+    },
+    {
+      title: 'Snap and magnetism',
+      text: 'Halves, quarters, thirds and maximize on edge drop, plus 8px edge magnetism against neighbours.',
+    },
+    {
+      title: 'Undo and redo',
+      text: 'Every interaction is one history entry. A drag is a single undo, not sixty move events.',
+    },
+    {
+      title: 'Workspaces',
+      text: 'Park windows on virtual desktops. Focus follows the window across workspaces.',
+    },
+    {
+      title: 'Persistence',
+      text: 'Serialize to JSON, hydrate back, or drop in the persist plugin with versioned migrations.',
+    },
+    {
+      title: 'Accessibility',
+      text: 'Roles, labels, a focus trap for modals, keyboard control and a live region that narrates the desktop.',
+    },
+    {
+      title: 'Touch ready',
+      text: 'Pointer events throughout, adaptive hit areas on coarse pointers, long-press context menu.',
+    },
+    {
+      title: 'Themeable',
+      text: 'Three CSS themes ship with it — glass, light and retro — and every value is a custom property.',
+    },
+  ],
+  frameworks: [
+    ['vanilla', 'attachDesktop + attachWindow'],
+    ['react', 'useWindowManager, useDesktop'],
+    ['vue', 'useDesktop with template refs'],
+    ['svelte', 'use:desktop actions'],
+    ['solid', 'signals and ref callbacks'],
+    ['angular', 'signals and DestroyRef'],
+  ],
+  compareHead: ['', 'wmkit', 'react-rnd', 'dockview', 'winbox.js'],
+  compareRows: [
+    {
+      label: 'Framework agnostic',
+      cells: [
+        { text: 'yes', tone: 'good' },
+        { text: 'react only', tone: 'bad' },
+        { text: 'react only', tone: 'bad' },
+        { text: 'yes', tone: 'good' },
+      ],
+    },
+    {
+      label: 'Headless core',
+      cells: [
+        { text: 'yes', tone: 'good' },
+        { text: 'no', tone: 'bad' },
+        { text: 'no', tone: 'bad' },
+        { text: 'no', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Snap zones',
+      cells: [
+        { text: 'halves, quarters, thirds', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+        { text: 'dock grid', tone: 'plain' },
+        { text: 'halves', tone: 'plain' },
+      ],
+    },
+    {
+      label: 'Undo / redo',
+      cells: [
+        { text: 'built in', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+        { text: 'none', tone: 'bad' },
+        { text: 'none', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Workspaces',
+      cells: [
+        { text: 'built in', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+        { text: 'none', tone: 'bad' },
+        { text: 'none', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Serialize / restore',
+      cells: [
+        { text: 'core + plugin', tone: 'good' },
+        { text: 'roll your own', tone: 'bad' },
+        { text: 'yes', tone: 'good' },
+        { text: 'partial', tone: 'plain' },
+      ],
+    },
+    {
+      label: 'Keyboard control',
+      cells: [
+        { text: 'move, resize, snap, cycle', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+        { text: 'partial', tone: 'plain' },
+        { text: 'none', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Live region for AT',
+      cells: [
+        { text: 'yes', tone: 'good' },
+        { text: 'no', tone: 'bad' },
+        { text: 'no', tone: 'bad' },
+        { text: 'no', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Content ownership',
+      cells: [
+        { text: 'your tree', tone: 'good' },
+        { text: 'your tree', tone: 'good' },
+        { text: 'your tree', tone: 'good' },
+        { text: 'innerHTML', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Bundle (brotli)',
+      cells: [
+        { text: '~11 kB', tone: 'good' },
+        { text: '~14 kB', tone: 'plain' },
+        { text: '~60 kB', tone: 'bad' },
+        { text: '~10 kB', tone: 'good' },
+      ],
+    },
+  ],
 }
+
+const ru: Dict = {
+  meta: {
+    title: 'wmkit — headless-оконный менеджер для веба',
+    description:
+      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 12 кБ, адаптеры для React, Vue, Svelte, Solid и Angular, рабочие столы, undo/redo, доступность и 60fps.',
+  },
+  ui: {
+    skip: 'Перейти к документации',
+    'hero.eyebrow': 'headless-оконный менеджер · 0 зависимостей',
+    'hero.line1': 'ОКНА',
+    'hero.line2': 'в вашем веб-приложении',
+    'hero.lede':
+      'Тащить, растягивать, прилипать, сворачивать, отменять — настоящий рабочий стол внутри страницы. Каждое окно здесь это работа самой библиотеки. Возьмите любое.',
+    'hero.launch': 'Открыть рабочий стол',
+    'hero.docs': 'Документация',
+    'hero.hint':
+      'тащите заголовок к краю для прилипания · ⌘⌥← / → прилипание · ⌘Z отмена · F6 обход · ? помощь',
+    'features.kicker': '01 — возможности',
+    'features.title': 'Всё, что есть у рабочего стола',
+    'features.sub':
+      'Ядро хранит состояние, DOM-слой двигает пиксели, ваш фреймворк рисует содержимое. Любую часть можно заменить.',
+    'fw.kicker': '02 — адаптеры',
+    'fw.title': 'Одно ядро, шесть способов взять его в руки',
+    'fw.sub':
+      'Содержимое окна всегда живёт в вашем дереве компонентов — никакого innerHTML и порталов в пустоту. Адаптеры это тонкий сахар над одной и той же машиной состояний.',
+    'fw.open': 'Открыть код.ts на рабочем столе ↗',
+    'cmp.kicker': '03 — рынок',
+    'cmp.title': 'Честное сравнение',
+    'cmp.sub': 'Ниша плавающих окон затихла много лет назад. Ровно поэтому wmkit и существует.',
+    'cmp.note': 'Проверено 26 июля 2026: последние коммиты, загрузки npm, открытые запросы фич.',
+    'outro.title': 'Дайте приложению окна',
+    'footer.made': 'Эта страница работает на самом wmkit.',
+    'footer.back': '↑ Вернуться к демо',
+    'copy.aria': 'Скопировать команду установки',
+  },
+  menus: [
+    {
+      id: 'window',
+      label: 'Окно',
+      items: [
+        { id: 'new', label: 'Новое окно' },
+        { id: 'tile', label: 'Плиткой' },
+        { id: 'cascade', label: 'Каскадом' },
+        { id: 'center', label: 'По центру' },
+        { id: 'back', label: 'На задний план' },
+        { id: 'minimizeAll', label: 'Свернуть все' },
+        { id: 'restoreAll', label: 'Развернуть все' },
+        { id: 'closeAll', label: 'Закрыть все' },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Правка',
+      items: [
+        { id: 'undo', label: 'Отменить', key: '⌘Z' },
+        { id: 'redo', label: 'Повторить', key: '⌘⇧Z' },
+        { id: 'saveLayout', label: 'Сохранить раскладку' },
+        { id: 'reset', label: 'Сбросить стол' },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Помощь',
+      items: [
+        { id: 'shortcuts', label: 'Горячие клавиши', key: '?' },
+        { id: 'readme', label: 'О wmkit' },
+        { id: 'github', label: 'GitHub ↗' },
+        { id: 'npm', label: 'npm ↗' },
+      ],
+    },
+  ],
+  apps: {
+    readme: { title: 'читай.md', icon: '◆' },
+    terminal: { title: 'терминал', icon: '›_' },
+    inspector: { title: 'инспектор', icon: '◈' },
+    layouts: { title: 'раскладки', icon: '▤' },
+    code: { title: 'код.ts', icon: '{}' },
+    bench: { title: 'бенчмарк', icon: '▲' },
+    paint: { title: 'рисовалка', icon: '✎' },
+    settings: { title: 'настройки', icon: '⚙' },
+    shortcuts: { title: 'клавиши', icon: '⌘' },
+  },
+  readme: {
+    lead: 'Оконный менеджер без единого мнения о вашем интерфейсе.',
+    body: 'Ядро это чистая машина состояний: знает границы, порядок, стадии и фокус, и никогда не трогает DOM. DOM-слой превращает события указателя в переходы состояний на 60fps. Адаптеры для React, Vue, Svelte, Solid и Angular это тонкие обёртки над одним и тем же объектом, около 60 строк каждая.',
+    badges: [
+      ['0', 'зависимостей'],
+      ['<12 кБ', 'ядро в brotli'],
+      ['100%', 'покрытие ядра'],
+      ['MIT', 'лицензия'],
+    ],
+  },
+  terminal: {
+    hello: 'оболочка wmkit — введите "help" для списка команд',
+    help: 'open [заголовок] · close <id> · focus <id> · snap <зона> · tile · cascade · undo · redo · workspace <n> · theme <glass|light|retro> · state · clear',
+    unknown: 'неизвестная команда:',
+    gone: 'нет такого окна:',
+  },
+  inspector: { events: 'журнал событий', empty: 'пока пусто — подвигайте окно' },
+  layouts: {
+    zones: 'прилепить активное окно',
+    arrange: 'расставить',
+    history: 'история',
+    saved: 'сохранённые раскладки',
+    save: 'сохранить текущую',
+    none: 'пока ничего не сохранено',
+  },
+  bench: {
+    lead: 'Открыть пачку окон одной транзакцией и замерить коммит.',
+    run: 'открыть 50 окон',
+    opened: 'окон открыто за',
+    frame: 'коммит состояния',
+    note: 'Одна транзакция, одна перерисовка, один проход layout. Закрыть — Окно → Закрыть все.',
+  },
+  paint: {
+    lead: 'Холст сохраняет пиксели при перетаскивании, растягивании и сворачивании — содержимое никогда не перевешивается в другой узел. Пропорции зафиксированы 4:3.',
+    clear: 'очистить',
+  },
+  settings: {
+    theme: 'тема',
+    magnetism: 'магнетизм краёв',
+    snap: 'зоны прилипания',
+    announce: 'объявления для скринридера',
+    on: 'вкл',
+    off: 'выкл',
+  },
+  shortcuts: [
+    ['тащить заголовок', 'двигать окно'],
+    ['тащить к краю', 'прилипание к половине или четверти'],
+    ['тащить вверх', 'развернуть'],
+    ['двойной клик по заголовку', 'развернуть или восстановить'],
+    ['стрелки', 'двигать на 16px'],
+    ['alt + стрелки', 'двигать на 1px'],
+    ['shift + стрелки', 'менять размер'],
+    ['⌘ / ctrl + alt + ← →', 'прилипание к половине'],
+    ['⌘ / ctrl + alt + ↑ ↓', 'развернуть или свернуть'],
+    ['⌘ / ctrl + Z', 'отменить'],
+    ['⌘ / ctrl + shift + Z', 'повторить'],
+    ['F6 / shift + F6', 'обход фокуса'],
+    ['escape при перетаскивании', 'отменить перетаскивание'],
+    ['?', 'это окно'],
+  ],
+  features: [
+    {
+      title: 'Headless-ядро',
+      text: 'Чистая машина состояний с событиями. Рисуйте чем угодно — или ничем, и тестируйте в Node.',
+    },
+    {
+      title: 'Прилипание и магнетизм',
+      text: 'Половины, четверти, трети и разворот при броске к краю, плюс магнетизм 8px к соседям.',
+    },
+    {
+      title: 'Отмена и повтор',
+      text: 'Каждое взаимодействие это одна запись истории. Перетаскивание — одна отмена, а не шестьдесят.',
+    },
+    {
+      title: 'Рабочие столы',
+      text: 'Раскладывайте окна по виртуальным столам. Фокус переносит вас на нужный стол.',
+    },
+    {
+      title: 'Сохранение',
+      text: 'Сериализация в JSON, восстановление обратно или плагин persist с версионированными миграциями.',
+    },
+    {
+      title: 'Доступность',
+      text: 'Роли, метки, ловушка фокуса для модалок, управление с клавиатуры и live-регион, который озвучивает стол.',
+    },
+    {
+      title: 'Готово к тачу',
+      text: 'Pointer events везде, увеличенные зоны захвата на грубом указателе, контекстное меню по долгому нажатию.',
+    },
+    {
+      title: 'Темы',
+      text: 'В комплекте три CSS-темы — glass, light и retro — и каждое значение это custom property.',
+    },
+  ],
+  frameworks: [
+    ['vanilla', 'attachDesktop + attachWindow'],
+    ['react', 'useWindowManager, useDesktop'],
+    ['vue', 'useDesktop с template ref'],
+    ['svelte', 'экшены use:desktop'],
+    ['solid', 'сигналы и ref-колбэки'],
+    ['angular', 'сигналы и DestroyRef'],
+  ],
+  compareHead: ['', 'wmkit', 'react-rnd', 'dockview', 'winbox.js'],
+  compareRows: [
+    {
+      label: 'Не зависит от фреймворка',
+      cells: [
+        { text: 'да', tone: 'good' },
+        { text: 'только react', tone: 'bad' },
+        { text: 'только react', tone: 'bad' },
+        { text: 'да', tone: 'good' },
+      ],
+    },
+    {
+      label: 'Headless-ядро',
+      cells: [
+        { text: 'да', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Зоны прилипания',
+      cells: [
+        { text: 'половины, четверти, трети', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'док-сетка', tone: 'plain' },
+        { text: 'половины', tone: 'plain' },
+      ],
+    },
+    {
+      label: 'Отмена и повтор',
+      cells: [
+        { text: 'встроено', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Рабочие столы',
+      cells: [
+        { text: 'встроено', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Сериализация и восстановление',
+      cells: [
+        { text: 'ядро + плагин', tone: 'good' },
+        { text: 'своими руками', tone: 'bad' },
+        { text: 'да', tone: 'good' },
+        { text: 'частично', tone: 'plain' },
+      ],
+    },
+    {
+      label: 'Управление с клавиатуры',
+      cells: [
+        { text: 'движение, размер, прилипание, обход', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'частично', tone: 'plain' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Live-регион для скринридера',
+      cells: [
+        { text: 'да', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Кто владеет содержимым',
+      cells: [
+        { text: 'ваше дерево', tone: 'good' },
+        { text: 'ваше дерево', tone: 'good' },
+        { text: 'ваше дерево', tone: 'good' },
+        { text: 'innerHTML', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Размер (brotli)',
+      cells: [
+        { text: '~11 кБ', tone: 'good' },
+        { text: '~14 кБ', tone: 'plain' },
+        { text: '~60 кБ', tone: 'bad' },
+        { text: '~10 кБ', tone: 'good' },
+      ],
+    },
+  ],
+}
+
+export const dictionaries: Record<Lang, Dict> = { en, ru }

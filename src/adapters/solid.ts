@@ -36,6 +36,7 @@ export interface SolidDesktop {
 
 export function createDesktop(wm: WindowManager, options?: DesktopOptions): SolidDesktop {
   const binder = createDesktopBinder(wm, options)
+  disposeWithOwner(() => binder.destroy())
   return {
     binder,
     desktop(element) {

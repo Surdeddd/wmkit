@@ -31,9 +31,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm test:coverage
       - run: pnpm build
+      - run: pnpm size
       - run: pnpm publint
+      - run: pnpm attw
       - run: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -91,7 +91,9 @@ export function createDragStarter(ctx: SessionContext) {
         for (const otherId of state.order) {
           if (otherId === id) continue
           const other = state.windows[otherId]
-          if (other && other.stage !== 'minimized') targets.push(other.bounds)
+          if (other && other.stage !== 'minimized' && other.workspace === state.workspace) {
+            targets.push(other.bounds)
+          }
         }
         const magnet = magnetize(
           { x: nextX, y: nextY, width: current.bounds.width, height: current.bounds.height },
@@ -131,7 +133,7 @@ export function createDragStarter(ctx: SessionContext) {
         const travelled =
           Math.abs(movePoint.x - (session.startBounds.x + session.grabDX)) +
           Math.abs(movePoint.y - (session.startBounds.y + session.grabDY))
-        if (travelled < 3 && session.restored) return
+        if (travelled < 3) return
         session.moved = true
         if (el) {
           el.dataset.wmDragging = ''
@@ -163,43 +165,43 @@ export function createDragStarter(ctx: SessionContext) {
 
     function finish(cancelled: boolean): void {
       if (ctx.currentDrag() !== session) return
-      if (session.raf !== 0) view.cancelAnimationFrame(session.raf)
-      if (session.hasPending && !cancelled) flush()
-      ctx.releaseDrag(session)
-      releaseRect()
-      handle.removeEventListener('pointermove', onMove)
-      handle.removeEventListener('pointerup', onUp)
-      handle.removeEventListener('pointercancel', onCancel)
-      doc.removeEventListener('keydown', onKeydown, true)
-      if (handle.hasPointerCapture(session.pointerId)) {
-        handle.releasePointerCapture(session.pointerId)
-      }
-      if (el) {
-        delete el.dataset.wmDragging
-        el.style.willChange = ''
-      }
-      ctx.hidePreview()
-
-      if (cancelled) {
-        if (session.moved && session.restored) {
-          if (session.startStage === 'maximized') {
-            wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
-            wm.maximize(id)
-          } else if (session.startStage === 'snapped' && session.startZone) {
-            wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
-            wm.snap(id, session.startZone)
-          } else {
-            wm.move(id, session.startBounds.x, session.startBounds.y)
+      try {
+        if (session.raf !== 0) view.cancelAnimationFrame(session.raf)
+        if (session.hasPending && !cancelled) flush()
+        if (cancelled) {
+          if (session.moved && session.restored) {
+            if (session.startStage === 'maximized') {
+              wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
+              wm.maximize(id)
+            } else if (session.startStage === 'snapped' && session.startZone) {
+              wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
+              wm.snap(id, session.startZone)
+            } else {
+              wm.move(id, session.startBounds.x, session.startBounds.y)
+            }
           }
+        } else if (session.moved && session.zone) {
+          if (session.zone === 'maximize') wm.maximize(id)
+          else wm.snap(id, session.zone)
         }
-        wm.endInteraction()
-        return
+      } finally {
+        ctx.releaseDrag(session)
+        releaseRect()
+        handle.removeEventListener('pointermove', onMove)
+        handle.removeEventListener('pointerup', onUp)
+        handle.removeEventListener('pointercancel', onCancel)
+        doc.removeEventListener('keydown', onKeydown, true)
+        if (handle.hasPointerCapture(session.pointerId)) {
+          handle.releasePointerCapture(session.pointerId)
+        }
+        if (el) {
+          delete el.dataset.wmDragging
+          el.style.willChange = ''
+        }
+        ctx.hidePreview()
+        if (cancelled) wm.abortInteraction()
+        else wm.endInteraction()
       }
-      if (session.moved && session.zone) {
-        if (session.zone === 'maximize') wm.maximize(id)
-        else wm.snap(id, session.zone)
-      }
-      wm.endInteraction()
     }
 
     session.finish = finish

@@ -1,7 +1,7 @@
 export const snippets: Array<{ id: string; label: string; code: string }> = [
   {
     id: 'vanilla',
-    label: 'Vanilla',
+    label: 'vanilla',
     code: `import { createWindowManager, attachDesktop } from '@surdeddd/wmkit'
 import '@surdeddd/wmkit/themes/glass.css'
 
@@ -12,12 +12,15 @@ const win = wm.open({ title: 'Hello', width: 420, height: 280 })
 desktop.attachWindow(win.id, myWindowElement)
 
 wm.on('stage', ({ window }) => console.log(window.title, window.stage))
-wm.snap(win.id, 'left')`,
+wm.snap(win.id, 'left-third')
+wm.undo()`,
   },
   {
     id: 'react',
-    label: 'React',
-    code: `import { useWindowManager, useDesktop, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
+    label: 'react',
+    code: `import {
+  useWindowManager, useDesktop, useWmState, useWmWindowRef,
+} from '@surdeddd/wmkit/react'
 
 function Desktop() {
   const wm = useWindowManager()
@@ -39,97 +42,127 @@ function Win({ binder, win }) {
     <section ref={ref}>
       <header data-wm-drag>
         <span data-wm-title>{win.title}</span>
-        <button data-wm-close aria-label="Close" />
+        <button data-wm-close />
       </header>
-      <div data-wm-content>anything you render stays yours</div>
+      <div data-wm-content>{win.meta.body}</div>
     </section>
   )
 }`,
   },
   {
     id: 'vue',
-    label: 'Vue',
-    code: `<script setup>
+    label: 'vue',
+    code: `<script setup lang="ts">
 import { ref } from 'vue'
-import { useWindowManager, useDesktop, useWmWindowEl, useWmState } from '@surdeddd/wmkit/vue'
+import { useWindowManager, useDesktop, useWmState, useWmWindowEl } from '@surdeddd/wmkit/vue'
 
+const host = ref<HTMLElement>()
 const wm = useWindowManager()
-const desktopEl = ref(null)
-const binder = useDesktop(wm, desktopEl)
+const binder = useDesktop(wm, host)
 const state = useWmState(wm)
 
-const noteEl = ref(null)
-useWmWindowEl(binder, 'note', noteEl)
-wm.open({ id: 'note', title: 'Заметка' })
+const panel = ref<HTMLElement>()
+useWmWindowEl(binder, 'notes', panel)
+wm.open({ id: 'notes', title: 'Notes' })
 </script>
 
 <template>
-  <div ref="desktopEl" class="desktop">
-    <section ref="noteEl">
-      <header data-wm-drag><span data-wm-title>{{ state.windows.note?.title }}</span></header>
-      <div data-wm-content>composables all the way down</div>
+  <div ref="host" class="desktop">
+    <section ref="panel">
+      <header data-wm-drag><span data-wm-title>Notes</span></header>
+      <div data-wm-content>{{ state.order.length }} windows</div>
     </section>
   </div>
 </template>`,
   },
   {
     id: 'svelte',
-    label: 'Svelte',
-    code: `<script>
-  import { createManager, createDesktop, wmWindowStore } from '@surdeddd/wmkit/svelte'
+    label: 'svelte',
+    code: `<script lang="ts">
+  import { createManager, createDesktop, wmStore } from '@surdeddd/wmkit/svelte'
 
   const wm = createManager()
   const dk = createDesktop(wm)
-  wm.open({ id: 'main', title: 'Hello' })
-  const main = wmWindowStore(wm, 'main')
+  const state = wmStore(wm)
+
+  wm.open({ id: 'notes', title: 'Notes' })
 </script>
 
-<div use:dk.desktop class="desktop">
-  <section use:dk.window={{ id: 'main' }}>
-    <header data-wm-drag><span data-wm-title>{$main?.title}</span></header>
-    <div data-wm-content>stores and actions, no wrappers</div>
+<div class="desktop" use:dk.desktop>
+  <section use:dk.window={{ id: 'notes' }}>
+    <header data-wm-drag><span data-wm-title>Notes</span></header>
+    <div data-wm-content>{$state.order.length} windows</div>
   </section>
 </div>`,
   },
   {
     id: 'solid',
-    label: 'Solid',
-    code: `import { For } from 'solid-js'
-import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
+    label: 'solid',
+    code: `import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
 
 function Desktop() {
   const wm = useWindowManager()
   const dk = createDesktop(wm)
   const state = useWmState(wm)
-  wm.open({ title: 'Hello' })
+
+  wm.open({ id: 'notes', title: 'Notes' })
 
   return (
-    <div ref={dk.desktop} class="desktop">
-      <For each={state().order}>
-        {(id) => (
-          <section ref={dk.window(id)}>
-            <header data-wm-drag>
-              <span data-wm-title>{state().windows[id]?.title}</span>
-            </header>
-            <div data-wm-content>fine-grained, obviously</div>
-          </section>
-        )}
-      </For>
+    <div class="desktop" ref={dk.desktop}>
+      <section ref={dk.window('notes')}>
+        <header data-wm-drag><span data-wm-title>Notes</span></header>
+        <div data-wm-content>{state().order.length} windows</div>
+      </section>
     </div>
   )
 }`,
   },
+  {
+    id: 'angular',
+    label: 'angular',
+    code: `import { Component, ElementRef, viewChild, afterNextRender } from '@angular/core'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-desktop',
+  template: \`
+    <div class="desktop" #host>
+      <section #panel>
+        <header data-wm-drag><span data-wm-title>Notes</span></header>
+        <div data-wm-content>{{ state().order.length }} windows</div>
+      </section>
+    </div>\`,
+})
+export class DesktopComponent {
+  private host = viewChild.required<ElementRef>('host')
+  private panel = viewChild.required<ElementRef>('panel')
+  wm = useWindowManager()
+  state = useWmState(this.wm)
+
+  constructor() {
+    const dk = createDesktop(this.wm)
+    afterNextRender(() => {
+      dk.desktop(this.host().nativeElement)
+      this.wm.open({ id: 'notes', title: 'Notes' })
+      dk.window('notes')(this.panel().nativeElement)
+    })
+  }
+}`,
+  },
 ]
 
-const escapeHtml = (raw: string) =>
-  raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-
-const TOKEN =
-  /(\/\/[^\n]*)|('[^'\n]*'|`[^`]*`|"[^"\n]*")|\b(import|from|export|const|let|function|return|new|await|async|setup|use|each)\b|\b(\d+)\b/g
+const KEYWORDS =
+  /\b(import|from|const|let|function|return|export|class|new|await|async|type|interface|private|constructor)\b/g
 
 export function highlight(code: string): string {
-  return escapeHtml(code).replace(TOKEN, (match, cm, str, kw) => {
-    const cls = cm ? 'cm' : str ? 'str' : kw ? 'kw' : 'num'
-    return `<span class="tok-${cls}">${match}</span>`
-  })
+  const escaped = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  return escaped
+    .replace(/(\/\/[^\n]*)/g, '<span class="com">$1</span>')
+    .replace(/('[^'\n]*'|`[^`]*`)/g, '<span class="str">$1</span>')
+    .replace(KEYWORDS, '<span class="kw">$1</span>')
+    .replace(/\b([a-zA-Z_$][\w$]*)\(/g, '<span class="fn">$1</span>(')
 }

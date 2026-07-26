@@ -6,139 +6,172 @@
     <title>wmkit — headless window manager for the web</title>
     <meta
       name="description"
-      content="Draggable, resizable, snappable windows for any web app. Headless core, adapters for React, Vue, Svelte and Solid, first-class accessibility, 60fps."
+      content="Draggable, resizable, snappable windows for any web app. Headless core under 12 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps."
     />
     <meta property="og:title" content="wmkit — headless window manager for the web" />
     <meta
       property="og:description"
-      content="Windows, taskbar, snapping and persistence for any framework. This page is built with it."
+      content="A whole desktop inside the page: windows, dock, workspaces, snapping, undo. This page is the demo — it runs on the library."
     />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#08090b" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='6' width='20' height='16' rx='4' fill='%2322d3aa'/%3E%3Crect x='9' y='11' width='20' height='16' rx='4' fill='%236366f1' fill-opacity='0.85'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0f12'/%3E%3Crect x='6' y='7' width='13' height='11' fill='none' stroke='%23d3ff4e' stroke-width='2'/%3E%3Crect x='13' y='14' width='13' height='11' fill='%23d3ff4e'/%3E%3C/svg%3E"
     />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
-    <div class="aurora" aria-hidden="true">
-      <i class="blob blob-a"></i>
-      <i class="blob blob-b"></i>
-      <i class="blob blob-c"></i>
-    </div>
-    <div class="grain" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-beam" aria-hidden="true"></div>
+    <div class="bg-noise" aria-hidden="true"></div>
 
-    <header class="nav">
-      <a class="wordmark" href="#top">wm<span>kit</span></a>
-      <nav class="nav-links" aria-label="Site">
-        <a href="#features" data-i18n="nav.features">Features</a>
-        <a href="#frameworks" data-i18n="nav.frameworks">Frameworks</a>
-        <a href="#compare" data-i18n="nav.compare">Compare</a>
-        <a href="https://github.com/Surdeddd/wmkit" rel="noreferrer">GitHub</a>
-      </nav>
-      <div class="lang">
-        <button type="button" data-lang="en" aria-pressed="true" aria-label="Switch to English">EN</button>
-        <button type="button" data-lang="ru" aria-pressed="false" aria-label="Переключить на русский">RU</button>
-      </div>
-    </header>
+    <div class="boot" id="boot" aria-hidden="true"><pre id="boot-log"></pre></div>
 
-    <main id="top">
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow" data-i18n="hero.eyebrow">headless window manager</p>
-          <h1 class="title">
-            <span data-i18n="hero.title1">Windows.</span>
-            <span class="title-accent" data-i18n="hero.title2">In your web app.</span>
-            <span data-i18n="hero.title3">Any framework.</span>
+    <a class="skip" href="#docs" data-i18n="skip">Skip to documentation</a>
+
+    <div class="shell">
+      <header class="menubar">
+        <a class="brand" href="#demo">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">wmkit</span>
+          <span class="brand-ver" id="brand-ver">v0.4</span>
+        </a>
+
+        <nav class="menus" id="menus" aria-label="Application"></nav>
+
+        <div class="menubar-spacer"></div>
+
+        <div class="workspaces" id="workspaces" role="tablist" aria-label="Workspaces"></div>
+
+        <div class="readouts" aria-hidden="true">
+          <span class="readout"><b id="stat-fps">60</b>fps</span>
+          <span class="readout"><b id="stat-win">0</b>win</span>
+        </div>
+
+        <div class="lang" id="lang">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+        </div>
+      </header>
+
+      <div class="stage" id="demo">
+        <div class="wallpaper">
+          <p class="eyebrow" data-i18n="hero.eyebrow">headless window manager · 0 dependencies</p>
+          <h1 class="wordmark">
+            <span data-i18n="hero.line1">WINDOWS</span>
+            <em data-i18n="hero.line2">in your web app</em>
           </h1>
-          <p class="sub" data-i18n="hero.sub">
-            Drag, resize, snap, minimize — a full desktop experience inside the page. Headless
-            core, zero dependencies, adapters for React, Vue, Svelte and Solid. Every window on
-            this page is real. Grab one.
+          <p class="lede" data-i18n="hero.lede">
+            Drag, resize, snap, minimize, undo — a real desktop inside the page. Every window you
+            see is the library doing its job. Grab one.
           </p>
-          <div class="install">
-            <code>pnpm add @surdeddd/wmkit</code>
-            <button type="button" class="copy" data-copy="pnpm add @surdeddd/wmkit" data-i18n-aria="hero.copy" aria-label="Copy install command">
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5 2a2 2 0 0 0-2 2v7h1.5V4A.5.5 0 0 1 5 3.5h6V2H5zm2 3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm-.5 2A.5.5 0 0 1 7 6.5h4a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V7z"/></svg>
+          <div class="wall-actions">
+            <button type="button" class="btn btn-primary" id="wall-launch" data-i18n="hero.launch">
+              Open the desktop
             </button>
+            <a class="btn" href="#docs" data-i18n="hero.docs">Read the docs</a>
           </div>
-          <div class="cta">
-            <a class="btn btn-primary" href="#frameworks" data-i18n="hero.cta1">Get started</a>
-            <a class="btn btn-ghost" href="https://github.com/Surdeddd/wmkit" rel="noreferrer">
-              <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-              GitHub
-            </a>
-          </div>
-          <ul class="badges">
-            <li><strong>0</strong> <span data-i18n="hero.badge1">dependencies</span></li>
-            <li><strong>&lt;10 kB</strong> <span data-i18n="hero.badge2">gzip core</span></li>
-            <li><strong>100%</strong> <span data-i18n="hero.badge3">test coverage</span></li>
-            <li><strong>MIT</strong> <span data-i18n="hero.badge4">license</span></li>
-          </ul>
+          <p class="hint" data-i18n="hero.hint">
+            drag a titlebar to a screen edge to snap · ⌘⌥← / → snap · ⌘Z undo · F6 cycle · ? help
+          </p>
         </div>
-        <div class="desktop-wrap">
-          <div id="desktop" class="desktop"></div>
-          <div class="dock-wrap">
-            <div id="dock" class="dock" role="toolbar" aria-label="Taskbar"></div>
-            <button type="button" id="dock-plus" class="dock-plus" data-i18n-aria="dock.plus" aria-label="Open a new window">+</button>
-          </div>
-        </div>
+
+        <div id="desktop" class="desktop"></div>
+      </div>
+
+      <footer class="dock">
+        <div class="launcher" id="launcher" role="toolbar" aria-label="Launcher"></div>
+        <div class="dock-sep" aria-hidden="true"></div>
+        <div class="tasks" id="dock" role="toolbar" aria-label="Taskbar"></div>
+      </footer>
+    </div>
+
+    <main class="longform" id="docs">
+      <section class="band" id="features">
+        <header class="band-head">
+          <p class="kicker" data-i18n="features.kicker">01 — capabilities</p>
+          <h2 data-i18n="features.title">Everything a desktop has</h2>
+          <p class="band-sub" data-i18n="features.sub">
+            The core keeps state, the DOM layer moves pixels, your framework renders content. Each
+                        piece is replaceable.
+          </p>
+        </header>
+        <div class="feature-grid" id="feature-grid"></div>
       </section>
 
-      <section class="features" id="features">
-        <h2 data-i18n="features.title">Everything a desktop has</h2>
-        <p class="section-sub" data-i18n="features.sub">
-          The core keeps state, the DOM layer moves pixels, your framework renders the content.
+      <section class="band" id="frameworks">
+        <header class="band-head">
+          <p class="kicker" data-i18n="fw.kicker">02 — adapters</p>
+          <h2 data-i18n="fw.title">One core, six ways to hold it</h2>
+          <p class="band-sub" data-i18n="fw.sub">
+            Window content always lives in your own component tree — no innerHTML, no portals into
+            the void. Adapters are thin sugar over the same state machine.
+          </p>
+        </header>
+        <div class="fw-row" id="fw-row"></div>
+        <p class="band-note">
+          <button type="button" class="linkish" id="open-code" data-i18n="fw.open">
+            Open code.ts in the desktop ↗
+          </button>
         </p>
-        <div class="grid" id="feature-grid"></div>
       </section>
 
-      <section class="frameworks" id="frameworks">
-        <h2 data-i18n="fw.title">One core, five ways to hold it</h2>
-        <p class="section-sub" data-i18n="fw.sub">
-          Window content always lives in your framework's own tree — no innerHTML, no portals into
-          the void. Adapters are thin sugar over the same state machine.
-        </p>
-        <div class="code-card">
-          <div class="tabs" role="tablist" aria-label="Framework" id="fw-tabs"></div>
-          <pre class="code" id="fw-code"></pre>
-        </div>
-      </section>
-
-      <section class="compare" id="compare">
-        <h2 data-i18n="cmp.title">Honest comparison</h2>
-        <p class="section-sub" data-i18n="cmp.sub">
-          The floating-window niche went quiet years ago. That's exactly why wmkit exists.
-        </p>
+      <section class="band" id="compare">
+        <header class="band-head">
+          <p class="kicker" data-i18n="cmp.kicker">03 — landscape</p>
+          <h2 data-i18n="cmp.title">Honest comparison</h2>
+          <p class="band-sub" data-i18n="cmp.sub">
+            The floating-window niche went quiet years ago. That is exactly why wmkit exists.
+          </p>
+        </header>
         <div class="table-wrap" id="compare-table"></div>
         <p class="footnote" data-i18n="cmp.note">
-          Data checked on July 10, 2026: last commits, npm downloads, open feature requests.
+          Checked on July 26, 2026: last commits, npm downloads, open feature requests.
         </p>
       </section>
 
-      <section class="outro">
+      <section class="band band-outro">
         <h2 data-i18n="outro.title">Give your app windows</h2>
         <div class="install install-big">
           <code>pnpm add @surdeddd/wmkit</code>
-          <button type="button" class="copy" data-copy="pnpm add @surdeddd/wmkit" data-i18n-aria="hero.copy" aria-label="Copy install command">
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M5 2a2 2 0 0 0-2 2v7h1.5V4A.5.5 0 0 1 5 3.5h6V2H5zm2 3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm-.5 2A.5.5 0 0 1 7 6.5h4a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V7z"/></svg>
+          <button
+            type="button"
+            class="copy"
+            data-copy="pnpm add @surdeddd/wmkit"
+            data-i18n-aria="copy.aria"
+            aria-label="Copy install command"
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M5 2a2 2 0 0 0-2 2v7h1.5V4A.5.5 0 0 1 5 3.5h6V2H5zm2 3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm-.5 2A.5.5 0 0 1 7 6.5h4a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V7z"
+              />
+            </svg>
           </button>
         </div>
-        <div class="cta">
-          <a class="btn btn-ghost" href="https://github.com/Surdeddd/wmkit" rel="noreferrer" data-i18n="outro.star">Star on GitHub</a>
+        <div class="wall-actions">
+          <a class="btn btn-primary" href="https://github.com/Surdeddd/wmkit" rel="noreferrer">
+            GitHub
+          </a>
+          <a class="btn" href="https://www.npmjs.com/package/@surdeddd/wmkit" rel="noreferrer">
+            npm
+          </a>
         </div>
       </section>
-    </main>
 
-    <footer class="footer">
-      <span>wmkit · MIT · 2026</span>
-      <span data-i18n="footer.made">This page runs on wmkit itself — drag the windows above.</span>
-      <a href="https://github.com/Surdeddd/wmkit" rel="noreferrer">github.com/Surdeddd/wmkit</a>
-    </footer>
+      <footer class="page-footer">
+        <span>wmkit · MIT · 2026</span>
+        <span data-i18n="footer.made">This page runs on wmkit itself.</span>
+        <a href="#demo" data-i18n="footer.back">↑ Back to the demo</a>
+        <a href="https://github.com/Surdeddd/wmkit" rel="noreferrer">github.com/Surdeddd/wmkit</a>
+      </footer>
+    </main>
   </body>
 </html>

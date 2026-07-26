@@ -49,6 +49,7 @@ export function useDesktop(
   options?: DesktopOptions,
 ): DesktopBinder {
   const binder = createDesktopBinder(wm, options)
+  disposeWithScope(() => binder.destroy())
   watch(
     target,
     (element, _previous, onCleanup) => {

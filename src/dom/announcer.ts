@@ -8,6 +8,7 @@ export interface AnnouncerMessages {
   maximized(title: string): string
   snapped(title: string, zone: string): string
   focused(title: string): string
+  workspace(index: number): string
 }
 
 export const defaultMessages: AnnouncerMessages = {
@@ -18,6 +19,7 @@ export const defaultMessages: AnnouncerMessages = {
   maximized: (title) => `${title} maximized`,
   snapped: (title, zone) => `${title} snapped to ${zone.replace('-', ' ')}`,
   focused: (title) => `${title} focused`,
+  workspace: (index) => `workspace ${index + 1}`,
 }
 
 export interface Announcer {
@@ -41,8 +43,11 @@ export function createAnnouncer(
   container.append(element)
 
   let clearTimer: ReturnType<typeof setTimeout> | undefined
+  let lastMessage = ''
+  let detailed = false
 
   function announce(message: string): void {
+    lastMessage = message
     element.textContent = message
     if (clearTimer !== undefined) clearTimeout(clearTimer)
     clearTimer = setTimeout(() => {
@@ -59,6 +64,19 @@ export function createAnnouncer(
       else if (win.stage === 'snapped' && win.snapZone)
         announce(dict.snapped(win.title, win.snapZone))
       else if (win.stage === 'normal' && previous !== 'normal') announce(dict.restored(win.title))
+      else return
+      detailed = true
+    }),
+    wm.on('focus', ({ window: win, previous }) => {
+      if (detailed || previous === null || lastMessage === dict.opened(win.title)) return
+      announce(dict.focused(win.title))
+    }),
+    wm.on('workspace', ({ workspace }) => {
+      announce(dict.workspace(workspace))
+      detailed = true
+    }),
+    wm.subscribe(() => {
+      detailed = false
     }),
   ]
 

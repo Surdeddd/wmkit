@@ -13,8 +13,10 @@ export function clampSize(size: Size, min: Size, max: Size | null): Size {
 
 export function clampToViewport(bounds: Bounds, viewport: Size, minVisible: number): Bounds {
   if (viewport.width <= 0 || viewport.height <= 0) return bounds
-  const x = clamp(bounds.x, minVisible - bounds.width, viewport.width - minVisible)
-  const y = clamp(bounds.y, 0, Math.max(0, viewport.height - minVisible))
+  const visibleX = Math.min(minVisible, bounds.width)
+  const visibleY = Math.min(minVisible, bounds.height)
+  const x = clamp(bounds.x, visibleX - bounds.width, Math.max(0, viewport.width - visibleX))
+  const y = clamp(bounds.y, 0, Math.max(0, viewport.height - visibleY))
   return x === bounds.x && y === bounds.y ? bounds : { ...bounds, x, y }
 }
 
@@ -22,12 +24,46 @@ export function boundsEqual(a: Bounds, b: Bounds): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
 }
 
+export function applyAspect(
+  size: Size,
+  ratio: number,
+  min: Size,
+  max: Size | null,
+  drive: 'width' | 'height',
+): Size {
+  if (!Number.isFinite(ratio) || ratio <= 0) return clampSize(size, min, max)
+  const maxWidth = max ? max.width : Number.POSITIVE_INFINITY
+  const maxHeight = max ? max.height : Number.POSITIVE_INFINITY
+  if (drive === 'height') {
+    const height = clamp(
+      size.height,
+      Math.max(min.height, min.width / ratio),
+      Math.min(maxHeight, maxWidth / ratio),
+    )
+    return { width: height * ratio, height }
+  }
+  const width = clamp(
+    size.width,
+    Math.max(min.width, min.height * ratio),
+    Math.min(maxWidth, maxHeight * ratio),
+  )
+  return { width, height: width / ratio }
+}
+
 export function zoneBounds(zone: SnapZone, viewport: Size): Bounds {
   const w = viewport.width
   const h = viewport.height
   const halfW = Math.round(w / 2)
   const halfH = Math.round(h / 2)
+  const oneThird = Math.round(w / 3)
+  const twoThirds = Math.round((w * 2) / 3)
   switch (zone) {
+    case 'left-third':
+      return { x: 0, y: 0, width: oneThird, height: h }
+    case 'center-third':
+      return { x: oneThird, y: 0, width: twoThirds - oneThird, height: h }
+    case 'right-third':
+      return { x: twoThirds, y: 0, width: w - twoThirds, height: h }
     case 'left':
       return { x: 0, y: 0, width: halfW, height: h }
     case 'right':

@@ -30,6 +30,7 @@ export interface UseDesktopResult {
 export function useDesktop(wm: WindowManager, options?: DesktopOptions): UseDesktopResult {
   const optionsRef = useRef(options)
   const binder = useMemo(() => createDesktopBinder(wm, optionsRef.current), [wm])
+  useEffect(() => () => binder.destroy(), [binder])
   const cleanupRef = useRef<(() => void) | null>(null)
   const ref = useCallback<ElementRef>(
     (node) => {

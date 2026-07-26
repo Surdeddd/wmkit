@@ -15,16 +15,17 @@
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
 - ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, all thin sugar over one core
-- ⊞ **Snap zones** — halves, quarters and drag-to-top maximize with a live preview
+- ⊞ **Snap zones** — halves, quarters, thirds and drag-to-top maximize with a live preview
 - 🧲 **Magnetism** — window edges align to neighbours and the viewport while dragging
 - ↩️ **Undo/redo** — every mutation is one step; a whole drag collapses into a single history entry
-- 🗂️ **Named layouts & arrange** — save/load desktop snapshots, `cascade`/`tile` in one call
-- ⌨️ **Accessible** — keyboard move/resize, F6 window cycling, focus-trapped modals, `aria-live` announcements
+- 🗂️ **Workspaces & layouts** — virtual desktops, saved snapshots, `cascade`/`tile` in one call
+- 🔒 **Aspect ratio lock** — pin a window to 16:9 or 4:3 and resize stays honest
+- ⌨️ **Accessible** — keyboard move/resize/snap, F6 window cycling, focus-trapped modals, `aria-live` announcements
 - ⚡ **Fast** — `transform`-only positioning, rAF-batched pointer input, structural sharing; 50 windows drag at 60fps
-- 💾 **Persistence** — one call to serialize the desktop, one call to restore it
+- 💾 **Persistence** — one call to serialize the desktop, one call to restore it, with versioned migrations
 - 🎨 **Three themes** — dark glass, light glass and Win98 retro, or bring your own CSS
 - 🖼️ **Popout** *(experimental)* — send a window into Document Picture-in-Picture
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~9.3 kB brotli core
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~10.7 kB brotli core
 
 ## Install
 
@@ -231,7 +232,7 @@ export class DesktopComponent implements AfterViewInit {
 
 ## Snap zones in action
 
-[![Snap zones — window tiled to the left half](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/snap.png)](https://surdeddd.github.io/wmkit/)
+[![Snap zones — three windows tiled into thirds](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/snap.png)](https://surdeddd.github.io/wmkit/)
 
 Throw a window against an edge or corner — a live preview shows the target zone, releasing tiles it. Halves, quarters, and drag-to-top maximize.
 
@@ -251,6 +252,7 @@ interface ManagerOptions {
   cascadeOrigin?: { x: number; y: number }
   idPrefix?: string
   historyLimit?: number         // undo/redo depth (default 50, 0 disables history)
+  workspace?: number            // initial virtual desktop (default 0)
 }
 ```
 
@@ -262,13 +264,16 @@ Manager methods:
 | `close(id)` / `closeAll()` | focus moves to the next eligible window |
 | `focus(id)` / `blur()` / `cycleFocus(dir?)` | focusing a minimized window restores it; modals block focus below them |
 | `minimize(id)` / `maximize(id)` / `restore(id)` / `toggleMaximize(id)` | restore returns to the pre-minimize stage, including maximized/snapped |
-| `snap(id, zone)` | `'left' \| 'right' \| 'top' \| 'bottom' \| 'top-left' \| …` |
-| `move(id, x, y)` / `moveBy(id, dx, dy)` / `resize(id, patch)` | resizing a snapped window unsnaps it |
+| `snap(id, zone)` | halves, quarters and thirds: `'left' \| 'right' \| 'top' \| 'bottom' \| 'top-left' \| … \| 'left-third' \| 'center-third' \| 'right-third'` |
+| `move(id, x, y)` / `moveBy(id, dx, dy)` / `resize(id, patch)` | resizing a snapped window unsnaps it; `aspectRatio` is preserved |
+| `center(id)` / `sendToBack(id)` | centre in the viewport, or drop to the bottom of the window's layer |
 | `restoreTo(id, bounds)` | used for drag-off-snap; stage → `normal` at explicit bounds |
-| `update(id, patch)` | title, layer, min/max size, per-window flags, `meta` |
-| `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest |
-| `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop |
+| `update(id, patch)` | title, layer, min/max size, `aspectRatio`, per-window flags, `meta` |
+| `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest; never recorded in history |
+| `workspace()` / `setWorkspace(n)` / `moveToWorkspace(id, n)` | virtual desktops; focusing a window switches to its workspace |
+| `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop, re-derived against the current viewport |
 | `undo()` / `redo()` / `canUndo()` / `canRedo()` / `clearHistory()` | every mutation is one step; a whole drag or resize collapses into a single entry |
+| `beginInteraction()` / `endInteraction()` / `abortInteraction()` | group a live gesture into one history entry, or drop it entirely on cancel |
 | `saveLayout(name)` / `loadLayout(name)` / `deleteLayout(name)` / `layoutNames()` | named desktop snapshots; `getLayout`/`setLayout` for external storage |
 | `arrange('cascade' \| 'tile')` | cascade staggers restored sizes, tile fills the viewport in a grid |
 | `minimizeAll()` / `restoreAll()` | bulk stage switches in one history step |
@@ -284,7 +289,7 @@ DOM controller: pointer drag with capture (touch/pen included), 8-direction resi
 ```ts
 interface DesktopOptions {
   snap?: boolean | { threshold?: number; cornerSize?: number; preview?: boolean; topEdge?: 'maximize' | 'top' | 'none' }
-  keyboard?: boolean | { moveStep?: number; cycle?: boolean }
+  keyboard?: boolean | { moveStep?: number; cycle?: boolean; snapShortcuts?: boolean; historyShortcuts?: boolean }
   announce?: boolean | Partial<AnnouncerMessages>   // localize screen-reader strings here
   autoViewport?: boolean                            // ResizeObserver → wm.setViewport (default true)
   magnetism?: boolean | { threshold?: number }      // edge-align to neighbours + viewport while dragging (default on, 8 px / 12 px coarse)
@@ -294,7 +299,7 @@ interface DesktopOptions {
 }
 ```
 
-Keyboard defaults: arrows move the focused window (16 px), `Alt` for 1 px steps, `Shift+arrows` resize, `F6` / `Shift+F6` cycle windows, `Escape` cancels an in-flight drag or resize.
+Keyboard defaults: arrows move the focused window (16 px), `Alt` for 1 px steps, `Shift+arrows` resize, `Ctrl/⌘+Alt+←/→` snap to a half, `Ctrl/⌘+Alt+↑/↓` maximize or minimize, `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` undo and redo, `F6` / `Shift+F6` cycle windows, `Escape` cancels an in-flight drag or resize (and drops it from the history).
 
 ### `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 
@@ -306,6 +311,15 @@ store.clear()
 ```
 
 Storage defaults to `localStorage` (probed safely — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation.
+
+Payloads are wrapped in a `{ version, state }` envelope. Bump `version` when your window contract changes and pass `migrate` to upgrade older data — anything you cannot migrate is discarded instead of restored broken:
+
+```js
+persist(wm, {
+  version: 2,
+  migrate: (state, from) => (from === 1 ? upgrade(state) : null),
+})
+```
 
 ### `popout(wm, id, contentEl, options?)` — `@surdeddd/wmkit/popout` *(experimental)*
 
@@ -350,8 +364,8 @@ The core never touches `window`/`document` — create managers and even `hydrate
 
 ## Quality
 
-- 172 unit tests, **100%** line/branch/function/statement coverage on the core state machine and persistence
-- 178+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
+- 216 unit tests, **100%** line/branch/function/statement coverage on the core state machine and persistence
+- 190+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, workspaces, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
 - performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~150 ms, a move among 50 windows costs ~1.2 µs, a full 100-step undo/redo sweep ~52 µs
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
 

@@ -18,6 +18,8 @@ export interface DesktopSnapOptions extends SnapDetectOptions {
 export interface DesktopKeyboardOptions {
   moveStep?: number
   cycle?: boolean
+  snapShortcuts?: boolean
+  historyShortcuts?: boolean
 }
 
 export interface HitAreaOptions {
@@ -61,7 +63,7 @@ export interface ActiveDrag {
 export interface SessionContext {
   wm: WindowManager
   doc: Document
-  view: Window
+  view: Window & typeof globalThis
   toLocal(event: PointerEvent): Point
   trackRect(): () => void
   windowElement(id: string): HTMLElement | undefined
@@ -78,7 +80,7 @@ export interface SessionContext {
   releaseDrag(session: ActiveDrag): void
 }
 
-export function windowOf(element: HTMLElement): Window {
+export function windowOf(element: HTMLElement): Window & typeof globalThis {
   const view = element.ownerDocument.defaultView
   if (!view) throw new Error('wmkit: desktop element is not attached to a document')
   return view

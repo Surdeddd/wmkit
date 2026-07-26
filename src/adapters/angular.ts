@@ -40,6 +40,7 @@ export interface AngularDesktop {
 
 export function createDesktop(wm: WindowManager, options?: DesktopOptions): AngularDesktop {
   const binder = createDesktopBinder(wm, options)
+  onDestroy(() => binder.destroy())
   return {
     binder,
     desktop(element) {

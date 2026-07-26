@@ -1,5 +1,5 @@
 import { createEmitter } from './emitter'
-import { boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
+import { applyAspect, boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
 import type {
   Bounds,
   HistoryEntry,
@@ -30,7 +30,14 @@ const ZONES: readonly SnapZone[] = [
   'top-right',
   'bottom-left',
   'bottom-right',
+  'left-third',
+  'center-third',
+  'right-third',
 ]
+
+function normalizeWorkspace(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback
+}
 
 export function createWindowManager(options: ManagerOptions = {}): WindowManager {
   const emitter = createEmitter<ManagerEvents>()
@@ -46,12 +53,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let order: string[] = []
   let focusedId: string | null = null
   let viewport: Size = options.viewport ?? { width: 0, height: 0 }
+  let workspace = normalizeWorkspace(options.workspace, 0)
   let seq = 0
   let idCounter = 0
   let cascadeIndex = 0
   let snapshot: ManagerState | null = null
   let batchDepth = 0
   let batchDirty = false
+  let historyDirty = false
   const pendingEvents: Array<() => void> = []
   const past: HistoryEntry[] = []
   let future: HistoryEntry[] = []
@@ -63,12 +72,18 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function getState(): ManagerState {
     if (!snapshot) {
-      snapshot = { windows, order, focusedId, viewport }
+      snapshot = { windows, order, focusedId, viewport, workspace }
     }
     return snapshot
   }
 
   function commit(): void {
+    snapshot = null
+    batchDirty = true
+    historyDirty = true
+  }
+
+  function commitQuiet(): void {
     snapshot = null
     batchDirty = true
   }
@@ -119,10 +134,15 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return changed
   }
 
+  function onActiveWorkspace(win: WindowState): boolean {
+    return win.workspace === workspace
+  }
+
   function topModalId(): string | null {
     for (let i = order.length - 1; i >= 0; i -= 1) {
       const win = windows[order[i] as string] as WindowState
-      if (win.layer === 'modal' && win.stage !== 'minimized') return win.id
+      if (win.layer === 'modal' && win.stage !== 'minimized' && onActiveWorkspace(win))
+        return win.id
     }
     return null
   }
@@ -131,7 +151,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const modal = topModalId()
     return order.filter((id) => {
       const win = windows[id] as WindowState
-      if (win.stage === 'minimized') return false
+      if (win.stage === 'minimized' || !onActiveWorkspace(win)) return false
       if (modal && win.layer !== 'modal') return false
       return true
     })
@@ -146,8 +166,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     queueEvent(() => emitter.emit('focus', { window: win, previous }))
   }
 
-  function normalizeSize(size: Size, win: Pick<WindowState, 'minSize' | 'maxSize'>): Size {
-    return clampSize(size, win.minSize, win.maxSize)
+  function normalizeSize(
+    size: Size,
+    win: Pick<WindowState, 'minSize' | 'maxSize' | 'aspectRatio'>,
+    drive: 'width' | 'height' = 'width',
+  ): Size {
+    if (win.aspectRatio === null) return clampSize(size, win.minSize, win.maxSize)
+    return applyAspect(size, win.aspectRatio, win.minSize, win.maxSize, drive)
   }
 
   function positionForOpen(init: WindowInit): { x: number; y: number } {
@@ -175,11 +200,18 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
             height: init.maxHeight ?? Number.POSITIVE_INFINITY,
           }
         : null
-    const size = clampSize(
-      { width: init.width ?? defaultSize.width, height: init.height ?? defaultSize.height },
-      minSize,
-      maxSize,
-    )
+    const aspectRatio =
+      init.aspectRatio !== undefined && Number.isFinite(init.aspectRatio) && init.aspectRatio > 0
+        ? init.aspectRatio
+        : null
+    const requested = {
+      width: init.width ?? defaultSize.width,
+      height: init.height ?? defaultSize.height,
+    }
+    const size =
+      aspectRatio === null
+        ? clampSize(requested, minSize, maxSize)
+        : applyAspect(requested, aspectRatio, minSize, maxSize, 'width')
     const position = positionForOpen(init)
     let bounds: Bounds = { ...position, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
@@ -196,8 +228,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       stage: 'normal',
       snapZone: null,
       layer: init.layer ?? 'normal',
+      workspace: normalizeWorkspace(init.workspace, workspace),
       minSize,
       maxSize,
+      aspectRatio,
       openedSeq: ++seq,
       draggable: init.draggable ?? true,
       resizable: init.resizable ?? true,
@@ -217,7 +251,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     setWindow(win)
     raise(id)
     let focusPayload: { window: WindowState; previous: string | null } | null = null
-    if (stage !== 'minimized') {
+    if (stage !== 'minimized' && onActiveWorkspace(win)) {
       const previous = focusedId
       const modal = topModalId()
       if (!modal || win.layer === 'modal') {
@@ -258,11 +292,12 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function focus(id: string): boolean {
     const win = windows[id]
     if (!win) return false
+    if (!onActiveWorkspace(win)) setWorkspace(win.workspace)
     const modal = topModalId()
     if (modal && modal !== id && win.layer !== 'modal') {
       const modalWin = windows[modal]
       if (modalWin) queueEvent(() => emitter.emit('modalblocked', { window: modalWin }))
-      commit()
+      commitQuiet()
       return false
     }
     if (win.stage === 'minimized') {
@@ -306,6 +341,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return { x: 0, y: 0, width: viewport.width, height: viewport.height }
   }
 
+  function snapBounds(win: WindowState, zone: SnapZone): Bounds {
+    const rect = zoneBounds(zone, viewport)
+    return { x: rect.x, y: rect.y, ...normalizeSize(rect, win) }
+  }
+
+  function focusUnlessBlocked(id: string): void {
+    const modal = topModalId()
+    if (modal === null || modal === id) focus(id)
+  }
+
   function applyStage(id: string, build: (win: WindowState) => WindowState | null): boolean {
     const win = windows[id]
     if (!win) return false
@@ -334,7 +379,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function maximize(id: string): boolean {
     const result = applyStage(id, (win) => {
       if (win.stage === 'maximized') return null
-      const restoreBounds = win.stage === 'normal' ? win.bounds : win.restoreBounds
+      const restoreBounds = win.stage === 'normal' ? win.bounds : (win.restoreBounds ?? win.bounds)
       return {
         ...win,
         stage: 'maximized',
@@ -366,13 +411,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
             ...win,
             stage: 'snapped',
             restoreStage: null,
-            bounds: zoneBounds(win.snapZone, viewport),
+            bounds: snapBounds(win, win.snapZone),
           }
         }
         return { ...win, stage: 'normal', restoreStage: null }
       }
       if (win.stage === 'normal') return null
-      const bounds = win.restoreBounds ?? win.bounds
+      const target = win.restoreBounds ?? win.bounds
+      const bounds: Bounds = { x: target.x, y: target.y, ...normalizeSize(target, win) }
       return {
         ...win,
         stage: 'normal',
@@ -382,7 +428,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         bounds: keepInViewport ? clampToViewport(bounds, viewport, minVisible) : bounds,
       }
     })
-    if (result) focus(id)
+    if (result) focusUnlessBlocked(id)
     return result
   }
 
@@ -399,20 +445,20 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         bounds: keepInViewport ? clampToViewport(next, viewport, minVisible) : next,
       }
     })
-    if (result) focus(id)
+    if (result) focusUnlessBlocked(id)
     return result
   }
 
   function snap(id: string, zone: SnapZone): boolean {
     const result = applyStage(id, (win) => {
-      const restoreBounds = win.stage === 'normal' ? win.bounds : win.restoreBounds
+      const restoreBounds = win.stage === 'normal' ? win.bounds : (win.restoreBounds ?? win.bounds)
       return {
         ...win,
         stage: 'snapped',
         snapZone: zone,
         restoreBounds,
         restoreStage: null,
-        bounds: zoneBounds(zone, viewport),
+        bounds: snapBounds(win, zone),
       }
     })
     if (result) focus(id)
@@ -442,7 +488,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const win = windows[id]
     if (!win || win.stage === 'maximized' || win.stage === 'minimized') return false
     const merged: Bounds = { ...win.bounds, ...patch }
-    const size = normalizeSize(merged, win)
+    const drive =
+      Math.abs(merged.height - win.bounds.height) > Math.abs(merged.width - win.bounds.width)
+        ? 'height'
+        : 'width'
+    const size = normalizeSize(merged, win, drive)
     let bounds: Bounds = { x: merged.x, y: merged.y, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
     const becameNormal = win.stage === 'snapped'
@@ -466,6 +516,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       layer: patch.layer ?? win.layer,
       minSize: patch.minSize ?? win.minSize,
       maxSize: patch.maxSize === undefined ? win.maxSize : patch.maxSize,
+      aspectRatio:
+        patch.aspectRatio === undefined
+          ? win.aspectRatio
+          : patch.aspectRatio !== null &&
+              Number.isFinite(patch.aspectRatio) &&
+              patch.aspectRatio > 0
+            ? patch.aspectRatio
+            : null,
       draggable: patch.draggable ?? win.draggable,
       resizable: patch.resizable ?? win.resizable,
       closable: patch.closable ?? win.closable,
@@ -497,21 +555,84 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (next.width === viewport.width && next.height === viewport.height) return
     viewport = { ...next }
     reflowViewport()
-    snapshot = null
-    batchDirty = true
+    commitQuiet()
+  }
+
+  function setWorkspace(next: number): boolean {
+    const target = normalizeWorkspace(next, workspace)
+    if (target === workspace) return false
+    const previous = workspace
+    workspace = target
+    const previousFocus = focusedId
+    focusTop()
+    queueEvent(() => emitter.emit('workspace', { workspace: target, previous }))
+    if (focusedId && focusedId !== previousFocus) {
+      emitFocus(windows[focusedId] as WindowState, previousFocus)
+    }
+    commit()
+    return true
+  }
+
+  function moveToWorkspace(id: string, next: number): boolean {
+    const win = windows[id]
+    if (!win) return false
+    const target = normalizeWorkspace(next, win.workspace)
+    if (target === win.workspace) return false
+    const updated = { ...win, workspace: target }
+    setWindow(updated)
+    if (!onActiveWorkspace(updated) && focusedId === id) {
+      focusTop()
+      if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
+    }
+    queueEvent(() => emitter.emit('update', { window: updated }))
+    commit()
+    return true
+  }
+
+  function sendToBack(id: string): boolean {
+    const win = windows[id]
+    if (!win) return false
+    const without = order.filter((entry) => entry !== id)
+    const rank = LAYER_RANK[win.layer]
+    let insertAt = 0
+    for (const entry of without) {
+      if (layerRankOf(entry) < rank) insertAt += 1
+      else break
+    }
+    const next = [...without.slice(0, insertAt), id, ...without.slice(insertAt)]
+    if (next.every((entry, i) => entry === order[i])) return false
+    order = next
+    queueEvent(() => emitter.emit('order', { order }))
+    if (focusedId === id) {
+      focusTop()
+      if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
+    }
+    commit()
+    return true
+  }
+
+  function center(id: string): boolean {
+    const win = windows[id]
+    if (win?.stage !== 'normal') return false
+    return move(
+      id,
+      Math.round((viewport.width - win.bounds.width) / 2),
+      Math.round((viewport.height - win.bounds.height) / 2),
+    )
   }
 
   function minimized(): readonly WindowState[] {
     return Object.values(windows)
-      .filter((win) => win.stage === 'minimized')
+      .filter((win) => win.stage === 'minimized' && onActiveWorkspace(win))
       .sort((a, b) => a.openedSeq - b.openedSeq)
   }
 
   function captureEntry(): HistoryEntry {
-    return { windows, order, focusedId }
+    return { windows, order, focusedId, workspace }
   }
 
   function recordHistory(): void {
+    if (!historyDirty) return
     if (skipNextHistory) {
       skipNextHistory = false
       return
@@ -537,6 +658,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         if (batchDirty) {
           batchDirty = false
           recordHistory()
+          historyDirty = false
           snapshot = null
           flushEvents()
           emitter.emit('change', { state: getState() })
@@ -554,7 +676,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         setWindow(updated)
         queueEvent(() => emitter.emit('resize', { window: updated }))
       } else if (win.stage === 'snapped' && win.snapZone) {
-        const updated = { ...win, bounds: zoneBounds(win.snapZone, viewport) }
+        const updated = { ...win, bounds: snapBounds(win, win.snapZone) }
         setWindow(updated)
         queueEvent(() => emitter.emit('resize', { window: updated }))
       } else if (win.stage === 'normal' && keepInViewport) {
@@ -572,6 +694,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     windows = entry.windows
     order = [...entry.order]
     focusedId = entry.focusedId
+    const previousWorkspace = workspace
+    workspace = entry.workspace
+    if (workspace !== previousWorkspace) {
+      queueEvent(() => emitter.emit('workspace', { workspace, previous: previousWorkspace }))
+    }
     reflowViewport()
     commit()
   }
@@ -601,6 +728,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function endInteraction(): void {
     if (interactionDepth > 0) interactionDepth -= 1
+  }
+
+  function abortInteraction(): void {
+    if (interactionDepth > 0 && interactionRecorded) {
+      past.pop()
+      interactionRecorded = false
+    }
+    endInteraction()
   }
 
   function clearHistory(): void {
@@ -640,7 +775,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function arrange(mode: 'cascade' | 'tile'): void {
-    const ids = order.filter((id) => (windows[id] as WindowState).stage !== 'minimized')
+    const ids = order.filter((id) => {
+      const win = windows[id] as WindowState
+      return win.stage !== 'minimized' && onActiveWorkspace(win)
+    })
     if (ids.length === 0) return
     if (mode === 'cascade') {
       ids.forEach((id, index) => {
@@ -655,6 +793,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       })
       return
     }
+    if (viewport.width <= 0 || viewport.height <= 0) return
     const cols = Math.ceil(Math.sqrt(ids.length))
     const rows = Math.ceil(ids.length / cols)
     const cellWidth = Math.floor(viewport.width / cols)
@@ -670,7 +809,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function minimizeAll(): void {
-    for (const id of [...order]) minimize(id)
+    for (const id of [...order]) {
+      if (onActiveWorkspace(windows[id] as WindowState)) minimize(id)
+    }
   }
 
   function restoreAll(): void {
@@ -697,6 +838,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         })),
       order: [...order],
       focusedId,
+      workspace,
     }
   }
 
@@ -770,8 +912,15 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         stage: raw.stage,
         snapZone: ZONES.includes(raw.snapZone as SnapZone) ? raw.snapZone : null,
         layer: raw.layer,
+        workspace: normalizeWorkspace(raw.workspace, 0),
         minSize: isSize(raw.minSize) ? { ...raw.minSize } : { width: 160, height: 100 },
         maxSize: readMaxSize(raw.maxSize),
+        aspectRatio:
+          typeof raw.aspectRatio === 'number' &&
+          Number.isFinite(raw.aspectRatio) &&
+          raw.aspectRatio > 0
+            ? raw.aspectRatio
+            : null,
         openedSeq: typeof raw.openedSeq === 'number' ? raw.openedSeq : ++maxSeq,
         draggable: raw.draggable !== false,
         resizable: raw.resizable !== false,
@@ -802,8 +951,19 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     order = nextOrder
     order = sortByLayer(order)
     seq = maxSeq
+    const previousWorkspace = workspace
+    workspace = normalizeWorkspace(data.workspace, 0)
+    if (workspace !== previousWorkspace) {
+      queueEvent(() => emitter.emit('workspace', { workspace, previous: previousWorkspace }))
+    }
     focusedId = data.focusedId && windows[data.focusedId] ? data.focusedId : null
-    if (focusedId && windows[focusedId]?.stage === 'minimized') focusedId = null
+    const focusedCandidate = focusedId ? windows[focusedId] : undefined
+    if (
+      focusedCandidate &&
+      (focusedCandidate.stage === 'minimized' || !onActiveWorkspace(focusedCandidate))
+    ) {
+      focusedId = null
+    }
     if (!focusedId) focusTop()
     const modal = topModalId()
     if (modal) {
@@ -822,6 +982,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         queueEvent(() => emitter.emit('open', { window: opened }))
       }
     }
+    if (viewport.width > 0 && viewport.height > 0) reflowViewport()
     queueEvent(() => emitter.emit('order', { order }))
     clearHistory()
     skipNextHistory = true
@@ -848,12 +1009,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     snap: (id, zone) => transact(() => snap(id, zone)),
     move: (id, x, y) => transact(() => move(id, x, y)),
     moveBy: (id, dx, dy) => transact(() => moveBy(id, dx, dy)),
+    center: (id) => transact(() => center(id)),
+    sendToBack: (id) => transact(() => sendToBack(id)),
     resize: (id, patch) => transact(() => resize(id, patch)),
     update: (id, patch) => transact(() => update(id, patch)),
     get: (id) => windows[id],
     getState,
     minimized,
     setViewport: (next) => transact(() => setViewport(next)),
+    workspace: () => workspace,
+    setWorkspace: (next) => transact(() => setWorkspace(next)),
+    moveToWorkspace: (id, next) => transact(() => moveToWorkspace(id, next)),
     batch: (run) => transact(run),
     serialize,
     hydrate: (data) => transact(() => hydrate(data)),
@@ -863,6 +1029,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     canRedo: () => future.length > 0,
     beginInteraction,
     endInteraction,
+    abortInteraction,
+    clearHistory,
     saveLayout,
     loadLayout: (name) => transact(() => loadLayout(name)),
     getLayout,

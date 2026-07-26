@@ -11,6 +11,23 @@ export interface PersistOptions {
   storage?: PersistStorage
   debounce?: number
   autoRestore?: boolean
+  version?: number
+  migrate?: (state: unknown, from: number) => SerializedState | null
+}
+
+interface PersistEnvelope {
+  version: number
+  state: SerializedState
+}
+
+function unwrap(raw: unknown): PersistEnvelope | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const candidate = raw as Record<string, unknown>
+  if (typeof candidate.version === 'number' && typeof candidate.state === 'object') {
+    return { version: candidate.version, state: candidate.state as SerializedState }
+  }
+  if (Array.isArray(candidate.windows)) return { version: 0, state: raw as SerializedState }
+  return null
 }
 
 export interface PersistController {
@@ -36,13 +53,14 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   const key = options.key ?? 'wmkit'
   const storage = options.storage ?? defaultStorage()
   const debounce = options.debounce ?? 150
+  const version = options.version ?? 0
   let timer: ReturnType<typeof setTimeout> | undefined
   let suspended = false
 
   function save(): void {
     if (!storage) return
     try {
-      storage.setItem(key, JSON.stringify(wm.serialize()))
+      storage.setItem(key, JSON.stringify({ version, state: wm.serialize() }))
     } catch {}
   }
 
@@ -55,15 +73,24 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
       return false
     }
     if (!raw) return false
-    let data: SerializedState
+    let parsed: unknown
     try {
-      data = JSON.parse(raw) as SerializedState
+      parsed = JSON.parse(raw)
     } catch {
       return false
     }
+    const envelope = unwrap(parsed)
+    if (!envelope) return false
+    let data: SerializedState | null = envelope.state
+    const stale = envelope.version !== version
+    if (stale) {
+      data = options.migrate ? options.migrate(envelope.state, envelope.version) : null
+    }
+    if (!data) return false
     suspended = true
     const restored = wm.hydrate(data)
     suspended = false
+    if (restored && stale) save()
     return restored
   }
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
+import type { SerializedState } from '../../src/core/types'
 import { type PersistStorage, persist } from '../../src/plugins/persist'
 
 function memoryStorage(): PersistStorage & { data: Map<string, string> } {
@@ -39,7 +40,7 @@ describe('persist', () => {
     vi.advanceTimersByTime(150)
     const raw = storage.data.get('wmkit')
     expect(raw).toBeTruthy()
-    expect(JSON.parse(raw as string).windows[0].title).toBe('Saved')
+    expect(JSON.parse(raw as string).state.windows[0].title).toBe('Saved')
   })
 
   it('coalesces rapid changes into one write', () => {
@@ -97,6 +98,57 @@ describe('persist', () => {
     expect(controller.restore()).toBe(false)
     storage.setItem('wmkit', JSON.stringify({ version: 99 }))
     expect(controller.restore()).toBe(false)
+    storage.setItem('wmkit', 'null')
+    expect(controller.restore()).toBe(false)
+    storage.setItem('wmkit', '42')
+    expect(controller.restore()).toBe(false)
+  })
+
+  it('reads a legacy payload written without an envelope', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a', title: 'Legacy' })
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify(donor.serialize()))
+    const wm = makeWm()
+    persist(wm, { storage })
+    expect(wm.get('a')?.title).toBe('Legacy')
+  })
+
+  it('drops a payload from another version when no migration is given', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a' })
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify({ version: 1, state: donor.serialize() }))
+    const wm = makeWm()
+    expect(persist(wm, { storage, version: 2 }).restore()).toBe(false)
+    expect(wm.get('a')).toBeUndefined()
+  })
+
+  it('runs the migration hook for an older payload', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a', title: 'old' })
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify({ version: 1, state: donor.serialize() }))
+    const migrate = vi.fn((state: unknown, from: number) => {
+      expect(from).toBe(1)
+      const data = state as SerializedState
+      const first = data.windows[0]
+      if (first) first.title = 'migrated'
+      return data
+    })
+    const wm = makeWm()
+    persist(wm, { storage, version: 2, migrate })
+    expect(migrate).toHaveBeenCalledTimes(1)
+    expect(wm.get('a')?.title).toBe('migrated')
+    vi.advanceTimersByTime(150)
+    expect(JSON.parse(storage.data.get('wmkit') as string).version).toBe(2)
+  })
+
+  it('treats a null migration result as unusable', () => {
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify({ version: 1, state: makeWm().serialize() }))
+    const wm = makeWm()
+    expect(persist(wm, { storage, version: 3, migrate: () => null }).restore()).toBe(false)
   })
 
   it('survives storage read and write failures', () => {

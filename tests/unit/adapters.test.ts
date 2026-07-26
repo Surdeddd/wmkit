@@ -266,6 +266,43 @@ describe('angular adapter smoke', () => {
   })
 })
 
+describe('binder lifecycle', () => {
+  it('re-subscribes after a rebind so late windows still attach', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+
+    const action = dk.desktop(desktopEl)
+    action.destroy()
+    dk.desktop(desktopEl)
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.binder.bindWindow('late', winEl)
+    expect(winEl.dataset.wmWindow).toBeUndefined()
+
+    wm.open({ id: 'late', title: 'Late' })
+    expect(winEl.dataset.wmWindow).toBe('late')
+  })
+
+  it('destroy releases the desktop and stops attaching new windows', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    dk.binder.destroy()
+    expect(dk.binder.controller()).toBeNull()
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.binder.bindWindow('after', winEl)
+    wm.open({ id: 'after', title: 'After' })
+    expect(winEl.dataset.wmWindow).toBeUndefined()
+  })
+})
+
 describe('titlebar context menu hook', () => {
   it('fires the hook with the window state and suppresses the native menu', () => {
     const wm = createWindowManager(VIEWPORT)
