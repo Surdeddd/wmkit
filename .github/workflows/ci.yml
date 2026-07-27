@@ -39,7 +39,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm exec playwright install --with-deps chromium webkit firefox
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
