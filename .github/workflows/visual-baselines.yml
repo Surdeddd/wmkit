@@ -16,8 +16,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test visual.spec.ts --project=chromium --update-snapshots
-        env:
-          WMKIT_SNAPSHOTS: '1'
       - uses: actions/upload-artifact@v4
         with:
           name: visual-baselines
