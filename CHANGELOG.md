@@ -1,3 +1,10 @@
+## [0.4.2](https://github.com/Surdeddd/wmkit/compare/v0.4.1...v0.4.2) (2026-07-31)
+
+
+### Bug Fixes
+
+* repair 32 defects found by a second audit of the 0.4 code ([3eef29b](https://github.com/Surdeddd/wmkit/commit/3eef29b810271ce922ff6f9b6561bd18ba447941))
+
 ## [0.4.1](https://github.com/Surdeddd/wmkit/compare/v0.4.0...v0.4.1) (2026-07-26)
 
 
