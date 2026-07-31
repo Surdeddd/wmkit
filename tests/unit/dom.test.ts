@@ -343,6 +343,83 @@ describe('resize session', () => {
   })
 })
 
+describe('tab groups in the dom', () => {
+  it('hides inactive tabs and marks the active one', () => {
+    const harness = makeHarness()
+    const a = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    const b = harness.add({ id: 'b', x: 300, y: 300, width: 200, height: 150 })
+    const groupId = harness.wm.group(['a', 'b']) as string
+
+    expect(a.root.dataset.wmGroup).toBe(groupId)
+    expect(a.root.dataset.wmTab).toBe('active')
+    expect(a.root.hidden).toBe(false)
+    expect(b.root.dataset.wmTab).toBe('inactive')
+    expect(b.root.hidden).toBe(true)
+
+    harness.wm.activateTab('b')
+    expect(a.root.hidden).toBe(true)
+    expect(b.root.hidden).toBe(false)
+    expect(b.root.dataset.wmTab).toBe('active')
+  })
+
+  it('clears the group attributes when the group dissolves', () => {
+    const harness = makeHarness()
+    const a = harness.add({ id: 'a' })
+    harness.add({ id: 'b' })
+    harness.wm.group(['a', 'b'])
+    expect(a.root.dataset.wmGroup).toBeDefined()
+
+    harness.wm.ungroup('a')
+    expect(a.root.dataset.wmGroup).toBeUndefined()
+    expect(a.root.dataset.wmTab).toBeUndefined()
+    expect(a.root.hidden).toBe(false)
+  })
+
+  it('groups a window when its titlebar is dropped on another one', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    const targetHandle = harness.handleOf('target')
+    document.elementsFromPoint = () => [targetHandle]
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
+    handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
+    harness.flushFrames()
+    expect(
+      harness.element.querySelector('[data-wm-tab-target]')?.getAttribute('data-wm-window'),
+    ).toBe('target')
+
+    handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    const state = harness.wm.getState()
+    const groupId = harness.wm.get('moving')?.groupId as string
+    expect(groupId).toBeTruthy()
+    expect(state.groups[groupId]?.activeId).toBe('moving')
+    expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+  })
+
+  it('does not group on a quick pass over another titlebar', () => {
+    const harness = makeHarness({ magnetism: false, snap: false })
+    harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    document.elementsFromPoint = () => [harness.handleOf('target')]
+
+    drag(harness, handle, [60, 20], [450, 410])
+    handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(harness.wm.get('moving')?.groupId).toBeNull()
+  })
+
+  it('does not group when the gesture is disabled', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: false })
+    harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    document.elementsFromPoint = () => [harness.handleOf('target')]
+
+    drag(harness, handle, [60, 20], [450, 410])
+    handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(harness.wm.get('moving')?.groupId).toBeNull()
+  })
+})
+
 describe('desktop controller', () => {
   it('hides windows that belong to another workspace', () => {
     const harness = makeHarness()

@@ -15,6 +15,7 @@
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
 - ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, all thin sugar over one core
+- 🗃️ **Tab groups** — drop one titlebar onto another and the windows share a frame, dockview style
 - ⊞ **Snap zones** — halves, quarters, thirds and drag-to-top maximize with a live preview
 - 🧲 **Magnetism** — window edges align to neighbours and the viewport while dragging
 - ↩️ **Undo/redo** — every mutation is one step; a whole drag collapses into a single history entry

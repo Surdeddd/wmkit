@@ -107,7 +107,33 @@ test('documentation sections render below the desktop', async ({ page }) => {
   await expect(page.locator('#fw-row > div')).toHaveCount(6)
   const table = page.locator('#compare-table table')
   await expect(table.locator('thead .col-wmkit')).toHaveText('wmkit')
-  await expect(table.locator('tbody tr')).toHaveCount(10)
+  await expect(table.locator('tbody tr')).toHaveCount(11)
+})
+
+test('dropping a titlebar on another window groups them into tabs', async ({ page }) => {
+  const moving = await launch(page, 'layouts')
+  const host = page.locator(readme)
+  const movingHandle = moving.locator('[data-wm-drag]')
+  const hostHandle = host.locator('[data-wm-drag]')
+
+  const from = await boxOf(movingHandle)
+  const to = await boxOf(hostHandle)
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+  await page.mouse.move(to.x + to.width / 2 + 1, to.y + to.height / 2)
+  await expect(page.locator('[data-wm-tab-target]')).toBeVisible()
+  await page.mouse.up()
+
+  await expect(moving).toHaveAttribute('data-wm-tab', 'active')
+  await expect(host).toHaveAttribute('data-wm-tab', 'inactive')
+  await expect(host).toBeHidden()
+
+  const tabs = moving.locator('.win-tab')
+  await expect(tabs).toHaveCount(2)
+  await tabs.filter({ hasText: 'readme' }).click()
+  await expect(host).toBeVisible()
+  await expect(moving).toBeHidden()
 })
 
 test('capture landing screenshots', async ({ page }, testInfo) => {

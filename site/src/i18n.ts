@@ -287,6 +287,15 @@ const en: Dict = {
       ],
     },
     {
+      label: 'Tab groups',
+      cells: [
+        { text: 'drag to group', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+        { text: 'core feature', tone: 'good' },
+        { text: 'none', tone: 'bad' },
+      ],
+    },
+    {
       label: 'Serialize / restore',
       cells: [
         { text: 'core + plugin', tone: 'good' },
@@ -562,6 +571,15 @@ const ru: Dict = {
         { text: 'встроено', tone: 'good' },
         { text: 'нет', tone: 'bad' },
         { text: 'нет', tone: 'bad' },
+        { text: 'нет', tone: 'bad' },
+      ],
+    },
+    {
+      label: 'Вкладочные группы',
+      cells: [
+        { text: 'бросок для группировки', tone: 'good' },
+        { text: 'нет', tone: 'bad' },
+        { text: 'ключевая фича', tone: 'good' },
         { text: 'нет', tone: 'bad' },
       ],
     },

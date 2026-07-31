@@ -14,6 +14,11 @@ interface DragSession extends ActiveDrag {
   restored: boolean
   moved: boolean
   zone: SnapZone | 'maximize' | null
+  groupTarget: string | null
+  hoverId: string | null
+  hoverTimer: number
+  clientX: number
+  clientY: number
   raf: number
   pendingX: number
   pendingY: number
@@ -46,6 +51,11 @@ export function createDragStarter(ctx: SessionContext) {
       restored: win.stage === 'normal',
       moved: false,
       zone: null,
+      groupTarget: null,
+      hoverId: null,
+      hoverTimer: 0,
+      clientX: event.clientX,
+      clientY: event.clientY,
       raf: 0,
       pendingX: 0,
       pendingY: 0,
@@ -54,6 +64,20 @@ export function createDragStarter(ctx: SessionContext) {
     }
 
     const el = ctx.windowElement(id)
+
+    function armGroup(target: string): void {
+      session.groupTarget = target
+      ctx.markGroupTarget(target)
+    }
+
+    function clearHover(): void {
+      if (session.hoverTimer !== 0) {
+        view.clearTimeout(session.hoverTimer)
+        session.hoverTimer = 0
+      }
+      session.groupTarget = null
+      ctx.markGroupTarget(null)
+    }
 
     function flush(): void {
       if (!session.hasPending || ctx.currentDrag() !== session) return
@@ -105,6 +129,21 @@ export function createDragStarter(ctx: SessionContext) {
       }
       wm.move(id, nextX, nextY)
 
+      const candidate = ctx.groupTarget(session.clientX, session.clientY, id)
+      if (candidate !== session.hoverId) {
+        session.hoverId = candidate
+        clearHover()
+        if (candidate) {
+          if (ctx.groupDwell <= 0) armGroup(candidate)
+          else session.hoverTimer = view.setTimeout(() => armGroup(candidate), ctx.groupDwell)
+        }
+      }
+      if (session.groupTarget) {
+        session.zone = null
+        ctx.hidePreview()
+        return
+      }
+
       if (ctx.snapEnabled && current.snappable) {
         const viewport = wm.getState().viewport
         const rawZone = detectSnapZone(session.pendingX, session.pendingY, viewport, ctx.snapDetect)
@@ -142,6 +181,8 @@ export function createDragStarter(ctx: SessionContext) {
       }
       session.pendingX = movePoint.x
       session.pendingY = movePoint.y
+      session.clientX = moveEvent.clientX
+      session.clientY = moveEvent.clientY
       session.hasPending = true
       if (session.raf === 0) session.raf = view.requestAnimationFrame(flush)
     }
@@ -180,6 +221,8 @@ export function createDragStarter(ctx: SessionContext) {
               wm.move(id, session.startBounds.x, session.startBounds.y)
             }
           }
+        } else if (session.moved && session.groupTarget) {
+          if (wm.group([session.groupTarget, id])) wm.activateTab(id)
         } else if (session.moved && session.zone) {
           if (session.zone === 'maximize') wm.maximize(id)
           else wm.snap(id, session.zone)
@@ -199,6 +242,8 @@ export function createDragStarter(ctx: SessionContext) {
           el.style.willChange = ''
         }
         ctx.hidePreview()
+        if (session.hoverTimer !== 0) view.clearTimeout(session.hoverTimer)
+        ctx.markGroupTarget(null)
         if (cancelled) wm.abortInteraction()
         else wm.endInteraction()
       }

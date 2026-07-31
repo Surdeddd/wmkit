@@ -196,6 +196,48 @@ With `viewport` at its zero default, `clampToViewport` is a no-op — so a manag
 
 Windows outside the active workspace are hidden by the DOM layer, skipped by `focusTargets`, `minimized()`, `arrange()`, `minimizeAll()` and drag magnetism.
 
+### Tab groups
+
+Several windows can share one frame. Members keep their own identity, content and title, but
+share geometry; exactly one member is visible at a time and the rest behave like hidden windows.
+
+| Method | Returns | Notes |
+| --- | --- | --- |
+| `group(ids)` | `string \| null` | `null` for fewer than two known windows; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them |
+| `ungroup(id)` | `boolean` | detaches one member; a group left with a single member dissolves entirely |
+| `activateTab(id)` | `boolean` | makes a member the visible tab; `false` when it is already active or not grouped |
+| `groupMembers(groupId)` | `readonly WindowState[]` | members in tab order (back to front) |
+
+```ts
+const groupId = wm.group(['editor', 'preview', 'console'])
+wm.activateTab('preview')
+wm.groupMembers(groupId).map((win) => win.title)
+wm.ungroup('console')
+```
+
+Invariants the manager maintains for you:
+
+- every member shares `bounds`, `stage`, `snapZone`, `layer` and `workspace` — moving, resizing,
+  snapping, maximizing or moving a group to another workspace moves the whole group in one step
+- inactive tabs are skipped by `focus`, `cycleFocus`, `minimized()` and drag magnetism, exactly
+  like windows on another workspace
+- `focus(id)` on an inactive tab activates it first, so DOM focus never lands on a hidden element
+- closing the active tab hands the tab over to a sibling; closing the second-to-last member
+  dissolves the group
+
+`ManagerState.groups` exposes the current picture, which is what a tab strip renders from:
+
+```ts
+interface WindowGroup {
+  id: string
+  activeId: string
+  members: readonly string[]
+}
+```
+
+The `group` event fires on creation, activation and membership changes with
+`{ groupId, members, activeId, previous }`.
+
 ### History
 
 | Method | Returns | Notes |
@@ -261,6 +303,7 @@ Binds the manager to a DOM subtree and returns a `DesktopController`. The elemen
 
 ```ts
 interface DesktopOptions {
+  grouping?: boolean | { dwell?: number }   // drop-to-group gesture, 420 ms hover before it arms
   snap?: boolean | {
     threshold?: number      // 12, or 20 on coarse pointers
     cornerSize?: number     // 64, or 96 on coarse pointers

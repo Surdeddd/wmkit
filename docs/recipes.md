@@ -102,6 +102,58 @@ store.restore()
 
 Bounds are re-derived against the current viewport during `hydrate`, so a desktop saved on a 27-inch monitor and restored on a laptop comes back on-screen: maximized windows refill, snapped windows re-snap, and normal windows are clamped so their titlebars stay reachable.
 
+## A tab strip for grouped windows
+
+Grouping is headless: the manager decides who is visible, you render the strip. Everything you
+need is in `state.groups`.
+
+```js
+function renderTabs(windowEl, id) {
+  const state = wm.getState()
+  const win = state.windows[id]
+  const group = win?.groupId ? state.groups[win.groupId] : undefined
+  const strip = windowEl.querySelector('.tabs')
+  if (!group) {
+    strip.replaceChildren()
+    return
+  }
+  strip.replaceChildren(
+    ...group.members.map((memberId) => {
+      const tab = document.createElement('button')
+      tab.type = 'button'
+      tab.textContent = state.windows[memberId]?.title ?? memberId
+      tab.setAttribute('aria-selected', String(group.activeId === memberId))
+      tab.addEventListener('click', () => wm.activateTab(memberId))
+      tab.addEventListener('dblclick', () => wm.ungroup(memberId))
+      return tab
+    }),
+  )
+}
+
+wm.subscribe(() => {
+  for (const [id, el] of mounted) renderTabs(el, id)
+})
+```
+
+The DOM layer hides inactive members for you and marks the elements: `data-wm-group` carries the
+group id and `data-wm-tab` is `active` or `inactive`, so a theme can style the frame without any
+JavaScript.
+
+Holding one titlebar over another for a moment groups the two windows. The pause matters: without
+it, every drag that happens to end over a neighbour's titlebar would swallow the window. The
+default dwell is 420 ms, tunable with `grouping: { dwell: 250 }`. While the gesture is armed the
+target carries `data-wm-tab-target`:
+
+```css
+[data-wm-tab-target] {
+  outline: 2px dashed var(--wm-accent);
+  outline-offset: -2px;
+}
+```
+
+Turn the gesture off with `attachDesktop(wm, el, { grouping: false })` and drive `group()` and
+`ungroup()` from your own UI instead.
+
 ## Workspaces
 
 ```js

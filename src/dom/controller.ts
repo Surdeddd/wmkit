@@ -23,6 +23,7 @@ interface AttachedWindow {
   lastState: WindowState | null
   lastZ: number
   lastWorkspace: number
+  lastTab: boolean
   cleanup: Array<() => void>
 }
 
@@ -46,6 +47,9 @@ export function attachDesktop(
 
   const coarsePointer =
     typeof view.matchMedia === 'function' && view.matchMedia('(pointer: coarse)').matches
+  const groupingEnabled = options.grouping !== false
+  const groupDwell =
+    (typeof options.grouping === 'object' ? options.grouping.dwell : undefined) ?? 420
   const snapEnabled = options.snap !== false
   const snapOptions: DesktopSnapOptions = typeof options.snap === 'object' ? options.snap : {}
   const snapPreviewEnabled = snapOptions.preview !== false
@@ -76,6 +80,7 @@ export function attachDesktop(
   let lastOrder: readonly string[] | null = null
   let lastFocused: string | null = null
   let drag: ActiveDrag | null = null
+  let groupTargetId: string | null = null
   let cachedRect: { left: number; top: number } | null = null
   let rectUsers = 0
 
@@ -153,6 +158,29 @@ export function attachDesktop(
     hitEdge,
     hitCorner,
     magnetThreshold,
+    groupDwell,
+    groupTarget(clientX, clientY, selfId) {
+      if (!groupingEnabled || typeof doc.elementsFromPoint !== 'function') return null
+      for (const node of doc.elementsFromPoint(clientX, clientY)) {
+        const handle = node.closest?.('[data-wm-drag]')
+        const host = handle?.closest<HTMLElement>('[data-wm-window]')
+        const id = host?.dataset.wmWindow
+        if (id && id !== selfId && registry.has(id)) return id
+      }
+      return null
+    },
+    markGroupTarget(id) {
+      if (groupTargetId === id) return
+      if (groupTargetId) {
+        const previous = registry.get(groupTargetId)
+        if (previous) delete previous.element.dataset.wmTabTarget
+      }
+      groupTargetId = id
+      if (id) {
+        const next = registry.get(id)
+        if (next) next.element.dataset.wmTabTarget = ''
+      }
+    },
     currentDrag: () => drag,
     claimDrag(session) {
       drag = session
@@ -179,18 +207,30 @@ export function attachDesktop(
     win: WindowState,
     zIndex: number,
     activeWorkspace: number,
+    activeTab: boolean,
   ): void {
     const el = attached.element
     const firstSync = attached.lastState === null
     if (firstSync) el.style.transition = 'none'
-    if (attached.lastState !== win || attached.lastWorkspace !== activeWorkspace) {
+    if (
+      attached.lastState !== win ||
+      attached.lastWorkspace !== activeWorkspace ||
+      attached.lastTab !== activeTab
+    ) {
       el.style.transform = `translate3d(${win.bounds.x}px, ${win.bounds.y}px, 0)`
       el.style.width = `${win.bounds.width}px`
       el.style.height = `${win.bounds.height}px`
       el.dataset.wmStage = win.stage
       el.dataset.wmLayer = win.layer
       el.dataset.wmWorkspace = String(win.workspace)
-      const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace
+      if (win.groupId === null) {
+        delete el.dataset.wmGroup
+        delete el.dataset.wmTab
+      } else {
+        el.dataset.wmGroup = win.groupId
+        el.dataset.wmTab = activeTab ? 'active' : 'inactive'
+      }
+      const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace || !activeTab
       if (hide && !el.hidden && el.contains(doc.activeElement)) {
         element.focus({ preventScroll: true })
       }
@@ -209,6 +249,7 @@ export function attachDesktop(
       }
       attached.lastState = win
       attached.lastWorkspace = activeWorkspace
+      attached.lastTab = activeTab
     }
     if (attached.lastZ !== zIndex) {
       el.style.zIndex = String(zIndex + 1)
@@ -227,12 +268,14 @@ export function attachDesktop(
       const attached = registry.get(id)
       const win = state.windows[id]
       if (!attached || !win) return
+      const activeTab = win.groupId === null || state.groups[win.groupId]?.activeId === win.id
       if (
         orderChanged ||
         attached.lastState !== win ||
-        attached.lastWorkspace !== state.workspace
+        attached.lastWorkspace !== state.workspace ||
+        attached.lastTab !== activeTab
       ) {
-        syncWindow(attached, win, index, state.workspace)
+        syncWindow(attached, win, index, state.workspace, activeTab)
       }
     })
     if (state.focusedId !== lastFocused) {
@@ -347,6 +390,7 @@ export function attachDesktop(
       lastState: null,
       lastZ: -1,
       lastWorkspace: -1,
+      lastTab: true,
       cleanup: [],
     }
 

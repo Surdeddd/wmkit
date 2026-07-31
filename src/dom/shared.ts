@@ -31,7 +31,12 @@ export interface MagnetismOptions {
   threshold?: number
 }
 
+export interface GroupingOptions {
+  dwell?: number
+}
+
 export interface DesktopOptions {
+  grouping?: boolean | GroupingOptions
   snap?: boolean | DesktopSnapOptions
   keyboard?: boolean | DesktopKeyboardOptions
   announce?: boolean | Partial<AnnouncerMessages>
@@ -75,6 +80,9 @@ export interface SessionContext {
   hitEdge: number
   hitCorner: number
   magnetThreshold: number
+  groupDwell: number
+  groupTarget(clientX: number, clientY: number, selfId: string): string | null
+  markGroupTarget(id: string | null): void
   currentDrag(): ActiveDrag | null
   claimDrag(session: ActiveDrag): void
   releaseDrag(session: ActiveDrag): void

@@ -1590,6 +1590,235 @@ describe('center and sendToBack', () => {
   })
 })
 
+describe('tab groups', () => {
+  function grouped() {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.open({ id: 'b', x: 500, y: 300, width: 200, height: 150 })
+    const groupId = wm.group(['a', 'b'])
+    return { wm, groupId: groupId as string }
+  }
+
+  it('refuses to group fewer than two known windows', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    expect(wm.group([])).toBeNull()
+    expect(wm.group(['a'])).toBeNull()
+    expect(wm.group(['a', 'ghost'])).toBeNull()
+    expect(wm.group(['a', 'a'])).toBeNull()
+  })
+
+  it('adopts the host geometry and activates the host', () => {
+    const { wm, groupId } = grouped()
+    expect(groupId).toMatch(/^wm-group-/)
+    expect(wm.get('b')?.bounds).toEqual(wm.get('a')?.bounds)
+    expect(wm.get('a')?.groupId).toBe(groupId)
+
+    const state = wm.getState()
+    expect(state.groups[groupId]).toMatchObject({ activeId: 'a', members: ['b', 'a'] })
+    expect(state.focusedId).toBe('a')
+  })
+
+  it('keeps every member on the same geometry through moves and stages', () => {
+    const { wm } = grouped()
+    wm.move('a', 120, 90)
+    expect(wm.get('b')?.bounds).toMatchObject({ x: 120, y: 90 })
+
+    wm.maximize('a')
+    expect(wm.get('b')).toMatchObject({ stage: 'maximized' })
+    wm.snap('a', 'left')
+    expect(wm.get('b')).toMatchObject({ stage: 'snapped', snapZone: 'left' })
+    wm.restore('a')
+    expect(wm.get('b')?.bounds).toEqual(wm.get('a')?.bounds)
+
+    wm.resize('a', { width: 420 })
+    expect(wm.get('b')?.bounds.width).toBe(420)
+  })
+
+  it('follows the host across layers and workspaces', () => {
+    const { wm } = grouped()
+    wm.update('a', { layer: 'floating' })
+    expect(wm.get('b')?.layer).toBe('floating')
+    wm.moveToWorkspace('a', 2)
+    expect(wm.get('b')?.workspace).toBe(2)
+  })
+
+  it('hides inactive tabs from focus, the taskbar and cycling', () => {
+    const { wm } = grouped()
+    wm.minimize('a')
+    expect(wm.minimized().map((win) => win.id)).toEqual(['a'])
+
+    wm.restore('a')
+    expect(wm.cycleFocus()).toBe('a')
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('activates a tab and refuses a redundant activation', () => {
+    const { wm, groupId } = grouped()
+    const onGroup = vi.fn()
+    wm.on('group', onGroup)
+
+    expect(wm.activateTab('a')).toBe(false)
+    expect(wm.activateTab('b')).toBe(true)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('b')
+    expect(onGroup).toHaveBeenCalledWith({
+      groupId,
+      members: ['b', 'a'],
+      activeId: 'b',
+      previous: 'a',
+    })
+    expect(wm.activateTab('ghost')).toBe(false)
+  })
+
+  it('focusing an inactive tab brings it to the front of its group', () => {
+    const { wm, groupId } = grouped()
+    expect(wm.focus('b')).toBe(true)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('b')
+    expect(wm.getState().focusedId).toBe('b')
+  })
+
+  it('dissolves the group when it drops below two members', () => {
+    const { wm, groupId } = grouped()
+    expect(wm.ungroup('ghost')).toBe(false)
+    expect(wm.ungroup('a')).toBe(true)
+    expect(wm.get('a')?.groupId).toBeNull()
+    expect(wm.get('b')?.groupId).toBeNull()
+    expect(wm.getState().groups[groupId]).toBeUndefined()
+  })
+
+  it('keeps the group alive when a third member leaves', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    wm.activateTab('c')
+
+    expect(wm.ungroup('c')).toBe(true)
+    const state = wm.getState()
+    expect(state.groups[groupId]?.members).toEqual(['b', 'a'])
+    expect(state.groups[groupId]?.activeId).toBe('b')
+  })
+
+  it('keeps the active tab when an inactive member leaves', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c']) wm.open({ id })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    const onGroup = vi.fn()
+    wm.on('group', onGroup)
+
+    expect(wm.ungroup('b')).toBe(true)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('a')
+    expect(onGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ groupId, activeId: 'a', previous: null }),
+    )
+  })
+
+  it('hands the tab over when the active member is closed', () => {
+    const { wm, groupId } = grouped()
+    wm.close('a')
+    expect(wm.getState().groups[groupId]).toBeUndefined()
+    expect(wm.get('b')?.groupId).toBeNull()
+  })
+
+  it('merges existing groups instead of nesting them', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c', 'd']) wm.open({ id })
+    const first = wm.group(['a', 'b']) as string
+    const second = wm.group(['c', 'd']) as string
+    const merged = wm.group(['a', 'c']) as string
+
+    expect(merged).not.toBe(first)
+    expect(merged).not.toBe(second)
+    const state = wm.getState()
+    expect(Object.keys(state.groups)).toEqual([merged])
+    expect([...(state.groups[merged]?.members ?? [])].sort()).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('leaves members untouched when the change carries no geometry', () => {
+    const { wm } = grouped()
+    const before = wm.get('b')
+    wm.update('a', { title: 'renamed' })
+    expect(wm.get('b')).toBe(before)
+    expect(wm.get('a')?.title).toBe('renamed')
+  })
+
+  it('picks the first member when the payload carries no active tab map', () => {
+    const { wm, groupId } = grouped()
+    wm.activateTab('b')
+    const data = wm.serialize()
+    ;(data as unknown as Record<string, unknown>).activeTabs = undefined
+    const next = makeWm()
+    expect(next.hydrate(data)).toBe(true)
+    expect(next.getState().groups[groupId]?.activeId).toBe('b')
+  })
+
+  it('exposes members in tab order', () => {
+    const { wm, groupId } = grouped()
+    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['b', 'a'])
+    expect(wm.groupMembers('nope')).toEqual([])
+  })
+
+  it('round trips groups through serialize and hydrate', () => {
+    const { wm, groupId } = grouped()
+    wm.activateTab('b')
+    const data = wm.serialize()
+    expect(data.activeTabs[groupId]).toBe('b')
+
+    const next = makeWm()
+    expect(next.hydrate(data)).toBe(true)
+    expect(next.get('a')?.groupId).toBe(groupId)
+    expect(next.getState().groups[groupId]?.activeId).toBe('b')
+  })
+
+  it('repairs a broken group on hydrate', () => {
+    const { wm, groupId } = grouped()
+    const data = wm.serialize()
+    data.activeTabs[groupId] = 'ghost'
+    const next = makeWm()
+    next.hydrate(data)
+    expect(next.getState().groups[groupId]?.activeId).toBe('b')
+
+    const lonely = wm.serialize()
+    const raw = rawWindow(lonely)
+    raw.groupId = null
+    lonely.activeTabs = {}
+    const third = makeWm()
+    third.hydrate(lonely)
+    expect(third.getState().groups).toEqual({})
+  })
+
+  it('drops a non string group id on hydrate', () => {
+    const { wm } = grouped()
+    const data = wm.serialize()
+    rawWindow(data).groupId = 42
+    rawWindow(data, 1).groupId = ''
+    const next = makeWm()
+    next.hydrate(data)
+    expect(next.getState().groups).toEqual({})
+  })
+
+  it('restores the active tab through undo', () => {
+    const { wm, groupId } = grouped()
+    wm.activateTab('b')
+    expect(wm.undo()).toBe(true)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('a')
+    expect(wm.redo()).toBe(true)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('b')
+  })
+
+  it('ignores a modal parked behind an inactive tab', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'gate', layer: 'modal' })
+    wm.group(['a', 'gate'])
+    wm.activateTab('a')
+    wm.open({ id: 'c' })
+    expect(wm.focus('c')).toBe(true)
+    expect(wm.getState().focusedId).toBe('c')
+  })
+})
+
 describe('audited regressions', () => {
   it('re-derives bounds against the current viewport on hydrate', () => {
     const donor = makeWm()

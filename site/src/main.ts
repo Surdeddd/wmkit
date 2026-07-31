@@ -156,7 +156,10 @@ function chrome(id: string, title: string): HTMLElement {
   const titleEl = document.createElement('span')
   titleEl.dataset.wmTitle = ''
   titleEl.textContent = title
-  header.append(controls, titleEl)
+  const tabs = document.createElement('span')
+  tabs.className = 'win-tabs'
+  tabs.hidden = true
+  header.append(controls, titleEl, tabs)
   const content = document.createElement('div')
   content.dataset.wmContent = ''
   element.append(header, content)
@@ -223,6 +226,59 @@ wm.on('close', ({ window: win }) => {
   entry.instance?.destroy?.()
   mounted.delete(win.id)
 })
+
+function syncTabs(): void {
+  const state = wm.getState()
+  for (const [id, entry] of mounted) {
+    const strip = entry.element.querySelector<HTMLElement>('.win-tabs')
+    const titleEl = entry.element.querySelector<HTMLElement>('[data-wm-title]')
+    const win = state.windows[id]
+    const group = win?.groupId ? state.groups[win.groupId] : undefined
+    if (!strip || !titleEl) continue
+    if (!group) {
+      strip.hidden = true
+      titleEl.hidden = false
+      if (strip.dataset.signature !== undefined) {
+        delete strip.dataset.signature
+        strip.replaceChildren()
+      }
+      continue
+    }
+    const signature = [...group.members]
+      .sort()
+      .map((memberId) => `${memberId}:${state.windows[memberId]?.title ?? ''}`)
+      .join(',')
+    strip.hidden = false
+    titleEl.hidden = true
+    if (strip.dataset.signature === signature) {
+      for (const tab of strip.querySelectorAll<HTMLButtonElement>('.win-tab')) {
+        tab.setAttribute('aria-selected', String(tab.dataset.tab === group.activeId))
+      }
+      continue
+    }
+    strip.dataset.signature = signature
+    strip.replaceChildren(
+      ...group.members.map((memberId) => {
+        const member = state.windows[memberId]
+        const tab = document.createElement('button')
+        tab.type = 'button'
+        tab.className = 'win-tab'
+        tab.dataset.tab = memberId
+        tab.textContent = member?.title ?? memberId
+        tab.setAttribute('aria-selected', String(group.activeId === memberId))
+        tab.addEventListener('click', (event) => {
+          event.stopPropagation()
+          wm.activateTab(memberId)
+        })
+        tab.addEventListener('dblclick', (event) => {
+          event.stopPropagation()
+          wm.ungroup(memberId)
+        })
+        return tab
+      }),
+    )
+  }
+}
 
 function reconcile(): void {
   const state = wm.getState()
@@ -545,6 +601,7 @@ function setLang(next: Lang): void {
 
 wm.subscribe(() => {
   reconcile()
+  syncTabs()
   renderDock()
   syncLauncher()
   syncWorkspaces()

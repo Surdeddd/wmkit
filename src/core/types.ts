@@ -48,6 +48,7 @@ export interface WindowState extends WindowFlags {
   snapZone: SnapZone | null
   layer: WindowLayer
   workspace: number
+  groupId: string | null
   minSize: Size
   maxSize: Size | null
   aspectRatio: number | null
@@ -78,6 +79,13 @@ export interface HistoryEntry {
   order: readonly string[]
   focusedId: string | null
   workspace: number
+  activeTabs: Readonly<Record<string, string>>
+}
+
+export interface WindowGroup {
+  id: string
+  activeId: string
+  members: readonly string[]
 }
 
 export interface ManagerState {
@@ -86,6 +94,7 @@ export interface ManagerState {
   focusedId: string | null
   viewport: Size
   workspace: number
+  groups: Readonly<Record<string, WindowGroup>>
 }
 
 export interface SerializedMaxSize {
@@ -103,6 +112,7 @@ export interface SerializedState {
   order: string[]
   focusedId: string | null
   workspace: number
+  activeTabs: Record<string, string>
 }
 
 export interface ManagerEvents {
@@ -115,6 +125,7 @@ export interface ManagerEvents {
   update: { window: WindowState }
   order: { order: readonly string[] }
   workspace: { workspace: number; previous: number }
+  group: { groupId: string; members: readonly string[]; activeId: string; previous: string | null }
   modalblocked: { window: WindowState }
   change: { state: ManagerState }
 }
@@ -172,6 +183,10 @@ export interface WindowManager {
   workspace(): number
   setWorkspace(workspace: number): boolean
   moveToWorkspace(id: string, workspace: number): boolean
+  group(ids: readonly string[]): string | null
+  ungroup(id: string): boolean
+  activateTab(id: string): boolean
+  groupMembers(groupId: string): readonly WindowState[]
   batch(run: () => void): void
   serialize(): SerializedState
   hydrate(data: SerializedState): boolean
