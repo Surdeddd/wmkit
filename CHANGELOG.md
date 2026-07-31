@@ -1,3 +1,10 @@
+## [0.5.1](https://github.com/Surdeddd/wmkit/compare/v0.5.0...v0.5.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **groups:** close the tab group defects found by the third audit wave ([97b3f22](https://github.com/Surdeddd/wmkit/commit/97b3f2255fb5a4bfcc8625dfad8e73c3863f5320))
+
 # [0.5.0](https://github.com/Surdeddd/wmkit/compare/v0.4.2...v0.5.0) (2026-07-31)
 
 
