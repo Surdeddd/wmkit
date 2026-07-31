@@ -151,18 +151,24 @@ export class DesktopComponent {
   },
 ]
 
-const KEYWORDS =
-  /\b(import|from|const|let|function|return|export|class|new|await|async|type|interface|private|constructor)\b/g
+const ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+}
+
+const TOKENS =
+  /(\/\/[^\n]*)|('[^'\n]*'|`[^`]*`)|\b(import|from|const|let|function|return|export|class|new|await|async|type|interface|private|constructor)\b|\b([a-zA-Z_$][\w$]*)(?=\()/g
 
 export function highlight(code: string): string {
-  const escaped = code
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-  return escaped
-    .replace(/(\/\/[^\n]*)/g, '<span class="com">$1</span>')
-    .replace(/('[^'\n]*'|`[^`]*`)/g, '<span class="str">$1</span>')
-    .replace(KEYWORDS, '<span class="kw">$1</span>')
-    .replace(/\b([a-zA-Z_$][\w$]*)\(/g, '<span class="fn">$1</span>(')
+  return code
+    .replace(/[&<>"]/g, (char) => ESCAPES[char] as string)
+    .replace(TOKENS, (match, comment, string, keyword, callee) => {
+      if (comment) return `<span class="com">${comment}</span>`
+      if (string) return `<span class="str">${string}</span>`
+      if (keyword) return `<span class="kw">${keyword}</span>`
+      if (callee) return `<span class="fn">${callee}</span>`
+      return match
+    })
 }

@@ -20,10 +20,10 @@ export default defineConfig({
       include: ['src/core/**', 'src/plugins/**', 'src/dom/**', 'src/adapters/**'],
       thresholds: {
         'src/core/**': { statements: 100, lines: 100, functions: 100, branches: 100 },
-        'src/plugins/persist.ts': { statements: 100, lines: 100, functions: 100, branches: 100 },
         'src/dom/**': { statements: 85, lines: 85, functions: 80, branches: 70 },
         'src/adapters/**': { statements: 88, lines: 88, functions: 85, branches: 95 },
-        'src/plugins/popout.ts': { statements: 70, lines: 70, functions: 95, branches: 75 },
+        'src/plugins/**': { statements: 70, lines: 70, functions: 95, branches: 75 },
+        'src/plugins/persist.ts': { statements: 100, lines: 100, functions: 100, branches: 100 },
       },
       reporter: ['text', 'html'],
     },

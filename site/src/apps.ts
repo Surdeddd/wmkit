@@ -156,11 +156,14 @@ const terminal: AppSpec = {
       log.scrollTop = log.scrollHeight
     }
 
+    const greetLead = el('div', 'out')
+    const greetCmd = el('div', 'cmd', 'help')
+    const greetHelp = el('div', 'out')
+    log.append(greetLead, greetCmd, greetHelp)
+
     const hello = () => {
-      log.replaceChildren()
-      write(ctx.dict().terminal.hello)
-      write('help', 'cmd')
-      write(ctx.dict().terminal.help)
+      greetLead.textContent = ctx.dict().terminal.hello
+      greetHelp.textContent = ctx.dict().terminal.help
     }
     hello()
 

@@ -194,6 +194,11 @@ export function attachDesktop(
       if (hide && !el.hidden && el.contains(doc.activeElement)) {
         element.focus({ preventScroll: true })
       }
+      if (!hide && el.hidden && wm.getState().focusedId === win.id) {
+        queueMicrotask(() => {
+          if (!el.hidden && !el.contains(doc.activeElement)) el.focus({ preventScroll: true })
+        })
+      }
       el.hidden = hide
       el.setAttribute('aria-label', win.title)
       if (win.layer === 'modal') el.setAttribute('aria-modal', 'true')
@@ -250,6 +255,7 @@ export function attachDesktop(
     wm.on('focus', ({ window: win }) => {
       const attached = registry.get(win.id)
       if (!attached) return
+      if (attached.element.hidden) syncAll()
       if (!attached.element.contains(doc.activeElement)) {
         attached.element.focus({ preventScroll: true })
       }
@@ -288,6 +294,7 @@ export function attachDesktop(
         return
       }
       if (!event.ctrlKey && !event.metaKey) return
+      if (drag) return
       const target = event.target as Element | null
       if (target?.closest(INTERACTIVE_SELECTOR)) return
       if (historyShortcuts && (event.key === 'z' || event.key === 'Z')) {

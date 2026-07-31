@@ -192,6 +192,12 @@ describe('drag session', () => {
     const preview = harness.element.querySelector<HTMLElement>('[data-wm-snap-preview]')
     expect(preview?.style.display).toBe('block')
 
+    handle.dispatchEvent(pointerEvent('pointermove', 400, 300))
+    harness.flushFrames()
+    expect(preview?.style.display).toBe('none')
+
+    handle.dispatchEvent(pointerEvent('pointermove', 4, 300))
+    harness.flushFrames()
     handle.dispatchEvent(pointerEvent('pointerup', 4, 300))
     expect(harness.wm.get('a')).toMatchObject({ stage: 'snapped', snapZone: 'left' })
     expect(preview?.style.display).toBe('none')
@@ -203,9 +209,14 @@ describe('drag session', () => {
     harness.wm.maximize('a')
 
     drag(harness, handle, [400, 10], [420, 120])
-    const win = harness.wm.get('a')
-    expect(win?.stage).toBe('normal')
-    expect(win?.bounds.width).toBe(200)
+    expect(harness.wm.get('a')).toMatchObject({
+      stage: 'normal',
+      bounds: { x: 320, y: 110, width: 200, height: 150 },
+    })
+
+    handle.dispatchEvent(pointerEvent('pointermove', 470, 160))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 370, y: 150 })
   })
 })
 
@@ -246,6 +257,49 @@ describe('resize session', () => {
     harness.flushFrames()
 
     expect(harness.wm.get('a')?.bounds).toMatchObject({ width: 300, height: 150 })
+  })
+
+  it('drives the ratio from the dragged north edge and keeps the bottom anchored', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'b', x: 100, y: 200, width: 200, height: 100, aspectRatio: 2 })
+    const handle = harness.resizeHandle('b', 'n')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 200, 200))
+    handle.dispatchEvent(pointerEvent('pointermove', 200, 150))
+    harness.flushFrames()
+
+    const bounds = harness.wm.get('b')?.bounds
+    expect(bounds).toMatchObject({ width: 300, height: 150 })
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBe(300)
+  })
+
+  it('keeps the opposite corner pinned when an aspect-locked window is resized by nw', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'd', x: 100, y: 200, width: 200, height: 100, aspectRatio: 2 })
+    const handle = harness.resizeHandle('d', 'nw')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 100, 200))
+    handle.dispatchEvent(pointerEvent('pointermove', 90, 120))
+    harness.flushFrames()
+
+    const bounds = harness.wm.get('d')?.bounds
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBe(300)
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBe(300)
+    expect((bounds?.width ?? 0) / (bounds?.height ?? 1)).toBe(2)
+  })
+
+  it('never lets an aspect-locked north drag push the window above the desktop', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'c', x: 0, y: 40, width: 200, height: 100, aspectRatio: 2 })
+    const handle = harness.resizeHandle('c', 'n')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 100, 40))
+    handle.dispatchEvent(pointerEvent('pointermove', 100, -400))
+    harness.flushFrames()
+
+    const bounds = harness.wm.get('c')?.bounds
+    expect(bounds?.y).toBeGreaterThanOrEqual(0)
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBe(140)
   })
 
   it('escape during a resize puts a snapped window back where it was', () => {

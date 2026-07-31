@@ -109,14 +109,15 @@ describe('flip animations', () => {
     const target = document.createElement('div')
     document.body.append(source, target)
     stubRects(source, target, width)
-    const animate = vi.fn(() => ({ onfinish: null, oncancel: null }) as unknown as Animation)
+    const anim = { onfinish: null as (() => void) | null, oncancel: null as (() => void) | null }
+    const animate = vi.fn(() => anim as unknown as Animation)
     Object.defineProperty(source, 'animate', { value: animate, configurable: true })
     Object.defineProperty(HTMLDivElement.prototype, 'animate', {
       value: animate,
       configurable: true,
       writable: true,
     })
-    return { source, target, animate }
+    return { source, target, animate, anim }
   }
 
   it('reports the reduced motion preference', () => {
@@ -126,9 +127,9 @@ describe('flip animations', () => {
     expect(prefersReducedMotion(window)).toBe(false)
   })
 
-  it('runs a ghost from the window to the target and cleans it up', () => {
+  it('runs a ghost from the window to the target and removes it when finished', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
-    const { source, target, animate } = setup()
+    const { source, target, animate, anim } = setup()
     flipToTarget(source, target)
 
     expect(animate).toHaveBeenCalledTimes(1)
@@ -136,15 +137,27 @@ describe('flip animations', () => {
     expect(ghost.style.position).toBe('fixed')
     const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
     expect(call[1].duration).toBe(260)
+    expect(call[0][0]?.transform).toBe('translate(0, 0) scale(1, 1)')
+    expect(call[0][1]?.transform).toBe('translate(210px, 340px) scale(0.2, 0.2)')
+
+    expect(ghost.isConnected).toBe(true)
+    anim.onfinish?.()
+    expect(ghost.isConnected).toBe(false)
   })
 
   it('runs the reverse ghost from the target back to the window', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
-    const { source, target, animate } = setup()
+    const { source, target, animate, anim } = setup()
     flipFromTarget(source, target, { duration: 120, easing: 'linear' })
 
     const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
     expect(call[1]).toMatchObject({ duration: 120, easing: 'linear' })
+    expect(call[0][0]?.transform).toBe('translate(210px, 340px) scale(0.2, 0.2)')
+    expect(call[0][1]?.transform).toBe('translate(0, 0) scale(1, 1)')
+
+    const ghost = document.body.lastElementChild as HTMLElement
+    anim.oncancel?.()
+    expect(ghost.isConnected).toBe(false)
   })
 
   it('skips the ghost under reduced motion or a collapsed rect', () => {

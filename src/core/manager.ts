@@ -66,6 +66,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let future: HistoryEntry[] = []
   let interactionDepth = 0
   let interactionRecorded = false
+  let interactionMark: { past: HistoryEntry[]; future: HistoryEntry[] } | null = null
   let skipNextHistory = false
   let pendingHistory: HistoryEntry | null = null
   const layouts = new Map<string, SerializedState>()
@@ -211,7 +212,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const size =
       aspectRatio === null
         ? clampSize(requested, minSize, maxSize)
-        : applyAspect(requested, aspectRatio, minSize, maxSize, 'width')
+        : applyAspect(
+            requested,
+            aspectRatio,
+            minSize,
+            maxSize,
+            init.width === undefined && init.height !== undefined ? 'height' : 'width',
+          )
     const position = positionForOpen(init)
     let bounds: Bounds = { ...position, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
@@ -343,7 +350,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function snapBounds(win: WindowState, zone: SnapZone): Bounds {
     const rect = zoneBounds(zone, viewport)
-    return { x: rect.x, y: rect.y, ...normalizeSize(rect, win) }
+    const byWidth = normalizeSize(rect, win)
+    const size = byWidth.height > rect.height ? normalizeSize(rect, win, 'height') : byWidth
+    return {
+      x: Math.max(0, Math.min(rect.x, viewport.width - size.width)),
+      y: Math.max(0, Math.min(rect.y, viewport.height - size.height)),
+      ...size,
+    }
   }
 
   function focusUnlessBlocked(id: string): void {
@@ -532,7 +545,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       snappable: patch.snappable ?? win.snappable,
       meta: patch.meta ? { ...win.meta, ...patch.meta } : win.meta,
     }
-    const size = normalizeSize(next.bounds, next)
+    const size = next.stage === 'maximized' ? next.bounds : normalizeSize(next.bounds, next)
     const resized = size.width !== next.bounds.width || size.height !== next.bounds.height
     const finalWin = resized ? { ...next, bounds: { ...next.bounds, ...size } } : next
     setWindow(finalWin)
@@ -583,6 +596,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (!onActiveWorkspace(updated) && focusedId === id) {
       focusTop()
       if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
+    } else if (onActiveWorkspace(updated) && topModalId() === id && focusedId !== id) {
+      const previous = focusedId
+      focusedId = id
+      emitFocus(updated, previous)
     }
     queueEvent(() => emitter.emit('update', { window: updated }))
     commit()
@@ -723,16 +740,22 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function beginInteraction(): void {
     interactionDepth += 1
-    if (interactionDepth === 1) interactionRecorded = false
+    if (interactionDepth === 1) {
+      interactionRecorded = false
+      interactionMark = { past: [...past], future }
+    }
   }
 
   function endInteraction(): void {
     if (interactionDepth > 0) interactionDepth -= 1
+    if (interactionDepth === 0) interactionMark = null
   }
 
   function abortInteraction(): void {
-    if (interactionDepth > 0 && interactionRecorded) {
-      past.pop()
+    if (interactionDepth > 0 && interactionMark) {
+      past.length = 0
+      past.push(...interactionMark.past)
+      future = interactionMark.future
       interactionRecorded = false
     }
     endInteraction()

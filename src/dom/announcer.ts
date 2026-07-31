@@ -43,11 +43,9 @@ export function createAnnouncer(
   container.append(element)
 
   let clearTimer: ReturnType<typeof setTimeout> | undefined
-  let lastMessage = ''
   let detailed = false
 
   function announce(message: string): void {
-    lastMessage = message
     element.textContent = message
     if (clearTimer !== undefined) clearTimeout(clearTimer)
     clearTimer = setTimeout(() => {
@@ -56,8 +54,14 @@ export function createAnnouncer(
   }
 
   const unsubscribers = [
-    wm.on('open', ({ window: win }) => announce(dict.opened(win.title))),
-    wm.on('close', ({ window: win }) => announce(dict.closed(win.title))),
+    wm.on('open', ({ window: win }) => {
+      announce(dict.opened(win.title))
+      detailed = true
+    }),
+    wm.on('close', ({ window: win }) => {
+      announce(dict.closed(win.title))
+      detailed = true
+    }),
     wm.on('stage', ({ window: win, previous }) => {
       if (win.stage === 'minimized') announce(dict.minimized(win.title))
       else if (win.stage === 'maximized') announce(dict.maximized(win.title))
@@ -68,7 +72,7 @@ export function createAnnouncer(
       detailed = true
     }),
     wm.on('focus', ({ window: win, previous }) => {
-      if (detailed || previous === null || lastMessage === dict.opened(win.title)) return
+      if (detailed || previous === null) return
       announce(dict.focused(win.title))
     }),
     wm.on('workspace', ({ workspace }) => {

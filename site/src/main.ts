@@ -24,6 +24,18 @@ const THEME_URLS: Record<ThemeName, string> = {
 
 const WORKSPACES = 3
 
+const EN_CONTROLS = [
+  ['[data-wm-close]', 'Close'],
+  ['[data-wm-minimize]', 'Minimize'],
+  ['[data-wm-maximize]', 'Maximize'],
+] as const
+
+const RU_CONTROLS = [
+  ['[data-wm-close]', 'Закрыть'],
+  ['[data-wm-minimize]', 'Свернуть'],
+  ['[data-wm-maximize]', 'Развернуть'],
+] as const
+
 function must<T>(value: T | null, what: string): T {
   if (!value) throw new Error(`wmkit demo: missing ${what}`)
   return value
@@ -131,9 +143,9 @@ function chrome(id: string, title: string): HTMLElement {
   const controls = document.createElement('span')
   controls.dataset.wmControls = ''
   for (const [attribute, label] of [
-    ['wmClose', lang === 'ru' ? 'Закрыть' : 'Close'],
-    ['wmMinimize', lang === 'ru' ? 'Свернуть' : 'Minimize'],
-    ['wmMaximize', lang === 'ru' ? 'Развернуть' : 'Maximize'],
+    ['wmClose', lang === 'ru' ? RU_CONTROLS[0][1] : EN_CONTROLS[0][1]],
+    ['wmMinimize', lang === 'ru' ? RU_CONTROLS[1][1] : EN_CONTROLS[1][1]],
+    ['wmMaximize', lang === 'ru' ? RU_CONTROLS[2][1] : EN_CONTROLS[2][1]],
   ] as const) {
     const control = document.createElement('button')
     control.type = 'button'
@@ -182,15 +194,28 @@ function openApp(id: AppId): void {
   activate(id, entry)
 }
 
-wm.on('open', ({ window: win }) => {
-  if (mounted.has(win.id)) return
-  const entry = mount(win.id, win.title, null)
-  const body = contentOf(entry.element)
-  body.append(
-    Object.assign(document.createElement('p'), { className: 'app-note', textContent: win.id }),
-  )
-  activate(win.id, entry)
-})
+function adopt(id: string, title: string): void {
+  if (mounted.has(id)) return
+  const spec = specById.get(id as AppId) ?? null
+  const entry = mount(id, title, spec)
+  if (!spec) {
+    contentOf(entry.element).append(
+      Object.assign(document.createElement('p'), { className: 'app-note', textContent: id }),
+    )
+  }
+  activate(id, entry)
+}
+
+function release(id: string): void {
+  const entry = mounted.get(id)
+  if (!entry) return
+  entry.instance?.destroy?.()
+  entry.detach?.()
+  entry.element.remove()
+  mounted.delete(id)
+}
+
+wm.on('open', ({ window: win }) => adopt(win.id, win.title))
 
 wm.on('close', ({ window: win }) => {
   const entry = mounted.get(win.id)
@@ -198,6 +223,17 @@ wm.on('close', ({ window: win }) => {
   entry.instance?.destroy?.()
   mounted.delete(win.id)
 })
+
+function reconcile(): void {
+  const state = wm.getState()
+  for (const id of [...mounted.keys()]) {
+    if (!state.windows[id]) release(id)
+  }
+  for (const id of state.order) {
+    const win = state.windows[id]
+    if (win) adopt(id, win.title)
+  }
+}
 
 function resetDesktop(): void {
   wm.batch(() => {
@@ -317,6 +353,7 @@ const menuActions: Record<string, () => void> = {
   saveLayout: () => {
     wm.saveLayout(`layout ${wm.layoutNames().length + 1}`)
     openApp('layouts')
+    mounted.get('layouts')?.instance?.relabel?.()
   },
   reset: () => resetDesktop(),
   shortcuts: () => openApp('shortcuts'),
@@ -476,9 +513,13 @@ function relabelAll(): void {
     const spec = entry.spec
     if (!spec) continue
     const title = dict().apps[spec.id].title
-    wm.update(id, { title })
+    if (wm.get(id)?.title !== title) wm.update(id, { title })
     const titleEl = entry.element.querySelector('[data-wm-title]')
     if (titleEl) titleEl.textContent = title
+    const aria = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
+    for (const [selector, label] of aria) {
+      entry.element.querySelector(selector)?.setAttribute('aria-label', `${label} ${title}`)
+    }
     if (entry.instance?.relabel) {
       entry.instance.relabel()
     } else {
@@ -503,6 +544,7 @@ function setLang(next: Lang): void {
 }
 
 wm.subscribe(() => {
+  reconcile()
   renderDock()
   syncLauncher()
   syncWorkspaces()
@@ -541,7 +583,11 @@ for (const node of document.querySelectorAll<HTMLButtonElement>('.copy')) {
 
 document.querySelector('#wall-launch')?.addEventListener('click', () => {
   const state = wm.getState()
-  if (state.order.length === 0) openDefaults()
+  const visible = state.order.filter((id) => {
+    const win = state.windows[id]
+    return win && win.workspace === state.workspace && win.stage !== 'minimized'
+  })
+  if (visible.length === 0) openDefaults()
   else wm.arrange('tile')
 })
 

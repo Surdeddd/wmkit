@@ -43,6 +43,7 @@ export function createResizeStarter(ctx: SessionContext) {
     let pendingX = 0
     let pendingY = 0
     let hasPending = false
+    let applied = false
     const el = ctx.windowElement(id)
     if (el) el.dataset.wmResizing = direction
 
@@ -52,7 +53,8 @@ export function createResizeStarter(ctx: SessionContext) {
       raf = 0
       const dx = pendingX - startPoint.x
       const dy = pendingY - startPoint.y
-      const top = direction.includes('n') ? Math.max(0, start.y + dy) : start.y
+      const floor = Math.min(0, start.y)
+      const top = direction.includes('n') ? Math.max(floor, start.y + dy) : start.y
       const raw = {
         width: direction.includes('e')
           ? start.width + dx
@@ -65,16 +67,21 @@ export function createResizeStarter(ctx: SessionContext) {
             ? start.y + start.height - top
             : start.height,
       }
-      const size =
+      let size =
         aspect === null
           ? clampSize(raw, minSize, maxSize)
           : applyAspect(raw, aspect, minSize, maxSize, drive)
+      const available = start.y + start.height - floor
+      if (direction.includes('n') && size.height > available) {
+        size = applyAspect({ ...size, height: available }, aspect ?? 0, minSize, maxSize, 'height')
+      }
       const next: Bounds = {
         x: direction.includes('w') ? start.x + start.width - size.width : start.x,
         y: direction.includes('n') ? start.y + start.height - size.height : start.y,
         ...size,
       }
       wm.resize(id, next)
+      applied = true
     }
 
     function onMove(moveEvent: PointerEvent): void {
@@ -91,7 +98,7 @@ export function createResizeStarter(ctx: SessionContext) {
       try {
         if (raf !== 0) view.cancelAnimationFrame(raf)
         if (hasPending && !cancelled) flush()
-        if (cancelled) {
+        if (cancelled && applied) {
           if (startStage === 'snapped' && startZone) {
             wm.restoreTo(id, startRestore ?? start)
             wm.snap(id, startZone)

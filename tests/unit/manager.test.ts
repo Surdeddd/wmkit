@@ -1384,6 +1384,25 @@ describe('workspaces', () => {
     expect(wm.getState().focusedId).toBe('a')
   })
 
+  it('takes focus when a modal arrives on the active workspace', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'gate', layer: 'modal', workspace: 1 })
+    expect(wm.getState().focusedId).toBe('a')
+
+    expect(wm.moveToWorkspace('gate', 0)).toBe(true)
+    expect(wm.getState().focusedId).toBe('gate')
+    expect(wm.focus('a')).toBe(false)
+  })
+
+  it('does not hand focus to a plain window arriving on the active workspace', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b', workspace: 1 })
+    wm.moveToWorkspace('b', 0)
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
   it('keeps focus when the moved window was not focused', () => {
     const wm = makeWm()
     wm.open({ id: 'a' })
@@ -1476,6 +1495,33 @@ describe('aspect ratio', () => {
     expect(wm.get('a')?.bounds).toMatchObject({ width: 600, height: 300 })
     wm.resize('a', { height: 100 })
     expect(wm.get('a')?.bounds).toMatchObject({ width: 200, height: 100 })
+  })
+
+  it('drives the opening size from height when only height is given', () => {
+    const wm = makeWm()
+    expect(wm.open({ id: 'a', height: 300, aspectRatio: 2 }).bounds).toMatchObject({
+      width: 600,
+      height: 300,
+    })
+  })
+
+  it('fits a snapped zone by height when the ratio would overflow it', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', width: 200, aspectRatio: 1 })
+    wm.snap('a', 'bottom')
+    const bounds = wm.get('a')?.bounds
+    expect(bounds).toMatchObject({ width: 400, height: 400 })
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeLessThanOrEqual(800)
+  })
+
+  it('leaves a maximized window filling the viewport when a ratio is applied', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.maximize('a')
+    wm.update('a', { aspectRatio: 2 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 1000, height: 800 })
+    wm.restore('a')
+    expect(wm.get('a')?.bounds.width).toBe((wm.get('a')?.bounds.height ?? 0) * 2)
   })
 
   it('sets and clears the ratio through update', () => {
