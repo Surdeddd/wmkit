@@ -136,6 +136,129 @@ test('dropping a titlebar on another window groups them into tabs', async ({ pag
   await expect(moving).toBeHidden()
 })
 
+test('a tab can be dragged out of its group', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'the group needs two roomy windows side by side')
+  const moving = await launch(page, 'layouts')
+  const host = page.locator(readme)
+
+  await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
+  await expect(host).toBeVisible()
+  await expect(host.locator('.win-tab')).toHaveCount(2)
+
+  const tab = host.locator('.win-tab[data-tab="layouts"]')
+  const box = await boxOf(tab)
+  const dropX = box.x + 220
+  const dropY = box.y + 320
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 80, box.y + 60, { steps: 6 })
+  await page.mouse.move(dropX, dropY, { steps: 10 })
+  await page.mouse.up()
+
+  await expect(moving).toHaveJSProperty('dataset.wmGroup', undefined)
+  await expect(host).toBeVisible()
+  await expect(moving).toBeVisible()
+
+  const after = await boxOf(moving)
+  expect(Math.abs(after.x + after.width / 2 - dropX)).toBeLessThanOrEqual(14)
+  expect(Math.abs(after.y + 12 - dropY)).toBeLessThanOrEqual(14)
+
+  await page.evaluate(() => window.__wmDemo.wm.undo())
+  expect(await page.evaluate(() => window.__wmDemo.wm.get('layouts')?.groupId)).toBeTruthy()
+})
+
+test('a torn off tab keeps its own size instead of the maximized frame', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'the group needs two roomy windows side by side')
+  const moving = await launch(page, 'layouts')
+  const host = page.locator(readme)
+
+  await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
+  const framed = await boxOf(host)
+
+  await page.evaluate(() => window.__wmDemo.wm.maximize('readme'))
+  await expect(host).toHaveAttribute('data-wm-stage', 'maximized')
+  const maximized = await boxOf(host)
+  expect(maximized.width).toBeGreaterThan(framed.width + 50)
+
+  const box = await boxOf(host.locator('.win-tab[data-tab="layouts"]'))
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 60, box.y + 120, { steps: 6 })
+  await page.mouse.move(box.x + 260, box.y + 360, { steps: 10 })
+  await page.mouse.up()
+
+  await expect(moving).toHaveAttribute('data-wm-stage', 'normal')
+  const after = await boxOf(moving)
+  expect(Math.abs(after.width - framed.width)).toBeLessThanOrEqual(2)
+})
+
+test('the tab strip takes no room until the window is grouped', async ({ page }) => {
+  const strip = page.locator(`${readme} .win-tabs`)
+  const widthOf = () => strip.evaluate((el) => el.getBoundingClientRect().width)
+  expect(await widthOf()).toBe(0)
+
+  await launch(page, 'layouts')
+  await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
+  await expect(strip).toBeVisible()
+  expect(await widthOf()).toBeGreaterThan(0)
+})
+
+test('a tab nudged inside its own strip stays in the group', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'the group needs two roomy windows side by side')
+  await launch(page, 'layouts')
+  await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
+
+  const host = page.locator(readme)
+  const from = await boxOf(host.locator('.win-tab[data-tab="layouts"]'))
+  const to = await boxOf(host.locator('.win-tab[data-tab="readme"]'))
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 })
+  await page.mouse.up()
+
+  expect(await page.evaluate(() => window.__wmDemo.wm.get('layouts')?.groupId)).toBeTruthy()
+  await expect(host.locator('.win-tab')).toHaveCount(2)
+})
+
+test('a tab dropped on a covered titlebar does not join the window underneath', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'the group needs three roomy windows')
+  const moving = await launch(page, 'layouts')
+  await launch(page, 'terminal')
+
+  await page.evaluate(() => {
+    const wm = window.__wmDemo.wm
+    wm.group(['readme', 'layouts'])
+    wm.restoreTo('terminal', { x: 40, y: 40, width: 420, height: 320 })
+    wm.restoreTo('readme', { x: 60, y: 60, width: 420, height: 320 })
+    wm.focus('readme')
+  })
+
+  const host = page.locator(readme)
+  const covered = await boxOf(page.locator('[data-testid="window-terminal"] [data-wm-drag]'))
+  const box = await boxOf(host.locator('.win-tab[data-tab="layouts"]'))
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 30, box.y + 40, { steps: 6 })
+  await page.mouse.move(covered.x + covered.width / 2, covered.y + covered.height / 2, {
+    steps: 10,
+  })
+  await page.mouse.up()
+
+  const groups = await page.evaluate(() => {
+    const wm = window.__wmDemo.wm
+    return { layouts: wm.get('layouts')?.groupId, terminal: wm.get('terminal')?.groupId }
+  })
+  expect(groups.terminal).toBeNull()
+  expect(groups.layouts).toBeNull()
+  await expect(moving).toBeVisible()
+})
+
 test('capture landing screenshots', async ({ page }, testInfo) => {
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(600)

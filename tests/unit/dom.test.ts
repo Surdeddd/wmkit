@@ -36,7 +36,11 @@ interface Harness {
   wm: WindowManager
   desktop: DesktopController
   element: HTMLElement
-  add(init: WindowInit & { id: string }): { root: HTMLElement; handle: HTMLElement }
+  add(init: WindowInit & { id: string }): {
+    root: HTMLElement
+    handle: HTMLElement
+    detach: () => void
+  }
   handleOf(id: string): HTMLElement
   resizeHandle(id: string, direction: string): HTMLElement
   flushFrames(): void
@@ -66,9 +70,9 @@ function makeHarness(options: DesktopOptions = {}): Harness {
       const root = document.createElement('section')
       root.innerHTML = '<header data-wm-drag><span data-wm-title>t</span></header>'
       element.append(root)
-      desktop.attachWindow(init.id, root)
+      const detach = desktop.attachWindow(init.id, root)
       const handle = root.querySelector<HTMLElement>('[data-wm-drag]') as HTMLElement
-      return { root, handle }
+      return { root, handle, detach }
     },
     handleOf(id) {
       return element.querySelector<HTMLElement>(
@@ -182,6 +186,16 @@ describe('drag session', () => {
     harness.wm.move('a', 100, 100)
     drag(harness, harness.handleOf('a'), [150, 110], [245, 110])
     expect(harness.wm.get('a')?.bounds.x).toBe(195)
+  })
+
+  it('does not magnetise a grouped window to its own hidden siblings', () => {
+    const harness = makeHarness({ magnetism: { threshold: 10 }, snap: false })
+    harness.add({ id: 'hidden', x: 100, y: 100, width: 200, height: 150 })
+    harness.add({ id: 'moving', x: 100, y: 100, width: 200, height: 150 })
+    harness.wm.group(['moving', 'hidden'])
+
+    drag(harness, harness.handleOf('moving'), [150, 110], [156, 110])
+    expect(harness.wm.get('moving')?.bounds.x).toBe(106)
   })
 
   it('previews a snap zone and applies it on release', () => {
@@ -409,14 +423,96 @@ describe('tab groups in the dom', () => {
   })
 
   it('does not group when the gesture is disabled', () => {
-    const harness = makeHarness({ magnetism: false, snap: false, grouping: false })
+    vi.useFakeTimers()
+    try {
+      const harness = makeHarness({ magnetism: false, snap: false, grouping: false })
+      harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+      const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+      document.elementsFromPoint = () => [harness.handleOf('target')]
+
+      drag(harness, handle, [60, 20], [450, 410])
+      vi.advanceTimersByTime(1000)
+      expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+
+      handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+      expect(harness.wm.get('moving')?.groupId).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('arms the group target once the dwell elapses', () => {
+    vi.useFakeTimers()
+    try {
+      const harness = makeHarness({ magnetism: false, snap: false })
+      harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+      const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+      document.elementsFromPoint = () => [harness.handleOf('target')]
+
+      drag(harness, handle, [60, 20], [450, 410])
+      expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+
+      vi.advanceTimersByTime(500)
+      expect(
+        harness.element.querySelector('[data-wm-tab-target]')?.getAttribute('data-wm-window'),
+      ).toBe('target')
+
+      handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+      expect(harness.wm.get('moving')?.groupId).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops the snap preview once the group target arms', () => {
+    vi.useFakeTimers()
+    try {
+      const harness = makeHarness({ magnetism: false })
+      harness.add({ id: 'target', x: 0, y: 0, width: 200, height: 150 })
+      const { handle } = harness.add({ id: 'moving', x: 300, y: 300, width: 200, height: 150 })
+      document.elementsFromPoint = () => [harness.handleOf('target')]
+
+      drag(harness, handle, [350, 310], [4, 200])
+      const preview = harness.element.querySelector<HTMLElement>('[data-wm-snap-preview]')
+      expect(preview?.style.display).toBe('block')
+
+      vi.advanceTimersByTime(500)
+      expect(preview?.style.display).toBe('none')
+      expect(harness.element.querySelector('[data-wm-tab-target]')).not.toBeNull()
+
+      handle.dispatchEvent(pointerEvent('pointerup', 4, 200))
+      expect(harness.wm.get('moving')?.stage).toBe('normal')
+      expect(harness.wm.get('moving')?.groupId).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a hit test result that is not this desktop window element', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    document.elementsFromPoint = () => [harness.handleOf('target')]
+    const stale = harness.handleOf('target').closest('[data-wm-window]') as HTMLElement
+    const clone = stale.cloneNode(true) as HTMLElement
+    document.elementsFromPoint = () => [clone.querySelector('[data-wm-drag]') as HTMLElement]
 
     drag(harness, handle, [60, 20], [450, 410])
     handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
     expect(harness.wm.get('moving')?.groupId).toBeNull()
+  })
+
+  it('clears the target flag when the marked window detaches mid drag', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    const target = harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    document.elementsFromPoint = () => [harness.handleOf('target')]
+
+    drag(harness, handle, [60, 20], [450, 410])
+    expect(target.root.dataset.wmTabTarget).toBe('')
+
+    target.detach()
+    handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(target.root.dataset.wmTabTarget).toBeUndefined()
   })
 })
 

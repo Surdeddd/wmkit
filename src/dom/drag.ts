@@ -67,6 +67,8 @@ export function createDragStarter(ctx: SessionContext) {
 
     function armGroup(target: string): void {
       session.groupTarget = target
+      session.zone = null
+      ctx.hidePreview()
       ctx.markGroupTarget(target)
     }
 
@@ -115,9 +117,9 @@ export function createDragStarter(ctx: SessionContext) {
         for (const otherId of state.order) {
           if (otherId === id) continue
           const other = state.windows[otherId]
-          if (other && other.stage !== 'minimized' && other.workspace === state.workspace) {
-            targets.push(other.bounds)
-          }
+          if (!other || other.stage === 'minimized' || other.workspace !== state.workspace) continue
+          if (other.groupId !== null && state.groups[other.groupId]?.activeId !== otherId) continue
+          targets.push(other.bounds)
         }
         const magnet = magnetize(
           { x: nextX, y: nextY, width: current.bounds.width, height: current.bounds.height },

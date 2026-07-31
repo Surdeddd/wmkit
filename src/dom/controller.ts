@@ -81,6 +81,7 @@ export function attachDesktop(
   let lastFocused: string | null = null
   let drag: ActiveDrag | null = null
   let groupTargetId: string | null = null
+  let groupTargetEl: HTMLElement | null = null
   let cachedRect: { left: number; top: number } | null = null
   let rectUsers = 0
 
@@ -165,21 +166,16 @@ export function attachDesktop(
         const handle = node.closest?.('[data-wm-drag]')
         const host = handle?.closest<HTMLElement>('[data-wm-window]')
         const id = host?.dataset.wmWindow
-        if (id && id !== selfId && registry.has(id)) return id
+        if (id && id !== selfId && registry.get(id)?.element === host) return id
       }
       return null
     },
     markGroupTarget(id) {
       if (groupTargetId === id) return
-      if (groupTargetId) {
-        const previous = registry.get(groupTargetId)
-        if (previous) delete previous.element.dataset.wmTabTarget
-      }
+      if (groupTargetEl) delete groupTargetEl.dataset.wmTabTarget
       groupTargetId = id
-      if (id) {
-        const next = registry.get(id)
-        if (next) next.element.dataset.wmTabTarget = ''
-      }
+      groupTargetEl = id ? (registry.get(id)?.element ?? null) : null
+      if (groupTargetEl) groupTargetEl.dataset.wmTabTarget = ''
     },
     currentDrag: () => drag,
     claimDrag(session) {

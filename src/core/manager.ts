@@ -123,16 +123,23 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       .map((entry) => entry.id)
   }
 
+  function blockOf(id: string): string[] {
+    const win = windows[id] as WindowState
+    if (win.groupId === null) return [id]
+    return [...membersOf(win.groupId).filter((entry) => entry !== id), id]
+  }
+
   function raise(id: string): boolean {
     const win = windows[id] as WindowState
-    const without = order.filter((entry) => entry !== id)
+    const block = blockOf(id)
+    const without = order.filter((entry) => !block.includes(entry))
     const rank = LAYER_RANK[win.layer]
     let insertAt = without.length
     for (let i = without.length - 1; i >= 0; i -= 1) {
       if (layerRankOf(without[i] as string) > rank) insertAt = i
       else break
     }
-    const next = [...without.slice(0, insertAt), id, ...without.slice(insertAt)]
+    const next = [...without.slice(0, insertAt), ...block, ...without.slice(insertAt)]
     const changed = next.length !== order.length || next.some((entry, i) => entry !== order[i])
     order = next
     return changed
@@ -151,7 +158,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function buildGroups(): Record<string, WindowGroup> {
-    const result: Record<string, WindowGroup> = {}
+    const result: Record<string, WindowGroup> = Object.create(null)
     for (const [groupId, activeId] of Object.entries(activeTabs)) {
       result[groupId] = { id: groupId, activeId, members: membersOf(groupId) }
     }
@@ -223,6 +230,15 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function focusTop(): void {
     const targets = focusTargets()
     focusedId = targets.length > 0 ? (targets[targets.length - 1] as string) : null
+  }
+
+  function reconcileFocus(): void {
+    if (focusedId === null) return
+    const win = windows[focusedId]
+    if (win && win.stage !== 'minimized' && onActiveWorkspace(win) && isVisibleTab(win)) return
+    const previous = focusedId
+    focusTop()
+    if (focusedId) emitFocus(windows[focusedId] as WindowState, previous)
   }
 
   function emitFocus(win: WindowState, previous: string | null): void {
@@ -370,7 +386,6 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const win = windows[id]
     if (!win) return false
     if (!onActiveWorkspace(win)) setWorkspace(win.workspace)
-    if (!isVisibleTab(win)) activateTab(id)
     const modal = topModalId()
     if (modal && modal !== id && win.layer !== 'modal') {
       const modalWin = windows[modal]
@@ -378,6 +393,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       commitQuiet()
       return false
     }
+    if (!isVisibleTab(win)) activateTab(id)
     if (win.stage === 'minimized') {
       restore(id)
       return focusedId === id
@@ -443,6 +459,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     setWindow(next)
     syncGroup(next)
     queueEvent(() => emitter.emit('stage', { window: next, previous: win.stage }))
+    if (next.groupId !== null) reconcileFocus()
     commit()
     return true
   }
@@ -672,6 +689,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (!onActiveWorkspace(updated) && focusedId === id) {
       focusTop()
       if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
+    } else if (updated.groupId !== null && !onActiveWorkspace(updated)) {
+      reconcileFocus()
     } else if (onActiveWorkspace(updated) && topModalId() === id && focusedId !== id) {
       const previous = focusedId
       focusedId = id
@@ -700,7 +719,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
     if (expanded.length < 2) return null
 
-    const groupId = `${idPrefix}-group-${++groupCounter}`
+    let groupId = `${idPrefix}-group-${++groupCounter}`
+    while (activeTabs[groupId]) groupId = `${idPrefix}-group-${++groupCounter}`
+    const shared = expanded.reduce<Size>(
+      (size, id) => {
+        const fit = normalizeSize(size, windows[id] as WindowState)
+        return { width: Math.max(size.width, fit.width), height: Math.max(size.height, fit.height) }
+      },
+      { width: host.bounds.width, height: host.bounds.height },
+    )
+    const bounds: Bounds = { x: host.bounds.x, y: host.bounds.y, ...shared }
     const retired = new Set<string>()
     for (const id of expanded) {
       const win = windows[id] as WindowState
@@ -708,7 +736,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       setWindow({
         ...win,
         groupId,
-        bounds: host.bounds,
+        bounds,
         stage: host.stage,
         snapZone: host.snapZone,
         restoreBounds: host.restoreBounds,
@@ -723,8 +751,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     raise(host.id)
     emitGroup(groupId, null)
     queueEvent(() => emitter.emit('order', { order }))
+    const hostVisible = onActiveWorkspace(host) && host.stage !== 'minimized'
+    if (!hostVisible) reconcileFocus()
     commit()
-    if (onActiveWorkspace(host) && host.stage !== 'minimized') focus(host.id)
+    if (hostVisible) focus(host.id)
     return groupId
   }
 
@@ -739,7 +769,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     dissolveIfOrphaned(groupId)
     if (membersOf(groupId).length >= 2) emitGroup(groupId, wasActive ? id : null)
     commit()
-    focus(id)
+    if (onActiveWorkspace(win) && win.stage !== 'minimized') focus(id)
     return true
   }
 
@@ -750,6 +780,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const previous = activeTabs[groupId] as string
     if (previous === id) return false
     activeTabs = { ...activeTabs, [groupId]: id }
+    if (focusedId === previous) {
+      focusedId = id
+      emitFocus(win, previous)
+    }
     emitGroup(groupId, previous)
     commit()
     return true
@@ -762,14 +796,15 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function sendToBack(id: string): boolean {
     const win = windows[id]
     if (!win) return false
-    const without = order.filter((entry) => entry !== id)
+    const block = blockOf(id)
+    const without = order.filter((entry) => !block.includes(entry))
     const rank = LAYER_RANK[win.layer]
     let insertAt = 0
     for (const entry of without) {
       if (layerRankOf(entry) < rank) insertAt += 1
       else break
     }
-    const next = [...without.slice(0, insertAt), id, ...without.slice(insertAt)]
+    const next = [...without.slice(0, insertAt), ...block, ...without.slice(insertAt)]
     if (next.every((entry, i) => entry === order[i])) return false
     order = next
     queueEvent(() => emitter.emit('order', { order }))
@@ -841,19 +876,23 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function reflowViewport(): void {
     for (const id of order) {
       const win = windows[id] as WindowState
+      if (!isVisibleTab(win)) continue
       if (win.stage === 'maximized') {
         const updated = { ...win, bounds: fullBounds() }
         setWindow(updated)
+        syncGroup(updated)
         queueEvent(() => emitter.emit('resize', { window: updated }))
       } else if (win.stage === 'snapped' && win.snapZone) {
         const updated = { ...win, bounds: snapBounds(win, win.snapZone) }
         setWindow(updated)
+        syncGroup(updated)
         queueEvent(() => emitter.emit('resize', { window: updated }))
       } else if (win.stage === 'normal' && keepInViewport) {
         const bounds = clampToViewport(win.bounds, viewport, minVisible)
         if (!boundsEqual(bounds, win.bounds)) {
           const updated = { ...win, bounds }
           setWindow(updated)
+          syncGroup(updated)
           queueEvent(() => emitter.emit('move', { window: updated }))
         }
       }
@@ -954,7 +993,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function arrange(mode: 'cascade' | 'tile'): void {
     const ids = order.filter((id) => {
       const win = windows[id] as WindowState
-      return win.stage !== 'minimized' && onActiveWorkspace(win)
+      return win.stage !== 'minimized' && onActiveWorkspace(win) && isVisibleTab(win)
     })
     if (ids.length === 0) return
     if (mode === 'cascade') {
@@ -987,7 +1026,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function minimizeAll(): void {
     for (const id of [...order]) {
-      if (onActiveWorkspace(windows[id] as WindowState)) minimize(id)
+      const win = windows[id] as WindowState
+      if (onActiveWorkspace(win) && isVisibleTab(win)) minimize(id)
     }
   }
 
@@ -1143,7 +1183,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     ) {
       focusedId = null
     }
-    const restoredTabs: Record<string, string> = {}
+    const restoredTabs: Record<string, string> = Object.create(null)
     const rawTabs = (data as { activeTabs?: unknown }).activeTabs
     for (const id of order) {
       const groupId = (windows[id] as WindowState).groupId

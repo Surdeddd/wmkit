@@ -1817,6 +1817,225 @@ describe('tab groups', () => {
     expect(wm.focus('c')).toBe(true)
     expect(wm.getState().focusedId).toBe('c')
   })
+
+  it('hands the tab to a survivor when the active member of a bigger group is closed', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c']) wm.open({ id })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    wm.close('a')
+
+    const state = wm.getState()
+    expect(state.groups[groupId]?.members).toEqual(['b', 'c'])
+    expect(state.groups[groupId]?.activeId).toBe('b')
+    expect(wm.get('b')?.groupId).toBe(groupId)
+  })
+
+  it('round trips an active tab that differs from the first member', () => {
+    const { wm, groupId } = grouped()
+    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['b', 'a'])
+
+    const data = wm.serialize()
+    expect(data.activeTabs[groupId]).toBe('a')
+    const next = makeWm()
+    expect(next.hydrate(data)).toBe(true)
+    expect(next.getState().groups[groupId]?.activeId).toBe('a')
+  })
+})
+
+describe('tab group regressions', () => {
+  function grouped() {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.open({ id: 'b', x: 500, y: 300, width: 200, height: 150 })
+    return { wm, groupId: wm.group(['a', 'b']) as string }
+  }
+
+  it('mints a fresh group id after hydrating a live one', () => {
+    const { wm, groupId } = grouped()
+    const data = wm.serialize()
+
+    const next = makeWm()
+    expect(next.hydrate(data)).toBe(true)
+    next.open({ id: 'c' })
+    next.open({ id: 'd' })
+    const second = next.group(['c', 'd']) as string
+
+    expect(second).not.toBe(groupId)
+    expect(next.getState().groups[groupId]?.members).toEqual(['b', 'a'])
+    expect(next.getState().groups[second]?.members).toEqual(['d', 'c'])
+  })
+
+  it('moves focus along with the tab it activates', () => {
+    const { wm } = grouped()
+    const onFocus = vi.fn()
+    wm.on('focus', onFocus)
+
+    expect(wm.getState().focusedId).toBe('a')
+    expect(wm.activateTab('b')).toBe(true)
+    expect(wm.getState().focusedId).toBe('b')
+    expect(onFocus).toHaveBeenCalledWith({ window: wm.get('b'), previous: 'a' })
+  })
+
+  it('leaves focus alone when the group is in the background', () => {
+    const { wm } = grouped()
+    wm.open({ id: 'c' })
+    expect(wm.getState().focusedId).toBe('c')
+
+    expect(wm.activateTab('b')).toBe(true)
+    expect(wm.getState().focusedId).toBe('c')
+  })
+
+  it('releases focus when a hidden member drags the frame into a minimized stage', () => {
+    const { wm } = grouped()
+    wm.open({ id: 'c' })
+    wm.focus('b')
+    expect(wm.getState().focusedId).toBe('b')
+
+    wm.minimize('a')
+    expect(wm.get('b')?.stage).toBe('minimized')
+    expect(wm.getState().focusedId).toBe('c')
+  })
+
+  it('releases focus when a hidden member drags the frame off the workspace', () => {
+    const { wm } = grouped()
+    wm.open({ id: 'c' })
+    wm.focus('b')
+
+    wm.moveToWorkspace('a', 1)
+    expect(wm.get('b')?.workspace).toBe(1)
+    expect(wm.getState().focusedId).toBe('c')
+  })
+
+  it('reconciles focus when the group forms around a hidden host', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.minimize('a')
+    expect(wm.getState().focusedId).toBe('b')
+
+    wm.group(['a', 'b'])
+    expect(wm.get('b')?.stage).toBe('minimized')
+    expect(wm.getState().focusedId).toBeNull()
+  })
+
+  it('keeps members contiguous in the stacking order', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c', 'd']) wm.open({ id })
+    wm.group(['a', 'c'])
+
+    const { order } = wm.getState()
+    expect(Math.abs(order.indexOf('a') - order.indexOf('c'))).toBe(1)
+  })
+
+  it('re-sorts the stacking order when the host promotes a member', () => {
+    const wm = makeWm()
+    wm.open({ id: 'x' })
+    wm.open({ id: 'y' })
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.open({ id: 'n', layer: 'modal' })
+    wm.group(['m', 'x'])
+
+    const { order } = wm.getState()
+    expect(wm.get('x')?.layer).toBe('modal')
+    expect(order.indexOf('y')).toBeLessThan(order.indexOf('x'))
+  })
+
+  it('tiles a group as a single frame', () => {
+    const wm = makeWm({ viewport: { width: 1000, height: 800 } })
+    for (const id of ['a', 'b', 'solo']) wm.open({ id })
+    wm.group(['a', 'b'])
+
+    wm.arrange('tile')
+    expect(wm.get('solo')?.bounds).toEqual({ x: 0, y: 0, width: 500, height: 800 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 500, y: 0, width: 500, height: 800 })
+    expect(wm.get('b')?.bounds).toEqual(wm.get('a')?.bounds)
+  })
+
+  it('minimizes a group once, through its visible tab', () => {
+    const { wm } = grouped()
+    const onStage = vi.fn()
+    wm.on('stage', onStage)
+
+    wm.minimizeAll()
+    expect(onStage).toHaveBeenCalledTimes(1)
+    expect(onStage.mock.calls[0]?.[0].window.id).toBe('a')
+    expect(wm.get('b')?.stage).toBe('minimized')
+    expect(wm.getState().focusedId).toBeNull()
+
+    wm.restoreAll()
+    expect(wm.get('a')?.stage).toBe('normal')
+    expect(wm.get('b')?.stage).toBe('normal')
+  })
+
+  it('reflows a snapped group against the constraints of its visible tab', () => {
+    const wm = makeWm({ viewport: { width: 1200, height: 800 } })
+    wm.open({ id: 'a', minWidth: 160 })
+    wm.open({ id: 'b', minWidth: 400 })
+    wm.group(['a', 'b'])
+    wm.snap('a', 'left')
+    wm.activateTab('b')
+
+    wm.setViewport({ width: 600, height: 400 })
+    expect(wm.get('b')?.bounds).toEqual({ x: 0, y: 0, width: 400, height: 400 })
+    expect(wm.get('a')?.bounds).toEqual(wm.get('b')?.bounds)
+  })
+
+  it('never resolves a group from the Object prototype', () => {
+    const { wm } = grouped()
+    const { groups } = wm.getState()
+
+    expect(groups.toString).toBeUndefined()
+    expect(groups.constructor).toBeUndefined()
+  })
+
+  it('sizes a new group so every member clears its own minimum', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', width: 300, height: 200 })
+    wm.open({ id: 'b', minWidth: 520, minHeight: 340 })
+    wm.group(['a', 'b'])
+
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 520, height: 340 })
+    expect(wm.get('b')?.bounds).toEqual(wm.get('a')?.bounds)
+  })
+
+  it('registers a group whose id shadows an Object prototype key', () => {
+    const shadow = '__proto__'
+    const { wm } = grouped()
+    const data = wm.serialize()
+    rawWindow(data, 0).groupId = shadow
+    rawWindow(data, 1).groupId = shadow
+    data.activeTabs = {}
+
+    const next = makeWm()
+    expect(next.hydrate(data)).toBe(true)
+    const group = next.getState().groups[shadow]
+    expect(group?.members).toEqual(['b', 'a'])
+    expect(next.getState().focusedId).toBe(group?.activeId)
+  })
+
+  it('does not switch the tab when a modal refuses the focus', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const groupId = wm.group(['a', 'b']) as string
+    wm.open({ id: 'gate', layer: 'modal' })
+
+    expect(wm.focus('b')).toBe(false)
+    expect(wm.getState().groups[groupId]?.activeId).toBe('a')
+    expect(wm.getState().focusedId).toBe('gate')
+  })
+
+  it('does not follow an off-workspace member when it leaves the group', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.group(['a', 'b'])
+    wm.moveToWorkspace('a', 1)
+    expect(wm.getState().workspace).toBe(0)
+
+    expect(wm.ungroup('a')).toBe(true)
+    expect(wm.getState().workspace).toBe(0)
+  })
 })
 
 describe('audited regressions', () => {

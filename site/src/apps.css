@@ -89,6 +89,10 @@
   overflow: hidden;
 }
 
+.win-tabs[hidden] {
+  display: none;
+}
+
 .win-tab {
   padding: 3px 9px;
   max-width: 14ch;

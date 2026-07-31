@@ -227,6 +227,104 @@ wm.on('close', ({ window: win }) => {
   mounted.delete(win.id)
 })
 
+function elementOf(target: EventTarget | null): Element | null {
+  return target instanceof Element ? target : null
+}
+
+function tearOff(id: string, x: number, y: number): void {
+  if (!wm.get(id)?.groupId) return
+  wm.batch(() => {
+    wm.ungroup(id)
+    if (wm.get(id)?.stage !== 'normal') wm.restore(id)
+    const rect = desktopEl.getBoundingClientRect()
+    const box = wm.get(id)?.bounds
+    if (!box) return
+    wm.restoreTo(id, {
+      x: Math.round(x - rect.left - box.width / 2),
+      y: Math.round(y - rect.top - 12),
+      width: box.width,
+      height: box.height,
+    })
+  })
+}
+
+function titlebarWindowAt(clientX: number, clientY: number, selfId: string): string | null {
+  const node = document.elementsFromPoint(clientX, clientY)[0]
+  if (!node?.closest('[data-wm-drag]')) return null
+  const id = node.closest<HTMLElement>('[data-wm-window]')?.dataset.wmWindow
+  return id && id !== selfId && wm.get(id) ? id : null
+}
+
+function startTabDrag(event: PointerEvent, id: string): void {
+  if (event.button !== 0) return
+  event.stopPropagation()
+  const tab = event.currentTarget as HTMLElement
+  const strip = tab.parentElement
+  const pointerId = event.pointerId
+  const origin = { x: event.clientX, y: event.clientY }
+  let moved = false
+
+  function clearTargets(): void {
+    for (const el of desktopEl.querySelectorAll<HTMLElement>('[data-wm-tab-target]')) {
+      delete el.dataset.wmTabTarget
+    }
+  }
+
+  function stop(): void {
+    tab.removeEventListener('pointermove', onMove)
+    tab.removeEventListener('pointerup', onUp)
+    tab.removeEventListener('pointercancel', onCancel)
+    if (tab.hasPointerCapture(pointerId)) tab.releasePointerCapture(pointerId)
+    clearTargets()
+  }
+
+  function onMove(move: PointerEvent): void {
+    if (move.pointerId !== pointerId) return
+    if (!moved && Math.abs(move.clientX - origin.x) + Math.abs(move.clientY - origin.y) < 6) return
+    moved = true
+    clearTargets()
+    const target = titlebarWindowAt(move.clientX, move.clientY, id)
+    if (target && wm.get(target)?.groupId !== wm.get(id)?.groupId) {
+      const host = desktopEl.querySelector<HTMLElement>(`[data-wm-window="${target}"]`)
+      if (host) host.dataset.wmTabTarget = ''
+    }
+  }
+
+  function onCancel(cancel: PointerEvent): void {
+    if (cancel.pointerId === pointerId) stop()
+  }
+
+  function onUp(up: PointerEvent): void {
+    if (up.pointerId !== pointerId) return
+    stop()
+    if (!moved) return
+    const box = strip?.getBoundingClientRect()
+    if (
+      box &&
+      up.clientX >= box.left &&
+      up.clientX <= box.right &&
+      up.clientY >= box.top &&
+      up.clientY <= box.bottom
+    ) {
+      return
+    }
+    const target = titlebarWindowAt(up.clientX, up.clientY, id)
+    if (target && wm.get(target)?.groupId !== wm.get(id)?.groupId) {
+      wm.batch(() => {
+        wm.ungroup(id)
+        if (wm.group([target, id])) wm.activateTab(id)
+      })
+      return
+    }
+    tearOff(id, up.clientX, up.clientY)
+  }
+
+  tab.setPointerCapture(pointerId)
+  tab.addEventListener('pointermove', onMove)
+  tab.addEventListener('pointerup', onUp)
+  tab.addEventListener('pointercancel', onCancel)
+}
+
 function syncTabs(): void {
   const state = wm.getState()
   for (const [id, entry] of mounted) {
@@ -237,6 +335,7 @@ function syncTabs(): void {
     if (!strip || !titleEl) continue
     if (!group) {
       strip.hidden = true
+      strip.removeAttribute('role')
       titleEl.hidden = false
       if (strip.dataset.signature !== undefined) {
         delete strip.dataset.signature
@@ -249,6 +348,7 @@ function syncTabs(): void {
       .map((memberId) => `${memberId}:${state.windows[memberId]?.title ?? ''}`)
       .join(',')
     strip.hidden = false
+    strip.setAttribute('role', 'tablist')
     titleEl.hidden = true
     if (strip.dataset.signature === signature) {
       for (const tab of strip.querySelectorAll<HTMLButtonElement>('.win-tab')) {
@@ -265,15 +365,13 @@ function syncTabs(): void {
         tab.className = 'win-tab'
         tab.dataset.tab = memberId
         tab.textContent = member?.title ?? memberId
+        tab.setAttribute('role', 'tab')
         tab.setAttribute('aria-selected', String(group.activeId === memberId))
         tab.addEventListener('click', (event) => {
           event.stopPropagation()
           wm.activateTab(memberId)
         })
-        tab.addEventListener('dblclick', (event) => {
-          event.stopPropagation()
-          wm.ungroup(memberId)
-        })
+        tab.addEventListener('pointerdown', (event) => startTabDrag(event, memberId))
         return tab
       }),
     )
@@ -611,7 +709,7 @@ wm.subscribe(() => {
 document.addEventListener('click', closeMenus)
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeMenus()
-  const target = event.target as HTMLElement | null
+  const target = elementOf(event.target)
   if (target?.closest('input, textarea, [contenteditable]')) return
   if (event.key === '?') {
     event.preventDefault()
@@ -654,7 +752,7 @@ document.querySelector('#open-code')?.addEventListener('click', () => {
 })
 
 document.addEventListener('pointermove', (event) => {
-  const card = (event.target as Element | null)?.closest<HTMLElement>('.feature')
+  const card = elementOf(event.target)?.closest<HTMLElement>('.feature')
   if (!card) return
   const rect = card.getBoundingClientRect()
   card.style.setProperty('--mx', `${event.clientX - rect.left}px`)

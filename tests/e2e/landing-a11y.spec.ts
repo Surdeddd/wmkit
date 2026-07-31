@@ -34,6 +34,16 @@ test.describe('landing accessibility', () => {
     expect(await scan(page)).toEqual([])
   })
 
+  test('axe finds no violations with a tab group on the desktop', async ({ page }) => {
+    await page.goto('?lang=en')
+    await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+    await page.click('#launcher button[data-app="layouts"]')
+    await expect(page.locator('[data-testid="window-layouts"]')).toBeVisible()
+    await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
+    await expect(page.locator('[data-testid="window-readme"] .win-tab')).toHaveCount(2)
+    expect(await scan(page)).toEqual([])
+  })
+
   test('axe finds no violations in russian', async ({ page }) => {
     await page.goto('?lang=ru')
     await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()

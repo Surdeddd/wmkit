@@ -124,7 +124,6 @@ function renderTabs(windowEl, id) {
       tab.textContent = state.windows[memberId]?.title ?? memberId
       tab.setAttribute('aria-selected', String(group.activeId === memberId))
       tab.addEventListener('click', () => wm.activateTab(memberId))
-      tab.addEventListener('dblclick', () => wm.ungroup(memberId))
       return tab
     }),
   )
@@ -134,6 +133,11 @@ wm.subscribe(() => {
   for (const [id, el] of mounted) renderTabs(el, id)
 })
 ```
+
+Do not hang the "tear this tab out" gesture on `dblclick`. Activating a tab swaps which member the
+DOM layer shows, so the two clicks land on two different elements and the browser retargets the
+`dblclick` to a common ancestor — usually the titlebar, whose own double-click handler toggles
+maximize instead. Drive tear-off from a pointer drag, or from an explicit control on the tab.
 
 The DOM layer hides inactive members for you and marks the elements: `data-wm-group` carries the
 group id and `data-wm-tab` is `active` or `inactive`, so a theme can style the frame without any
