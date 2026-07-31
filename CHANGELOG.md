@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/Surdeddd/wmkit/compare/v0.4.2...v0.5.0) (2026-07-31)
+
+
+### Features
+
+* tab groups — several windows sharing one frame ([c4900aa](https://github.com/Surdeddd/wmkit/commit/c4900aac412084c4a566c31aecd105d3e2080504))
+
 ## [0.4.2](https://github.com/Surdeddd/wmkit/compare/v0.4.1...v0.4.2) (2026-07-31)
 
 
