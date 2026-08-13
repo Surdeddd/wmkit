@@ -1,3 +1,10 @@
+## [0.6.1](https://github.com/Surdeddd/wmkit/compare/v0.6.0...v0.6.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **site:** hide the boot overlay instead of only fading it out ([bc32e7a](https://github.com/Surdeddd/wmkit/commit/bc32e7a1c9d657ee0a1b4e21d798c12dba79c94d))
+
 # [0.6.0](https://github.com/Surdeddd/wmkit/compare/v0.5.1...v0.6.0) (2026-08-13)
 
 
