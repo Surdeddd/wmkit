@@ -35,8 +35,7 @@ memory-bank/
 # editors & os
 .DS_Store
 .idea/
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 *.log
 npm-debug.log*
 pnpm-debug.log*

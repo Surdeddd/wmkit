@@ -1,4 +1,5 @@
 export function prefersReducedMotion(win: Window): boolean {
+  if (typeof win.matchMedia !== 'function') return false
   return win.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 

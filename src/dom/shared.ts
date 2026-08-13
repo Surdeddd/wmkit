@@ -50,8 +50,16 @@ export interface DesktopOptions {
   hitAreas?: HitAreaOptions
   magnetism?: boolean | MagnetismOptions
   stacking?: StackingOptions
+  animation?: boolean | AnimationOptions
+  interactiveSelector?: string
+  beforeClose?: (window: WindowState) => boolean | void
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
+}
+
+export interface AnimationOptions {
+  duration?: number
+  easing?: string
 }
 
 export interface WindowAttachOptions {
@@ -86,6 +94,7 @@ export interface SessionContext {
   topEdge: 'maximize' | 'top' | 'none'
   hitEdge: number
   hitCorner: number
+  interactiveSelector: string
   magnetThreshold: number
   groupDwell: number
   groupTarget(clientX: number, clientY: number, selfId: string): string | null

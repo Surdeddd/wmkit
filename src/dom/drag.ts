@@ -1,6 +1,6 @@
 import { clamp, detectSnapZone, magnetize, zoneBounds } from '../core/geometry'
 import type { Bounds, SnapZone, WindowStage } from '../core/types'
-import { type ActiveDrag, INTERACTIVE_SELECTOR, type SessionContext } from './shared'
+import type { ActiveDrag, SessionContext } from './shared'
 
 interface DragSession extends ActiveDrag {
   pointerId: number
@@ -32,7 +32,7 @@ export function createDragStarter(ctx: SessionContext) {
     const win = wm.get(id)
     if (!win?.draggable || event.button !== 0 || ctx.currentDrag()) return
     const target = event.target as Element | null
-    if (target?.closest(INTERACTIVE_SELECTOR)) return
+    if (target?.closest(ctx.interactiveSelector)) return
     event.preventDefault()
 
     const releaseRect = ctx.trackRect()

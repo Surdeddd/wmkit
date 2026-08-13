@@ -178,4 +178,12 @@ They are hidden automatically when the window is not resizable, and when its sta
 
 ## Motion and accessibility
 
-Every shipped theme drops its animations under `prefers-reduced-motion: reduce`, and `flipToTarget`/`flipFromTarget` opt out at the JS level as well. Keep focus visible — the library gives the window `tabindex="-1"` and focuses it, so a `:focus-visible` outline on `[data-wm-window]` is worth having. Check contrast for `--wm-text-dim` if you retune it: it is used for the inactive titlebar text, which still has to be readable.
+Every shipped theme drops its animations under `prefers-reduced-motion: reduce`, and `flipToTarget`/`flipFromTarget` opt out at the JS level as well. The whole minimize animation can also be turned off or retimed from the controller with `animation: false` or `animation: { duration, easing }`. Keep focus visible — the library gives the window `tabindex="-1"` and focuses it, so a `:focus-visible` outline on `[data-wm-window]` is worth having. Check contrast for `--wm-text-dim` if you retune it: it is used for the inactive titlebar text, which still has to be readable.
+
+### Pointer targets
+
+The window controls are small on purpose, so every theme grows their hit area with a transparent pseudo-element instead of growing the dot itself. Each control ends up at least 24×24 CSS pixels and neighbouring targets never overlap, which is what WCAG 2.5.8 asks for. If you restyle the controls, keep both halves of that deal: shrink the dot as much as you like, but re-check the pseudo-element inset and the `gap` on `[data-wm-controls]` so the targets stay 24px apart.
+
+### Windows high contrast
+
+Under `forced-colors: active` the platform throws away your colours, which would otherwise leave the three traffic lights as three identical circles. Every shipped theme redraws them in that mode as bordered buttons carrying `✕`, `–` and `□`, repaints the frame with `Canvas`/`CanvasText`, marks the focused window with `Highlight`, and turns the snap preview into a solid `Highlight` outline. A custom theme should do the same — colour alone is never enough to tell the controls apart.

@@ -41,6 +41,25 @@
   border: 1px solid #3c434f;
 }
 
+[data-wm-desktop][data-theme="glass"] [data-wm-controls] {
+  gap: 13px;
+}
+
+[data-wm-desktop][data-theme="glass"] [data-wm-close]::after,
+[data-wm-desktop][data-theme="glass"] [data-wm-minimize]::after,
+[data-wm-desktop][data-theme="glass"] [data-wm-maximize]::after {
+  inset: -6.5px;
+}
+
+@media (forced-colors: active) {
+  [data-wm-desktop][data-theme="glass"] [data-wm-close],
+  [data-wm-desktop][data-theme="glass"] [data-wm-minimize],
+  [data-wm-desktop][data-theme="glass"] [data-wm-maximize] {
+    width: 18px;
+    height: 16px;
+  }
+}
+
 [data-wm-desktop][data-theme="glass"] [data-wm-focused] [data-wm-close] {
   background: #ff6a4d;
   border-color: #ff6a4d;

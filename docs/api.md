@@ -333,6 +333,12 @@ interface DesktopOptions {
     gap?: number       // 32 — room left between neighbours for cheap reordering
     isolate?: boolean  // true — isolation:isolate so window layers stay inside the desktop
   }
+  animation?: boolean | {
+    duration?: number   // 260
+    easing?: string     // cubic-bezier(0.32, 0.72, 0, 1)
+  }
+  interactiveSelector?: string  // what a drag handle must not start on
+  beforeClose?: (window: WindowState) => boolean | void  // return false to keep it open
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }

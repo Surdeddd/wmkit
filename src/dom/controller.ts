@@ -5,6 +5,7 @@ import { createDragStarter } from './drag'
 import { createResizeHandles, createResizeStarter } from './resize'
 import {
   type ActiveDrag,
+  type AnimationOptions,
   type DesktopController,
   type DesktopKeyboardOptions,
   type DesktopOptions,
@@ -71,6 +72,10 @@ export function attachDesktop(
         (coarsePointer ? 12 : 8))
   const zIndexBase = options.stacking?.base ?? 0
   const zIndexGap = options.stacking?.gap ?? 32
+  const interactiveSelector = options.interactiveSelector ?? INTERACTIVE_SELECTOR
+  const animationEnabled = options.animation !== false
+  const animationOptions: AnimationOptions =
+    typeof options.animation === 'object' ? options.animation : {}
 
   element.dataset.wmDesktop = ''
   element.tabIndex = -1
@@ -162,6 +167,7 @@ export function attachDesktop(
     topEdge,
     hitEdge,
     hitCorner,
+    interactiveSelector,
     magnetThreshold,
     groupDwell,
     groupTarget(clientX, clientY, selfId) {
@@ -336,12 +342,17 @@ export function attachDesktop(
     wm.on('stage', ({ window: win, previous }) => {
       const attached = registry.get(win.id)
       if (!attached) return
+      if (!animationEnabled) return
       if (win.stage === 'minimized' && previous !== 'minimized') {
         const target = options.minimizeTarget?.(win)
-        if (target) flipToTarget(attached.element, target)
+        if (target) flipToTarget(attached.element, target, animationOptions)
       } else if (previous === 'minimized' && win.stage !== 'minimized') {
         const target = options.minimizeTarget?.(win)
-        if (target) view.requestAnimationFrame(() => flipFromTarget(attached.element, target))
+        if (target) {
+          view.requestAnimationFrame(() =>
+            flipFromTarget(attached.element, target, animationOptions),
+          )
+        }
       }
     }),
   )
@@ -356,7 +367,7 @@ export function attachDesktop(
       if (!event.ctrlKey && !event.metaKey) return
       if (drag) return
       const target = event.target as Element | null
-      if (target?.closest(INTERACTIVE_SELECTOR)) return
+      if (target?.closest(interactiveSelector)) return
       if (historyShortcuts && (event.key === 'z' || event.key === 'Z')) {
         event.preventDefault()
         if (event.shiftKey) wm.redo()
@@ -447,7 +458,7 @@ export function attachDesktop(
       const current = wm.get(id)
       if (!current) return
       if (target.closest('[data-wm-close]')) {
-        if (current.closable) wm.close(id)
+        if (current.closable && options.beforeClose?.(current) !== false) wm.close(id)
       } else if (target.closest('[data-wm-minimize]')) {
         if (current.minimizable) wm.minimize(id)
       } else if (target.closest('[data-wm-maximize]')) {
@@ -465,7 +476,7 @@ export function attachDesktop(
 
       const onDoubleClick = (event: MouseEvent) => {
         const target = event.target as Element | null
-        if (target?.closest(INTERACTIVE_SELECTOR)) return
+        if (target?.closest(interactiveSelector)) return
         const current = wm.get(id)
         if (current?.maximizable) wm.toggleMaximize(id)
       }
@@ -500,7 +511,7 @@ export function attachDesktop(
 
     const onWindowKeydown = (event: KeyboardEvent) => {
       const target = event.target as Element | null
-      if (target?.closest(INTERACTIVE_SELECTOR)) return
+      if (target?.closest(interactiveSelector)) return
       const current = wm.get(id)
       if (!current) return
       const arrows: Record<string, [number, number]> = {

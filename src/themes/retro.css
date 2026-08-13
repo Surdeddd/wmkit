@@ -68,7 +68,7 @@
 
 [data-wm-window] [data-wm-controls] {
   display: flex;
-  gap: 2px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -82,10 +82,19 @@
     var(--wm-face-light);
   background: var(--wm-face);
   padding: 0;
+  position: relative;
   cursor: pointer;
   font-size: 9px;
   line-height: 1;
   color: var(--wm-text);
+}
+
+[data-wm-window] [data-wm-close]::before,
+[data-wm-window] [data-wm-minimize]::before,
+[data-wm-window] [data-wm-maximize]::before {
+  content: "";
+  position: absolute;
+  inset: -5px -4px;
 }
 
 [data-wm-window] [data-wm-close]:active,
@@ -150,5 +159,41 @@
   }
   90% {
     translate: 2px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wm-window] {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  [data-wm-window] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  [data-wm-window] [data-wm-drag] {
+    background: Canvas;
+    color: CanvasText;
+    border-bottom: 1px solid CanvasText;
+  }
+
+  [data-wm-window][data-wm-focused] [data-wm-drag] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  [data-wm-window] [data-wm-close],
+  [data-wm-window] [data-wm-minimize],
+  [data-wm-window] [data-wm-maximize] {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  [data-wm-snap-preview] {
+    border: 2px solid Highlight;
   }
 }

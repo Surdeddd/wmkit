@@ -99,7 +99,7 @@
 
 [data-wm-window] [data-wm-controls] {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -111,10 +111,19 @@
   border-radius: 50%;
   border: none;
   padding: 0;
+  position: relative;
   cursor: pointer;
   transition:
     filter 120ms ease,
     transform 120ms ease;
+}
+
+[data-wm-window] [data-wm-close]::after,
+[data-wm-window] [data-wm-minimize]::after,
+[data-wm-window] [data-wm-maximize]::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
 }
 
 [data-wm-window] [data-wm-close]:hover,
@@ -195,8 +204,65 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-wm-window],
-  [data-wm-snap-preview] {
+  [data-wm-snap-preview],
+  [data-wm-window] [data-wm-close],
+  [data-wm-window] [data-wm-minimize],
+  [data-wm-window] [data-wm-maximize] {
     transition: none;
     animation: none;
+  }
+
+  [data-wm-window] [data-wm-close]:hover,
+  [data-wm-window] [data-wm-minimize]:hover,
+  [data-wm-window] [data-wm-maximize]:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  [data-wm-window] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  [data-wm-window][data-wm-focused] {
+    border-color: Highlight;
+  }
+
+  [data-wm-window] [data-wm-drag] {
+    background: Canvas;
+    border-bottom: 1px solid CanvasText;
+  }
+
+  [data-wm-window] [data-wm-close],
+  [data-wm-window] [data-wm-minimize],
+  [data-wm-window] [data-wm-maximize] {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 16px;
+    border: 1px solid ButtonText;
+    border-radius: 2px;
+    background: ButtonFace;
+    color: ButtonText;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  [data-wm-window] [data-wm-close]::before {
+    content: "\2715";
+  }
+
+  [data-wm-window] [data-wm-minimize]::before {
+    content: "\2013";
+  }
+
+  [data-wm-window] [data-wm-maximize]::before {
+    content: "\25A1";
+  }
+
+  [data-wm-snap-preview] {
+    background: transparent;
+    border: 2px solid Highlight;
   }
 }

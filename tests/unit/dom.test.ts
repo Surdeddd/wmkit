@@ -516,6 +516,106 @@ describe('tab groups in the dom', () => {
   })
 })
 
+describe('configuration surface', () => {
+  it('lets a veto keep the close button from closing a window', () => {
+    const blocked: string[] = []
+    const harness = makeHarness({
+      beforeClose: (win) => {
+        blocked.push(win.id)
+        return win.id === 'guarded' ? false : undefined
+      },
+    })
+    const closeOf = (root: HTMLElement) => {
+      const button = document.createElement('button')
+      button.dataset.wmClose = ''
+      root.querySelector('[data-wm-drag]')?.append(button)
+      return button
+    }
+    const guarded = harness.add({ id: 'guarded' })
+    const plain = harness.add({ id: 'plain' })
+
+    closeOf(guarded.root).click()
+    expect(harness.wm.get('guarded')).toBeDefined()
+
+    closeOf(plain.root).click()
+    expect(harness.wm.get('plain')).toBeUndefined()
+    expect(blocked).toEqual(['guarded', 'plain'])
+  })
+
+  it('treats a custom interactive selector as undraggable', () => {
+    const harness = makeHarness({
+      magnetism: false,
+      snap: false,
+      interactiveSelector: '.no-drag',
+    })
+    const { handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const guard = document.createElement('span')
+    guard.className = 'no-drag'
+    handle.append(guard)
+
+    guard.dispatchEvent(pointerEvent('pointerdown', 150, 110))
+    handle.dispatchEvent(pointerEvent('pointermove', 250, 210))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+
+    drag(harness, handle, [150, 110], [250, 210])
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 200, y: 200 })
+  })
+
+  it('passes the configured duration to the minimize animation', () => {
+    const calls: Array<{ duration?: unknown; easing?: unknown }> = []
+    const original = Element.prototype.animate
+    Element.prototype.animate = function animate(
+      _keyframes: unknown,
+      options?: number | KeyframeAnimationOptions,
+    ) {
+      calls.push(typeof options === 'object' && options !== null ? options : { duration: options })
+      return { onfinish: null, oncancel: null } as unknown as Animation
+    } as typeof Element.prototype.animate
+
+    try {
+      const dock = document.createElement('div')
+      dock.getBoundingClientRect = () => new DOMRect(0, 500, 40, 20)
+      document.body.append(dock)
+      const harness = makeHarness({
+        animation: { duration: 90, easing: 'linear' },
+        minimizeTarget: () => dock,
+      })
+      const { root } = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+      root.getBoundingClientRect = () => new DOMRect(10, 10, 200, 150)
+
+      harness.wm.minimize('a')
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toMatchObject({ duration: 90, easing: 'linear' })
+    } finally {
+      Element.prototype.animate = original
+    }
+  })
+
+  it('skips the minimize animation when animation is turned off', () => {
+    const original = Element.prototype.animate
+    let called = 0
+    Element.prototype.animate = function animate() {
+      called += 1
+      return { onfinish: null, oncancel: null } as unknown as Animation
+    } as typeof Element.prototype.animate
+
+    try {
+      const dock = document.createElement('div')
+      dock.getBoundingClientRect = () => new DOMRect(0, 500, 40, 20)
+      document.body.append(dock)
+      const harness = makeHarness({ animation: false, minimizeTarget: () => dock })
+      const { root } = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+      root.getBoundingClientRect = () => new DOMRect(10, 10, 200, 150)
+
+      harness.wm.minimize('a')
+      expect(called).toBe(0)
+    } finally {
+      Element.prototype.animate = original
+    }
+  })
+})
+
 describe('stacking order in the dom', () => {
   function zOf(harness: Harness, id: string): number {
     const el = harness.element.querySelector<HTMLElement>(`[data-wm-window="${id}"]`)
