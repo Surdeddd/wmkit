@@ -123,7 +123,9 @@ body {
   font-family: var(--mono);
   font-size: 13px;
   color: var(--signal-dim);
-  transition: opacity 420ms var(--ease);
+  transition:
+    opacity 420ms var(--ease),
+    visibility 0s linear 420ms;
 }
 
 .boot pre {
@@ -134,6 +136,7 @@ body {
 
 .boot[data-done] {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 

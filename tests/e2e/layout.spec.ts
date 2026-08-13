@@ -87,3 +87,19 @@ for (const size of SIZES) {
     }
   })
 }
+
+test('the boot overlay leaves no ghost behind the windows', async ({ page }) => {
+  await page.goto('?lang=en')
+  await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+  await page.waitForTimeout(1400)
+
+  const boot = await page.evaluate(() => {
+    const el = document.querySelector('#boot') as HTMLElement
+    const style = getComputedStyle(el)
+    return { opacity: style.opacity, visibility: style.visibility, done: el.dataset.done }
+  })
+
+  expect(boot.done).toBe('')
+  expect(boot.opacity).toBe('0')
+  expect(boot.visibility).toBe('hidden')
+})
