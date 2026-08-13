@@ -1,3 +1,21 @@
+# [0.6.0](https://github.com/Surdeddd/wmkit/compare/v0.5.1...v0.6.0) (2026-08-13)
+
+
+### Bug Fixes
+
+* **core:** size a tab group's frame for every member, not just the one that moved ([306887f](https://github.com/Surdeddd/wmkit/commit/306887f8a3d27bc293ea0d8374c46b55d4680da6))
+* **site:** compose the demo for every width instead of only the widest ([511d852](https://github.com/Surdeddd/wmkit/commit/511d8521673bc9d0faacdacd10191de26a169225))
+
+
+### Features
+
+* **dom:** make the desktop configurable and fix what the themes hid ([0993f2f](https://github.com/Surdeddd/wmkit/commit/0993f2f06d79ecc50a392f15d0964db47a37bc84))
+
+
+### Performance Improvements
+
+* make stacking and bulk operations scale to large desktops ([04c2909](https://github.com/Surdeddd/wmkit/commit/04c290931fb0a0bc1fa89a4f748f417aeb683c4e))
+
 ## [0.5.1](https://github.com/Surdeddd/wmkit/compare/v0.5.0...v0.5.1) (2026-07-31)
 
 
