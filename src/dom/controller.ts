@@ -15,6 +15,7 @@ import {
   type WindowAttachOptions,
   windowOf,
 } from './shared'
+import { restack, type StackingTarget, UNASSIGNED } from './stacking'
 
 interface AttachedWindow {
   element: HTMLElement
@@ -68,12 +69,15 @@ export function attachDesktop(
       ? 0
       : ((typeof options.magnetism === 'object' ? options.magnetism.threshold : undefined) ??
         (coarsePointer ? 12 : 8))
+  const zIndexBase = options.stacking?.base ?? 0
+  const zIndexGap = options.stacking?.gap ?? 32
 
   element.dataset.wmDesktop = ''
   element.tabIndex = -1
   if (view.getComputedStyle(element).position === 'static') {
     element.style.position = 'relative'
   }
+  if (options.stacking?.isolate !== false) element.style.isolation = 'isolate'
 
   const registry = new Map<string, AttachedWindow>()
   const cleanup: Array<() => void> = []
@@ -201,7 +205,6 @@ export function attachDesktop(
   function syncWindow(
     attached: AttachedWindow,
     win: WindowState,
-    zIndex: number,
     activeWorkspace: number,
     activeTab: boolean,
   ): void {
@@ -247,33 +250,51 @@ export function attachDesktop(
       attached.lastWorkspace = activeWorkspace
       attached.lastTab = activeTab
     }
-    if (attached.lastZ !== zIndex) {
-      el.style.zIndex = String(zIndex + 1)
-      attached.lastZ = zIndex
-    }
     if (firstSync) {
       void el.offsetWidth
       el.style.transition = ''
     }
   }
 
+  const stackRows: AttachedWindow[] = []
+  const stackTarget: StackingTarget = {
+    length: 0,
+    zAt: (index) => (stackRows[index] as AttachedWindow).lastZ,
+    assign(index, z) {
+      const attached = stackRows[index] as AttachedWindow
+      attached.lastZ = z
+      attached.element.style.zIndex = String(z)
+    },
+  }
+
+  function applyStacking(order: readonly string[]): void {
+    let length = 0
+    for (const id of order) {
+      const attached = registry.get(id)
+      if (attached) stackRows[length++] = attached
+    }
+    stackTarget.length = length
+    restack(stackTarget, { base: zIndexBase, gap: zIndexGap })
+    stackRows.length = length
+  }
+
   function syncAll(): void {
     const state = wm.getState()
     const orderChanged = state.order !== lastOrder
-    state.order.forEach((id, index) => {
+    for (const id of state.order) {
       const attached = registry.get(id)
       const win = state.windows[id]
-      if (!attached || !win) return
+      if (!attached || !win) continue
       const activeTab = win.groupId === null || state.groups[win.groupId]?.activeId === win.id
       if (
-        orderChanged ||
         attached.lastState !== win ||
         attached.lastWorkspace !== state.workspace ||
         attached.lastTab !== activeTab
       ) {
-        syncWindow(attached, win, index, state.workspace, activeTab)
+        syncWindow(attached, win, state.workspace, activeTab)
       }
-    })
+    }
+    if (orderChanged) applyStacking(state.order)
     if (state.focusedId !== lastFocused) {
       if (lastFocused) {
         const prev = registry.get(lastFocused)
@@ -384,7 +405,7 @@ export function attachDesktop(
       handle: null,
       handles: [],
       lastState: null,
-      lastZ: -1,
+      lastZ: UNASSIGNED,
       lastWorkspace: -1,
       lastTab: true,
       cleanup: [],

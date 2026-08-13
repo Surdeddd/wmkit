@@ -328,6 +328,11 @@ interface DesktopOptions {
   autoViewport?: boolean      // true — ResizeObserver drives setViewport
   hitAreas?: { edge?: number; corner?: number }  // 8/12, or 16/24 on coarse pointers
   magnetism?: boolean | { threshold?: number }   // 8, or 12 on coarse pointers
+  stacking?: {
+    base?: number      // 0 — z-index of the desktop floor
+    gap?: number       // 32 — room left between neighbours for cheap reordering
+    isolate?: boolean  // true — isolation:isolate so window layers stay inside the desktop
+  }
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }
@@ -351,6 +356,10 @@ interface WindowAttachOptions {
 ### What the controller writes
 
 On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` exists), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`.
+
+The desktop element itself gets `isolation: isolate`, so the `z-index` values the controller writes stay inside it and can never fight the host page's own layers. Turn that off with `stacking: { isolate: false }` when the desktop must share a stacking context with the page around it.
+
+Raising a window rewrites exactly one `z-index`: values are spread `gap` apart and the controller only re-numbers the windows that actually changed places, falling back to a full renumber when it runs out of room. Reading a window's `z-index` therefore tells you nothing but its relative position.
 
 It also injects `[data-wm-resize]` handles, one `[data-wm-snap-preview]` per desktop and one visually hidden `[data-wm-announcer]` live region. A `<header>`, `<footer>`, `<nav>` or `<aside>` used as the drag handle gets `role="presentation"` so it does not leak a landmark out of the dialog.
 

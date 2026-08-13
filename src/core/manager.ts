@@ -50,7 +50,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   const idPrefix = options.idPrefix ?? 'wm'
   const historyLimit = options.historyLimit ?? 50
 
-  let windows: Record<string, WindowState> = {}
+  let windows: Readonly<Record<string, WindowState>> = {}
+  let windowsShared = false
+  let modalCount = 0
+  let cachedGroups: Record<string, WindowGroup> | null = null
+  let cachedOrder: readonly string[] | null = null
+  let cachedTabs: Readonly<Record<string, string>> | null = null
+  let groupsDirty = false
   let order: string[] = []
   let focusedId: string | null = null
   let viewport: Size = options.viewport ?? { width: 0, height: 0 }
@@ -76,6 +82,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function getState(): ManagerState {
     if (!snapshot) {
+      windowsShared = true
       snapshot = { windows, order, focusedId, viewport, workspace, groups: buildGroups() }
     }
     return snapshot
@@ -102,14 +109,38 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     pendingEvents.push(emit)
   }
 
+  function ownWindows(): Record<string, WindowState> {
+    if (windowsShared) {
+      windows = { ...windows }
+      windowsShared = false
+    }
+    return windows as Record<string, WindowState>
+  }
+
   function setWindow(next: WindowState): void {
-    windows = { ...windows, [next.id]: next }
+    const map = ownWindows()
+    const previous = map[next.id]
+    const wasModal = previous?.layer === 'modal'
+    if (wasModal !== (next.layer === 'modal')) modalCount += wasModal ? -1 : 1
+    if (previous?.groupId !== next.groupId) groupsDirty = true
+    map[next.id] = next
   }
 
   function removeWindow(id: string): void {
-    const { [id]: _removed, ...rest } = windows
-    windows = rest
+    const map = ownWindows()
+    const previous = map[id]
+    if (previous?.layer === 'modal') modalCount -= 1
+    if (previous?.groupId != null) groupsDirty = true
+    delete map[id]
     order = order.filter((entry) => entry !== id)
+  }
+
+  function countModals(): number {
+    let total = 0
+    for (const id of order) {
+      if ((windows[id] as WindowState).layer === 'modal') total += 1
+    }
+    return total
   }
 
   function layerRankOf(id: string): number {
@@ -158,10 +189,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function buildGroups(): Record<string, WindowGroup> {
+    if (cachedGroups && !groupsDirty && cachedOrder === order && cachedTabs === activeTabs) {
+      return cachedGroups
+    }
     const result: Record<string, WindowGroup> = Object.create(null)
     for (const [groupId, activeId] of Object.entries(activeTabs)) {
       result[groupId] = { id: groupId, activeId, members: membersOf(groupId) }
     }
+    cachedGroups = result
+    cachedOrder = order
+    cachedTabs = activeTabs
+    groupsDirty = false
     return result
   }
 
@@ -203,6 +241,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function topModalId(): string | null {
+    if (modalCount === 0) return null
     for (let i = order.length - 1; i >= 0; i -= 1) {
       const win = windows[order[i] as string] as WindowState
       if (
@@ -228,8 +267,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function focusTop(): void {
-    const targets = focusTargets()
-    focusedId = targets.length > 0 ? (targets[targets.length - 1] as string) : null
+    for (let i = order.length - 1; i >= 0; i -= 1) {
+      const win = windows[order[i] as string] as WindowState
+      if (win.stage === 'minimized' || !onActiveWorkspace(win) || !isVisibleTab(win)) continue
+      focusedId = win.id
+      return
+    }
+    focusedId = null
   }
 
   function reconcileFocus(): void {
@@ -833,6 +877,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function captureEntry(): HistoryEntry {
+    windowsShared = true
     return { windows, order, focusedId, workspace, activeTabs }
   }
 
@@ -902,6 +947,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function applyEntry(entry: HistoryEntry): void {
     windows = entry.windows
     order = [...entry.order]
+    modalCount = countModals()
+    groupsDirty = true
     focusedId = entry.focusedId
     activeTabs = entry.activeTabs as Record<string, string>
     const previousWorkspace = workspace
@@ -1167,8 +1214,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
 
     windows = nextWindows
+    windowsShared = false
     order = nextOrder
     order = sortByLayer(order)
+    modalCount = countModals()
+    groupsDirty = true
     seq = maxSeq
     const previousWorkspace = workspace
     workspace = normalizeWorkspace(data.workspace, 0)

@@ -35,6 +35,12 @@ export interface GroupingOptions {
   dwell?: number
 }
 
+export interface StackingOptions {
+  base?: number
+  gap?: number
+  isolate?: boolean
+}
+
 export interface DesktopOptions {
   grouping?: boolean | GroupingOptions
   snap?: boolean | DesktopSnapOptions
@@ -43,6 +49,7 @@ export interface DesktopOptions {
   autoViewport?: boolean
   hitAreas?: HitAreaOptions
   magnetism?: boolean | MagnetismOptions
+  stacking?: StackingOptions
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }

@@ -1709,6 +1709,8 @@ describe('tab groups', () => {
 
     expect(wm.ungroup('b')).toBe(true)
     expect(wm.getState().groups[groupId]?.activeId).toBe('a')
+    expect(wm.getState().groups[groupId]?.members).toEqual(['c', 'a'])
+    expect(wm.get('b')?.groupId).toBeNull()
     expect(onGroup).toHaveBeenCalledWith(
       expect.objectContaining({ groupId, activeId: 'a', previous: null }),
     )
@@ -1839,6 +1841,175 @@ describe('tab groups', () => {
     const next = makeWm()
     expect(next.hydrate(data)).toBe(true)
     expect(next.getState().groups[groupId]?.activeId).toBe('a')
+  })
+})
+
+describe('state sharing', () => {
+  it('never mutates a snapshot that was already handed out', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 10, y: 10 })
+    wm.open({ id: 'b' })
+    const before = wm.getState()
+    const beforeWindows = before.windows
+    const beforeA = before.windows.a
+
+    wm.move('a', 200, 200)
+
+    expect(before.windows).toBe(beforeWindows)
+    expect(before.windows.a).toBe(beforeA)
+    expect(before.windows.a?.bounds.x).toBe(10)
+    expect(wm.getState().windows).not.toBe(beforeWindows)
+    expect(wm.getState().windows.a?.bounds.x).toBe(200)
+  })
+
+  it('keeps untouched windows referentially stable across a change', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const before = wm.getState().windows.b
+
+    wm.move('a', 300, 300)
+    expect(wm.getState().windows.b).toBe(before)
+  })
+
+  it('does not let a later change leak into a recorded history entry', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 10, y: 10 })
+    wm.move('a', 100, 100)
+    wm.move('a', 200, 200)
+
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.bounds.x).toBe(100)
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.bounds.x).toBe(10)
+    expect(wm.redo()).toBe(true)
+    expect(wm.get('a')?.bounds.x).toBe(100)
+  })
+
+  it('survives a batch that touches every window twice', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c']) wm.open({ id })
+    const before = wm.getState()
+    const originA = before.windows.a?.bounds.x as number
+    const originB = before.windows.b?.bounds.x as number
+
+    wm.batch(() => {
+      wm.move('a', 20, 20)
+      wm.move('b', 30, 30)
+      wm.move('a', 40, 40)
+    })
+
+    expect(before.windows.a?.bounds.x).toBe(originA)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 40, y: 40 })
+    expect(wm.get('b')?.bounds).toMatchObject({ x: 30, y: 30 })
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.bounds.x).toBe(originA)
+    expect(wm.get('b')?.bounds.x).toBe(originB)
+  })
+
+  it('undoes back to an empty desktop', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('b')).toBeUndefined()
+    expect(wm.get('a')).toBeDefined()
+
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')).toBeUndefined()
+    expect(wm.getState().order).toEqual([])
+  })
+
+  it('refreshes the group map when a member leaves a parked group', () => {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c']) wm.open({ id })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    wm.minimize('a')
+    expect(wm.getState().groups[groupId]?.members).toEqual(['b', 'c', 'a'])
+
+    expect(wm.ungroup('b')).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['c', 'a'])
+  })
+
+  it('does not mutate a snapshot taken in the middle of a batch', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    let middle: ReturnType<typeof wm.getState> | null = null
+
+    wm.batch(() => {
+      wm.move('a', 50, 50)
+      middle = wm.getState()
+      wm.move('a', 90, 90)
+    })
+
+    expect((middle as unknown as ReturnType<typeof wm.getState>).windows.a?.bounds).toMatchObject({
+      x: 50,
+      y: 50,
+    })
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 90, y: 90 })
+  })
+
+  it('keeps history intact when restoring an entry triggers a viewport reflow', () => {
+    const wm = makeWm({ viewport: { width: 1000, height: 800 } })
+    wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.maximize('a')
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 1000, height: 800 })
+
+    wm.setViewport({ width: 600, height: 400 })
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 600, height: 400 })
+
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.stage).toBe('normal')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 40, y: 40, width: 300, height: 200 })
+
+    expect(wm.redo()).toBe(true)
+    expect(wm.get('a')?.stage).toBe('maximized')
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 600, height: 400 })
+
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.stage).toBe('normal')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 40, y: 40, width: 300, height: 200 })
+  })
+
+  it('keeps the modal gate correct as layers change', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    expect(wm.focus('a')).toBe(true)
+
+    wm.update('b', { layer: 'modal' })
+    expect(wm.focus('a')).toBe(false)
+
+    wm.update('b', { layer: 'normal' })
+    expect(wm.focus('a')).toBe(true)
+
+    wm.update('b', { layer: 'modal' })
+    expect(wm.focus('a')).toBe(false)
+    wm.close('b')
+    expect(wm.focus('a')).toBe(true)
+  })
+
+  it('restores the modal gate through hydrate and undo', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'gate', layer: 'modal' })
+    const data = wm.serialize()
+
+    const next = makeWm()
+    next.open({ id: 'a' })
+    next.open({ id: 'gate' })
+    expect(next.focus('a')).toBe(true)
+    expect(next.hydrate(data)).toBe(true)
+    expect(next.focus('a')).toBe(false)
+
+    const third = makeWm()
+    third.open({ id: 'a' })
+    third.open({ id: 'gate', layer: 'modal' })
+    third.close('gate')
+    expect(third.focus('a')).toBe(true)
+    expect(third.undo()).toBe(true)
+    expect(third.focus('a')).toBe(false)
   })
 })
 

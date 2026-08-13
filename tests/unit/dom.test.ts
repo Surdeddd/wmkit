@@ -516,6 +516,70 @@ describe('tab groups in the dom', () => {
   })
 })
 
+describe('stacking order in the dom', () => {
+  function zOf(harness: Harness, id: string): number {
+    const el = harness.element.querySelector<HTMLElement>(`[data-wm-window="${id}"]`)
+    return Number(el?.style.zIndex)
+  }
+
+  it('paints windows in manager order', () => {
+    const harness = makeHarness()
+    for (const id of ['a', 'b', 'c']) harness.add({ id })
+
+    expect(zOf(harness, 'a')).toBeLessThan(zOf(harness, 'b'))
+    expect(zOf(harness, 'b')).toBeLessThan(zOf(harness, 'c'))
+
+    harness.wm.focus('a')
+    expect(zOf(harness, 'a')).toBeGreaterThan(zOf(harness, 'c'))
+  })
+
+  it('rewrites a single z-index when one window is raised', () => {
+    const harness = makeHarness()
+    for (let i = 0; i < 12; i += 1) harness.add({ id: `w${i}` })
+    const writes = new Set<string>()
+    for (let i = 0; i < 12; i += 1) {
+      const el = harness.element.querySelector<HTMLElement>(
+        `[data-wm-window="w${i}"]`,
+      ) as HTMLElement
+      const before = el.style.zIndex
+      Object.defineProperty(el.style, 'zIndex', {
+        get: () => before,
+        set: () => writes.add(`w${i}`),
+        configurable: true,
+      })
+    }
+
+    harness.wm.focus('w3')
+    expect([...writes]).toEqual(['w3'])
+  })
+
+  it('isolates the desktop so window layers never escape the host page', () => {
+    const harness = makeHarness()
+    expect(harness.element.style.isolation).toBe('isolate')
+
+    const opened = makeHarness({ stacking: { isolate: false } })
+    expect(opened.element.style.isolation).toBe('')
+  })
+
+  it('honours the configured stacking base and gap', () => {
+    const harness = makeHarness({ stacking: { base: 900, gap: 5 } })
+    harness.add({ id: 'a' })
+    harness.add({ id: 'b' })
+
+    expect(zOf(harness, 'a')).toBe(905)
+    expect(zOf(harness, 'b')).toBe(910)
+  })
+
+  it('keeps a group contiguous above an unrelated window', () => {
+    const harness = makeHarness()
+    for (const id of ['a', 'b', 'c']) harness.add({ id })
+    harness.wm.group(['a', 'b'])
+
+    expect(zOf(harness, 'c')).toBeLessThan(zOf(harness, 'a'))
+    expect(zOf(harness, 'c')).toBeLessThan(zOf(harness, 'b'))
+  })
+})
+
 describe('desktop controller', () => {
   it('hides windows that belong to another workspace', () => {
     const harness = makeHarness()
