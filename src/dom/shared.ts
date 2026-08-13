@@ -52,6 +52,7 @@ export interface DesktopOptions {
   stacking?: StackingOptions
   animation?: boolean | AnimationOptions
   interactiveSelector?: string
+  // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
   beforeClose?: (window: WindowState) => boolean | void
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void

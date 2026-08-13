@@ -203,31 +203,51 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return result
   }
 
-  function syncGroup(source: WindowState): void {
-    if (source.groupId === null) return
-    for (const id of membersOf(source.groupId)) {
-      if (id === source.id) continue
+  function sharedSize(ids: readonly string[], size: Size): Size {
+    let shared = size
+    for (const id of ids) {
+      const fit = normalizeSize(shared, windows[id] as WindowState)
+      shared = {
+        width: Math.max(shared.width, fit.width),
+        height: Math.max(shared.height, fit.height),
+      }
+    }
+    return shared
+  }
+
+  function syncGroup(source: WindowState): WindowState {
+    if (source.groupId === null) return source
+    const members = membersOf(source.groupId)
+    const fitted = sharedSize(members, source.bounds)
+    let effective = source
+    if (fitted.width !== source.bounds.width || fitted.height !== source.bounds.height) {
+      effective = { ...source, bounds: { ...source.bounds, ...fitted } }
+      setWindow(effective)
+    }
+    for (const id of members) {
+      if (id === effective.id) continue
       const member = windows[id] as WindowState
       if (
-        boundsEqual(member.bounds, source.bounds) &&
-        member.stage === source.stage &&
-        member.snapZone === source.snapZone &&
-        member.layer === source.layer &&
-        member.workspace === source.workspace
+        boundsEqual(member.bounds, effective.bounds) &&
+        member.stage === effective.stage &&
+        member.snapZone === effective.snapZone &&
+        member.layer === effective.layer &&
+        member.workspace === effective.workspace
       ) {
         continue
       }
       setWindow({
         ...member,
-        bounds: source.bounds,
-        stage: source.stage,
-        snapZone: source.snapZone,
-        restoreBounds: source.restoreBounds,
-        restoreStage: source.restoreStage,
-        layer: source.layer,
-        workspace: source.workspace,
+        bounds: effective.bounds,
+        stage: effective.stage,
+        snapZone: effective.snapZone,
+        restoreBounds: effective.restoreBounds,
+        restoreStage: effective.restoreStage,
+        layer: effective.layer,
+        workspace: effective.workspace,
       })
     }
+    return effective
   }
 
   function dissolveIfOrphaned(groupId: string): void {
@@ -501,8 +521,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const next = build(win)
     if (!next) return false
     setWindow(next)
-    syncGroup(next)
-    queueEvent(() => emitter.emit('stage', { window: next, previous: win.stage }))
+    const synced = syncGroup(next)
+    queueEvent(() => emitter.emit('stage', { window: synced, previous: win.stage }))
     if (next.groupId !== null) reconcileFocus()
     commit()
     return true
@@ -648,9 +668,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       ? { ...win, stage: 'normal', snapZone: null, restoreBounds: null, bounds }
       : { ...win, bounds }
     setWindow(next)
-    syncGroup(next)
-    if (becameNormal) queueEvent(() => emitter.emit('stage', { window: next, previous: 'snapped' }))
-    queueEvent(() => emitter.emit('resize', { window: next }))
+    const synced = syncGroup(next)
+    if (becameNormal) {
+      queueEvent(() => emitter.emit('stage', { window: synced, previous: 'snapped' }))
+    }
+    queueEvent(() => emitter.emit('resize', { window: synced }))
     commit()
     return true
   }
@@ -684,18 +706,18 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const resized = size.width !== next.bounds.width || size.height !== next.bounds.height
     const finalWin = resized ? { ...next, bounds: { ...next.bounds, ...size } } : next
     setWindow(finalWin)
-    syncGroup(finalWin)
+    const synced = syncGroup(finalWin)
     if (patch.layer && patch.layer !== win.layer) {
       order = sortByLayer(order)
       queueEvent(() => emitter.emit('order', { order }))
       if (patch.layer === 'modal' && topModalId() === id && focusedId !== id) {
         const previous = focusedId
         focusedId = id
-        emitFocus(finalWin, previous)
+        emitFocus(synced, previous)
       }
     }
-    queueEvent(() => emitter.emit('update', { window: finalWin }))
-    if (resized) queueEvent(() => emitter.emit('resize', { window: finalWin }))
+    queueEvent(() => emitter.emit('update', { window: synced }))
+    if (resized) queueEvent(() => emitter.emit('resize', { window: synced }))
     commit()
     return true
   }
@@ -796,9 +818,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     emitGroup(groupId, null)
     queueEvent(() => emitter.emit('order', { order }))
     const hostVisible = onActiveWorkspace(host) && host.stage !== 'minimized'
-    if (!hostVisible) reconcileFocus()
     commit()
     if (hostVisible) focus(host.id)
+    reconcileFocus()
+    commit()
     return groupId
   }
 
@@ -925,13 +948,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       if (win.stage === 'maximized') {
         const updated = { ...win, bounds: fullBounds() }
         setWindow(updated)
-        syncGroup(updated)
-        queueEvent(() => emitter.emit('resize', { window: updated }))
+        const synced = syncGroup(updated)
+        queueEvent(() => emitter.emit('resize', { window: synced }))
       } else if (win.stage === 'snapped' && win.snapZone) {
         const updated = { ...win, bounds: snapBounds(win, win.snapZone) }
         setWindow(updated)
-        syncGroup(updated)
-        queueEvent(() => emitter.emit('resize', { window: updated }))
+        const synced = syncGroup(updated)
+        queueEvent(() => emitter.emit('resize', { window: synced }))
       } else if (win.stage === 'normal' && keepInViewport) {
         const bounds = clampToViewport(win.bounds, viewport, minVisible)
         if (!boundsEqual(bounds, win.bounds)) {

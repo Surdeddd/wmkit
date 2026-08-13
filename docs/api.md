@@ -222,8 +222,10 @@ Invariants the manager maintains for you:
 - inactive tabs are skipped by `focus`, `cycleFocus`, `minimized()`, `arrange()`, `minimizeAll()`,
   viewport reflow and drag magnetism, exactly like windows on another workspace — the group counts
   as one frame, driven by its visible tab
-- the new frame is sized so it satisfies every member's `minSize` and `maxSize`, not just the
-  host's
+- the frame is sized so it satisfies every member's `minSize` and `maxSize`, not just the host's —
+  including later moves, resizes and stage changes, so resizing one tab can grow the frame rather
+  than push a sibling under its own minimum. The `resize` and `update` events carry the frame the
+  group actually took, which is not always the one you asked for
 - `focus(id)` on an inactive tab activates it first, so DOM focus never lands on a hidden element;
   a focus a modal refuses leaves the active tab untouched
 - members stay contiguous in `order`, so switching tabs never changes where the frame sits in the

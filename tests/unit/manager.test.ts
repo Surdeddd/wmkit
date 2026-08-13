@@ -2184,6 +2184,47 @@ describe('tab group regressions', () => {
     expect(next.getState().focusedId).toBe(group?.activeId)
   })
 
+  it('keeps every member above its own minimum when one of them is resized', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', minWidth: 160, minHeight: 100 })
+    wm.open({ id: 'b', minWidth: 520, minHeight: 380 })
+    wm.group(['a', 'b'])
+
+    wm.resize('a', { width: 200, height: 140 })
+    expect(wm.get('b')?.bounds).toMatchObject({ width: 520, height: 380 })
+    expect(wm.get('a')?.bounds).toEqual(wm.get('b')?.bounds)
+  })
+
+  it('reports the frame the group actually took, not the one that was asked for', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', minWidth: 160 })
+    wm.open({ id: 'b', minWidth: 520 })
+    wm.group(['a', 'b'])
+    const onResize = vi.fn()
+    wm.on('resize', onResize)
+
+    wm.resize('a', { width: 200 })
+    expect(onResize).toHaveBeenCalledTimes(1)
+    expect(onResize.mock.calls[0]?.[0].window.bounds.width).toBe(520)
+  })
+
+  it('does not leave focus on a hidden tab when a modal refuses the new host', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'gate', layer: 'modal' })
+    expect(wm.getState().focusedId).toBe('gate')
+    wm.focus('b')
+    expect(wm.getState().focusedId).toBe('gate')
+
+    wm.group(['a', 'b'])
+    const state = wm.getState()
+    const focused = state.focusedId ? state.windows[state.focusedId] : null
+    expect(focused).not.toBeNull()
+    const groupId = focused?.groupId
+    if (groupId) expect(state.groups[groupId]?.activeId).toBe(focused?.id)
+  })
+
   it('does not switch the tab when a modal refuses the focus', () => {
     const wm = makeWm()
     wm.open({ id: 'a' })
