@@ -14,6 +14,7 @@ export interface AppContext {
   option(name: 'magnetism' | 'snap' | 'announce'): boolean
   setOption(name: 'magnetism' | 'snap' | 'announce', value: boolean): void
   size(): { width: number; height: number }
+  safeArea(): { x: number; y: number; width: number; height: number }
 }
 
 export interface AppInstance {
@@ -66,17 +67,44 @@ interface Slot {
   y: number
 }
 
-function place(ctx: AppContext, width: number, height: number, right: number, top: number): Slot {
+function clamp(value: number, low: number, high: number): number {
+  return high < low ? low : Math.max(low, Math.min(high, value))
+}
+
+function place(
+  ctx: AppContext,
+  width: number,
+  height: number,
+  right: number,
+  top: number,
+  row = 0,
+): Slot {
   const box = ctx.size()
-  const w = Math.min(width, Math.max(220, box.width - 24))
-  const h = Math.min(height, Math.max(160, box.height - 24))
-  const wanted = box.width < 720 ? Math.round(box.height * 0.42) : top
-  return {
-    width: w,
-    height: h,
-    x: Math.max(12, Math.min(box.width - w - 12, box.width - right)),
-    y: Math.max(12, Math.min(Math.max(12, box.height - h - 12), wanted)),
+  const area = ctx.safeArea()
+
+  if (box.width < 1100) {
+    const rows = box.width >= 720 ? 2 : 1
+    const slot = Math.floor((area.height - 12 * (rows + 1)) / rows)
+    const step = rows === 1 ? Math.min(ctx.wm.getState().order.length, 4) * 14 : 0
+    const w = Math.max(220, area.width - 24 - step)
+    const h = Math.max(160, slot - step)
+    return {
+      width: w,
+      height: h,
+      x: Math.round(area.x + 12 + step),
+      y: Math.round(area.y + 12 + step + Math.min(row, rows - 1) * (slot + 12)),
+    }
   }
+
+  const column = area.width < 780
+  const w = column ? area.width - 24 : Math.min(width, Math.max(220, area.width - 24))
+  const capped = Math.min(height, Math.max(160, area.height - 24))
+  const x = column
+    ? area.x + 12
+    : clamp(box.width - right, area.x + 12, area.x + area.width - w - 12)
+  const y = clamp(area.y + top, area.y + 12, area.y + area.height - capped - 12)
+  const h = row > 0 ? Math.max(capped, area.y + area.height - y - 12) : capped
+  return { width: w, height: h, x: Math.round(x), y: Math.round(y) }
 }
 
 function centred(ctx: AppContext, width: number, height: number): Slot {
@@ -130,7 +158,7 @@ const terminal: AppSpec = {
   init(ctx) {
     return {
       title: 'terminal',
-      ...place(ctx, 748, 322, 800, 364),
+      ...place(ctx, 748, 322, 800, 364, 1),
       minWidth: 260,
       minHeight: 150,
     }

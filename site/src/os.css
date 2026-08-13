@@ -485,6 +485,7 @@ body {
   font-size: 11px;
   color: var(--fg-faint);
   letter-spacing: 0.02em;
+  text-wrap: balance;
 }
 
 #desktop.desktop {
@@ -742,6 +743,16 @@ body {
   white-space: nowrap;
 }
 
+@media (max-width: 860px) {
+  .table-wrap th:first-child,
+  .table-wrap td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--ink-800);
+    box-shadow: 1px 0 0 var(--line);
+  }
+}
+
 .table-wrap thead th {
   background: var(--ink-700);
   font-family: var(--mono);
@@ -860,11 +871,18 @@ body {
   .wallpaper {
     max-width: none;
     justify-content: flex-start;
-    padding-top: 26px;
+    inset: 0 0 auto;
+    gap: 12px;
+    padding: 20px clamp(16px, 4vw, 32px) 18px;
+    background: linear-gradient(180deg, var(--ink-900) 72%, transparent);
   }
 
   .menus,
   .readouts {
+    display: none;
+  }
+
+  .wallpaper .hint {
     display: none;
   }
 }
@@ -876,6 +894,27 @@ body {
 
   .lede {
     font-size: 13.5px;
+  }
+
+  .wallpaper {
+    gap: 10px;
+    padding: 14px 16px 14px;
+  }
+
+  .wall-actions {
+    width: 100%;
+  }
+
+  .wall-actions a,
+  .wall-actions button {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media (pointer: coarse) {
+  .wallpaper .hint {
+    display: none;
   }
 }
 

@@ -124,6 +124,26 @@ const ctx: AppContext = {
     relabelAll()
   },
   size: () => ({ width: desktopEl.clientWidth, height: desktopEl.clientHeight }),
+  safeArea,
+}
+
+function safeArea(): { x: number; y: number; width: number; height: number } {
+  const width = desktopEl.clientWidth
+  const height = desktopEl.clientHeight
+  const full = { x: 0, y: 0, width, height }
+  const hero = document.querySelector<HTMLElement>('.wallpaper')
+  if (!hero || width === 0) return full
+
+  const stage = desktopEl.getBoundingClientRect()
+  const box = hero.getBoundingClientRect()
+  const area =
+    width >= 1100
+      ? { x: box.right - stage.left + 24, y: 0, width: 0, height }
+      : { x: 0, y: box.bottom - stage.top + 16, width, height: 0 }
+  area.width = area.width || width - area.x
+  area.height = area.height || height - area.y
+
+  return area.width < 260 || area.height < 200 ? full : area
 }
 
 function remountDesktop(): void {
@@ -400,7 +420,7 @@ function resetDesktop(): void {
 function openDefaults(): void {
   const width = desktopEl.clientWidth
   openApp('readme')
-  if (width >= 1200) openApp('inspector')
+  if (width >= 1440) openApp('inspector')
   if (width >= 720) openApp('terminal')
   wm.focus(width >= 720 ? 'terminal' : 'readme')
 }

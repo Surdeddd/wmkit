@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const PORT = Number(process.env.WMKIT_E2E_PORT ?? 4188)
+
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -9,7 +11,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:4173/wmkit/',
+    baseURL: `http://localhost:${PORT}/wmkit/`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -32,9 +34,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm site:build && pnpm site:preview --port 4173 --strictPort',
-    url: 'http://localhost:4173/wmkit/',
-    reuseExistingServer: !process.env.CI,
+    command: `pnpm site:build && pnpm site:preview --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}/wmkit/`,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })
