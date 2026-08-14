@@ -22,7 +22,7 @@ export function createDesktopBinder(
   options: DesktopOptions = {},
 ): DesktopBinder {
   let controller: DesktopController | null = null
-  let stopOpen: (() => void) | null = null
+  let stops: Array<() => void> = []
   const entries = new Set<PendingWindow>()
 
   function attachEntry(entry: PendingWindow): void {
@@ -32,8 +32,8 @@ export function createDesktopBinder(
   }
 
   function unbindDesktop(): void {
-    stopOpen?.()
-    stopOpen = null
+    for (const stop of stops) stop()
+    stops = []
     for (const entry of entries) entry.detach = null
     controller?.destroy()
     controller = null
@@ -45,11 +45,18 @@ export function createDesktopBinder(
     bindDesktop(element) {
       if (controller) throw new Error('wmkit: desktop is already bound')
       controller = attachDesktop(wm, element, options)
-      stopOpen = wm.on('open', ({ window: win }) => {
-        for (const entry of entries) {
-          if (entry.id === win.id) attachEntry(entry)
-        }
-      })
+      stops.push(
+        wm.on('open', ({ window: win }) => {
+          for (const entry of entries) {
+            if (entry.id === win.id) attachEntry(entry)
+          }
+        }),
+        wm.on('close', ({ window: win }) => {
+          for (const entry of entries) {
+            if (entry.id === win.id) entry.detach = null
+          }
+        }),
+      )
       for (const entry of entries) attachEntry(entry)
       return unbindDesktop
     },

@@ -337,6 +337,43 @@ describe('binder lifecycle', () => {
     expect(winEl.dataset.wmWindow).toBe('late')
   })
 
+  it('re-attaches an element when its window comes back', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.binder.bindWindow('doc', winEl)
+    wm.open({ id: 'doc', title: 'Doc' })
+    expect(winEl.dataset.wmWindow).toBe('doc')
+
+    wm.close('doc')
+    expect(winEl.dataset.wmWindow).toBeUndefined()
+
+    wm.open({ id: 'doc', title: 'Doc again' })
+    expect(winEl.dataset.wmWindow, 'the element never came back').toBe('doc')
+  })
+
+  it('re-attaches an element when history brings its window back', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.binder.bindWindow('doc', winEl)
+    wm.open({ id: 'doc', title: 'Doc' })
+    wm.close('doc')
+    expect(wm.undo()).toBe(true)
+
+    expect(winEl.dataset.wmWindow, 'undo left the element unbound').toBe('doc')
+  })
+
   it('destroy releases the desktop and stops attaching new windows', () => {
     const wm = createWindowManager(VIEWPORT)
     const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
