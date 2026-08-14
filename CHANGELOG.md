@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/Surdeddd/wmkit/compare/v0.6.1...v0.7.0) (2026-08-14)
+
+
+### Features
+
+* **core:** give a tab group a real tab order with moveTab and cycleTab ([862dd42](https://github.com/Surdeddd/wmkit/commit/862dd429ba8dae88e2593c7e8989237210c31511))
+
 ## [0.6.1](https://github.com/Surdeddd/wmkit/compare/v0.6.0...v0.6.1) (2026-08-13)
 
 
