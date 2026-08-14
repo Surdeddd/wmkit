@@ -1,3 +1,17 @@
+# [0.8.0](https://github.com/Surdeddd/wmkit/compare/v0.7.2...v0.8.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* **build:** declare the new subpaths for node10 type resolution ([cff9fc6](https://github.com/Surdeddd/wmkit/commit/cff9fc61e167a8e6061499adef7ee2ee5282784e))
+
+
+### Features
+
+* **devtools:** ship a panel that shows what the manager is doing ([8f69320](https://github.com/Surdeddd/wmkit/commit/8f6932031eebafdf636298ea298a04b9650c5e1e))
+* **dom:** pinch a window to resize it and swipe two fingers to change workspace ([c27feab](https://github.com/Surdeddd/wmkit/commit/c27feab42fb0e4edb0036a8f00cd04734f1a1b49))
+* **themes:** dress a single window with a variant and ship thirteen more themes ([ab00797](https://github.com/Surdeddd/wmkit/commit/ab0079797acf94dbb8ce2917323053152c3e2da5))
+
 ## [0.7.2](https://github.com/Surdeddd/wmkit/compare/v0.7.1...v0.7.2) (2026-08-14)
 
 
