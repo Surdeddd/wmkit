@@ -262,6 +262,19 @@ if (isPopoutSupported()) await popout(wm, 'docs', contentElement)
 
 Окно уезжает в настоящее always-on-top окно ОС (Document Picture-in-Picture) с тем же JS-контекстом и состоянием.
 
+### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
+
+Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.46 кБ в brotli.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { touchGestures } from '@surdeddd/wmkit/gestures'
+
+attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })] })
+```
+
+Жест — это просто функция: принимает `GestureContext`, возвращает свою отписку. Свои жесты уживаются со встроенными драгом и ресайзом через ту же пару `claim`/`busy` — подробности в [docs/api.md](docs/api.md).
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 Панель, которую подключают по желанию: живая таблица окон, журнал событий и управление менеджером — чтобы видеть, что делает машина состояний, без отладчика. Она следит за менеджером, а не за DOM, поэтому работает с любым адаптером и без него.

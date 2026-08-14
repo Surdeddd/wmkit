@@ -99,7 +99,7 @@
   font-size: var(--wm-title-size, 13px);
   font-weight: var(--wm-title-weight, 600);
   letter-spacing: var(--wm-title-tracking, 0.01em);
-  color: var(--wm-text-dim);
+  color: var(--wm-title-color, var(--wm-text-dim));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -107,7 +107,7 @@
 }
 
 [data-wm-window][data-wm-focused] [data-wm-title] {
-  color: var(--wm-text);
+  color: var(--wm-title-color-focused, var(--wm-text));
 }
 
 [data-wm-window] [data-wm-controls] {

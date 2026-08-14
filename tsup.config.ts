@@ -12,6 +12,7 @@ export default defineConfig({
     persist: 'src/plugins/persist.ts',
     popout: 'src/plugins/popout.ts',
     devtools: 'src/plugins/devtools/index.ts',
+    gestures: 'src/plugins/gestures.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

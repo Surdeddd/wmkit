@@ -1,7 +1,6 @@
 import type { SnapDetectOptions } from '../core/geometry'
 import type { Bounds, WindowManager, WindowState } from '../core/types'
 import type { AnnouncerMessages } from './announcer'
-import type { PinchOptions, SwipeOptions } from './gestures'
 
 export const INTERACTIVE_SELECTOR =
   'button, input, select, textarea, a[href], [contenteditable], [data-wm-close], [data-wm-minimize], [data-wm-maximize]'
@@ -52,8 +51,7 @@ export interface DesktopOptions {
   magnetism?: boolean | MagnetismOptions
   stacking?: StackingOptions
   animation?: boolean | AnimationOptions
-  pinch?: boolean | PinchOptions
-  swipe?: boolean | SwipeOptions
+  gestures?: readonly DesktopGesture[]
   interactiveSelector?: string
   // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
   beforeClose?: (window: WindowState) => boolean | void
@@ -80,10 +78,27 @@ export interface DesktopController {
   destroy(): void
 }
 
-export interface ActiveDrag {
+export interface ActiveGesture {
   id: string
   finish(cancelled: boolean): void
 }
+
+export type ActiveDrag = ActiveGesture
+
+export interface GestureContext {
+  wm: WindowManager
+  doc: Document
+  view: Window & typeof globalThis
+  desktop: HTMLElement
+  toLocal(event: PointerEvent): Point
+  trackRect(): () => void
+  windowElement(id: string): HTMLElement | undefined
+  busy(): boolean
+  claim(gesture: ActiveGesture): void
+  release(gesture: ActiveGesture): void
+}
+
+export type DesktopGesture = (ctx: GestureContext) => () => void
 
 export interface SessionContext {
   wm: WindowManager

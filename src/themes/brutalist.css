@@ -17,6 +17,8 @@
   --wm-title-weight: 700;
   --wm-title-tracking: 0.14em;
   --wm-titlebar-padding: 9px 12px;
+  --wm-title-color: #f4f2ec;
+  --wm-title-color-focused: #ffffff;
   --wm-transition: 90ms linear;
   position: relative;
   overflow: hidden;
@@ -96,16 +98,15 @@
   font-size: var(--wm-title-size, 13px);
   font-weight: var(--wm-title-weight, 600);
   letter-spacing: var(--wm-title-tracking, 0.01em);
-  color: var(--wm-text-dim);
+  color: var(--wm-title-color, var(--wm-text-dim));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: uppercase;
-  color: #f4f2ec;
 }
 
 [data-wm-window][data-wm-focused] [data-wm-title] {
-  color: var(--wm-text);
+  color: var(--wm-title-color-focused, var(--wm-text));
 }
 
 [data-wm-window] [data-wm-controls] {
@@ -196,10 +197,6 @@
     transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
     width 140ms ease,
     height 140ms ease;
-}
-
-[data-wm-window][data-wm-focused] [data-wm-title] {
-  color: #ffffff;
 }
 
 [data-wm-window] [data-wm-close],

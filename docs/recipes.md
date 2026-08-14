@@ -327,7 +327,7 @@ What still matters on your side:
 
 ## Touch gestures
 
-Both gestures answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
+Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.46 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
 
 - **Pinch a window to resize it.** Two fingers on the same window scale it around the point between them. The window's own `minSize`, `maxSize` and `aspectRatio` still rule, and the anchor is derived from the clamped size, so the point under your fingers stays put even at the limit. The whole pinch is one undo step; `Escape` or a cancelled pointer puts the start bounds back. While it runs the element carries `data-wm-pinching`.
 - **Swipe two fingers sideways to change workspace.** It works over a window as well as over bare desktop, which matters on a phone where windows cover everything. A gesture commits once the fingers travel `threshold` pixels horizontally and the travel is more than twice the vertical drift.
@@ -335,10 +335,13 @@ Both gestures answer only `pointerType === 'touch'`, so mouse and pen behaviour 
 The two never fight: whichever crosses its own threshold first wins, and neither starts while a drag or resize already owns the pointer.
 
 ```js
+import { touchGestures } from '@surdeddd/wmkit/gestures'
+
 attachDesktop(wm, root, {
-  pinch: { threshold: 16 },
-  swipe: { workspaces: 4 },
+  gestures: [touchGestures({ pinch: { threshold: 16 }, swipe: { workspaces: 4 } })],
 })
 ```
 
-One caveat worth knowing. A browser will hand you two-finger pointer events only if the element does not give the gesture to the page first, so wmkit sets `touch-action: pan-x pan-y` on every attached window — content still scrolls, but the browser's own pinch-zoom no longer steals the gesture. If your windows never scroll, `pinch: { lockTouchAction: true }` upgrades that to `touch-action: none`.
+Import `pinch()` or `swipe()` on their own when you only want one of them.
+
+One caveat worth knowing. A browser will hand you two-finger pointer events only if the element does not give the gesture to the page first, so the pinch gesture sets `touch-action: pan-x pan-y` on the desktop — content still scrolls, but the browser's own pinch-zoom no longer steals the gesture. If your windows never scroll, `lockTouchAction: true` upgrades that to `touch-action: none`.

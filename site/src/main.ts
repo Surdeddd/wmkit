@@ -7,6 +7,7 @@ import {
   type WindowInit,
   type WindowState,
 } from '@surdeddd/wmkit'
+import { touchGestures } from '@surdeddd/wmkit/gestures'
 import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
 import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
 import blueprintUrl from '@surdeddd/wmkit/themes/blueprint.css?url'
@@ -122,7 +123,7 @@ function desktopOptions(): DesktopOptions {
     magnetism: options.magnetism,
     snap: options.snap,
     announce: options.announce,
-    swipe: { workspaces: WORKSPACES },
+    gestures: [touchGestures({ swipe: { workspaces: WORKSPACES } })],
     minimizeTarget: (win) => dockEl.querySelector(`[data-task="${win.id}"]`) ?? dockEl,
     onTitlebarContextMenu: (win) => {
       wm.sendToBack(win.id)

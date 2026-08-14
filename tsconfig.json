@@ -29,6 +29,7 @@
       "@surdeddd/wmkit/persist": ["./src/plugins/persist.ts"],
       "@surdeddd/wmkit/popout": ["./src/plugins/popout.ts"],
       "@surdeddd/wmkit/devtools": ["./src/plugins/devtools/index.ts"],
+      "@surdeddd/wmkit/gestures": ["./src/plugins/gestures.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"]
     }
   },

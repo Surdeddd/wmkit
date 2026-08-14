@@ -4,6 +4,11 @@ import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import {
+  pinch as pinchGesture,
+  swipe as swipeGesture,
+  touchGestures,
+} from '../../src/plugins/gestures'
 
 const VIEWPORT = { width: 800, height: 600 }
 
@@ -43,7 +48,12 @@ function makeHarness(options: DesktopOptions = {}): Harness {
   const element = document.createElement('div')
   document.body.append(element)
   const wm = createWindowManager({ viewport: VIEWPORT })
-  const desktop = attachDesktop(wm, element, { autoViewport: false, announce: false, ...options })
+  const desktop = attachDesktop(wm, element, {
+    autoViewport: false,
+    announce: false,
+    gestures: [touchGestures()],
+    ...options,
+  })
 
   return {
     wm,
@@ -121,7 +131,7 @@ describe('pinch to resize', () => {
   })
 
   it('waits for the fingers to travel past the threshold', () => {
-    const harness = makeHarness({ pinch: { threshold: 40 } })
+    const harness = makeHarness({ gestures: [touchGestures({ pinch: { threshold: 40 } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     pinch(harness, root, [100, 100, 300, 100], [95, 100, 305, 100])
@@ -282,7 +292,7 @@ describe('pinch to resize', () => {
   })
 
   it('stays out of the way when the gesture is switched off', () => {
-    const harness = makeHarness({ pinch: false })
+    const harness = makeHarness({ gestures: [swipeGesture()] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     pinch(harness, root, [100, 100, 300, 300], [50, 50, 350, 350])
@@ -290,7 +300,7 @@ describe('pinch to resize', () => {
   })
 
   it('still pinches when the window is asked to hold the touch action', () => {
-    const harness = makeHarness({ pinch: { lockTouchAction: true } })
+    const harness = makeHarness({ gestures: [touchGestures({ pinch: { lockTouchAction: true } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     pinch(harness, root, [100, 100, 300, 300], [50, 50, 350, 350])
@@ -340,7 +350,7 @@ describe('pinch to resize', () => {
   })
 
   it('leaves the bounds alone when a gesture is cancelled before it moves', () => {
-    const harness = makeHarness({ pinch: { threshold: 500 } })
+    const harness = makeHarness({ gestures: [touchGestures({ pinch: { threshold: 500 } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
     harness.wm.clearHistory()
 
@@ -379,7 +389,9 @@ describe('pinch to resize', () => {
 
 describe('two finger swipe to change workspace', () => {
   it('steps to the next workspace and back', () => {
-    const harness = makeHarness({ swipe: { threshold: 60, workspaces: 3 } })
+    const harness = makeHarness({
+      gestures: [touchGestures({ swipe: { threshold: 60, workspaces: 3 } })],
+    })
 
     swipe(harness, harness.element, [400, 300], [-120, 10])
     expect(harness.wm.workspace()).toBe(1)
@@ -389,7 +401,9 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('works over a window, not only over bare desktop', () => {
-    const harness = makeHarness({ swipe: { threshold: 60, workspaces: 3 } })
+    const harness = makeHarness({
+      gestures: [touchGestures({ swipe: { threshold: 60, workspaces: 3 } })],
+    })
     const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 800, height: 600 })
 
     swipe(harness, root, [400, 300], [-120, 0])
@@ -399,7 +413,9 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('stops at the last workspace and never below the first', () => {
-    const harness = makeHarness({ swipe: { threshold: 60, workspaces: 2 } })
+    const harness = makeHarness({
+      gestures: [touchGestures({ swipe: { threshold: 60, workspaces: 2 } })],
+    })
 
     swipe(harness, harness.element, [300, 300], [140, 0])
     expect(harness.wm.workspace()).toBe(0)
@@ -410,7 +426,7 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('keeps going when no workspace count is given', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
 
     swipe(harness, harness.element, [400, 300], [-140, 0])
     swipe(harness, harness.element, [400, 300], [-140, 0])
@@ -418,7 +434,7 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('ignores a short travel and a mostly vertical one', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
 
     swipe(harness, harness.element, [400, 300], [-40, 0])
     swipe(harness, harness.element, [400, 300], [-100, 120])
@@ -426,7 +442,7 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('ignores mouse pointers and a third finger', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     const el = harness.element
 
     el.dispatchEvent(touchEvent('pointerdown', 3, 400, 300, 'mouse'))
@@ -444,7 +460,11 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('never hijacks a drag that is already in flight', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 }, magnetism: false, snap: false })
+    const harness = makeHarness({
+      gestures: [touchGestures({ swipe: { threshold: 60 } })],
+      magnetism: false,
+      snap: false,
+    })
     const { handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
 
     handle.dispatchEvent(touchEvent('pointerdown', 8, 150, 110))
@@ -460,7 +480,7 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('lets the pinch win when the fingers spread instead of travelling', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     pinch(harness, root, [100, 100, 300, 300], [50, 50, 350, 350])
@@ -470,11 +490,11 @@ describe('two finger swipe to change workspace', () => {
   })
 
   it('stays out of the way when the gesture is switched off or the desktop is gone', () => {
-    const off = makeHarness({ swipe: false })
+    const off = makeHarness({ gestures: [pinchGesture()] })
     swipe(off, off.element, [400, 300], [-140, 0])
     expect(off.wm.workspace()).toBe(0)
 
-    const live = makeHarness({ swipe: { threshold: 60 } })
+    const live = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     live.desktop.destroy()
     swipe(live, live.element, [400, 300], [-140, 0])
     expect(live.wm.workspace()).toBe(0)
@@ -483,7 +503,7 @@ describe('two finger swipe to change workspace', () => {
 
 describe('two finger gestures give up cleanly', () => {
   it('drops a frame that was already queued when a third finger lands', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     const el = harness.element
 
     el.dispatchEvent(touchEvent('pointerdown', 3, 400, 300))
@@ -496,7 +516,7 @@ describe('two finger gestures give up cleanly', () => {
   })
 
   it('drops a queued frame when the pointer is cancelled', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     root.dispatchEvent(touchEvent('pointerdown', 1, 100, 100))
@@ -510,7 +530,7 @@ describe('two finger gestures give up cleanly', () => {
   })
 
   it('ignores a move from a finger it never saw go down', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
 
     harness.element.dispatchEvent(touchEvent('pointermove', 42, 100, 100))
     harness.element.dispatchEvent(touchEvent('pointerup', 42, 100, 100))
@@ -520,7 +540,7 @@ describe('two finger gestures give up cleanly', () => {
   })
 
   it('needs a real spread between the two fingers', () => {
-    const harness = makeHarness({ swipe: { threshold: 60 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
     const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
 
     root.dispatchEvent(touchEvent('pointerdown', 1, 200, 200))
@@ -535,7 +555,7 @@ describe('two finger gestures give up cleanly', () => {
 
 describe('two fingers on two windows', () => {
   it('never resizes either of them', () => {
-    const harness = makeHarness({ swipe: { threshold: 600 } })
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 600 } })] })
     const left = harness.add({ id: 'a', x: 0, y: 0, width: 200, height: 200 })
     const right = harness.add({ id: 'b', x: 400, y: 0, width: 200, height: 200 })
 

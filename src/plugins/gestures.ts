@@ -1,6 +1,6 @@
 import { applyAspect, clampSize } from '../core/geometry'
-import type { Bounds, Size } from '../core/types'
-import type { ActiveDrag, Point, SessionContext } from './shared'
+import type { Bounds, Size, WindowState } from '../core/types'
+import type { ActiveGesture, DesktopGesture, GestureContext, Point } from '../dom/shared'
 
 export interface PinchOptions {
   threshold?: number
@@ -12,17 +12,12 @@ export interface SwipeOptions {
   workspaces?: number
 }
 
-export interface GestureOptions {
-  pinch: false | Required<PinchOptions>
-  swipe: false | Required<SwipeOptions>
-}
-
 interface Finger {
   point: Point
   windowId: string | null
 }
 
-interface PinchSession extends ActiveDrag {
+interface PinchSession extends ActiveGesture {
   startBounds: Bounds
   midX: number
   midY: number
@@ -32,12 +27,12 @@ function spreadOf(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
-export function createGestureWatcher(
-  ctx: SessionContext,
-  element: HTMLElement,
-  options: GestureOptions,
+function watch(
+  ctx: GestureContext,
+  options: { pinch: Required<PinchOptions> | null; swipe: Required<SwipeOptions> | null },
 ): () => void {
   const { wm, doc, view } = ctx
+  const element = ctx.desktop
   const fingers = new Map<number, Finger>()
   let armed = false
   let target: string | null = null
@@ -74,7 +69,7 @@ export function createGestureWatcher(
     if (!active) return
     session = null
     if (cancelled) wm.resize(active.id, active.startBounds)
-    ctx.releaseDrag(active)
+    ctx.release(active)
     releaseRect?.()
     releaseRect = null
     const host = ctx.windowElement(active.id)
@@ -94,18 +89,14 @@ export function createGestureWatcher(
       midY: mid.y,
     }
     session = claimed
-    ctx.claimDrag(claimed)
+    ctx.claim(claimed)
     wm.beginInteraction()
     releaseRect = ctx.trackRect()
     const host = ctx.windowElement(id)
     if (host) host.dataset.wmPinching = ''
   }
 
-  function applyPinch(spread: number): void {
-    const active = session
-    if (!active) return
-    const win = wm.get(active.id)
-    if (!win) return
+  function applyPinch(active: PinchSession, win: WindowState, spread: number): void {
     const start = active.startBounds
     const ratio = spread / startSpread
     const raw: Size = { width: start.width * ratio, height: start.height * ratio }
@@ -133,16 +124,19 @@ export function createGestureWatcher(
     const pinch = options.pinch
 
     if (session) {
-      applyPinch(spread)
+      const win = wm.get(session.id)
+      if (win) applyPinch(session, win, spread)
       return
     }
-    if (pinch !== false && target !== null && Math.abs(spread - startSpread) > pinch.threshold) {
+    if (pinch !== null && target !== null && Math.abs(spread - startSpread) > pinch.threshold) {
+      const win = wm.get(target)
+      if (!win) return
       beginPinch(target, startMid)
-      applyPinch(spread)
+      if (session) applyPinch(session, win, spread)
       return
     }
     const swipe = options.swipe
-    if (swipe === false) return
+    if (swipe === null) return
     const dx = mid.x - startMid.x
     const dy = mid.y - startMid.y
     if (Math.abs(dx) < swipe.threshold || Math.abs(dx) <= 2 * Math.abs(dy)) return
@@ -161,7 +155,7 @@ export function createGestureWatcher(
     fingers.set(event.pointerId, { point: ctx.toLocal(event), windowId: windowIdAt(event) })
     const both = pair()
     if (!both) return
-    if (ctx.currentDrag()) return
+    if (ctx.busy()) return
     const [first, second] = both
     startSpread = spreadOf(first.point, second.point)
     if (startSpread === 0) return
@@ -212,6 +206,10 @@ export function createGestureWatcher(
     disarm()
   }
 
+  const previousTouchAction = element.style.touchAction
+  if (options.pinch) {
+    element.style.touchAction = options.pinch.lockTouchAction ? 'none' : 'pan-x pan-y'
+  }
   element.addEventListener('pointerdown', onDown)
   element.addEventListener('pointermove', onMove)
   element.addEventListener('pointerup', onRelease)
@@ -222,10 +220,41 @@ export function createGestureWatcher(
     if (session) endPinch(true)
     disarm()
     fingers.clear()
+    element.style.touchAction = previousTouchAction
     element.removeEventListener('pointerdown', onDown)
     element.removeEventListener('pointermove', onMove)
     element.removeEventListener('pointerup', onRelease)
     element.removeEventListener('pointercancel', onCancel)
     doc.removeEventListener('keydown', onKeydown, true)
   }
+}
+
+export function pinch(options: PinchOptions = {}): DesktopGesture {
+  const settings: Required<PinchOptions> = {
+    threshold: options.threshold ?? 12,
+    lockTouchAction: options.lockTouchAction === true,
+  }
+  return (ctx) => watch(ctx, { pinch: settings, swipe: null })
+}
+
+export function swipe(options: SwipeOptions = {}): DesktopGesture {
+  const settings: Required<SwipeOptions> = {
+    threshold: options.threshold ?? 72,
+    workspaces: options.workspaces ?? 0,
+  }
+  return (ctx) => watch(ctx, { pinch: null, swipe: settings })
+}
+
+export function touchGestures(
+  options: { pinch?: PinchOptions; swipe?: SwipeOptions } = {},
+): DesktopGesture {
+  const pinchSettings: Required<PinchOptions> = {
+    threshold: options.pinch?.threshold ?? 12,
+    lockTouchAction: options.pinch?.lockTouchAction === true,
+  }
+  const swipeSettings: Required<SwipeOptions> = {
+    threshold: options.swipe?.threshold ?? 72,
+    workspaces: options.swipe?.workspaces ?? 0,
+  }
+  return (ctx) => watch(ctx, { pinch: pinchSettings, swipe: swipeSettings })
 }

@@ -6,6 +6,7 @@ export default defineConfig({
       '@surdeddd/wmkit/persist': new URL('./src/plugins/persist.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/devtools': new URL('./src/plugins/devtools/index.ts', import.meta.url)
         .pathname,
+      '@surdeddd/wmkit/gestures': new URL('./src/plugins/gestures.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/popout': new URL('./src/plugins/popout.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/react': new URL('./src/adapters/react.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/vue': new URL('./src/adapters/vue.ts', import.meta.url).pathname,

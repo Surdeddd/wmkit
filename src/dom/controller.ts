@@ -2,7 +2,6 @@ import type { Bounds, SnapZone, WindowManager, WindowState } from '../core/types
 import { flipFromTarget, flipToTarget } from './animate'
 import { type Announcer, createAnnouncer } from './announcer'
 import { createDragStarter } from './drag'
-import { createGestureWatcher, type PinchOptions, type SwipeOptions } from './gestures'
 import { createResizeHandles, createResizeStarter } from './resize'
 import {
   type ActiveDrag,
@@ -11,6 +10,7 @@ import {
   type DesktopKeyboardOptions,
   type DesktopOptions,
   type DesktopSnapOptions,
+  type GestureContext,
   INTERACTIVE_SELECTOR,
   type Point,
   type SessionContext,
@@ -82,23 +82,7 @@ export function attachDesktop(
   const animationEnabled = options.animation !== false
   const animationOptions: AnimationOptions =
     typeof options.animation === 'object' ? options.animation : {}
-  const pinchSource: PinchOptions = typeof options.pinch === 'object' ? options.pinch : {}
-  const pinchOptions: false | Required<PinchOptions> =
-    options.pinch === false
-      ? false
-      : {
-          threshold: pinchSource.threshold ?? 12,
-          lockTouchAction: pinchSource.lockTouchAction === true,
-        }
   const windowVariant = options.windowVariant ?? defaultVariant
-  const swipeSource: SwipeOptions = typeof options.swipe === 'object' ? options.swipe : {}
-  const swipeOptions: false | Required<SwipeOptions> =
-    options.swipe === false
-      ? false
-      : {
-          threshold: swipeSource.threshold ?? 72,
-          workspaces: swipeSource.workspaces ?? 0,
-        }
 
   element.dataset.wmDesktop = ''
   element.tabIndex = -1
@@ -221,8 +205,20 @@ export function attachDesktop(
 
   const startDrag = createDragStarter(ctx)
   const startResize = createResizeStarter(ctx)
-  if (pinchOptions !== false || swipeOptions !== false) {
-    cleanup.push(createGestureWatcher(ctx, element, { pinch: pinchOptions, swipe: swipeOptions }))
+  if (options.gestures) {
+    const gestureContext: GestureContext = {
+      wm,
+      doc,
+      view,
+      desktop: element,
+      toLocal: (event) => ctx.toLocal(event),
+      trackRect: () => ctx.trackRect(),
+      windowElement: (id) => ctx.windowElement(id),
+      busy: () => drag !== null,
+      claim: (gesture) => ctx.claimDrag(gesture),
+      release: (gesture) => ctx.releaseDrag(gesture),
+    }
+    for (const gesture of options.gestures) cleanup.push(gesture(gestureContext))
   }
 
   if (options.autoViewport !== false) {
@@ -475,10 +471,6 @@ export function attachDesktop(
     attached.cleanup.push(() =>
       windowElement.removeEventListener('pointerdown', onPointerDownFocus, true),
     )
-
-    if (pinchOptions !== false) {
-      windowElement.style.touchAction = pinchOptions.lockTouchAction ? 'none' : 'pan-x pan-y'
-    }
 
     const onClick = (event: MouseEvent) => {
       const target = event.target as Element | null

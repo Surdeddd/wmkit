@@ -16,6 +16,9 @@ export default defineConfig({
       '@surdeddd/wmkit/persist': fileURLToPath(
         new URL('../src/plugins/persist.ts', import.meta.url),
       ),
+      '@surdeddd/wmkit/gestures': fileURLToPath(
+        new URL('../src/plugins/gestures.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit/popout': fileURLToPath(new URL('../src/plugins/popout.ts', import.meta.url)),
       '@surdeddd/wmkit/devtools': fileURLToPath(
         new URL('../src/plugins/devtools/index.ts', import.meta.url),

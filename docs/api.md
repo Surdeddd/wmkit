@@ -344,19 +344,59 @@ interface DesktopOptions {
     duration?: number   // 260
     easing?: string     // cubic-bezier(0.32, 0.72, 0, 1)
   }
-  pinch?: boolean | {
-    threshold?: number        // 12 — how far the fingers must spread before it resizes
-    lockTouchAction?: boolean // false — set touch-action:none instead of pan-x pan-y
-  }
-  swipe?: boolean | {
-    threshold?: number   // 72 — how far two fingers must travel sideways
-    workspaces?: number  // 0 — no upper bound; set it to stop at the last workspace
-  }
+  gestures?: readonly DesktopGesture[]  // opt-in, from @surdeddd/wmkit/gestures or your own
   interactiveSelector?: string  // what a drag handle must not start on
   beforeClose?: (window: WindowState) => boolean | void  // return false to keep it open
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }
+
+### Gestures
+
+The desktop ships no gestures of its own. Pass the ones you want and only those
+reach your bundle.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { touchGestures } from '@surdeddd/wmkit/gestures'
+
+attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })] })
+```
+
+`@surdeddd/wmkit/gestures` exports three factories: `pinch(options?)`,
+`swipe(options?)` and `touchGestures({ pinch, swipe })` when you want both from
+one listener.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `pinch.threshold` | `12` | how far the fingers must spread before it resizes |
+| `pinch.lockTouchAction` | `false` | set `touch-action: none` on the desktop instead of `pan-x pan-y` |
+| `swipe.threshold` | `72` | how far two fingers must travel sideways |
+| `swipe.workspaces` | `0` | no upper bound; set it to stop at the last workspace |
+
+A gesture is a function. It receives a `GestureContext` and returns its own
+teardown, so you can write your own the same way the shipped ones are written:
+
+```ts
+type DesktopGesture = (ctx: GestureContext) => () => void
+
+interface GestureContext {
+  wm: WindowManager
+  doc: Document
+  view: Window & typeof globalThis
+  desktop: HTMLElement
+  toLocal(event: PointerEvent): { x: number; y: number }
+  trackRect(): () => void
+  windowElement(id: string): HTMLElement | undefined
+  busy(): boolean                       // a drag or resize already owns the pointer
+  claim(gesture: ActiveGesture): void   // take the pointer, so nothing else acts on it
+  release(gesture: ActiveGesture): void
+}
+```
+
+`claim` is what keeps gestures from fighting the built-in drag and resize: the
+desktop holds one interaction at a time, and `busy()` tells you whether it is
+already taken.
 
 interface DesktopController {
   element: HTMLElement

@@ -326,6 +326,19 @@ persist(wm, {
 
 Moves a window's content into a [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) always-on-top OS window, keeping the same JS context and state. Feature-detect with `isPopoutSupported()`.
 
+### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
+
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.46 kB brotlied.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { touchGestures } from '@surdeddd/wmkit/gestures'
+
+attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })] })
+```
+
+A gesture is just a function that takes a `GestureContext` and returns its teardown, so your own gestures cooperate with the built-in drag and resize through the same `claim`/`busy` pair — see [docs/api.md](docs/api.md).
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 An opt-in panel that shows the live window table, an event log and the manager controls, so you can see what the state machine is doing without a debugger. It follows the manager, never the DOM, so it works with any adapter or none.
