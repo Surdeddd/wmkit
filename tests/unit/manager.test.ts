@@ -1615,7 +1615,7 @@ describe('tab groups', () => {
     expect(wm.get('a')?.groupId).toBe(groupId)
 
     const state = wm.getState()
-    expect(state.groups[groupId]).toMatchObject({ activeId: 'a', members: ['b', 'a'] })
+    expect(state.groups[groupId]).toMatchObject({ activeId: 'a', members: ['a', 'b'] })
     expect(state.focusedId).toBe('a')
   })
 
@@ -1663,7 +1663,7 @@ describe('tab groups', () => {
     expect(wm.getState().groups[groupId]?.activeId).toBe('b')
     expect(onGroup).toHaveBeenCalledWith({
       groupId,
-      members: ['b', 'a'],
+      members: ['a', 'b'],
       activeId: 'b',
       previous: 'a',
     })
@@ -1696,8 +1696,8 @@ describe('tab groups', () => {
 
     expect(wm.ungroup('c')).toBe(true)
     const state = wm.getState()
-    expect(state.groups[groupId]?.members).toEqual(['b', 'a'])
-    expect(state.groups[groupId]?.activeId).toBe('b')
+    expect(state.groups[groupId]?.members).toEqual(['a', 'b'])
+    expect(state.groups[groupId]?.activeId).toBe('a')
   })
 
   it('keeps the active tab when an inactive member leaves', () => {
@@ -1709,7 +1709,7 @@ describe('tab groups', () => {
 
     expect(wm.ungroup('b')).toBe(true)
     expect(wm.getState().groups[groupId]?.activeId).toBe('a')
-    expect(wm.getState().groups[groupId]?.members).toEqual(['c', 'a'])
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'c'])
     expect(wm.get('b')?.groupId).toBeNull()
     expect(onGroup).toHaveBeenCalledWith(
       expect.objectContaining({ groupId, activeId: 'a', previous: null }),
@@ -1752,12 +1752,12 @@ describe('tab groups', () => {
     ;(data as unknown as Record<string, unknown>).activeTabs = undefined
     const next = makeWm()
     expect(next.hydrate(data)).toBe(true)
-    expect(next.getState().groups[groupId]?.activeId).toBe('b')
+    expect(next.getState().groups[groupId]?.activeId).toBe('a')
   })
 
   it('exposes members in tab order', () => {
     const { wm, groupId } = grouped()
-    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['b', 'a'])
+    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['a', 'b'])
     expect(wm.groupMembers('nope')).toEqual([])
   })
 
@@ -1779,7 +1779,7 @@ describe('tab groups', () => {
     data.activeTabs[groupId] = 'ghost'
     const next = makeWm()
     next.hydrate(data)
-    expect(next.getState().groups[groupId]?.activeId).toBe('b')
+    expect(next.getState().groups[groupId]?.activeId).toBe('a')
 
     const lonely = wm.serialize()
     const raw = rawWindow(lonely)
@@ -1834,13 +1834,14 @@ describe('tab groups', () => {
 
   it('round trips an active tab that differs from the first member', () => {
     const { wm, groupId } = grouped()
-    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['b', 'a'])
+    expect(wm.groupMembers(groupId).map((win) => win.id)).toEqual(['a', 'b'])
+    wm.activateTab('b')
 
     const data = wm.serialize()
-    expect(data.activeTabs[groupId]).toBe('a')
+    expect(data.activeTabs[groupId]).toBe('b')
     const next = makeWm()
     expect(next.hydrate(data)).toBe(true)
-    expect(next.getState().groups[groupId]?.activeId).toBe('a')
+    expect(next.getState().groups[groupId]?.activeId).toBe('b')
   })
 })
 
@@ -1926,10 +1927,10 @@ describe('state sharing', () => {
     for (const id of ['a', 'b', 'c']) wm.open({ id })
     const groupId = wm.group(['a', 'b', 'c']) as string
     wm.minimize('a')
-    expect(wm.getState().groups[groupId]?.members).toEqual(['b', 'c', 'a'])
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'b', 'c'])
 
     expect(wm.ungroup('b')).toBe(true)
-    expect(wm.getState().groups[groupId]?.members).toEqual(['c', 'a'])
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'c'])
   })
 
   it('does not mutate a snapshot taken in the middle of a batch', () => {
@@ -2013,6 +2014,115 @@ describe('state sharing', () => {
   })
 })
 
+describe('tab order', () => {
+  function trio() {
+    const wm = makeWm()
+    for (const id of ['a', 'b', 'c']) wm.open({ id })
+    return { wm, groupId: wm.group(['a', 'b', 'c']) as string }
+  }
+
+  it('survives focus, raising and sending the group to the back', () => {
+    const { wm, groupId } = trio()
+    const members = () => wm.getState().groups[groupId]?.members
+
+    expect(members()).toEqual(['a', 'b', 'c'])
+    wm.focus('c')
+    expect(members()).toEqual(['a', 'b', 'c'])
+    wm.sendToBack('b')
+    expect(members()).toEqual(['a', 'b', 'c'])
+    wm.open({ id: 'other' })
+    wm.focus('a')
+    expect(members()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('moves a tab to a new slot', () => {
+    const { wm, groupId } = trio()
+    const onGroup = vi.fn()
+    wm.on('group', onGroup)
+
+    expect(wm.moveTab('a', 2)).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['b', 'c', 'a'])
+    expect(onGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ groupId, members: ['b', 'c', 'a'] }),
+    )
+
+    expect(wm.moveTab('a', 0)).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'b', 'c'])
+  })
+
+  it('clamps the slot and refuses a move that changes nothing', () => {
+    const { wm, groupId } = trio()
+    expect(wm.moveTab('a', 99)).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['b', 'c', 'a'])
+    expect(wm.moveTab('a', 99)).toBe(false)
+    expect(wm.moveTab('a', -4)).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'b', 'c'])
+  })
+
+  it('refuses to move a tab that has no group', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    expect(wm.moveTab('a', 1)).toBe(false)
+    expect(wm.moveTab('ghost', 0)).toBe(false)
+    const { wm: grouped } = trio()
+    expect(grouped.moveTab('a', Number.NaN)).toBe(false)
+  })
+
+  it('leaves the active tab, the focus and the geometry alone', () => {
+    const { wm } = trio()
+    wm.activateTab('b')
+    const bounds = wm.get('b')?.bounds
+
+    expect(wm.moveTab('c', 0)).toBe(true)
+    expect(wm.getState().focusedId).toBe('b')
+    expect(wm.get('b')?.bounds).toEqual(bounds)
+    expect(wm.get('c')?.bounds).toEqual(bounds)
+  })
+
+  it('folds a reorder into one undo step', () => {
+    const { wm, groupId } = trio()
+    expect(wm.moveTab('a', 2)).toBe(true)
+    expect(wm.undo()).toBe(true)
+    expect(wm.getState().groups[groupId]?.members).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps the group contiguous after a reorder', () => {
+    const { wm } = trio()
+    wm.open({ id: 'other' })
+    wm.moveTab('a', 2)
+
+    const { order } = wm.getState()
+    const slots = ['a', 'b', 'c'].map((id) => order.indexOf(id)).sort((x, y) => x - y)
+    expect((slots[2] as number) - (slots[0] as number)).toBe(2)
+  })
+
+  it('cycles through the tabs of the focused group', () => {
+    const { wm, groupId } = trio()
+    expect(wm.getState().groups[groupId]?.activeId).toBe('a')
+
+    expect(wm.cycleTab()).toBe('b')
+    expect(wm.cycleTab()).toBe('c')
+    expect(wm.cycleTab()).toBe('a')
+    expect(wm.cycleTab(-1)).toBe('c')
+  })
+
+  it('cycles in the order the tabs are shown, not the order they were raised', () => {
+    const { wm } = trio()
+    wm.moveTab('c', 0)
+    expect(wm.getState().groups[wm.get('a')?.groupId as string]?.members).toEqual(['c', 'a', 'b'])
+
+    wm.activateTab('c')
+    expect(wm.cycleTab()).toBe('a')
+  })
+
+  it('refuses to cycle without a focused group', () => {
+    const wm = makeWm()
+    expect(wm.cycleTab()).toBeNull()
+    wm.open({ id: 'a' })
+    expect(wm.cycleTab()).toBeNull()
+  })
+})
+
 describe('tab group regressions', () => {
   function grouped() {
     const wm = makeWm()
@@ -2032,8 +2142,8 @@ describe('tab group regressions', () => {
     const second = next.group(['c', 'd']) as string
 
     expect(second).not.toBe(groupId)
-    expect(next.getState().groups[groupId]?.members).toEqual(['b', 'a'])
-    expect(next.getState().groups[second]?.members).toEqual(['d', 'c'])
+    expect(next.getState().groups[groupId]?.members).toEqual(['a', 'b'])
+    expect(next.getState().groups[second]?.members).toEqual(['c', 'd'])
   })
 
   it('moves focus along with the tab it activates', () => {
@@ -2180,7 +2290,7 @@ describe('tab group regressions', () => {
     const next = makeWm()
     expect(next.hydrate(data)).toBe(true)
     const group = next.getState().groups[shadow]
-    expect(group?.members).toEqual(['b', 'a'])
+    expect(group?.members).toEqual(['a', 'b'])
     expect(next.getState().focusedId).toBe(group?.activeId)
   })
 

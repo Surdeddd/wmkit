@@ -186,6 +186,8 @@ export interface WindowManager {
   group(ids: readonly string[]): string | null
   ungroup(id: string): boolean
   activateTab(id: string): boolean
+  moveTab(id: string, index: number): boolean
+  cycleTab(direction?: 1 | -1): string | null
   groupMembers(groupId: string): readonly WindowState[]
   batch(run: () => void): void
   serialize(): SerializedState

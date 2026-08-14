@@ -206,6 +206,8 @@ share geometry; exactly one member is visible at a time and the rest behave like
 | `group(ids)` | `string \| null` | `null` for fewer than two known windows; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them |
 | `ungroup(id)` | `boolean` | detaches one member; a group left with a single member dissolves entirely |
 | `activateTab(id)` | `boolean` | makes a member the visible tab; `false` when it is already active or not grouped. Focus follows the tab, but only when the member going hidden was the focused window |
+| `moveTab(id, index)` | `boolean` | moves a member to another slot in the tab order; the index is clamped, and `false` means nothing moved. The active tab, the focus and the geometry stay put |
+| `cycleTab(direction?)` | `string \| null` | activates the next (`1`) or previous (`-1`) tab of the focused window's group, wrapping around; `null` when the focused window is not grouped |
 | `groupMembers(groupId)` | `readonly WindowState[]` | members in tab order (back to front) |
 
 ```ts
@@ -229,7 +231,8 @@ Invariants the manager maintains for you:
 - `focus(id)` on an inactive tab activates it first, so DOM focus never lands on a hidden element;
   a focus a modal refuses leaves the active tab untouched
 - members stay contiguous in `order`, so switching tabs never changes where the frame sits in the
-  stack
+  stack, and the tab order is yours: focusing, raising or sending the frame to the back never
+  shuffles it, only `moveTab` does
 - closing the active tab hands the tab over to a sibling; closing the second-to-last member
   dissolves the group
 - when a change hides the focused window — minimizing the frame through a hidden member, moving it

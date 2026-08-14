@@ -275,6 +275,21 @@ function titlebarWindowAt(clientX: number, clientY: number, selfId: string): str
   return id && id !== selfId && wm.get(id) ? id : null
 }
 
+function slotAt(strip: HTMLElement, clientX: number, id: string): number | null {
+  const tabs = [...strip.querySelectorAll<HTMLElement>('.win-tab')]
+  const from = tabs.findIndex((tab) => tab.dataset.tab === id)
+  if (from === -1) return null
+  let slot = tabs.length - 1
+  for (let i = 0; i < tabs.length; i += 1) {
+    const rect = (tabs[i] as HTMLElement).getBoundingClientRect()
+    if (clientX < rect.left + rect.width / 2) {
+      slot = i > from ? i - 1 : i
+      break
+    }
+  }
+  return slot === from ? null : slot
+}
+
 function startTabDrag(event: PointerEvent, id: string): void {
   if (event.button !== 0) return
   event.stopPropagation()
@@ -326,6 +341,8 @@ function startTabDrag(event: PointerEvent, id: string): void {
       up.clientY >= box.top &&
       up.clientY <= box.bottom
     ) {
+      const slot = slotAt(strip as HTMLElement, up.clientX, id)
+      if (slot !== null) wm.moveTab(id, slot)
       return
     }
     const target = titlebarWindowAt(up.clientX, up.clientY, id)
@@ -343,6 +360,40 @@ function startTabDrag(event: PointerEvent, id: string): void {
   tab.addEventListener('pointermove', onMove)
   tab.addEventListener('pointerup', onUp)
   tab.addEventListener('pointercancel', onCancel)
+}
+
+function focusTab(id: string): void {
+  const active = wm.getState().groups[wm.get(id)?.groupId ?? '']?.activeId
+  if (!active) return
+  const host = mounted.get(active)?.element
+  host?.querySelector<HTMLElement>(`.win-tab[data-tab="${id}"]`)?.focus()
+}
+
+function onTabKeydown(event: KeyboardEvent, id: string): void {
+  const groupId = wm.get(id)?.groupId
+  const members = groupId ? (wm.getState().groups[groupId]?.members ?? []) : []
+  if (members.length < 2) return
+  const index = members.indexOf(id)
+  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+
+  if (step !== 0 && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (wm.moveTab(id, index + step)) focusTab(id)
+    return
+  }
+  if (step !== 0) {
+    event.preventDefault()
+    event.stopPropagation()
+    const next = members[(index + step + members.length) % members.length] as string
+    if (wm.activateTab(next)) focusTab(next)
+    return
+  }
+  if (event.key !== 'Home' && event.key !== 'End') return
+  event.preventDefault()
+  event.stopPropagation()
+  const target = (event.key === 'Home' ? members[0] : members[members.length - 1]) as string
+  if (wm.activateTab(target)) focusTab(target)
 }
 
 function syncTabs(): void {
@@ -363,8 +414,7 @@ function syncTabs(): void {
       }
       continue
     }
-    const signature = [...group.members]
-      .sort()
+    const signature = group.members
       .map((memberId) => `${memberId}:${state.windows[memberId]?.title ?? ''}`)
       .join(',')
     strip.hidden = false
@@ -372,7 +422,9 @@ function syncTabs(): void {
     titleEl.hidden = true
     if (strip.dataset.signature === signature) {
       for (const tab of strip.querySelectorAll<HTMLButtonElement>('.win-tab')) {
-        tab.setAttribute('aria-selected', String(tab.dataset.tab === group.activeId))
+        const selected = tab.dataset.tab === group.activeId
+        tab.setAttribute('aria-selected', String(selected))
+        tab.tabIndex = selected ? 0 : -1
       }
       continue
     }
@@ -387,10 +439,12 @@ function syncTabs(): void {
         tab.textContent = member?.title ?? memberId
         tab.setAttribute('role', 'tab')
         tab.setAttribute('aria-selected', String(group.activeId === memberId))
+        tab.tabIndex = group.activeId === memberId ? 0 : -1
         tab.addEventListener('click', (event) => {
           event.stopPropagation()
           wm.activateTab(memberId)
         })
+        tab.addEventListener('keydown', (event) => onTabKeydown(event, memberId))
         tab.addEventListener('pointerdown', (event) => startTabDrag(event, memberId))
         return tab
       }),

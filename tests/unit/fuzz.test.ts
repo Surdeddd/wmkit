@@ -131,7 +131,7 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
 
   for (let step = 0; step < steps; step += 1) {
     const id = anyId()
-    const action = Math.floor(random() * 22)
+    const action = Math.floor(random() * 24)
     switch (action) {
       case 0:
         wm.open({
@@ -212,6 +212,12 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
         break
       case 20:
         if (id) wm.sendToBack(id)
+        break
+      case 21:
+        if (id) wm.moveTab(id, Math.floor(random() * 5) - 1)
+        break
+      case 22:
+        wm.cycleTab(random() < 0.5 ? 1 : -1)
         break
       default:
         wm.cycleFocus(random() < 0.5 ? 1 : -1)

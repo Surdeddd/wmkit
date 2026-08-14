@@ -156,8 +156,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function blockOf(id: string): string[] {
     const win = windows[id] as WindowState
-    if (win.groupId === null) return [id]
-    return [...membersOf(win.groupId).filter((entry) => entry !== id), id]
+    return win.groupId === null ? [id] : membersOf(win.groupId)
   }
 
   function raise(id: string): boolean {
@@ -856,6 +855,40 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return true
   }
 
+  function moveTab(id: string, index: number): boolean {
+    const win = windows[id]
+    if (!win?.groupId || !Number.isFinite(index)) return false
+    const members = membersOf(win.groupId)
+    const from = members.indexOf(id)
+    const target = Math.max(0, Math.min(members.length - 1, Math.trunc(index)))
+    if (from === -1 || from === target) return false
+
+    const reordered = [...members]
+    reordered.splice(from, 1)
+    reordered.splice(target, 0, id)
+    const next = [...order]
+    let cursor = 0
+    for (let i = 0; i < next.length; i += 1) {
+      if (!members.includes(next[i] as string)) continue
+      next[i] = reordered[cursor++] as string
+    }
+    order = next
+    emitGroup(win.groupId, null)
+    queueEvent(() => emitter.emit('order', { order }))
+    commit()
+    return true
+  }
+
+  function cycleTab(direction: 1 | -1 = 1): string | null {
+    const win = focusedId ? windows[focusedId] : undefined
+    if (!win?.groupId) return null
+    const members = membersOf(win.groupId)
+    const current = members.indexOf(activeTabs[win.groupId] as string)
+    const index = (current + direction + members.length) % members.length
+    const next = members[index] as string
+    return activateTab(next) ? next : null
+  }
+
   function groupMembers(groupId: string): readonly WindowState[] {
     return membersOf(groupId).map((id) => windows[id] as WindowState)
   }
@@ -1331,6 +1364,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     group: (ids) => transact(() => group(ids)),
     ungroup: (id) => transact(() => ungroup(id)),
     activateTab: (id) => transact(() => activateTab(id)),
+    moveTab: (id, index) => transact(() => moveTab(id, index)),
+    cycleTab: (direction) => transact(() => cycleTab(direction)),
     groupMembers,
     batch: (run) => transact(run),
     serialize,

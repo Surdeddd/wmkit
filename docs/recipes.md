@@ -139,6 +139,25 @@ DOM layer shows, so the two clicks land on two different elements and the browse
 `dblclick` to a common ancestor — usually the titlebar, whose own double-click handler toggles
 maximize instead. Drive tear-off from a pointer drag, or from an explicit control on the tab.
 
+The order in `group.members` is the tab order, and nothing but `moveTab` changes it — focusing a
+member, raising the frame or sending it to the back all leave it alone. That makes it safe to render
+the strip straight from `members` and to key your DOM on that order:
+
+```js
+tab.addEventListener('keydown', (event) => {
+  const members = wm.getState().groups[groupId].members
+  const at = members.indexOf(memberId)
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  const step = event.key === 'ArrowRight' ? 1 : -1
+  if (event.ctrlKey || event.metaKey) wm.moveTab(memberId, at + step)
+  else wm.cycleTab(step)
+})
+```
+
+Give the strip `role="tablist"`, each button `role="tab"`, and keep a roving `tabindex` — `0` on the
+shown tab, `-1` on the rest — so the whole group costs one stop in the page's tab sequence.
+
 The DOM layer hides inactive members for you and marks the elements: `data-wm-group` carries the
 group id and `data-wm-tab` is `active` or `inactive`, so a theme can style the frame without any
 JavaScript.
