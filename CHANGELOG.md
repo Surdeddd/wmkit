@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/Surdeddd/wmkit/compare/v0.7.0...v0.7.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **dom:** keep the rendered desktop in step with the state it renders ([64a85d6](https://github.com/Surdeddd/wmkit/commit/64a85d6ace6f3304aa9f7dd9da9150059dc49374))
+
 # [0.7.0](https://github.com/Surdeddd/wmkit/compare/v0.6.1...v0.7.0) (2026-08-14)
 
 
