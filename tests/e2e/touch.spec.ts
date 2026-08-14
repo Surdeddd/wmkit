@@ -36,7 +36,10 @@ async function settle(page: Page): Promise<void> {
 }
 
 test.describe('touch input', () => {
-  test.skip(({ browserName }) => browserName !== 'chromium', 'real touch needs the cdp session')
+  test.skip(
+    ({ browserName, isMobile }) => browserName !== 'chromium' || !isMobile,
+    'real touch needs a touch-enabled chromium context',
+  )
 
   test('a finger on the titlebar drags the window', async ({ page, context }) => {
     const cdp = await context.newCDPSession(page)
