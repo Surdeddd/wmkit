@@ -372,6 +372,10 @@ A window that the manager closes — including one that `undo` takes away — is
 
 On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` exists), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`.
 
+### Touch
+
+Every gesture is driven by pointer events, so a finger and a mouse take the same path. The drag handle and the resize grips are given `touch-action: none`, which is what stops the browser from panning the page out from under a drag, and hit areas grow on coarse pointers — the defaults above show both figures. Only one gesture runs at a time: a second finger landing on another titlebar mid-drag is ignored rather than starting a competing drag. A long press produces a `contextmenu` event like anywhere else, which is where `onTitlebarContextMenu` is called from, with the browser's own menu suppressed for you.
+
 The desktop element itself gets `isolation: isolate`, so the `z-index` values the controller writes stay inside it and can never fight the host page's own layers. Turn that off with `stacking: { isolate: false }` when the desktop must share a stacking context with the page around it.
 
 Raising a window rewrites exactly one `z-index`: values are spread `gap` apart and the controller only re-numbers the windows that actually changed places, falling back to a full renumber when it runs out of room. Reading a window's `z-index` therefore tells you nothing but its relative position.
