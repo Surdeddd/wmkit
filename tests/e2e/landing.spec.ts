@@ -17,7 +17,7 @@ async function launch(page: Page, app: string) {
 }
 
 test('the desktop boots with a live launcher', async ({ page }) => {
-  await expect(page.locator('#launcher button')).toHaveCount(9)
+  await expect(page.locator('#launcher button')).toHaveCount(10)
   await expect(page.locator(`${readme} [data-wm-title]`)).toHaveText('readme.md')
   await expect(page.locator('#stat-win')).not.toHaveText('0')
 })

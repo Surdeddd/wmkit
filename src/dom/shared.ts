@@ -58,6 +58,7 @@ export interface DesktopOptions {
   // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
   beforeClose?: (window: WindowState) => boolean | void
   minimizeTarget?: (window: WindowState) => Element | null
+  windowVariant?: (window: WindowState) => string | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
 }
 

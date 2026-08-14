@@ -40,6 +40,11 @@ const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+function defaultVariant(win: WindowState): string | null {
+  const variant = win.meta.variant
+  return typeof variant === 'string' && variant !== '' ? variant : null
+}
+
 export function attachDesktop(
   wm: WindowManager,
   element: HTMLElement,
@@ -85,6 +90,7 @@ export function attachDesktop(
           threshold: pinchSource.threshold ?? 12,
           lockTouchAction: pinchSource.lockTouchAction === true,
         }
+  const windowVariant = options.windowVariant ?? defaultVariant
   const swipeSource: SwipeOptions = typeof options.swipe === 'object' ? options.swipe : {}
   const swipeOptions: false | Required<SwipeOptions> =
     options.swipe === false
@@ -248,6 +254,9 @@ export function attachDesktop(
       el.dataset.wmStage = win.stage
       el.dataset.wmLayer = win.layer
       el.dataset.wmWorkspace = String(win.workspace)
+      const variant = windowVariant(win)
+      if (variant === null) delete el.dataset.wmVariant
+      else el.dataset.wmVariant = variant
       if (win.groupId === null) {
         delete el.dataset.wmGroup
         delete el.dataset.wmTab

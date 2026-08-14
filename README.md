@@ -24,7 +24,7 @@
 - ⌨️ **Accessible** — keyboard move/resize/snap, F6 window cycling, focus-trapped modals, `aria-live` announcements
 - ⚡ **Fast** — `transform`-only positioning, rAF-batched pointer input, structural sharing; 50 windows drag at 60fps
 - 💾 **Persistence** — one call to serialize the desktop, one call to restore it, with versioned migrations
-- 🎨 **Three themes** — dark glass, light glass and Win98 retro, or bring your own CSS
+- 🎨 **Sixteen themes** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — or bring your own CSS
 - 🖼️ **Popout** *(experimental)* — send a window into Document Picture-in-Picture
 - 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~10.7 kB brotli core
 
@@ -339,7 +339,9 @@ Moves a window's content into a [Document Picture-in-Picture](https://developer.
 }
 ```
 
-Two more ready-made themes ship alongside: `themes/light.css` (light glass) and `themes/retro.css` (pixel-perfect Win98 nostalgia). All three style the same `data-wm-*` attributes, so switching is a one-line import swap.
+Fifteen more ready-made themes ship alongside — `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest` and `synth`. They all style the same `data-wm-*` attributes, so switching is a one-line import swap, and every one of them ships 24px pointer targets plus `prefers-reduced-motion` and `forced-colors` blocks.
+
+A theme dresses every window; a variant dresses one. Set `meta.variant` on a window and the desktop mirrors it to `data-wm-variant` for your CSS to pick up — see [docs/theming.md](docs/theming.md).
 
 Skip the import entirely and the library stays headless: state attributes (`data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `data-wm-flash`, `[hidden]`) are yours to style.
 

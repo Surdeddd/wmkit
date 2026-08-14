@@ -35,7 +35,24 @@ async function targets(page: Page) {
 test.describe('theme pointer targets', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'one engine is enough for css rules')
 
-  for (const theme of ['glass', 'light', 'retro'] as const) {
+  for (const theme of [
+    'glass',
+    'light',
+    'retro',
+    'terminal',
+    'paper',
+    'neon',
+    'aqua',
+    'frost',
+    'candy',
+    'carbon',
+    'brutalist',
+    'blueprint',
+    'amber',
+    'noir',
+    'forest',
+    'synth',
+  ] as const) {
     test(`${theme} gives window controls a reachable pointer target`, async ({ page }) => {
       await page.addInitScript((name) => {
         localStorage.setItem('wmkit-theme', name)

@@ -58,7 +58,24 @@ test.describe('the landing tells the truth', () => {
   })
 
   test('every theme it offers actually loads', async ({ page }) => {
-    for (const theme of ['glass', 'light', 'retro'] as const) {
+    for (const theme of [
+      'glass',
+      'light',
+      'retro',
+      'terminal',
+      'paper',
+      'neon',
+      'aqua',
+      'frost',
+      'candy',
+      'carbon',
+      'brutalist',
+      'blueprint',
+      'amber',
+      'noir',
+      'forest',
+      'synth',
+    ] as const) {
       await page.addInitScript((name) => localStorage.setItem('wmkit-theme', name), theme)
       await page.goto('?lang=en')
       await expect(page.locator(readme)).toBeVisible()

@@ -1,17 +1,22 @@
 [data-wm-desktop] {
-  --wm-radius: 12px;
-  --wm-bg: rgba(255, 255, 255, 0.78);
-  --wm-bg-focused: rgba(255, 255, 255, 0.94);
-  --wm-border: rgba(15, 23, 42, 0.1);
-  --wm-border-focused: rgba(15, 23, 42, 0.22);
-  --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
-  --wm-shadow-focused: 0 16px 44px rgba(15, 23, 42, 0.2);
-  --wm-titlebar-bg: rgba(15, 23, 42, 0.03);
-  --wm-text: rgba(15, 23, 42, 0.92);
-  --wm-text-dim: rgba(15, 23, 42, 0.55);
-  --wm-accent: #4f46e5;
-  --wm-blur: 18px;
-  --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  --wm-radius: 2px;
+  --wm-bg: rgba(10, 36, 74, 0.94);
+  --wm-bg-focused: rgba(12, 44, 90, 0.98);
+  --wm-border: rgba(190, 220, 255, 0.35);
+  --wm-border-focused: rgba(215, 235, 255, 0.8);
+  --wm-shadow: none;
+  --wm-shadow-focused: 0 0 0 1px rgba(215, 235, 255, 0.45);
+  --wm-titlebar-bg: rgba(190, 220, 255, 0.1);
+  --wm-text: #e8f2ff;
+  --wm-text-dim: rgba(232, 242, 255, 0.6);
+  --wm-accent: #9ecbff;
+  --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --wm-title-font: var(--wm-mono);
+  --wm-title-size: 12px;
+  --wm-title-weight: 500;
+  --wm-title-tracking: 0.12em;
+  --wm-content-font: var(--wm-mono);
+  --wm-transition: 160ms linear;
   position: relative;
   overflow: hidden;
 }
@@ -22,9 +27,7 @@
   box-sizing: border-box;
   color: var(--wm-text);
   background: var(--wm-bg);
-  -webkit-backdrop-filter: blur(var(--wm-blur)) saturate(1.2);
-  backdrop-filter: blur(var(--wm-blur)) saturate(1.2);
-  border: 1px solid var(--wm-border);
+  border: var(--wm-border-width, 1px) solid var(--wm-border);
   border-radius: var(--wm-radius);
   box-shadow: var(--wm-shadow);
   outline: none;
@@ -34,9 +37,12 @@
     width var(--wm-transition),
     height var(--wm-transition),
     box-shadow 180ms ease,
-    border-color 180ms ease,
-    opacity 180ms ease;
+    border-color 180ms ease;
   animation: wm-window-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  background-image:
+    linear-gradient(rgba(190, 220, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(190, 220, 255, 0.07) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 
 [data-wm-window][hidden] {
@@ -71,8 +77,8 @@
 [data-wm-window] [data-wm-drag] {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: var(--wm-titlebar-padding, 10px 14px);
   background: var(--wm-titlebar-bg);
   border-bottom: 1px solid var(--wm-border);
   border-radius: var(--wm-radius) var(--wm-radius) 0 0;
@@ -89,34 +95,75 @@
 
 [data-wm-window] [data-wm-title] {
   flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--wm-text);
+  font-family: var(--wm-title-font, inherit);
+  font-size: var(--wm-title-size, 13px);
+  font-weight: var(--wm-title-weight, 600);
+  letter-spacing: var(--wm-title-tracking, 0.01em);
+  color: var(--wm-text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+[data-wm-window][data-wm-focused] [data-wm-title] {
+  color: var(--wm-text);
 }
 
 [data-wm-window] [data-wm-controls] {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
 [data-wm-window] [data-wm-close],
 [data-wm-window] [data-wm-minimize],
 [data-wm-window] [data-wm-maximize] {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
   padding: 0;
   position: relative;
+  border: 1px solid var(--wm-border-focused);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--wm-text-dim);
+  font-family: var(--wm-mono, inherit);
+  font-size: 10px;
+  line-height: 1;
   cursor: pointer;
   transition:
-    filter 120ms ease,
-    transform 120ms ease;
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+[data-wm-window] [data-wm-close]::before {
+  content: "\00d7";
+}
+
+[data-wm-window] [data-wm-minimize]::before {
+  content: "\2013";
+}
+
+[data-wm-window] [data-wm-maximize]::before {
+  content: "\25a1";
+}
+
+[data-wm-window] [data-wm-close]:hover {
+  color: #ffb4a2;
+  border-color: #ffb4a2;
+}
+
+[data-wm-window] [data-wm-minimize]:hover {
+  color: #ffe08a;
+  border-color: #ffe08a;
+}
+
+[data-wm-window] [data-wm-maximize]:hover {
+  color: #9ecbff;
+  border-color: #9ecbff;
 }
 
 [data-wm-window] [data-wm-close]::after,
@@ -124,14 +171,7 @@
 [data-wm-window] [data-wm-maximize]::after {
   content: "";
   position: absolute;
-  inset: -6px;
-}
-
-[data-wm-window] [data-wm-close]:hover,
-[data-wm-window] [data-wm-minimize]:hover,
-[data-wm-window] [data-wm-maximize]:hover {
-  filter: brightness(1.1);
-  transform: scale(1.12);
+  inset: -4px;
 }
 
 [data-wm-window] [data-wm-close]:focus-visible,
@@ -141,46 +181,35 @@
   outline-offset: 2px;
 }
 
-[data-wm-window] [data-wm-close] {
-  background: #ff5f57;
-}
-
-[data-wm-window] [data-wm-minimize] {
-  background: #febc2e;
-}
-
-[data-wm-window] [data-wm-maximize] {
-  background: #28c840;
-}
-
 [data-wm-window] [data-wm-content] {
   flex: 1;
   overflow: auto;
-  padding: 14px;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 [data-wm-snap-preview] {
   background: color-mix(in srgb, var(--wm-accent) 12%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--wm-accent) 45%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--wm-accent) 55%, transparent);
   border-radius: var(--wm-radius);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
   transition:
     transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
     width 140ms ease,
     height 140ms ease;
 }
 
+[data-wm-snap-preview] {
+  border-style: dashed;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
-    scale: 0.96;
   }
   to {
     opacity: 1;
-    scale: 1;
   }
 }
 
@@ -235,6 +264,10 @@
     border-bottom: 1px solid CanvasText;
   }
 
+  [data-wm-window] [data-wm-title] {
+    color: CanvasText;
+  }
+
   [data-wm-window] [data-wm-close],
   [data-wm-window] [data-wm-minimize],
   [data-wm-window] [data-wm-maximize] {
@@ -248,6 +281,7 @@
     color: ButtonText;
     font-size: 10px;
     line-height: 1;
+    box-shadow: none;
   }
 
   [data-wm-window] [data-wm-close]::before {
@@ -259,7 +293,7 @@
   }
 
   [data-wm-window] [data-wm-maximize]::before {
-    content: "\25A1";
+    content: "\25a1";
   }
 
   [data-wm-snap-preview] {

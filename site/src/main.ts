@@ -7,11 +7,24 @@ import {
   type WindowInit,
   type WindowState,
 } from '@surdeddd/wmkit'
+import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
+import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
+import blueprintUrl from '@surdeddd/wmkit/themes/blueprint.css?url'
+import brutalistUrl from '@surdeddd/wmkit/themes/brutalist.css?url'
+import candyUrl from '@surdeddd/wmkit/themes/candy.css?url'
+import carbonUrl from '@surdeddd/wmkit/themes/carbon.css?url'
+import forestUrl from '@surdeddd/wmkit/themes/forest.css?url'
+import frostUrl from '@surdeddd/wmkit/themes/frost.css?url'
 import glassUrl from '@surdeddd/wmkit/themes/glass.css?url'
 import lightUrl from '@surdeddd/wmkit/themes/light.css?url'
+import neonUrl from '@surdeddd/wmkit/themes/neon.css?url'
+import noirUrl from '@surdeddd/wmkit/themes/noir.css?url'
+import paperUrl from '@surdeddd/wmkit/themes/paper.css?url'
 import retroUrl from '@surdeddd/wmkit/themes/retro.css?url'
+import synthUrl from '@surdeddd/wmkit/themes/synth.css?url'
+import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
 import type { AppContext, AppInstance, AppSpec, ThemeName } from './apps'
-import { apps } from './apps'
+import { apps, isThemeName } from './apps'
 import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
 import './os.css'
 import './apps.css'
@@ -20,6 +33,19 @@ const THEME_URLS: Record<ThemeName, string> = {
   glass: glassUrl,
   light: lightUrl,
   retro: retroUrl,
+  terminal: terminalUrl,
+  paper: paperUrl,
+  neon: neonUrl,
+  aqua: aquaUrl,
+  frost: frostUrl,
+  candy: candyUrl,
+  carbon: carbonUrl,
+  brutalist: brutalistUrl,
+  blueprint: blueprintUrl,
+  amber: amberUrl,
+  noir: noirUrl,
+  forest: forestUrl,
+  synth: synthUrl,
 }
 
 const WORKSPACES = 3
@@ -61,7 +87,7 @@ function resolveLang(): Lang {
 
 function resolveTheme(): ThemeName {
   const stored = localStorage.getItem('wmkit-theme')
-  return stored === 'light' || stored === 'retro' ? stored : 'glass'
+  return stored !== null && isThemeName(stored) ? stored : 'glass'
 }
 
 let lang: Lang = resolveLang()

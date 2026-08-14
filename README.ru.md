@@ -20,7 +20,7 @@
 - ⌨️ **Доступность** — move/resize/snap с клавиатуры, цикл окон по F6, focus-trap в модалках, `aria-live`-анонсы
 - ⚡ **Производительность** — позиционирование только через `transform`, rAF-батчинг ввода, structural sharing; 50 окон таскаются на 60fps
 - 💾 **Персист** — один вызов сериализует рабочий стол, один — восстанавливает, с версионированием и миграциями
-- 🎨 **Три темы** — тёмное стекло, светлое стекло и Win98-ретро, либо полностью свой CSS
+- 🎨 **Шестнадцать тем** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — либо полностью свой CSS
 - 🖼️ **Popout** *(experimental)* — вынос окна в Document Picture-in-Picture
 - 📦 **Ноль зависимостей**, строгий TypeScript, ESM + CJS, ~10.7 kB brotli
 
@@ -266,7 +266,9 @@ if (isPopoutSupported()) await popout(wm, 'docs', contentElement)
 
 Подключите `@surdeddd/wmkit/themes/glass.css` и переопределяйте CSS-переменные (`--wm-radius`, `--wm-bg`, `--wm-accent`, …) — или не подключайте ничего и стилизуйте `data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `[hidden]` сами.
 
-Ещё две готовые темы: `themes/light.css` (светлое стекло) и `themes/retro.css` (Win98-ностальгия). Все три стилизуют одни и те же `data-wm-*` атрибуты — переключение = замена одного импорта.
+Ещё пятнадцать готовых тем: `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest`, `synth`. Все стилизуют одни и те же `data-wm-*` атрибуты — переключение = замена одного импорта, и у каждой есть 24px тач-цели плюс блоки `prefers-reduced-motion` и `forced-colors`.
+
+Тема одевает все окна, вариант — одно. Задайте `meta.variant` у окна, и десктоп отзеркалит его в `data-wm-variant` для вашего CSS — подробности в [docs/theming.md](docs/theming.md).
 
 ## SSR
 

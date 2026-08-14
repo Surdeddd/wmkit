@@ -2,7 +2,30 @@ import type { SnapZone, WindowInit, WindowManager } from '@surdeddd/wmkit'
 import type { AppId, Dict } from './i18n'
 import { highlight, snippets } from './snippets'
 
-export type ThemeName = 'glass' | 'light' | 'retro'
+export const THEME_NAMES = [
+  'glass',
+  'light',
+  'retro',
+  'terminal',
+  'paper',
+  'neon',
+  'aqua',
+  'frost',
+  'candy',
+  'carbon',
+  'brutalist',
+  'blueprint',
+  'amber',
+  'noir',
+  'forest',
+  'synth',
+] as const
+
+export type ThemeName = (typeof THEME_NAMES)[number]
+
+export function isThemeName(value: string): value is ThemeName {
+  return (THEME_NAMES as readonly string[]).includes(value)
+}
 
 export interface AppContext {
   wm: WindowManager
@@ -246,7 +269,7 @@ const terminal: AppSpec = {
           return
         }
         case 'theme': {
-          if (arg !== 'glass' && arg !== 'light' && arg !== 'retro') {
+          if (!isThemeName(arg)) {
             return write(`${copy.unknown} ${arg}`, 'err')
           }
           ctx.setTheme(arg)
@@ -700,9 +723,7 @@ const settings: AppSpec = {
     const themeRow = el('div', 'setting')
     const themeLabel = el('span')
     const themeSeg = el('div', 'seg')
-    const themeButtons = (['glass', 'light', 'retro'] as ThemeName[]).map((name) =>
-      button(name, () => ctx.setTheme(name)),
-    )
+    const themeButtons = THEME_NAMES.map((name) => button(name, () => ctx.setTheme(name)))
     themeSeg.append(...themeButtons)
     themeRow.append(themeLabel, themeSeg)
     rows.push({
@@ -710,8 +731,7 @@ const settings: AppSpec = {
       label: themeLabel,
       sync() {
         themeButtons.forEach((node, index) => {
-          const name = (['glass', 'light', 'retro'] as ThemeName[])[index]
-          node.setAttribute('aria-pressed', String(ctx.theme() === name))
+          node.setAttribute('aria-pressed', String(ctx.theme() === THEME_NAMES[index]))
         })
       },
     })
@@ -780,6 +800,85 @@ const shortcuts: AppSpec = {
   },
 }
 
+const skins: AppSpec = {
+  id: 'skins',
+  init(ctx) {
+    return { title: 'skins', ...centred(ctx, 424, 470), layer: 'floating' }
+  },
+  render(body, ctx) {
+    const lead = el('p', 'app-note')
+    const themeLabel = el('h4', 'skin-head')
+    const themeGrid = el('div', 'skin-grid')
+    const variantLabel = el('h4', 'skin-head')
+    const variantList = el('div', 'skin-list')
+    const hint = el('p', 'app-note')
+    body.replaceChildren(lead, themeLabel, themeGrid, variantLabel, variantList, hint)
+
+    const themeButtons = THEME_NAMES.map((name) => {
+      const node = el('button', `skin-swatch skin-${name}`)
+      node.type = 'button'
+      node.append(el('span', 'skin-chip'), el('span', 'skin-name', name))
+      node.addEventListener('click', () => ctx.setTheme(name))
+      themeGrid.append(node)
+      return node
+    })
+
+    const variantIds = ['', 'accent', 'ghost', 'sharp'] as const
+    const variantButtons = variantIds.map((variant) => {
+      const node = el('button', 'skin-variant')
+      node.type = 'button'
+      node.append(el('span', 'skin-variant-name'), el('span', 'skin-variant-note'))
+      node.addEventListener('click', () => {
+        const focused = ctx.wm.getState().focusedId
+        if (focused !== null) ctx.wm.update(focused, { meta: { variant } })
+        sync()
+      })
+      variantList.append(node)
+      return node
+    })
+
+    function currentVariant(): string {
+      const focused = ctx.wm.getState().focusedId
+      if (focused === null) return ''
+      const value = ctx.wm.get(focused)?.meta.variant
+      return typeof value === 'string' ? value : ''
+    }
+
+    function sync(): void {
+      const active = currentVariant()
+      const focused = ctx.wm.getState().focusedId
+      for (const [index, node] of themeButtons.entries()) {
+        node.setAttribute('aria-pressed', String(ctx.theme() === THEME_NAMES[index]))
+      }
+      for (const [index, node] of variantButtons.entries()) {
+        node.setAttribute('aria-pressed', String(active === variantIds[index]))
+        node.disabled = focused === null
+      }
+    }
+
+    function relabel(): void {
+      const copy = ctx.dict().skins
+      lead.textContent = copy.lead
+      themeLabel.textContent = copy.theme
+      variantLabel.textContent = copy.variant
+      hint.textContent = copy.focus
+      const names: Array<[string, string]> = [[copy.none, ''], ...copy.variants]
+      for (const [index, node] of variantButtons.entries()) {
+        const entry = names[index]
+        const name = node.querySelector('.skin-variant-name')
+        const note = node.querySelector('.skin-variant-note')
+        if (name) name.textContent = entry?.[0] ?? ''
+        if (note) note.textContent = entry?.[1] ?? ''
+      }
+      sync()
+    }
+
+    relabel()
+    const stop = ctx.wm.subscribe(() => sync())
+    return { relabel, destroy: stop }
+  },
+}
+
 export const apps: AppSpec[] = [
   readme,
   terminal,
@@ -789,5 +888,6 @@ export const apps: AppSpec[] = [
   bench,
   paint,
   settings,
+  skins,
   shortcuts,
 ]

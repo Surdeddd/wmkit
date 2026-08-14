@@ -1,16 +1,18 @@
 [data-wm-desktop] {
-  --wm-radius: 12px;
-  --wm-bg: rgba(255, 255, 255, 0.78);
-  --wm-bg-focused: rgba(255, 255, 255, 0.94);
-  --wm-border: rgba(15, 23, 42, 0.1);
-  --wm-border-focused: rgba(15, 23, 42, 0.22);
-  --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
-  --wm-shadow-focused: 0 16px 44px rgba(15, 23, 42, 0.2);
-  --wm-titlebar-bg: rgba(15, 23, 42, 0.03);
-  --wm-text: rgba(15, 23, 42, 0.92);
-  --wm-text-dim: rgba(15, 23, 42, 0.55);
-  --wm-accent: #4f46e5;
-  --wm-blur: 18px;
+  --wm-radius: 10px;
+  --wm-bg: rgba(238, 241, 246, 0.86);
+  --wm-bg-focused: rgba(246, 248, 252, 0.96);
+  --wm-border: rgba(60, 80, 110, 0.28);
+  --wm-border-focused: rgba(40, 70, 120, 0.45);
+  --wm-shadow: 0 6px 18px rgba(20, 40, 80, 0.18);
+  --wm-shadow-focused: 0 16px 40px rgba(20, 40, 80, 0.32);
+  --wm-titlebar-bg: linear-gradient(180deg, #fdfdfe 0%, #e4eaf3 48%, #d4dced 52%, #e8edf5 100%);
+  --wm-text: #1d2733;
+  --wm-text-dim: rgba(29, 39, 51, 0.62);
+  --wm-accent: #2f6fd0;
+  --wm-blur: 14px;
+  --wm-title-size: 13px;
+  --wm-title-weight: 600;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;
   overflow: hidden;
@@ -22,9 +24,9 @@
   box-sizing: border-box;
   color: var(--wm-text);
   background: var(--wm-bg);
-  -webkit-backdrop-filter: blur(var(--wm-blur)) saturate(1.2);
-  backdrop-filter: blur(var(--wm-blur)) saturate(1.2);
-  border: 1px solid var(--wm-border);
+  -webkit-backdrop-filter: blur(var(--wm-blur)) saturate(1.1);
+  backdrop-filter: blur(var(--wm-blur)) saturate(1.1);
+  border: var(--wm-border-width, 1px) solid var(--wm-border);
   border-radius: var(--wm-radius);
   box-shadow: var(--wm-shadow);
   outline: none;
@@ -34,8 +36,7 @@
     width var(--wm-transition),
     height var(--wm-transition),
     box-shadow 180ms ease,
-    border-color 180ms ease,
-    opacity 180ms ease;
+    border-color 180ms ease;
   animation: wm-window-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -71,8 +72,8 @@
 [data-wm-window] [data-wm-drag] {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: var(--wm-titlebar-padding, 10px 14px);
   background: var(--wm-titlebar-bg);
   border-bottom: 1px solid var(--wm-border);
   border-radius: var(--wm-radius) var(--wm-radius) 0 0;
@@ -80,6 +81,7 @@
   user-select: none;
   -webkit-user-select: none;
   flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 [data-wm-window][data-wm-stage="maximized"] [data-wm-drag],
@@ -89,34 +91,63 @@
 
 [data-wm-window] [data-wm-title] {
   flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--wm-text);
+  font-family: var(--wm-title-font, inherit);
+  font-size: var(--wm-title-size, 13px);
+  font-weight: var(--wm-title-weight, 600);
+  letter-spacing: var(--wm-title-tracking, 0.01em);
+  color: var(--wm-text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-wm-window][data-wm-focused] [data-wm-title] {
+  color: var(--wm-text);
 }
 
 [data-wm-window] [data-wm-controls] {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 [data-wm-window] [data-wm-close],
 [data-wm-window] [data-wm-minimize],
 [data-wm-window] [data-wm-maximize] {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: none;
+  border: 1px solid rgba(0, 0, 0, 0.22);
   padding: 0;
   position: relative;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.18);
   transition:
-    filter 120ms ease,
-    transform 120ms ease;
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+[data-wm-window] [data-wm-close] {
+  background: linear-gradient(180deg, color-mix(in srgb, #ef5f56 70%, white), #ef5f56);
+}
+
+[data-wm-window] [data-wm-minimize] {
+  background: linear-gradient(180deg, color-mix(in srgb, #f0b12e 70%, white), #f0b12e);
+}
+
+[data-wm-window] [data-wm-maximize] {
+  background: linear-gradient(180deg, color-mix(in srgb, #4fbe45 70%, white), #4fbe45);
+}
+
+[data-wm-window] [data-wm-close]:hover,
+[data-wm-window] [data-wm-minimize]:hover,
+[data-wm-window] [data-wm-maximize]:hover {
+  filter: brightness(1.12);
+  transform: scale(1.1);
 }
 
 [data-wm-window] [data-wm-close]::after,
@@ -124,14 +155,7 @@
 [data-wm-window] [data-wm-maximize]::after {
   content: "";
   position: absolute;
-  inset: -6px;
-}
-
-[data-wm-window] [data-wm-close]:hover,
-[data-wm-window] [data-wm-minimize]:hover,
-[data-wm-window] [data-wm-maximize]:hover {
-  filter: brightness(1.1);
-  transform: scale(1.12);
+  inset: -5px;
 }
 
 [data-wm-window] [data-wm-close]:focus-visible,
@@ -141,32 +165,19 @@
   outline-offset: 2px;
 }
 
-[data-wm-window] [data-wm-close] {
-  background: #ff5f57;
-}
-
-[data-wm-window] [data-wm-minimize] {
-  background: #febc2e;
-}
-
-[data-wm-window] [data-wm-maximize] {
-  background: #28c840;
-}
-
 [data-wm-window] [data-wm-content] {
   flex: 1;
   overflow: auto;
-  padding: 14px;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 [data-wm-snap-preview] {
   background: color-mix(in srgb, var(--wm-accent) 12%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--wm-accent) 45%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--wm-accent) 55%, transparent);
   border-radius: var(--wm-radius);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
   transition:
     transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
     width 140ms ease,
@@ -235,6 +246,10 @@
     border-bottom: 1px solid CanvasText;
   }
 
+  [data-wm-window] [data-wm-title] {
+    color: CanvasText;
+  }
+
   [data-wm-window] [data-wm-close],
   [data-wm-window] [data-wm-minimize],
   [data-wm-window] [data-wm-maximize] {
@@ -248,6 +263,7 @@
     color: ButtonText;
     font-size: 10px;
     line-height: 1;
+    box-shadow: none;
   }
 
   [data-wm-window] [data-wm-close]::before {
@@ -259,7 +275,7 @@
   }
 
   [data-wm-window] [data-wm-maximize]::before {
-    content: "\25A1";
+    content: "\25a1";
   }
 
   [data-wm-snap-preview] {

@@ -9,6 +9,7 @@ export type AppId =
   | 'bench'
   | 'paint'
   | 'settings'
+  | 'skins'
   | 'shortcuts'
 
 export interface CompareCell {
@@ -47,6 +48,14 @@ export interface Dict {
     announce: string
     on: string
     off: string
+  }
+  skins: {
+    lead: string
+    theme: string
+    variant: string
+    none: string
+    focus: string
+    variants: Array<[string, string]>
   }
   shortcuts: Array<[string, string]>
   features: Array<{ title: string; text: string }>
@@ -135,6 +144,7 @@ const en: Dict = {
     bench: { title: 'bench', icon: '▲' },
     paint: { title: 'paint', icon: '✎' },
     settings: { title: 'settings', icon: '⚙' },
+    skins: { title: 'skins', icon: '◈' },
     shortcuts: { title: 'shortcuts', icon: '⌘' },
   },
   readme: {
@@ -149,7 +159,7 @@ const en: Dict = {
   },
   terminal: {
     hello: 'wmkit shell — type "help" for commands',
-    help: 'open [title] · close <id> · focus <id> · snap <zone> · tile · cascade · undo · redo · workspace <n> · theme <glass|light|retro> · state · clear',
+    help: 'open [title] · close <id> · focus <id> · snap <zone> · tile · cascade · undo · redo · workspace <n> · theme <name> · state · clear',
     unknown: 'unknown command:',
     gone: 'no such window:',
   },
@@ -180,6 +190,18 @@ const en: Dict = {
     announce: 'screen reader announcements',
     on: 'on',
     off: 'off',
+  },
+  skins: {
+    lead: 'Sixteen shipped themes dress every window. A variant dresses one: the desktop mirrors it to data-wm-variant and your CSS overrides the tokens from there.',
+    theme: 'theme',
+    variant: 'variant of the focused window',
+    none: 'plain',
+    focus: 'Focus a window to give it a variant.',
+    variants: [
+      ['accent', 'tinted titlebar and an accent border'],
+      ['ghost', 'no shadow, slightly translucent'],
+      ['sharp', 'square corners'],
+    ],
   },
   shortcuts: [
     ['drag titlebar', 'move the window'],
@@ -231,7 +253,7 @@ const en: Dict = {
     },
     {
       title: 'Themeable',
-      text: 'Three CSS themes ship with it — glass, light and retro — and every value is a custom property.',
+      text: 'Sixteen CSS themes ship with it — every value is a custom property, and a per-window variant overrides them for one window.',
     },
   ],
   frameworks: [
@@ -426,6 +448,7 @@ const ru: Dict = {
     bench: { title: 'бенчмарк', icon: '▲' },
     paint: { title: 'рисовалка', icon: '✎' },
     settings: { title: 'настройки', icon: '⚙' },
+    skins: { title: 'оформление', icon: '◈' },
     shortcuts: { title: 'клавиши', icon: '⌘' },
   },
   readme: {
@@ -440,7 +463,7 @@ const ru: Dict = {
   },
   terminal: {
     hello: 'оболочка wmkit — введите "help" для списка команд',
-    help: 'open [заголовок] · close <id> · focus <id> · snap <зона> · tile · cascade · undo · redo · workspace <n> · theme <glass|light|retro> · state · clear',
+    help: 'open [заголовок] · close <id> · focus <id> · snap <зона> · tile · cascade · undo · redo · workspace <n> · theme <name> · state · clear',
     unknown: 'неизвестная команда:',
     gone: 'нет такого окна:',
   },
@@ -471,6 +494,18 @@ const ru: Dict = {
     announce: 'объявления для скринридера',
     on: 'вкл',
     off: 'выкл',
+  },
+  skins: {
+    lead: 'Шестнадцать готовых тем одевают все окна сразу. Вариант одевает одно: десктоп зеркалит его в data-wm-variant, а дальше ваш CSS переопределяет токены.',
+    theme: 'тема',
+    variant: 'вариант активного окна',
+    none: 'обычное',
+    focus: 'Сделайте окно активным, чтобы задать вариант.',
+    variants: [
+      ['accent', 'подкрашенный заголовок и акцентная рамка'],
+      ['ghost', 'без тени, чуть прозрачное'],
+      ['sharp', 'прямые углы'],
+    ],
   },
   shortcuts: [
     ['тащить заголовок', 'двигать окно'],
@@ -522,7 +557,7 @@ const ru: Dict = {
     },
     {
       title: 'Темы',
-      text: 'В комплекте три CSS-темы — glass, light и retro — и каждое значение это custom property.',
+      text: 'В комплекте шестнадцать CSS-тем — каждое значение это custom property, а вариант окна переопределяет их для одного окна.',
     },
   ],
   frameworks: [

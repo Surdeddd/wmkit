@@ -1351,3 +1351,43 @@ describe('minimize flight', () => {
     expect(flights).toHaveLength(0)
   })
 })
+
+describe('window appearance variants', () => {
+  it('mirrors a variant from the window meta and keeps it in step', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', meta: { variant: 'terminal' } })
+    expect(root.dataset.wmVariant).toBe('terminal')
+
+    harness.wm.update('a', { meta: { variant: 'paper' } })
+    expect(root.dataset.wmVariant).toBe('paper')
+
+    harness.wm.update('a', { meta: { variant: '' } })
+    expect(root.dataset.wmVariant).toBeUndefined()
+  })
+
+  it('leaves the attribute off for a window that never asked for one', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a' })
+    expect(root.dataset.wmVariant).toBeUndefined()
+  })
+
+  it('ignores a variant that is not a name', () => {
+    const harness = makeHarness()
+    const numeric = harness.add({ id: 'a', meta: { variant: 7 } })
+    const empty = harness.add({ id: 'b', meta: { variant: '' } })
+
+    expect(numeric.root.dataset.wmVariant).toBeUndefined()
+    expect(empty.root.dataset.wmVariant).toBeUndefined()
+  })
+
+  it('lets the desktop decide the variant itself', () => {
+    const harness = makeHarness({
+      windowVariant: (win) => (win.layer === 'modal' ? 'sheet' : null),
+    })
+    const modal = harness.add({ id: 'a', layer: 'modal', meta: { variant: 'terminal' } })
+    const plain = harness.add({ id: 'b', meta: { variant: 'terminal' } })
+
+    expect(modal.root.dataset.wmVariant).toBe('sheet')
+    expect(plain.root.dataset.wmVariant).toBeUndefined()
+  })
+})

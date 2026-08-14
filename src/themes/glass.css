@@ -50,7 +50,8 @@
 }
 
 [data-wm-window][data-wm-dragging],
-[data-wm-window][data-wm-resizing] {
+[data-wm-window][data-wm-resizing],
+[data-wm-window][data-wm-pinching] {
   transition:
     box-shadow 180ms ease,
     border-color 180ms ease;

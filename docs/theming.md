@@ -1,11 +1,59 @@
 # Theming
 
-wmkit never styles anything by class name. It writes `data-wm-*` attributes and inline geometry, and a theme is just CSS that reacts to those attributes. Three themes ship with the package; replacing them with your own removes every CSS requirement the library has.
+wmkit never styles anything by class name. It writes `data-wm-*` attributes and inline geometry, and a theme is just CSS that reacts to those attributes. Sixteen themes ship with the package; replacing them with your own removes every CSS requirement the library has.
 
 ```js
-import '@surdeddd/wmkit/themes/glass.css'   // dark translucent, the default look
-import '@surdeddd/wmkit/themes/light.css'   // light translucent
-import '@surdeddd/wmkit/themes/retro.css'   // Win98 bevels, no blur
+import '@surdeddd/wmkit/themes/glass.css'  // dark translucent, the default look
+import '@surdeddd/wmkit/themes/light.css'  // light translucent
+```
+
+| File | Look |
+| --- | --- |
+| `glass.css` | dark translucent, the default |
+| `light.css` | light translucent |
+| `retro.css` | Win98 bevels, no blur |
+| `terminal.css` | monospace, phosphor green, square controls |
+| `paper.css` | warm off-white, serif titles, ink offset shadow |
+| `neon.css` | deep indigo with a magenta and cyan glow |
+| `aqua.css` | glossy pinstriped titlebar, centred title |
+| `frost.css` | pale frosted glass, heavy blur, round corners |
+| `candy.css` | pastel gradient titlebar, very round, springy |
+| `carbon.css` | flat industrial dark, square, blue focus rail |
+| `brutalist.css` | 2px black frame, hard offset shadow, caps mono |
+| `blueprint.css` | navy drafting grid, dashed snap preview |
+| `amber.css` | amber CRT with scanlines and glow |
+| `noir.css` | pure black and white hairlines |
+| `forest.css` | dark olive with serif titles |
+| `synth.css` | sunset gradient titlebar over deep purple |
+
+Every one of them ships the same contract: 24px pointer targets on the window
+controls, a `prefers-reduced-motion` block that drops the transitions, and a
+`forced-colors` block that swaps the controls for labelled glyphs.
+
+## One window at a time
+
+A theme dresses every window. When one window needs to look different, give it a
+variant: the desktop mirrors it to `data-wm-variant` and your CSS overrides the
+tokens from there.
+
+```js
+wm.open({ id: 'log', meta: { variant: 'ghost' } })
+```
+
+```css
+[data-wm-window][data-wm-variant="ghost"] {
+  --wm-shadow: none;
+  opacity: 0.88;
+}
+```
+
+By default the variant is read from `meta.variant`. Pass `windowVariant` to
+`attachDesktop` to derive it from anything else instead:
+
+```js
+attachDesktop(wm, root, {
+  windowVariant: (win) => (win.layer === 'modal' ? 'sheet' : null),
+})
 ```
 
 ## The attribute contract
@@ -36,6 +84,8 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-focused` | window | present on the focused window |
 | `data-wm-dragging` | window | present during a drag |
 | `data-wm-resizing` | window | the direction: `n`, `se`, … |
+| `data-wm-pinching` | window | present while two fingers are resizing it |
+| `data-wm-variant` | window | the variant name, when the window has one |
 | `data-wm-flash` | window | present for one animation after a blocked modal interaction |
 | `data-wm-resize` | injected handles | the direction |
 | `data-wm-snap-preview` | injected preview | present |
