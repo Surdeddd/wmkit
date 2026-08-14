@@ -306,6 +306,12 @@
       "popout": [
         "./dist/popout.d.ts"
       ],
+      "gestures": [
+        "./dist/gestures.d.ts"
+      ],
+      "devtools": [
+        "./dist/devtools.d.ts"
+      ],
       "angular": [
         "./dist/angular.d.ts"
       ]
