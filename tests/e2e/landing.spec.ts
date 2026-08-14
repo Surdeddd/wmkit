@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { boxOf, dragBy } from './utils'
+import { boxOf, dragBy, settle } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
@@ -12,6 +12,7 @@ async function launch(page: Page, app: string) {
   await page.click(`#launcher button[data-app="${app}"]`)
   const window = page.locator(`[data-testid="window-${app}"]`)
   await expect(window).toBeVisible()
+  await settle(window)
   return window
 }
 

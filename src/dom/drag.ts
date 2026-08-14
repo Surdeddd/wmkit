@@ -60,7 +60,7 @@ export function createDragStarter(ctx: SessionContext) {
       pendingX: 0,
       pendingY: 0,
       hasPending: false,
-      finish: () => {},
+      finish: (cancelled: boolean) => finish(cancelled),
     }
 
     const el = ctx.windowElement(id)
@@ -251,7 +251,6 @@ export function createDragStarter(ctx: SessionContext) {
       }
     }
 
-    session.finish = finish
     wm.beginInteraction()
     ctx.claimDrag(session)
     handle.setPointerCapture(event.pointerId)

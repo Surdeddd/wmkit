@@ -220,6 +220,92 @@ describe('popout smoke', () => {
     await expect(popout(wm, 'p', content)).rejects.toThrow(/not supported/)
     await expect(popout(wm, 'ghost', content)).rejects.toThrow(/unknown window/)
   })
+
+  it('carries the page styles across and falls back to a link for cross-origin sheets', async () => {
+    const sheet = (cssText: string | null, owner: Node | null) =>
+      ({
+        get cssRules() {
+          if (cssText === null) throw new Error('cross-origin sheet')
+          return [{ cssText }] as unknown as CSSRuleList
+        },
+        ownerNode: owner,
+      }) as unknown as CSSStyleSheet
+
+    const sourceDoc = document.implementation.createHTMLDocument('source')
+    const link = sourceDoc.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://cdn.example.com/theme.css'
+    Object.defineProperty(sourceDoc, 'styleSheets', {
+      configurable: true,
+      value: [
+        sheet('.a{color:red}', null),
+        sheet(null, link),
+        sheet(null, sourceDoc.createElement('style')),
+      ],
+    })
+    Object.defineProperty(sourceDoc, 'adoptedStyleSheets', {
+      configurable: true,
+      value: [sheet('.b{color:blue}', null)],
+    })
+
+    const pipDoc = document.implementation.createHTMLDocument('pip')
+    Object.defineProperty(window, 'documentPictureInPicture', {
+      configurable: true,
+      value: {
+        requestWindow: async () =>
+          ({ document: pipDoc, addEventListener: vi.fn(), close: vi.fn() }) as unknown as Window,
+      },
+    })
+
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'p', title: 'Popped', width: 300, height: 200 })
+    const content = sourceDoc.createElement('div')
+    sourceDoc.body.append(content)
+
+    await popout(wm, 'p', content, { minimizeWhilePopped: false })
+
+    expect([...pipDoc.head.querySelectorAll('style')].map((node) => node.textContent)).toEqual([
+      '.a{color:red}',
+      '.b{color:blue}',
+    ])
+    expect(pipDoc.head.querySelector('link')?.href).toBe('https://cdn.example.com/theme.css')
+    expect(wm.get('p')?.stage).toBe('normal')
+
+    Object.defineProperty(window, 'documentPictureInPicture', {
+      configurable: true,
+      value: undefined,
+    })
+  })
+
+  it('skips the style copy when the caller opts out', async () => {
+    const pipDoc = document.implementation.createHTMLDocument('pip')
+    const pipWindow = { document: pipDoc, addEventListener: vi.fn(), close: vi.fn() }
+    Object.defineProperty(window, 'documentPictureInPicture', {
+      configurable: true,
+      value: { requestWindow: async () => pipWindow as unknown as Window },
+    })
+    const style = document.createElement('style')
+    style.textContent = '.leak{color:red}'
+    document.head.append(style)
+
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'p', title: 'Popped', width: 300, height: 200 })
+    const content = document.createElement('div')
+    document.body.append(content)
+    wm.minimize('p')
+
+    const handle = await popout(wm, 'p', content, { copyStyles: false, width: 640, height: 480 })
+    expect(pipDoc.head.querySelectorAll('style, link')).toHaveLength(0)
+
+    handle.close()
+    expect(wm.get('p')?.stage).toBe('minimized')
+
+    style.remove()
+    Object.defineProperty(window, 'documentPictureInPicture', {
+      configurable: true,
+      value: undefined,
+    })
+  })
 })
 
 describe('removeOnClose smoke', () => {

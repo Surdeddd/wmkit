@@ -4,6 +4,7 @@ import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import { windowOf } from '../../src/dom/shared'
 
 const VIEWPORT = { width: 800, height: 600 }
 
@@ -423,6 +424,68 @@ describe('tab groups in the dom', () => {
     drag(harness, handle, [60, 20], [450, 410])
     handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
     expect(harness.wm.get('moving')?.groupId).toBeNull()
+  })
+
+  it('disarms the pending group when the pointer moves off the titlebar again', () => {
+    vi.useFakeTimers()
+    try {
+      const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 200 } })
+      harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+      const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+      document.elementsFromPoint = () => [harness.handleOf('target')]
+
+      handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
+      handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
+      harness.flushFrames()
+
+      document.elementsFromPoint = () => []
+      handle.dispatchEvent(pointerEvent('pointermove', 200, 300))
+      harness.flushFrames()
+      vi.advanceTimersByTime(1000)
+
+      expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+      handle.dispatchEvent(pointerEvent('pointerup', 200, 300))
+      expect(harness.wm.get('moving')?.groupId).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('rolls a cancelled pointer back to where the window started', () => {
+    const harness = makeHarness({ magnetism: false, snap: false })
+    const { root, handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+
+    drag(harness, handle, [150, 110], [250, 210])
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 200, y: 200 })
+
+    handle.dispatchEvent(pointerEvent('pointercancel', 250, 210))
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+    expect(root.dataset.wmDragging).toBeUndefined()
+  })
+
+  it('puts a cancelled drag back into the snap zone it was torn from', () => {
+    const harness = makeHarness({ magnetism: false, snap: false })
+    const { handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    harness.wm.snap('a', 'left')
+    const snapped = harness.wm.get('a')?.bounds
+
+    drag(harness, handle, [150, 110], [420, 260])
+    expect(harness.wm.get('a')?.stage).toBe('normal')
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(harness.wm.get('a')).toMatchObject({ stage: 'snapped', snapZone: 'left' })
+    expect(harness.wm.get('a')?.bounds).toEqual(snapped)
+  })
+
+  it('leaves the top edge inert when it is configured to do nothing', () => {
+    const harness = makeHarness({ magnetism: false, snap: { topEdge: 'none' } })
+    const { handle } = harness.add({ id: 'a', x: 100, y: 300, width: 200, height: 150 })
+
+    drag(harness, handle, [150, 310], [400, 2])
+    expect(harness.element.querySelector('[data-wm-preview]')).toBeNull()
+
+    handle.dispatchEvent(pointerEvent('pointerup', 400, 2))
+    expect(harness.wm.get('a')?.stage).toBe('normal')
   })
 
   it('does not group when the gesture is disabled', () => {
@@ -865,11 +928,426 @@ describe('desktop controller', () => {
     expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
   })
 
+  it('cancels an in-flight resize when the desktop is destroyed', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const handle = harness.resizeHandle('a', 'e')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 300, 175))
+    handle.dispatchEvent(pointerEvent('pointermove', 380, 175))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds.width).toBe(280)
+
+    harness.desktop.destroy()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100, width: 200, height: 150 })
+    expect(root.dataset.wmResizing).toBeUndefined()
+  })
+
   it('refuses to attach an unknown or already attached window', () => {
     const harness = makeHarness()
     harness.add({ id: 'a' })
     const stray = document.createElement('section')
     expect(() => harness.desktop.attachWindow('ghost', stray)).toThrow(/unknown window/)
     expect(() => harness.desktop.attachWindow('a', stray)).toThrow(/already attached/)
+  })
+})
+
+function keydown(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init })
+  target.dispatchEvent(event)
+  return event
+}
+
+describe('window keyboard', () => {
+  it('moves the window one step per arrow and one pixel with alt', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+
+    expect(keydown(root, 'ArrowRight').defaultPrevented).toBe(true)
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 116, y: 100 })
+
+    keydown(root, 'ArrowUp', { altKey: true })
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 116, y: 99 })
+  })
+
+  it('resizes with shift and refuses on a window that cannot resize', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+
+    keydown(root, 'ArrowRight', { shiftKey: true })
+    keydown(root, 'ArrowDown', { shiftKey: true })
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ width: 216, height: 166 })
+
+    const fixed = harness.add({ id: 'b', x: 0, y: 0, width: 200, height: 150, resizable: false })
+    expect(keydown(fixed.root, 'ArrowRight', { shiftKey: true }).defaultPrevented).toBe(false)
+    expect(harness.wm.get('b')?.bounds).toMatchObject({ width: 200, height: 150 })
+  })
+
+  it('leaves arrows alone for shortcuts, form fields, unknown keys and locked windows', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const field = document.createElement('input')
+    root.append(field)
+
+    keydown(root, 'ArrowRight', { ctrlKey: true })
+    keydown(root, 'ArrowRight', { metaKey: true })
+    keydown(field, 'ArrowRight')
+    keydown(root, 'Home')
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+
+    harness.wm.maximize('a')
+    const before = harness.wm.get('a')?.bounds
+    expect(keydown(root, 'ArrowRight').defaultPrevented).toBe(false)
+    expect(harness.wm.get('a')?.bounds).toEqual(before)
+  })
+
+  it('ignores arrows entirely when keyboard support is switched off', () => {
+    const harness = makeHarness({ keyboard: false })
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+
+    keydown(root, 'ArrowRight')
+    keydown(root, 'ArrowDown', { shiftKey: true })
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100, width: 200, height: 150 })
+  })
+
+  it('drops the listener once the window is detached', () => {
+    const harness = makeHarness()
+    const { root, detach } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+
+    detach()
+    keydown(root, 'ArrowRight')
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100 })
+  })
+})
+
+describe('modal focus trap', () => {
+  function makeModal(): { harness: Harness; root: HTMLElement; buttons: HTMLButtonElement[] } {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'm', layer: 'modal', width: 200, height: 150 })
+    const buttons = ['first', 'second'].map((name) => {
+      const button = document.createElement('button')
+      button.textContent = name
+      Object.defineProperty(button, 'offsetParent', { configurable: true, value: root })
+      root.append(button)
+      return button
+    })
+    return { harness, root, buttons }
+  }
+
+  it('wraps forwards and backwards between the first and last control', () => {
+    const { root, buttons } = makeModal()
+    const [first, last] = buttons as [HTMLButtonElement, HTMLButtonElement]
+
+    last.focus()
+    expect(keydown(root, 'Tab').defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(first)
+
+    expect(keydown(root, 'Tab', { shiftKey: true }).defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(last)
+  })
+
+  it('lets a tab in the middle of the window through untouched', () => {
+    const { root, buttons } = makeModal()
+    const middle = document.createElement('button')
+    Object.defineProperty(middle, 'offsetParent', { configurable: true, value: root })
+    root.insertBefore(middle, buttons[1] as HTMLButtonElement)
+
+    middle.focus()
+    expect(keydown(root, 'Tab').defaultPrevented).toBe(false)
+    expect(document.activeElement).toBe(middle)
+  })
+
+  it('pulls focus back in when it has escaped the modal', () => {
+    const { root, buttons } = makeModal()
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    const [first, last] = buttons as [HTMLButtonElement, HTMLButtonElement]
+
+    outside.focus()
+    expect(keydown(root, 'Tab').defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(first)
+
+    outside.focus()
+    keydown(root, 'Tab', { shiftKey: true })
+    expect(document.activeElement).toBe(last)
+  })
+
+  it('stays out of the way for other keys, empty modals and ordinary windows', () => {
+    const { harness, root } = makeModal()
+    expect(keydown(root, 'Enter').defaultPrevented).toBe(false)
+
+    const empty = harness.add({ id: 'e', layer: 'modal', width: 100, height: 100 })
+    expect(keydown(empty.root, 'Tab').defaultPrevented).toBe(false)
+
+    const plain = harness.add({ id: 'p', width: 100, height: 100 })
+    const button = document.createElement('button')
+    Object.defineProperty(button, 'offsetParent', { configurable: true, value: plain.root })
+    plain.root.append(button)
+    button.focus()
+    expect(keydown(plain.root, 'Tab').defaultPrevented).toBe(false)
+  })
+})
+
+describe('remaining session edges', () => {
+  it('keeps a north corner inside the desktop while an aspect ratio widens it', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200, aspectRatio: 1 })
+    const handle = harness.resizeHandle('a', 'nw')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 100, 100))
+    handle.dispatchEvent(pointerEvent('pointermove', -300, 100))
+    harness.flushFrames()
+
+    const bounds = harness.wm.get('a')?.bounds
+    expect(bounds?.y).toBe(0)
+    expect(bounds?.height).toBe(300)
+    expect(bounds?.width).toBe(300)
+  })
+
+  it('rolls a resize back when the pointer is cancelled mid-gesture', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const handle = harness.resizeHandle('a', 'e')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 300, 175))
+    handle.dispatchEvent(pointerEvent('pointermove', 380, 175))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds.width).toBe(280)
+
+    handle.dispatchEvent(pointerEvent('pointercancel', 380, 175))
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100, width: 200, height: 150 })
+    expect(root.dataset.wmResizing).toBeUndefined()
+  })
+
+  it('refuses to work against an element that has no window', () => {
+    const detached = document.implementation.createHTMLDocument('x')
+    expect(() => windowOf(detached.createElement('div'))).toThrow(/not attached to a document/)
+    expect(windowOf(document.createElement('div'))).toBe(window)
+  })
+
+  it('gives a statically positioned desktop a containing block of its own', () => {
+    const element = document.createElement('div')
+    element.style.position = 'static'
+    document.body.append(element)
+    const wm = createWindowManager({ viewport: VIEWPORT })
+
+    attachDesktop(wm, element, { autoViewport: false, announce: false })
+    expect(element.style.position).toBe('relative')
+    expect(element.style.isolation).toBe('isolate')
+  })
+
+  it('follows the desktop size when the viewport is tracked automatically', () => {
+    const observed: Element[] = []
+    let notify: (() => void) | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback
+        }
+        observe(target: Element) {
+          observed.push(target)
+        }
+        disconnect() {
+          observed.length = 0
+        }
+      },
+    )
+
+    const element = document.createElement('div')
+    document.body.append(element)
+    Object.defineProperty(element, 'clientWidth', { configurable: true, value: 640 })
+    Object.defineProperty(element, 'clientHeight', { configurable: true, value: 480 })
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const desktop = attachDesktop(wm, element, { announce: false })
+
+    expect(wm.getState().viewport).toEqual({ width: 640, height: 480 })
+    expect(observed).toEqual([element])
+
+    Object.defineProperty(element, 'clientWidth', { configurable: true, value: 320 })
+    notify?.()
+    expect(wm.getState().viewport).toEqual({ width: 320, height: 480 })
+
+    desktop.destroy()
+    expect(observed).toHaveLength(0)
+  })
+
+  it('mounts a live region unless announcements are switched off', () => {
+    const element = document.createElement('div')
+    document.body.append(element)
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const desktop = attachDesktop(wm, element, {
+      autoViewport: false,
+      announce: { opened: (title: string) => `${title} готово` },
+    })
+
+    wm.open({ id: 'a', title: 'Заметки' })
+    const region = element.querySelector<HTMLElement>('[data-wm-announcer]')
+    expect(region?.textContent).toBe('Заметки готово')
+
+    desktop.destroy()
+    expect(element.querySelector('[data-wm-announcer]')).toBeNull()
+  })
+
+  it('flashes the window a blocked click landed on', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'm', layer: 'modal', width: 200, height: 150 })
+    const other = harness.add({ id: 'a', width: 200, height: 150 })
+
+    harness.wm.focus('a')
+    expect(root.dataset.wmFlash).toBe('')
+    expect(other.root.dataset.wmFlash).toBeUndefined()
+  })
+
+  it('takes an explicit drag handle selector and labels the window by its title', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Notes', x: 0, y: 0, width: 200, height: 150 })
+    const root = document.createElement('section')
+    root.innerHTML = '<div class="bar"><span data-wm-title>Notes</span></div>'
+    harness.element.append(root)
+    harness.desktop.attachWindow('a', root, { handle: '.bar' })
+
+    const bar = root.querySelector<HTMLElement>('.bar') as HTMLElement
+    bar.dispatchEvent(pointerEvent('pointerdown', 50, 10))
+    bar.dispatchEvent(pointerEvent('pointermove', 150, 110))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+    expect(root.getAttribute('aria-labelledby')).toBe('wmkit-title-a')
+  })
+
+  it('maximizes on a double click that misses the window controls', () => {
+    const harness = makeHarness()
+    const { root, handle } = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    const button = document.createElement('button')
+    handle.append(button)
+
+    button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    expect(harness.wm.get('a')?.stage).toBe('normal')
+
+    handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    expect(harness.wm.get('a')?.stage).toBe('maximized')
+    expect(root.dataset.wmStage).toBe('maximized')
+  })
+})
+
+describe('desktop keyboard', () => {
+  it('cycles focus with F6 in both directions', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a', width: 200, height: 150 })
+    harness.add({ id: 'b', width: 200, height: 150 })
+    harness.add({ id: 'c', width: 200, height: 150 })
+
+    keydown(harness.element, 'F6')
+    const forward = harness.wm.getState().focusedId
+    keydown(harness.element, 'F6', { shiftKey: true })
+    expect(harness.wm.getState().focusedId).not.toBe(forward)
+  })
+
+  it('snaps, maximizes, minimizes and restores the focused window', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    const combo = { ctrlKey: true, altKey: true }
+
+    keydown(harness.element, 'ArrowLeft', combo)
+    expect(harness.wm.get('a')?.snapZone).toBe('left')
+
+    keydown(harness.element, 'ArrowUp', combo)
+    expect(harness.wm.get('a')?.stage).toBe('maximized')
+
+    keydown(harness.element, 'ArrowDown', combo)
+    expect(harness.wm.get('a')?.stage).toBe('normal')
+
+    keydown(harness.element, 'ArrowDown', combo)
+    expect(harness.wm.get('a')?.stage).toBe('minimized')
+  })
+
+  it('leaves the shortcuts alone without alt, without focus or when switched off', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+
+    keydown(harness.element, 'ArrowLeft', { ctrlKey: true })
+    keydown(harness.element, 'Home', { ctrlKey: true, altKey: true })
+    expect(harness.wm.get('a')?.snapZone).toBeNull()
+
+    harness.wm.close('a')
+    keydown(harness.element, 'ArrowLeft', { metaKey: true, altKey: true })
+
+    const locked = makeHarness({ keyboard: { snapShortcuts: false } })
+    locked.add({ id: 'b', x: 10, y: 10, width: 200, height: 150 })
+    keydown(locked.element, 'ArrowLeft', { ctrlKey: true, altKey: true })
+    expect(locked.wm.get('b')?.snapZone).toBeNull()
+  })
+
+  it('refuses to move a window that has opted out of the stage change', () => {
+    const harness = makeHarness()
+    harness.add({
+      id: 'a',
+      x: 10,
+      y: 10,
+      width: 200,
+      height: 150,
+      snappable: false,
+      maximizable: false,
+      minimizable: false,
+    })
+    const combo = { ctrlKey: true, altKey: true }
+
+    keydown(harness.element, 'ArrowLeft', combo)
+    keydown(harness.element, 'ArrowUp', combo)
+    keydown(harness.element, 'ArrowDown', combo)
+    expect(harness.wm.get('a')).toMatchObject({ stage: 'normal', snapZone: null })
+  })
+})
+
+describe('minimize flight', () => {
+  const realAnimate = Element.prototype.animate
+
+  afterEach(() => {
+    Element.prototype.animate = realAnimate
+  })
+
+  it('flies the window to its taskbar slot and back', () => {
+    const flights: KeyframeAnimationOptions[] = []
+    Element.prototype.animate = function fake(_keyframes: unknown, options: unknown) {
+      flights.push(options as KeyframeAnimationOptions)
+      return { onfinish: null, oncancel: null } as unknown as Animation
+    } as typeof Element.prototype.animate
+
+    const slot = document.createElement('button')
+    slot.getBoundingClientRect = () => ({ left: 10, top: 560, width: 40, height: 20 }) as DOMRect
+    document.body.append(slot)
+
+    const harness = makeHarness({ minimizeTarget: () => slot, animation: { duration: 120 } })
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    root.getBoundingClientRect = () => ({ left: 100, top: 100, width: 200, height: 150 }) as DOMRect
+
+    harness.wm.minimize('a')
+    expect(flights).toHaveLength(1)
+    expect(flights[0]).toMatchObject({ duration: 120 })
+
+    harness.wm.restore('a')
+    expect(flights).toHaveLength(1)
+    harness.flushFrames()
+    expect(flights).toHaveLength(2)
+  })
+
+  it('stays still when there is no slot to fly to or animation is off', () => {
+    const flights: unknown[] = []
+    Element.prototype.animate = function fake() {
+      flights.push(1)
+      return { onfinish: null, oncancel: null } as unknown as Animation
+    } as typeof Element.prototype.animate
+
+    const silent = makeHarness({ minimizeTarget: () => null })
+    silent.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    silent.wm.minimize('a')
+    silent.wm.restore('a')
+    silent.flushFrames()
+
+    const still = makeHarness({ animation: false, minimizeTarget: () => document.body })
+    still.add({ id: 'b', x: 100, y: 100, width: 200, height: 150 })
+    still.wm.minimize('b')
+
+    expect(flights).toHaveLength(0)
   })
 })

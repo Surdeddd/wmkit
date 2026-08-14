@@ -96,6 +96,26 @@ describe('announcer', () => {
     wm.open({ id: 'a', title: 'Notes' })
     expect(announcer.element.textContent).toBe('')
   })
+
+  it('drops a pending clear when it is destroyed mid-message', () => {
+    const { wm, announcer } = makeAnnouncer()
+    wm.open({ id: 'a', title: 'Notes' })
+    expect(announcer.element.textContent).toBe('Notes window opened')
+
+    announcer.destroy()
+    vi.runAllTimers()
+    expect(announcer.element.textContent).toBe('Notes window opened')
+  })
+
+  it('says nothing when a window is placed where it already was', () => {
+    const { wm, announcer } = makeAnnouncer()
+    wm.open({ id: 'a', title: 'Notes', x: 10, y: 10, width: 200, height: 150 })
+    wm.focus('a')
+    announcer.announce('')
+
+    wm.restoreTo('a', { x: 40, y: 40, width: 200, height: 150 })
+    expect(announcer.element.textContent).toBe('')
+  })
 })
 
 describe('flip animations', () => {
@@ -164,11 +184,61 @@ describe('flip animations', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const reduced = setup()
     flipToTarget(reduced.source, reduced.target)
+    flipFromTarget(reduced.source, reduced.target)
     expect(reduced.animate).not.toHaveBeenCalled()
 
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
     const collapsed = setup(0)
     flipToTarget(collapsed.source, collapsed.target)
+    flipFromTarget(collapsed.source, collapsed.target)
     expect(collapsed.animate).not.toHaveBeenCalled()
+  })
+
+  it('falls back to no motion where the browser has no web animations', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target } = setup()
+    Object.defineProperty(source, 'animate', { value: undefined, configurable: true })
+    Object.defineProperty(HTMLDivElement.prototype, 'animate', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    })
+
+    flipToTarget(source, target)
+    flipFromTarget(source, target)
+    expect(document.body.children).toHaveLength(2)
+  })
+
+  it('leaves an element that belongs to no window alone', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { target } = setup()
+    const orphan = document.implementation.createHTMLDocument('x').createElement('div')
+
+    flipToTarget(orphan, target)
+    flipFromTarget(orphan, target)
+    expect(document.body.children).toHaveLength(2)
+  })
+
+  it('runs the reverse ghost with the default duration and easing', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target, animate, anim } = setup()
+    flipFromTarget(source, target)
+
+    const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
+    expect(call[1]).toMatchObject({ duration: 260, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' })
+
+    const ghost = document.body.lastElementChild as HTMLElement
+    anim.onfinish?.()
+    expect(ghost.isConnected).toBe(false)
+  })
+
+  it('clears the outbound ghost when its animation is interrupted', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target, anim } = setup()
+    flipToTarget(source, target)
+
+    const ghost = document.body.lastElementChild as HTMLElement
+    anim.oncancel?.()
+    expect(ghost.isConnected).toBe(false)
   })
 })
