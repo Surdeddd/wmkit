@@ -87,7 +87,7 @@ export function attachDesktop(
   const registry = new Map<string, AttachedWindow>()
   const cleanup: Array<() => void> = []
   let lastOrder: readonly string[] | null = null
-  let lastFocused: string | null = null
+  let focusedEl: HTMLElement | null = null
   let drag: ActiveDrag | null = null
   let groupTargetId: string | null = null
   let groupTargetEl: HTMLElement | null = null
@@ -301,16 +301,11 @@ export function attachDesktop(
       }
     }
     if (orderChanged) applyStacking(state.order)
-    if (state.focusedId !== lastFocused) {
-      if (lastFocused) {
-        const prev = registry.get(lastFocused)
-        if (prev) delete prev.element.dataset.wmFocused
-      }
-      if (state.focusedId) {
-        const next = registry.get(state.focusedId)
-        if (next) next.element.dataset.wmFocused = ''
-      }
-      lastFocused = state.focusedId
+    const wanted = state.focusedId ? (registry.get(state.focusedId)?.element ?? null) : null
+    if (wanted !== focusedEl) {
+      if (focusedEl) delete focusedEl.dataset.wmFocused
+      focusedEl = wanted
+      if (focusedEl) focusedEl.dataset.wmFocused = ''
     }
     lastOrder = state.order
   }
@@ -567,25 +562,33 @@ export function attachDesktop(
     windowElement.addEventListener('keydown', onModalTrap)
     attached.cleanup.push(() => windowElement.removeEventListener('keydown', onModalTrap))
 
+    let detached = false
     const detach = () => {
+      if (detached) return
+      detached = true
       if (drag?.id === id) endDrag(true)
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)
+      if (registry.get(id)?.element !== windowElement) delete windowElement.dataset.wmWindow
+      delete windowElement.dataset.wmFocused
+      delete windowElement.dataset.wmTabTarget
+      if (focusedEl === windowElement) focusedEl = null
+      if (groupTargetEl === windowElement) {
+        groupTargetId = null
+        groupTargetEl = null
+      }
     }
 
-    if (windowOptions.removeOnClose) {
-      const stopOnClose = wm.on('close', ({ window: closed }) => {
-        if (closed.id !== id) return
-        detach()
-        windowElement.remove()
-      })
-      attached.cleanup.push(stopOnClose)
-    }
+    const stopOnClose = wm.on('close', ({ window: closed }) => {
+      if (closed.id !== id) return
+      detach()
+      if (windowOptions.removeOnClose) windowElement.remove()
+    })
+    attached.cleanup.push(stopOnClose)
 
     registry.set(id, attached)
     lastOrder = null
-    lastFocused = null
     syncAll()
     if (wm.getState().focusedId === id && !windowElement.contains(doc.activeElement)) {
       windowElement.focus({ preventScroll: true })

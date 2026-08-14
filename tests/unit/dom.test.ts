@@ -96,9 +96,12 @@ function drag(harness: Harness, handle: HTMLElement, from: [number, number], to:
   harness.flushFrames()
 }
 
+const realElementsFromPoint = document.elementsFromPoint
+
 afterEach(() => {
   frames.length = 0
   vi.unstubAllGlobals()
+  document.elementsFromPoint = realElementsFromPoint
   document.body.replaceChildren()
 })
 
@@ -613,6 +616,118 @@ describe('configuration surface', () => {
     } finally {
       Element.prototype.animate = original
     }
+  })
+})
+
+describe('focus marker', () => {
+  const marked = (harness: Harness) =>
+    [...harness.element.querySelectorAll<HTMLElement>('[data-wm-focused]')].map(
+      (node) => node.dataset.wmWindow,
+    )
+
+  it('marks exactly one window when another is attached', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a' })
+    expect(marked(harness)).toEqual(['a'])
+
+    harness.add({ id: 'b' })
+    expect(marked(harness)).toEqual(['b'])
+
+    harness.wm.focus('a')
+    expect(marked(harness)).toEqual(['a'])
+  })
+
+  it('marks one window when the app attaches from the open event', () => {
+    const harness = makeHarness()
+    harness.wm.on('open', ({ window: win }) => {
+      if (harness.element.querySelector(`[data-wm-window="${win.id}"]`)) return
+      const root = document.createElement('section')
+      root.innerHTML = '<header data-wm-drag><span data-wm-title>t</span></header>'
+      harness.element.append(root)
+      harness.desktop.attachWindow(win.id, root)
+    })
+
+    harness.wm.open({ id: 'a' })
+    harness.wm.open({ id: 'b' })
+    expect(marked(harness)).toEqual(['b'])
+  })
+
+  it('moves the mark when the same window is re-attached to a new element', () => {
+    const harness = makeHarness()
+    const first = harness.add({ id: 'a' })
+    first.detach()
+
+    const replacement = document.createElement('section')
+    replacement.innerHTML = '<header data-wm-drag><span data-wm-title>t</span></header>'
+    harness.element.append(replacement)
+    harness.desktop.attachWindow('a', replacement)
+
+    expect(first.root.dataset.wmFocused).toBeUndefined()
+    expect(replacement.dataset.wmFocused).toBe('')
+  })
+
+  it('drops the mark when the focused window is closed', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a' })
+    harness.add({ id: 'b' })
+
+    harness.wm.close('b')
+    expect(marked(harness)).toEqual(['a'])
+  })
+})
+
+describe('attachment lifecycle', () => {
+  it('lets go of a window that the manager closed', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a' })
+    harness.add({ id: 'b' })
+    expect(root.dataset.wmWindow).toBe('a')
+
+    harness.wm.close('a')
+    expect(root.dataset.wmWindow).toBeUndefined()
+    expect(root.dataset.wmFocused).toBeUndefined()
+    expect(root.querySelector('[data-wm-resize]')).toBeNull()
+    expect(harness.element.querySelectorAll('[data-wm-window]')).toHaveLength(1)
+  })
+
+  it('leaves the element in the page unless it was asked to remove it', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a' })
+
+    harness.wm.close('a')
+    expect(root.isConnected).toBe(true)
+  })
+
+  it('survives a detach after the window is already gone', () => {
+    const harness = makeHarness()
+    const { detach } = harness.add({ id: 'a' })
+
+    harness.wm.close('a')
+    expect(() => detach()).not.toThrow()
+  })
+
+  it('does not let a stale detach unhook the element it was handed on to', () => {
+    const harness = makeHarness()
+    const { root, detach } = harness.add({ id: 'a' })
+
+    harness.wm.close('a')
+    harness.wm.open({ id: 'b' })
+    harness.desktop.attachWindow('b', root)
+    expect(root.dataset.wmWindow).toBe('b')
+
+    detach()
+    expect(root.dataset.wmWindow).toBe('b')
+    expect(harness.wm.get('b')).toBeDefined()
+  })
+
+  it('lets go of a window that history removed', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a' })
+    const { root } = harness.add({ id: 'b' })
+
+    expect(harness.wm.undo()).toBe(true)
+    expect(harness.wm.get('b')).toBeUndefined()
+    expect(root.dataset.wmWindow).toBeUndefined()
   })
 })
 

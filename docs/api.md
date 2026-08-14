@@ -310,6 +310,8 @@ interface ManagerEvents {
 
 Ordering inside one transaction: the specific events fire in the order they happened, then `change` last. Payload objects are the post-change state.
 
+`open` and `close` cover every way a window appears or disappears, not just the calls named after them: `hydrate`, `loadLayout`, `undo` and `redo` all report the difference they made, so mounting your content on `open` and disposing it on `close` stays correct across history. It is safe to call `attachWindow` straight from an `open` handler.
+
 ## `attachDesktop(wm, element, options?)`
 
 Binds the manager to a DOM subtree and returns a `DesktopController`. The element becomes the coordinate space; it gets `data-wm-desktop`, `tabindex="-1"` and `position: relative` when it was `static`.
@@ -363,6 +365,8 @@ interface WindowAttachOptions {
 ```
 
 `attachWindow` throws for an unknown id or an id that is already attached. It returns a detach function; `destroy()` detaches everything, cancels an in-flight gesture and removes the snap preview.
+
+A window that the manager closes — including one that `undo` takes away — is detached for you: its listeners and resize handles go, and the element loses `data-wm-window` so nothing mistakes it for a live window afterwards. The element itself stays in the page unless you passed `removeOnClose`, and the detach function you were handed is safe to call again at any point, including after you have attached that same element to a different window.
 
 ### What the controller writes
 

@@ -1908,6 +1908,28 @@ describe('state sharing', () => {
     expect(wm.get('b')?.bounds.x).toBe(originB)
   })
 
+  it('announces windows that history adds and removes', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    const opened: string[] = []
+    const closed: string[] = []
+    wm.on('open', ({ window: win }) => opened.push(win.id))
+    wm.on('close', ({ window: win }) => closed.push(win.id))
+
+    wm.open({ id: 'b' })
+    expect(opened).toEqual(['b'])
+
+    expect(wm.undo()).toBe(true)
+    expect(closed).toEqual(['b'])
+    expect(wm.redo()).toBe(true)
+    expect(opened).toEqual(['b', 'b'])
+
+    wm.close('a')
+    expect(closed).toEqual(['b', 'a'])
+    expect(wm.undo()).toBe(true)
+    expect(opened).toEqual(['b', 'b', 'a'])
+  })
+
   it('undoes back to an empty desktop', () => {
     const wm = makeWm()
     wm.open({ id: 'a' })

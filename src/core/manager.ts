@@ -1001,6 +1001,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function applyEntry(entry: HistoryEntry): void {
+    const previousWindows = windows
     windows = entry.windows
     order = [...entry.order]
     modalCount = countModals()
@@ -1011,6 +1012,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     workspace = entry.workspace
     if (workspace !== previousWorkspace) {
       queueEvent(() => emitter.emit('workspace', { workspace, previous: previousWorkspace }))
+    }
+    for (const id of Object.keys(previousWindows)) {
+      if (windows[id]) continue
+      const closed = previousWindows[id] as WindowState
+      queueEvent(() => emitter.emit('close', { window: closed }))
+    }
+    for (const id of order) {
+      if (previousWindows[id]) continue
+      const opened = windows[id] as WindowState
+      queueEvent(() => emitter.emit('open', { window: opened }))
     }
     reflowViewport()
     commit()
