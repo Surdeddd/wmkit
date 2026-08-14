@@ -35,18 +35,25 @@ test.describe('the landing tells the truth', () => {
     await page.goto('?lang=en')
     const window_ = page.locator(readme)
     await expect(window_).toBeVisible()
-    await page.evaluate(() => window.__wmDemo.wm.clearHistory())
 
-    const handle = window_.locator('[data-wm-drag]')
-    const box = await handle.boundingBox()
-    await page.mouse.move((box?.x ?? 0) + 40, (box?.y ?? 0) + 10)
+    const box = await window_.locator('[data-wm-drag]').boundingBox()
+    const start = { x: (box?.x ?? 0) + (box?.width ?? 0) / 2, y: (box?.y ?? 0) + 10 }
+    await page.evaluate(() => window.__wmDemo.wm.focus('readme'))
+    await page.evaluate(() => window.__wmDemo.wm.clearHistory())
+    const before = await page.evaluate(() => window.__wmDemo.wm.get('readme')?.bounds.x)
+
+    await page.mouse.move(start.x, start.y)
     await page.mouse.down()
     for (let step = 1; step <= 8; step += 1) {
-      await page.mouse.move((box?.x ?? 0) + 40 + step * 12, (box?.y ?? 0) + 10 + step * 6)
+      await page.mouse.move(start.x - step * 6, start.y + step * 6)
     }
     await page.mouse.up()
 
+    const moved = await page.evaluate(() => window.__wmDemo.wm.get('readme')?.bounds.x)
+    expect(moved, 'the drag never moved the window').not.toBe(before)
+
     expect(await page.evaluate(() => window.__wmDemo.wm.undo())).toBe(true)
+    expect(await page.evaluate(() => window.__wmDemo.wm.get('readme')?.bounds.x)).toBe(before)
     expect(await page.evaluate(() => window.__wmDemo.wm.canUndo())).toBe(false)
   })
 
