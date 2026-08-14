@@ -10,6 +10,7 @@ export type AppId =
   | 'paint'
   | 'settings'
   | 'skins'
+  | 'devtools'
   | 'shortcuts'
 
 export interface CompareCell {
@@ -24,6 +25,7 @@ export interface MenuCopy {
 }
 
 export interface Dict {
+  lang: Lang
   meta: { title: string; description: string }
   ui: Record<string, string>
   menus: MenuCopy[]
@@ -49,6 +51,7 @@ export interface Dict {
     on: string
     off: string
   }
+  devtools: { lead: string }
   skins: {
     lead: string
     theme: string
@@ -65,6 +68,7 @@ export interface Dict {
 }
 
 const en: Dict = {
+  lang: 'en',
   meta: {
     title: 'wmkit — headless window manager for the web',
     description:
@@ -145,6 +149,7 @@ const en: Dict = {
     paint: { title: 'paint', icon: '✎' },
     settings: { title: 'settings', icon: '⚙' },
     skins: { title: 'skins', icon: '◈' },
+    devtools: { title: 'devtools', icon: '⌥' },
     shortcuts: { title: 'shortcuts', icon: '⌘' },
   },
   readme: {
@@ -190,6 +195,9 @@ const en: Dict = {
     announce: 'screen reader announcements',
     on: 'on',
     off: 'off',
+  },
+  devtools: {
+    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.6 kB entry point you can drop into your own app. It follows the manager, not this page.',
   },
   skins: {
     lead: 'Sixteen shipped themes dress every window. A variant dresses one: the desktop mirrors it to data-wm-variant and your CSS overrides the tokens from there.',
@@ -369,6 +377,7 @@ const en: Dict = {
 }
 
 const ru: Dict = {
+  lang: 'ru',
   meta: {
     title: 'wmkit — headless-оконный менеджер для веба',
     description:
@@ -449,6 +458,7 @@ const ru: Dict = {
     paint: { title: 'рисовалка', icon: '✎' },
     settings: { title: 'настройки', icon: '⚙' },
     skins: { title: 'оформление', icon: '◈' },
+    devtools: { title: 'девтулы', icon: '⌥' },
     shortcuts: { title: 'клавиши', icon: '⌘' },
   },
   readme: {
@@ -494,6 +504,9 @@ const ru: Dict = {
     announce: 'объявления для скринридера',
     on: 'вкл',
     off: 'выкл',
+  },
+  devtools: {
+    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.6 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
   },
   skins: {
     lead: 'Шестнадцать готовых тем одевают все окна сразу. Вариант одевает одно: десктоп зеркалит его в data-wm-variant, а дальше ваш CSS переопределяет токены.',

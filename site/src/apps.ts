@@ -1,4 +1,9 @@
 import type { SnapZone, WindowInit, WindowManager } from '@surdeddd/wmkit'
+import {
+  createDevtools,
+  type DevtoolsController,
+  devtoolsMessagesRu,
+} from '@surdeddd/wmkit/devtools'
 import type { AppId, Dict } from './i18n'
 import { highlight, snippets } from './snippets'
 
@@ -879,6 +884,40 @@ const skins: AppSpec = {
   },
 }
 
+const devtools: AppSpec = {
+  id: 'devtools',
+  init(ctx) {
+    return { title: 'devtools', ...centred(ctx, 400, 452), layer: 'floating' }
+  },
+  render(body, ctx) {
+    const lead = el('p', 'app-note')
+    const host = el('div', 'devtools-host')
+    body.replaceChildren(lead, host)
+
+    let panel: DevtoolsController | null = null
+    const mount = () => {
+      panel?.destroy()
+      panel = createDevtools(ctx.wm, {
+        container: host,
+        messages: ctx.dict().lang === 'ru' ? devtoolsMessagesRu : undefined,
+      })
+    }
+
+    const relabel = () => {
+      lead.textContent = ctx.dict().devtools.lead
+      mount()
+    }
+
+    relabel()
+    return {
+      relabel,
+      destroy() {
+        panel?.destroy()
+      },
+    }
+  },
+}
+
 export const apps: AppSpec[] = [
   readme,
   terminal,
@@ -889,5 +928,6 @@ export const apps: AppSpec[] = [
   paint,
   settings,
   skins,
+  devtools,
   shortcuts,
 ]

@@ -11,6 +11,7 @@ export default defineConfig({
     angular: 'src/adapters/angular.ts',
     persist: 'src/plugins/persist.ts',
     popout: 'src/plugins/popout.ts',
+    devtools: 'src/plugins/devtools/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

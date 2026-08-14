@@ -262,6 +262,26 @@ if (isPopoutSupported()) await popout(wm, 'docs', contentElement)
 
 Окно уезжает в настоящее always-on-top окно ОС (Document Picture-in-Picture) с тем же JS-контекстом и состоянием.
 
+### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
+
+Панель, которую подключают по желанию: живая таблица окон, журнал событий и управление менеджером — чтобы видеть, что делает машина состояний, без отладчика. Она следит за менеджером, а не за DOM, поэтому работает с любым адаптером и без него.
+
+```js
+import { createDevtools, devtoolsMessagesRu } from '@surdeddd/wmkit/devtools'
+
+const panel = createDevtools(wm, { messages: devtoolsMessagesRu })
+panel.destroy()
+```
+
+| Опция | По умолчанию | Значение |
+| --- | --- | --- |
+| `container` | `document.body` | куда монтируется панель |
+| `messages` | английский каталог | `devtoolsMessagesRu` для русского или свои строки |
+| `logLimit` | `50` | размер кольцевого буфера журнала |
+| `events` | open, close, focus, stage, workspace, group, modalblocked | какие события менеджера писать |
+
+Строки обновляются точечно, а не перерисовываются целиком, поэтому фокус клавиатуры внутри панели переживает перемещение окон. Панель добавляет один изолированный стиль — общий для всех панелей и удаляемый вместе с последней.
+
 ## Темизация
 
 Подключите `@surdeddd/wmkit/themes/glass.css` и переопределяйте CSS-переменные (`--wm-radius`, `--wm-bg`, `--wm-accent`, …) — или не подключайте ничего и стилизуйте `data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `[hidden]` сами.

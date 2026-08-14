@@ -124,6 +124,16 @@
         "default": "./dist/popout.cjs"
       }
     },
+    "./devtools": {
+      "import": {
+        "types": "./dist/devtools.d.ts",
+        "default": "./dist/devtools.js"
+      },
+      "require": {
+        "types": "./dist/devtools.d.cts",
+        "default": "./dist/devtools.cjs"
+      }
+    },
     "./themes/*": "./dist/themes/*",
     "./package.json": "./package.json"
   },
@@ -254,6 +264,11 @@
       "name": "popout plugin",
       "path": "dist/popout.js",
       "limit": "1 kB"
+    },
+    {
+      "name": "devtools plugin",
+      "path": "dist/devtools.js",
+      "limit": "5 kB"
     }
   ],
   "typesVersions": {

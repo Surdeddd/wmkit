@@ -326,6 +326,26 @@ persist(wm, {
 
 Moves a window's content into a [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) always-on-top OS window, keeping the same JS context and state. Feature-detect with `isPopoutSupported()`.
 
+### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
+
+An opt-in panel that shows the live window table, an event log and the manager controls, so you can see what the state machine is doing without a debugger. It follows the manager, never the DOM, so it works with any adapter or none.
+
+```js
+import { createDevtools, devtoolsMessagesRu } from '@surdeddd/wmkit/devtools'
+
+const panel = createDevtools(wm, { logLimit: 100 })
+panel.destroy()
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `container` | `document.body` | where the panel mounts |
+| `messages` | English catalog | pass `devtoolsMessagesRu` for Russian, or your own strings |
+| `logLimit` | `50` | ring buffer size for the event log |
+| `events` | open, close, focus, stage, workspace, group, modalblocked | which manager events to log |
+
+Rows are patched in place rather than re-rendered, so keyboard focus inside the panel survives while windows move. It injects one scoped stylesheet, shared between panels and removed with the last one.
+
 ## Theming
 
 `@surdeddd/wmkit/themes/glass.css` styles the `data-wm-*` attributes and exposes CSS variables:

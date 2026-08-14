@@ -732,3 +732,16 @@
     transition: none;
   }
 }
+
+.devtools-host {
+  position: relative;
+  min-height: 300px;
+}
+
+.devtools-host [data-wm-devtools] {
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-shadow: none;
+}
