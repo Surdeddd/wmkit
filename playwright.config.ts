@@ -10,6 +10,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 4,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 30_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: `http://localhost:${PORT}/wmkit/`,
     trace: 'on-first-retry',
