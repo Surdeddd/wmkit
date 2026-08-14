@@ -1,6 +1,7 @@
 import type { SnapDetectOptions } from '../core/geometry'
 import type { Bounds, WindowManager, WindowState } from '../core/types'
 import type { AnnouncerMessages } from './announcer'
+import type { PinchOptions, SwipeOptions } from './gestures'
 
 export const INTERACTIVE_SELECTOR =
   'button, input, select, textarea, a[href], [contenteditable], [data-wm-close], [data-wm-minimize], [data-wm-maximize]'
@@ -51,6 +52,8 @@ export interface DesktopOptions {
   magnetism?: boolean | MagnetismOptions
   stacking?: StackingOptions
   animation?: boolean | AnimationOptions
+  pinch?: boolean | PinchOptions
+  swipe?: boolean | SwipeOptions
   interactiveSelector?: string
   // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
   beforeClose?: (window: WindowState) => boolean | void

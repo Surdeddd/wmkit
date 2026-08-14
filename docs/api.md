@@ -344,6 +344,14 @@ interface DesktopOptions {
     duration?: number   // 260
     easing?: string     // cubic-bezier(0.32, 0.72, 0, 1)
   }
+  pinch?: boolean | {
+    threshold?: number        // 12 — how far the fingers must spread before it resizes
+    lockTouchAction?: boolean // false — set touch-action:none instead of pan-x pan-y
+  }
+  swipe?: boolean | {
+    threshold?: number   // 72 — how far two fingers must travel sideways
+    workspaces?: number  // 0 — no upper bound; set it to stop at the last workspace
+  }
   interactiveSelector?: string  // what a drag handle must not start on
   beforeClose?: (window: WindowState) => boolean | void  // return false to keep it open
   minimizeTarget?: (window: WindowState) => Element | null

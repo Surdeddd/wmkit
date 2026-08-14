@@ -167,4 +167,58 @@ test.describe('touch input', () => {
     )
     expect(await page.evaluate(() => window.scrollY)).toBe(0)
   })
+
+  test('two fingers pinch the window smaller around their middle', async ({ page, context }) => {
+    const cdp = await context.newCDPSession(page)
+    await page.goto('?lang=en')
+    await expect(page.locator(readme)).toBeVisible()
+    await settle(page)
+
+    const before = await boundsOf(page, 'readme')
+    const box = await page.locator(readme).boundingBox()
+    const first = { x: (box?.x ?? 0) + 20, y: (box?.y ?? 0) + 60 }
+    const second = {
+      x: (box?.x ?? 0) + (box?.width ?? 0) - 20,
+      y: (box?.y ?? 0) + (box?.height ?? 0) - 20,
+    }
+
+    await touch(cdp, 'touchStart', [first, second])
+    for (let step = 1; step <= 6; step += 1) {
+      await touch(cdp, 'touchMove', [
+        { x: first.x + step * 10, y: first.y + step * 6 },
+        { x: second.x - step * 10, y: second.y - step * 6 },
+      ])
+    }
+    await touch(cdp, 'touchEnd', [])
+
+    const after = await boundsOf(page, 'readme')
+    expect(after?.width, 'the pinch never shrank the window').toBeLessThan(before?.width ?? 0)
+    expect(after?.x, 'the window never shrank towards its middle').toBeGreaterThan(before?.x ?? 0)
+    await expect(page.locator(readme)).not.toHaveAttribute('data-wm-pinching', '')
+  })
+
+  test('two fingers swiped sideways change workspace', async ({ page, context }) => {
+    const cdp = await context.newCDPSession(page)
+    await page.goto('?lang=en')
+    await expect(page.locator(readme)).toBeVisible()
+
+    const desktop = await page.locator('#desktop').boundingBox()
+    const first = {
+      x: (desktop?.x ?? 0) + (desktop?.width ?? 0) - 40,
+      y: (desktop?.y ?? 0) + (desktop?.height ?? 0) / 2,
+    }
+    const second = { x: first.x - 60, y: first.y }
+
+    await touch(cdp, 'touchStart', [first, second])
+    for (let step = 1; step <= 6; step += 1) {
+      await touch(cdp, 'touchMove', [
+        { x: first.x - step * 30, y: first.y },
+        { x: second.x - step * 30, y: second.y },
+      ])
+    }
+    await touch(cdp, 'touchEnd', [])
+
+    expect(await page.evaluate(() => window.__wmDemo.wm.workspace())).toBe(1)
+    await expect(page.locator(readme)).toBeHidden()
+  })
 })

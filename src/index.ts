@@ -38,6 +38,7 @@ export { createAnnouncer, defaultMessages } from './dom/announcer'
 export type { DesktopBinder } from './dom/binder'
 export { createDesktopBinder } from './dom/binder'
 export { attachDesktop } from './dom/controller'
+export type { PinchOptions, SwipeOptions } from './dom/gestures'
 export type {
   DesktopController,
   DesktopKeyboardOptions,
