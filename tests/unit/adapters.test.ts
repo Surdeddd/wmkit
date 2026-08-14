@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { createElement, useEffect } from 'react'
 import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -14,12 +14,14 @@ import {
   useDesktop,
   useWindowManager as useReactManager,
   useWmState as useReactState,
+  useWmWindow as useReactWindow,
   useWmWindowRef,
 } from '../../src/adapters/react'
 import {
   createDesktop as createSolidDesktop,
   useWindowManager as useSolidManager,
   useWmState as useSolidState,
+  useWmWindow as useSolidWindow,
 } from '../../src/adapters/solid'
 import {
   createManager,
@@ -31,6 +33,7 @@ import {
   useDesktop as useVueDesktop,
   useWindowManager as useVueManager,
   useWmState as useVueState,
+  useWmWindow as useVueWindow,
   useWmWindowEl,
 } from '../../src/adapters/vue'
 import { createWindowManager } from '../../src/core/manager'
@@ -263,6 +266,234 @@ describe('angular adapter smoke', () => {
 
     wm.update('ng', { title: 'Angular 2' })
     expect(state().windows.ng?.title).toBe('Angular 2')
+  })
+})
+
+describe('per window subscriptions', () => {
+  it('react gives a component just the window it asked for', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    const renders: string[] = []
+
+    function Title({ id }: { id: string }) {
+      const win = useReactWindow(wm, id)
+      renders.push(`${id}:${win?.title ?? 'gone'}`)
+      return createElement('span', { 'data-testid': `t-${id}` }, win?.title ?? 'gone')
+    }
+
+    render(createElement(Title, { id: 'a' }))
+    expect(screen.getByTestId('t-a').textContent).toBe('A')
+
+    act(() => {
+      wm.update('a', { title: 'A renamed' })
+    })
+    expect(screen.getByTestId('t-a').textContent).toBe('A renamed')
+
+    const before = renders.length
+    act(() => {
+      wm.update('b', { title: 'B renamed' })
+    })
+    expect(renders.length, 'a change to another window re-rendered this one').toBe(before)
+
+    act(() => {
+      wm.close('a')
+    })
+    expect(screen.getByTestId('t-a').textContent).toBe('gone')
+  })
+
+  it('react follows the id a component is re-rendered with', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+
+    function Title({ id }: { id: string }) {
+      const win = useReactWindow(wm, id)
+      return createElement('span', { 'data-testid': 'title' }, win?.title ?? 'gone')
+    }
+
+    const view = render(createElement(Title, { id: 'a' }))
+    expect(screen.getByTestId('title').textContent).toBe('A')
+
+    view.rerender(createElement(Title, { id: 'b' }))
+    expect(screen.getByTestId('title').textContent, 'the hook kept the old id').toBe('B')
+
+    act(() => {
+      wm.update('b', { title: 'B renamed' })
+    })
+    expect(screen.getByTestId('title').textContent).toBe('B renamed')
+  })
+
+  it('vue tracks one window through a ref id', async () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    const scope = effectScope()
+
+    scope.run(() => {
+      const id = shallowRef('a')
+      const win = useVueWindow(wm, id)
+      expect(win.value?.title).toBe('A')
+
+      id.value = 'b'
+      expect(win.value?.title).toBe('B')
+
+      wm.update('b', { title: 'B renamed' })
+      expect(win.value?.title).toBe('B renamed')
+
+      wm.close('b')
+      expect(win.value).toBeUndefined()
+    })
+    await nextTick()
+    scope.stop()
+  })
+
+  it('solid tracks one window through an accessor id', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+
+    createRoot((dispose) => {
+      let wanted = 'a'
+      const win = useSolidWindow(wm, () => wanted)
+      expect(win()?.title).toBe('A')
+
+      wanted = 'b'
+      expect(win()?.title).toBe('B')
+
+      wm.update('b', { title: 'B renamed' })
+      expect(win()?.title).toBe('B renamed')
+
+      const fixed = useSolidWindow(wm, 'a')
+      expect(fixed()?.title).toBe('A')
+      dispose()
+    })
+  })
+
+  it('svelte exposes a store per window', () => {
+    const wm = createManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    const store = wmWindowStore(wm, 'a')
+    const seen: Array<string | undefined> = []
+    const stop = store.subscribe((win) => seen.push(win?.title))
+
+    wm.update('a', { title: 'A renamed' })
+    wm.close('a')
+    stop()
+
+    expect(seen[0]).toBe('A')
+    expect(seen.at(-1)).toBeUndefined()
+    expect(seen).toContain('A renamed')
+  })
+})
+
+describe('svelte window action', () => {
+  it('keeps the binding when the action re-runs with the same id', () => {
+    const wm = createManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    wm.open({ id: 'a', title: 'A', x: 5, y: 6, width: 200, height: 150 })
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    const action = dk.window(winEl, { id: 'a' })
+    expect(winEl.dataset.wmWindow).toBe('a')
+
+    action.update?.({ id: 'a' })
+    expect(winEl.dataset.wmWindow, 'the element lost its binding on a re-render').toBe('a')
+    expect(winEl.style.transform).toBe('translate3d(5px, 6px, 0)')
+
+    wm.move('a', 40, 50)
+    expect(winEl.style.transform, 'the rebound element stopped following the window').toBe(
+      'translate3d(40px, 50px, 0)',
+    )
+    action.destroy?.()
+  })
+
+  it('does not cancel a drag when the component re-renders mid gesture', () => {
+    const captured = new Set<number>()
+    Element.prototype.setPointerCapture = function setPointerCapture(id: number) {
+      captured.add(id)
+    }
+    Element.prototype.releasePointerCapture = function releasePointerCapture(id: number) {
+      captured.delete(id)
+    }
+    Element.prototype.hasPointerCapture = function hasPointerCapture(id: number) {
+      return captured.has(id)
+    }
+    const frames: Array<() => void> = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(() => callback(0))
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+
+    const pointer = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+      })
+      Object.defineProperty(event, 'pointerId', { value: 1 })
+      return event as PointerEvent
+    }
+
+    const wm = createManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, {
+      ...DESKTOP_OPTIONS,
+      magnetism: false,
+      snap: false,
+    })
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    wm.open({ id: 'a', title: 'A', x: 100, y: 100, width: 200, height: 150 })
+
+    const winEl = document.createElement('section')
+    winEl.innerHTML = '<header data-wm-drag></header>'
+    desktopEl.append(winEl)
+    const action = dk.window(winEl, { id: 'a' })
+    const handle = winEl.querySelector('[data-wm-drag]') as HTMLElement
+
+    handle.dispatchEvent(pointer('pointerdown', 150, 110))
+    handle.dispatchEvent(pointer('pointermove', 190, 150))
+    for (const frame of frames.splice(0)) frame()
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 140, y: 140 })
+
+    action.update?.({ id: 'a' })
+
+    handle.dispatchEvent(pointer('pointermove', 230, 190))
+    for (const frame of frames.splice(0)) frame()
+    expect(wm.get('a')?.bounds, 'the re-render cancelled the drag').toMatchObject({
+      x: 180,
+      y: 180,
+    })
+
+    handle.dispatchEvent(pointer('pointerup', 230, 190))
+    action.destroy?.()
+    vi.unstubAllGlobals()
+  })
+
+  it('rebinds the element when the action is given another id', () => {
+    const wm = createManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    wm.open({ id: 'a', title: 'A', x: 5, y: 6, width: 200, height: 150 })
+    wm.open({ id: 'b', title: 'B', x: 70, y: 80, width: 200, height: 150 })
+
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    const action = dk.window(winEl, { id: 'a' })
+    action.update?.({ id: 'b' })
+
+    expect(winEl.dataset.wmWindow).toBe('b')
+    expect(winEl.style.transform).toBe('translate3d(70px, 80px, 0)')
+    action.destroy?.()
   })
 })
 
