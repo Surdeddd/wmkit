@@ -1,3 +1,10 @@
+## [0.7.2](https://github.com/Surdeddd/wmkit/compare/v0.7.1...v0.7.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **adapters:** let an element bind again when its window comes back ([6dcae7a](https://github.com/Surdeddd/wmkit/commit/6dcae7a99aca3e3f42cf4d15724b911bd242cc03))
+
 ## [0.7.1](https://github.com/Surdeddd/wmkit/compare/v0.7.0...v0.7.1) (2026-08-14)
 
 
