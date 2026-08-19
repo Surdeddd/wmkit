@@ -36,6 +36,20 @@ const SNAP_SHORTCUTS: Record<string, SnapZone> = {
   ArrowRight: 'right',
 }
 
+const SNAP_ZONES = new Set<string>([
+  'left',
+  'right',
+  'top',
+  'bottom',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'left-third',
+  'center-third',
+  'right-third',
+])
+
 const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 
 const FOCUSABLE_SELECTOR =
@@ -480,10 +494,38 @@ export function attachDesktop(
       if (!current) return
       if (target.closest('[data-wm-close]')) {
         if (current.closable && options.beforeClose?.(current) !== false) wm.close(id)
-      } else if (target.closest('[data-wm-minimize]')) {
+        return
+      }
+      if (target.closest('[data-wm-minimize]')) {
         if (current.minimizable) wm.minimize(id)
-      } else if (target.closest('[data-wm-maximize]')) {
+        return
+      }
+      if (target.closest('[data-wm-maximize]')) {
         if (current.maximizable) wm.toggleMaximize(id)
+        return
+      }
+      const act = createActions(wm, id)
+      const snapTarget = target.closest<HTMLElement>('[data-wm-snap]')
+      if (snapTarget) {
+        const zone = snapTarget.dataset.wmSnap ?? ''
+        if (current.snappable && SNAP_ZONES.has(zone)) act.snap(zone as SnapZone)
+        return
+      }
+      if (target.closest('[data-wm-restore]')) {
+        act.restore()
+        return
+      }
+      if (target.closest('[data-wm-center]')) {
+        act.center()
+        return
+      }
+      if (target.closest('[data-wm-send-back]')) {
+        act.sendToBack()
+        return
+      }
+      const workspaceTarget = target.closest<HTMLElement>('[data-wm-to-workspace]')
+      if (workspaceTarget) {
+        act.moveToWorkspace(Number.parseInt(workspaceTarget.dataset.wmToWorkspace ?? '', 10))
       }
     }
     windowElement.addEventListener('click', onClick)

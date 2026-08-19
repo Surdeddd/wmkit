@@ -952,6 +952,81 @@ describe('desktop controller', () => {
     expect(harness.desktop.actions('nope').focus()).toBe(false)
   })
 
+  it('drives snap, restore, centre, back and workspace from window attributes', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    const bar = document.createElement('div')
+    bar.innerHTML =
+      '<button data-wm-snap="left"></button><button data-wm-restore></button>' +
+      '<button data-wm-center></button><button data-wm-send-back></button>' +
+      '<button data-wm-to-workspace="2"></button>'
+    root.append(bar)
+    const [snap, restore, centre, back, workspace] = [
+      ...bar.querySelectorAll('button'),
+    ] as HTMLButtonElement[]
+
+    snap?.click()
+    expect(harness.wm.get('a')?.snapZone).toBe('left')
+
+    restore?.click()
+    expect(harness.wm.get('a')?.stage).toBe('normal')
+
+    centre?.click()
+    expect(harness.wm.get('a')?.bounds.x).toBe(300)
+
+    harness.add({ id: 'b', width: 100, height: 100 })
+    back?.click()
+    expect(harness.wm.getState().order[0]).toBe('a')
+
+    workspace?.click()
+    expect(harness.wm.get('a')?.workspace).toBe(2)
+  })
+
+  it('refuses an unknown zone without letting the manager throw', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', width: 200, height: 150 })
+    const odd = document.createElement('button')
+    odd.dataset.wmSnap = 'sideways'
+    root.append(odd)
+
+    const thrown: unknown[] = []
+    const onError = (event: ErrorEvent) => {
+      thrown.push(event.error)
+      event.preventDefault()
+    }
+    window.addEventListener('error', onError)
+    odd.click()
+    window.removeEventListener('error', onError)
+
+    expect(thrown).toEqual([])
+    expect(harness.wm.get('a')?.snapZone).toBeNull()
+  })
+
+  it('leaves a window that cannot snap alone, and shrugs off a bad workspace', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', width: 200, height: 150, snappable: false })
+    const bar = document.createElement('div')
+    bar.innerHTML =
+      '<button data-wm-snap="left"></button><button data-wm-to-workspace="x"></button>'
+    root.append(bar)
+
+    for (const node of bar.querySelectorAll('button')) (node as HTMLButtonElement).click()
+
+    expect(harness.wm.get('a')?.snapZone).toBeNull()
+    expect(harness.wm.get('a')?.workspace).toBe(0)
+  })
+
+  it('finds an action attribute however deeply it is nested', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', width: 200, height: 150 })
+    const nest = document.createElement('div')
+    nest.innerHTML = '<div><span><button data-wm-snap="right"><i></i></button></span></div>'
+    root.append(nest)
+
+    nest.querySelector('i')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(harness.wm.get('a')?.snapZone).toBe('right')
+  })
+
   it('refuses to attach an unknown or already attached window', () => {
     const harness = makeHarness()
     harness.add({ id: 'a' })
