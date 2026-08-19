@@ -11,6 +11,7 @@ import {
 } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
+import { themeStyle } from '@surdeddd/wmkit/themes'
 import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
 import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
 import blueprintUrl from '@surdeddd/wmkit/themes/blueprint.css?url'
@@ -125,27 +126,32 @@ export const SKIN_LAYOUTS: readonly SkinLayout[] = ['left', 'right', 'bare']
 let customTemplate: string | null = null
 let customShadow = false
 
-function controlMarkup(): string {
+function controlLines(): string[] {
   const labels = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
-  return labels
-    .map(
+  return [
+    '    <span data-wm-controls>',
+    ...labels.map(
       ([selector, label]) =>
-        `<button type="button" ${selector.slice(1, -1)} aria-label="${label} {{title}}"></button>`,
-    )
-    .join('')
+        `      <button type="button" ${selector.slice(1, -1)} aria-label="${label} {{title}}"></button>`,
+    ),
+    '    </span>',
+  ]
 }
 
 export function layoutTemplate(layout: SkinLayout): string {
-  const controls = layout === 'bare' ? '' : `<span data-wm-controls>${controlMarkup()}</span>`
-  const title = '<span data-wm-title>{{title}}</span>'
-  const tabs = '<span class="win-tabs" hidden></span>'
-  const bar =
-    layout === 'left'
-      ? `<header data-wm-drag data-side="left">${controls}${title}${tabs}</header>`
-      : layout === 'bare'
-        ? `<header data-wm-drag data-side="none">${title}${tabs}</header>`
-        : `<header data-wm-drag data-side="right">${title}${tabs}${controls}</header>`
-  return `<section data-testid="window-{{id}}">${bar}<div data-wm-content></div></section>`
+  const title = '    <span data-wm-title>{{title}}</span>'
+  const tabs = '    <span class="win-tabs" hidden></span>'
+  const controls = layout === 'bare' ? [] : controlLines()
+  const side = layout === 'bare' ? 'none' : layout
+  const inside = layout === 'right' ? [title, tabs, ...controls] : [...controls, title, tabs]
+  return [
+    '<section data-testid="window-{{id}}">',
+    `  <header data-wm-drag data-side="${side}">`,
+    ...inside,
+    '  </header>',
+    '  <div data-wm-content></div>',
+    '</section>',
+  ].join('\n')
 }
 
 export function currentSkinCode(): string {
@@ -183,7 +189,12 @@ export function setSkinLayout(layout: SkinLayout): void {
 export function applyCustomSkin(template: string, shadow: boolean): void {
   customTemplate = template
   customShadow = shadow
-  const built = skin({ template, shadow })
+  const built = skin({
+    name: 'custom',
+    template,
+    shadow,
+    ...(shadow ? { styles: themeStyle(theme, { shadow: true }) } : {}),
+  })
   for (const id of mounted.keys()) {
     if (wm.get(id)) desktop.mountWindow(id, built, { removeOnClose: true })
   }

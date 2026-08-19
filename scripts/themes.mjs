@@ -2,6 +2,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { toShadowCss } from './shadow-css.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(root, 'src', 'themes')
@@ -19,19 +20,23 @@ if (names.length === 0) throw new Error('wmkit: no theme stylesheets found')
 
 const quote = (css) => css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
 
+const read = (name) => readFileSync(join(source, `${name}.css`), 'utf8')
+
 const css = [
   "import type { ThemeName } from './index'",
   '',
   'export const themeCss: Record<ThemeName, string> = {',
-  ...names.map(
-    (name) => `  ${name}: \`${quote(readFileSync(join(source, `${name}.css`), 'utf8'))}\`,`,
-  ),
+  ...names.map((name) => `  ${name}: \`${quote(read(name))}\`,`),
+  '}',
+  '',
+  'export const themeShadowCss: Record<ThemeName, string> = {',
+  ...names.map((name) => `  ${name}: \`${quote(toShadowCss(read(name)))}\`,`),
   '}',
   '',
 ].join('\n')
 
 const index = [
-  "import { themeCss } from './css'",
+  "import { themeCss, themeShadowCss } from './css'",
   '',
   'export const themeNames = [',
   ...names.map((name) => `  '${name}',`),
@@ -39,10 +44,14 @@ const index = [
   '',
   'export type ThemeName = (typeof themeNames)[number]',
   '',
-  'export { themeCss }',
+  'export { themeCss, themeShadowCss }',
   '',
-  'export function themeStyle(name: ThemeName): string {',
-  '  return themeCss[name]',
+  'export interface ThemeStyleOptions {',
+  '  shadow?: boolean',
+  '}',
+  '',
+  'export function themeStyle(name: ThemeName, options: ThemeStyleOptions = {}): string {',
+  '  return options.shadow === true ? themeShadowCss[name] : themeCss[name]',
   '}',
   '',
 ].join('\n')

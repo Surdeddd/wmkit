@@ -1,4 +1,4 @@
-import { themeCss } from './css'
+import { themeCss, themeShadowCss } from './css'
 
 export const themeNames = [
   'amber',
@@ -21,8 +21,12 @@ export const themeNames = [
 
 export type ThemeName = (typeof themeNames)[number]
 
-export { themeCss }
+export { themeCss, themeShadowCss }
 
-export function themeStyle(name: ThemeName): string {
-  return themeCss[name]
+export interface ThemeStyleOptions {
+  shadow?: boolean
+}
+
+export function themeStyle(name: ThemeName, options: ThemeStyleOptions = {}): string {
+  return options.shadow === true ? themeShadowCss[name] : themeCss[name]
 }

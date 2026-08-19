@@ -816,7 +816,7 @@ const shortcuts: AppSpec = {
 const skins: AppSpec = {
   id: 'skins',
   init(ctx) {
-    return { title: 'skins', ...centred(ctx, 424, 470), layer: 'floating' }
+    return { title: 'skins', ...centred(ctx, 440, 660), layer: 'floating' }
   },
   render(body, ctx) {
     const lead = el('p', 'app-note')
@@ -831,7 +831,7 @@ const skins: AppSpec = {
     const templateLabel = el('h4', 'skin-head')
     const template = document.createElement('textarea')
     template.className = 'skin-template'
-    template.rows = 5
+    template.rows = 9
     template.spellcheck = false
     const shadowRow = el('label', 'skin-toggle')
     const shadowBox = document.createElement('input')
