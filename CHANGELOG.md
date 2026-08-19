@@ -1,3 +1,22 @@
+# [0.9.0](https://github.com/Surdeddd/wmkit/compare/v0.8.0...v0.9.0) (2026-08-19)
+
+
+### Bug Fixes
+
+* **dom:** rebuild a window outside the sync pass and unregister it before releasing ([881f2fe](https://github.com/Surdeddd/wmkit/commit/881f2feeeb2c52ce1e6ebc5c53ad9acc94c9369c))
+* **themes:** make a shipped theme actually usable inside a shadow root ([a71495f](https://github.com/Surdeddd/wmkit/commit/a71495f5d74e40508c79f131269ea9d5895dc6ea))
+
+
+### Features
+
+* **chrome:** build a window from a template string ([068bf61](https://github.com/Surdeddd/wmkit/commit/068bf61362adcd78054aa8693dd6f7dd0381727e))
+* **chrome:** isolate a skin in a shadow root without losing grouping, focus or the accessible name ([e063c15](https://github.com/Surdeddd/wmkit/commit/e063c15bc6b34ef709627709ae2230a3f2bf7fe9))
+* **dom:** drive snap, restore, centre, back and workspace from window attributes ([16c9932](https://github.com/Surdeddd/wmkit/commit/16c9932874ac8541ecd9e6b67f1ba249588e2032))
+* **dom:** expose the window actions as a typed object ([96dfed0](https://github.com/Surdeddd/wmkit/commit/96dfed0fc736327dfe068065dd5c9248c08946c2))
+* **dom:** keep the title node in step with the window title ([3f7d876](https://github.com/Surdeddd/wmkit/commit/3f7d876c48d6dbd6a1405c15df69753fc2dcc0f5))
+* **dom:** mount a window from a skin and rebuild it when the skin changes ([590af92](https://github.com/Surdeddd/wmkit/commit/590af92d9825d01c6bebd89e8184dea945602801))
+* **site:** build a window skin in the demo ([63394c8](https://github.com/Surdeddd/wmkit/commit/63394c84aff6f9525e7d23e374d43a9a954f85bd))
+
 # [0.8.0](https://github.com/Surdeddd/wmkit/compare/v0.7.2...v0.8.0) (2026-08-14)
 
 
