@@ -68,7 +68,7 @@ The desktop element becomes the coordinate space. Your markup stays yours — wm
 | Attribute | Meaning |
 | --- | --- |
 | `data-wm-drag` | drag handle (usually the titlebar); double-click toggles maximize |
-| `data-wm-title` | window title node, linked via `aria-labelledby` |
+| `data-wm-title` | window title node; its text follows the state, and it is linked via `aria-labelledby` when it shares a root with the window |
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | control buttons, wired by delegation |
 | `data-wm-content` | scrollable content area (styled by themes) |
 

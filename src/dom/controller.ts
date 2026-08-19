@@ -63,6 +63,37 @@ const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+function focusablesOf(el: HTMLElement): HTMLElement[] {
+  const root = el.shadowRoot
+  if (!root) return [...el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
+  const found: HTMLElement[] = []
+  for (const node of root.querySelectorAll<HTMLElement>(`${FOCUSABLE_SELECTOR}, slot`)) {
+    if (!(node instanceof HTMLSlotElement)) {
+      found.push(node)
+      continue
+    }
+    for (const assigned of node.assignedElements()) {
+      if (assigned.matches(FOCUSABLE_SELECTOR)) found.push(assigned as HTMLElement)
+      found.push(...assigned.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    }
+  }
+  return found
+}
+
+function dragHandleAt(node: Element, clientX: number, clientY: number): Element | null {
+  const handle = node.closest?.('[data-wm-drag]')
+  if (handle) return handle
+  const inner = node.shadowRoot?.elementFromPoint?.(clientX, clientY) ?? null
+  return inner === null || inner === node ? null : dragHandleAt(inner, clientX, clientY)
+}
+
+function windowElementOf(node: Element): HTMLElement | null {
+  const found = node.closest<HTMLElement>('[data-wm-window]')
+  if (found) return found
+  const host = (node.getRootNode() as ShadowRoot).host
+  return host ? windowElementOf(host) : null
+}
+
 function defaultVariant(win: WindowState): string | null {
   const variant = win.meta.variant
   return typeof variant === 'string' && variant !== '' ? variant : null
@@ -203,8 +234,8 @@ export function attachDesktop(
     groupTarget(clientX, clientY, selfId) {
       if (!groupingEnabled || typeof doc.elementsFromPoint !== 'function') return null
       for (const node of doc.elementsFromPoint(clientX, clientY)) {
-        const handle = node.closest?.('[data-wm-drag]')
-        const host = handle?.closest<HTMLElement>('[data-wm-window]')
+        const handle = dragHandleAt(node, clientX, clientY)
+        const host = handle && windowElementOf(handle)
         const id = host?.dataset.wmWindow
         if (id && id !== selfId && registry.get(id)?.element === host) return id
       }
@@ -485,11 +516,12 @@ export function attachDesktop(
     windowElement.style.left = '0'
     windowElement.style.top = '0'
 
-    const titleEl = windowElement.querySelector<HTMLElement>('[data-wm-title]')
-    if (titleEl) {
-      attached.title = titleEl
-      if (!titleEl.id) titleEl.id = `wmkit-title-${id}`
-      windowElement.setAttribute('aria-labelledby', titleEl.id)
+    const lightTitle = windowElement.querySelector<HTMLElement>('[data-wm-title]')
+    attached.title =
+      lightTitle ?? windowElement.shadowRoot?.querySelector<HTMLElement>('[data-wm-title]') ?? null
+    if (lightTitle) {
+      if (!lightTitle.id) lightTitle.id = `wmkit-title-${id}`
+      windowElement.setAttribute('aria-labelledby', lightTitle.id)
     }
 
     const handle =
@@ -589,7 +621,7 @@ export function attachDesktop(
         const onResizeDown = (event: PointerEvent) => startResize(id, direction, event)
         resizeHandle.addEventListener('pointerdown', onResizeDown)
         attached.cleanup.push(() => resizeHandle.removeEventListener('pointerdown', onResizeDown))
-        windowElement.append(resizeHandle)
+        ;(windowElement.shadowRoot ?? windowElement).append(resizeHandle)
         attached.handles.push(resizeHandle)
       }
     }
@@ -629,9 +661,10 @@ export function attachDesktop(
       if (event.key !== 'Tab') return
       const current = wm.get(id)
       if (current?.layer !== 'modal') return
-      const focusables = [
-        ...windowElement.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ].filter((node) => node.offsetParent !== null || node === doc.activeElement)
+      const active = windowElement.shadowRoot?.activeElement ?? doc.activeElement
+      const focusables = focusablesOf(windowElement).filter(
+        (node) => node.offsetParent !== null || node === active,
+      )
       if (focusables.length === 0) return
       const first = focusables[0]
       const last = focusables[focusables.length - 1]
@@ -641,10 +674,10 @@ export function attachDesktop(
         ;(event.shiftKey ? last : first).focus()
         return
       }
-      if (event.shiftKey && doc.activeElement === first) {
+      if (event.shiftKey && active === first) {
         event.preventDefault()
         last.focus()
-      } else if (!event.shiftKey && doc.activeElement === last) {
+      } else if (!event.shiftKey && active === last) {
         event.preventDefault()
         first.focus()
       }

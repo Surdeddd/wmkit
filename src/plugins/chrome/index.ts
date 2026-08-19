@@ -10,6 +10,7 @@ export { compileTemplate } from './template'
 export interface SkinSpec {
   template: string
   styles?: string
+  shadow?: boolean
   name?: string
 }
 
@@ -45,20 +46,47 @@ export function skin(spec: SkinSpec): WindowSkin {
   if ((spec.template.match(SLOT_PATTERN) ?? []).length !== 1) throw new Error(BAD_SLOT_COUNT)
   if (spec.styles !== undefined && spec.name === undefined) throw new Error(UNSCOPED_STYLES)
   const render = compileTemplate(spec.template)
+  const sheets = new WeakMap<Document, CSSStyleSheet>()
+
+  function adopt(root: ShadowRoot, doc: Document, css: string): void {
+    if (typeof CSSStyleSheet.prototype.replaceSync !== 'function') {
+      const tag = doc.createElement('style')
+      tag.textContent = css
+      root.prepend(tag)
+      return
+    }
+    let sheet = sheets.get(doc)
+    if (!sheet) {
+      sheet = new CSSStyleSheet()
+      sheet.replaceSync(css)
+      sheets.set(doc, sheet)
+    }
+    root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]
+  }
 
   return ({ doc, window: win }): SkinMount => {
     const holder = doc.createElement('template')
     holder.innerHTML = render(valuesOf(win))
-    const element = holder.content.firstElementChild as HTMLElement | null
-    const content =
-      element === null
-        ? null
-        : element.matches(SLOT)
-          ? element
-          : element.querySelector<HTMLElement>(SLOT)
-    if (element === null || content === null) throw new Error(BAD_STRUCTURE)
+    const built = holder.content.firstElementChild as HTMLElement | null
+    const slot =
+      built === null ? null : built.matches(SLOT) ? built : built.querySelector<HTMLElement>(SLOT)
+    if (built === null || slot === null) throw new Error(BAD_STRUCTURE)
+
+    if (spec.shadow !== true) {
+      if (spec.name !== undefined) built.dataset.wmSkin = spec.name
+      if (spec.styles !== undefined) injectStyles(doc, spec.name as string, spec.styles)
+      return { element: built, content: slot }
+    }
+
+    const element = doc.createElement('div')
     if (spec.name !== undefined) element.dataset.wmSkin = spec.name
-    if (spec.styles !== undefined) injectStyles(doc, spec.name as string, spec.styles)
+    const root = element.attachShadow({ mode: 'open' })
+    root.append(built)
+    slot.replaceWith(doc.createElement('slot'))
+    if (spec.styles !== undefined) adopt(root, doc, spec.styles)
+    const content = doc.createElement('div')
+    content.dataset.wmContent = ''
+    element.append(content)
     return { element, content }
   }
 }

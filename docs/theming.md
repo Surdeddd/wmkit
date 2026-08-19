@@ -63,7 +63,7 @@ attachDesktop(wm, root, {
 | Attribute | On | Meaning |
 | --- | --- | --- |
 | `data-wm-drag` | any descendant | drag handle; double click toggles maximize; right click or long press fires `onTitlebarContextMenu` |
-| `data-wm-title` | any descendant | title node, linked as `aria-labelledby` |
+| `data-wm-title` | any descendant, shadow root included | title node; its text follows the state, and it is linked as `aria-labelledby` only from the same root |
 | `data-wm-content` | any descendant | scrollable content area (styling only) |
 | `data-wm-controls` | any descendant | control group (styling only) |
 | `data-wm-close` | button | closes when `closable` |
