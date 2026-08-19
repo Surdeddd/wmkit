@@ -81,8 +81,12 @@ export function skin(spec: SkinSpec): WindowSkin {
     const element = doc.createElement('div')
     if (spec.name !== undefined) element.dataset.wmSkin = spec.name
     const root = element.attachShadow({ mode: 'open' })
-    root.append(built)
-    slot.replaceWith(doc.createElement('slot'))
+    const projection = doc.createElement('slot')
+    if (slot === built) root.append(projection)
+    else {
+      slot.replaceWith(projection)
+      root.append(...built.childNodes)
+    }
     if (spec.styles !== undefined) adopt(root, doc, spec.styles)
     const content = doc.createElement('div')
     content.dataset.wmContent = ''

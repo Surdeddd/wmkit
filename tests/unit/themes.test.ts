@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { themeCss, themeNames, themeStyle } from '../../src/themes/index'
+import { themeCss, themeNames, themeShadowCss, themeStyle } from '../../src/themes/index'
 
 const root = new URL('../../', import.meta.url).pathname
 const read = (file: string) => readFileSync(join(root, file), 'utf8')
@@ -40,6 +40,46 @@ describe('the shipped themes', () => {
         `${name} leaks a token`,
       ).toEqual([])
     }
+  })
+
+  it('offers a shadow flavour of every theme', () => {
+    expect(Object.keys(themeShadowCss).sort()).toEqual([...themeNames].sort())
+    for (const name of themeNames) {
+      expect(themeStyle(name, { shadow: true }), name).toBe(themeShadowCss[name])
+      expect(themeStyle(name, { shadow: false }), name).toBe(themeCss[name])
+      expect(themeStyle(name), name).toBe(themeCss[name])
+    }
+  })
+
+  it('leaves nothing in a shadow flavour that a shadow root cannot match', () => {
+    for (const name of themeNames) {
+      const css = themeShadowCss[name]
+      for (const outside of ['[data-wm-window]', '[data-wm-desktop]', '[data-wm-snap-preview]']) {
+        expect(css, `${name} still reaches for ${outside}`).not.toContain(outside)
+      }
+      expect(css, `${name} never speaks about its host`).toContain(':host')
+    }
+  })
+
+  it('keeps the window rules of a shadow flavour, only re-anchored', () => {
+    const light = themeCss.carbon
+    const shadow = themeShadowCss.carbon
+
+    expect(shadow).toContain(':host([data-wm-focused])')
+    expect(shadow).toContain(':host([data-wm-stage="maximized"]) [data-wm-drag]')
+    expect(shadow).toMatch(/^\[data-wm-drag\] \{/m)
+    expect(shadow).toContain('--wm-titlebar-bg')
+    expect(light).toContain('[data-wm-window][data-wm-focused]')
+    expect(light).not.toContain(':host')
+  })
+
+  it('carries the tokens of the desktop block and drops its layout', () => {
+    const shadow = themeShadowCss.light
+    const host = shadow.slice(0, shadow.indexOf('}'))
+
+    expect(host).toContain('--wm-radius')
+    expect(host).not.toContain('overflow: hidden')
+    expect(host).not.toContain('position: relative')
   })
 
   it('gives every theme feedback while a window is being handled', () => {

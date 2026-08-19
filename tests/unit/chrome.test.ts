@@ -232,6 +232,33 @@ describe('shadow skins', () => {
     expect(mounted.content.parentElement).toBe(mounted.element)
   })
 
+  it('puts the chrome straight in the shadow root so :host is its layout box', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Notes' })
+    const mounted = harness.desktop.mountWindow(
+      'a',
+      skin({ shadow: true, template: SHADOW_TEMPLATE }),
+    )
+    const root = mounted.element.shadowRoot as ShadowRoot
+
+    expect(root.querySelector('section')).toBeNull()
+    expect(root.firstElementChild?.tagName).toBe('HEADER')
+    expect([...root.children].some((node) => node.tagName === 'SLOT')).toBe(true)
+  })
+
+  it('keeps a template that is nothing but a slot', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a' })
+    const mounted = harness.desktop.mountWindow(
+      'a',
+      skin({ shadow: true, template: '<div data-wm-content></div>' }),
+    )
+    const root = mounted.element.shadowRoot as ShadowRoot
+
+    expect(root.querySelector('slot')).not.toBeNull()
+    expect(mounted.content.parentElement).toBe(mounted.element)
+  })
+
   it('keeps the resize grips out of reach of page css', () => {
     const harness = makeHarness()
     const isolated = skin({ name: 'iso', shadow: true, template: SHADOW_TEMPLATE })

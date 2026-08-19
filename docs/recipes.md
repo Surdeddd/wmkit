@@ -365,10 +365,15 @@ The template must contain exactly one `[data-wm-content]`; anything else throws 
 ```js
 import { themeStyle } from '@surdeddd/wmkit/themes'
 
-const sealed = skin({ name: 'sealed', shadow: true, styles: themeStyle('carbon'), template: TEMPLATE })
+const sealed = skin({
+  name: 'sealed',
+  shadow: true,
+  styles: themeStyle('carbon', { shadow: true }),
+  template: TEMPLATE,
+})
 ```
 
-Inside a shadow root, write `:host` where you would have written the window selector. Grouping by drag, the modal focus trap and the resize grips all keep working across the boundary; the accessible name switches from `aria-labelledby` to `aria-label`, because an IDREF cannot cross it.
+Pass `{ shadow: true }` or the theme arrives with its tokens and none of its rules — see [docs/theming.md](theming.md) for why. Inside a shadow root, write `:host` where you would have written the window selector. The template's own root element is unwrapped, so `:host` is the layout box your titlebar and content sit in. Grouping by drag, the modal focus trap and the resize grips all keep working across the boundary; the accessible name switches from `aria-labelledby` to `aria-label`, because an IDREF cannot cross it.
 
 ## Touch gestures
 
