@@ -943,6 +943,53 @@ describe('desktop controller', () => {
     expect(root.dataset.wmResizing).toBeUndefined()
   })
 
+  it('keeps the title node in step with the window title', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', title: 'First', width: 200, height: 150 })
+    const title = root.querySelector('[data-wm-title]') as HTMLElement
+
+    expect(title.textContent).toBe('First')
+
+    harness.wm.update('a', { title: 'Second' })
+    expect(title.textContent).toBe('Second')
+    expect(root.getAttribute('aria-label')).toBe('Second')
+  })
+
+  it('never touches the title node when the title has not changed', () => {
+    const harness = makeHarness({ magnetism: false, snap: false })
+    const { root, handle } = harness.add({
+      id: 'a',
+      title: 'First',
+      x: 10,
+      y: 10,
+      width: 200,
+      height: 150,
+    })
+    const title = root.querySelector('[data-wm-title]') as HTMLElement
+
+    const observer = new MutationObserver(() => {})
+    observer.observe(title, { characterData: true, childList: true, subtree: true })
+
+    drag(harness, handle, [60, 20], [160, 120])
+    harness.wm.focus('a')
+    harness.wm.minimize('a')
+    const seen = observer.takeRecords()
+    observer.disconnect()
+
+    expect(seen).toEqual([])
+  })
+
+  it('leaves a window without a title node alone', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'First', width: 200, height: 150 })
+    const root = document.createElement('section')
+    root.innerHTML = '<header data-wm-drag></header>'
+    harness.element.append(root)
+
+    expect(() => harness.desktop.attachWindow('a', root)).not.toThrow()
+    expect(root.getAttribute('aria-label')).toBe('First')
+  })
+
   it('hands out actions for a window from the desktop', () => {
     const harness = makeHarness()
     harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
