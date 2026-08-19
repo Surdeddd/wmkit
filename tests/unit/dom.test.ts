@@ -943,6 +943,15 @@ describe('desktop controller', () => {
     expect(root.dataset.wmResizing).toBeUndefined()
   })
 
+  it('hands out actions for a window from the desktop', () => {
+    const harness = makeHarness()
+    harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+
+    expect(harness.desktop.actions('a').minimize()).toBe(true)
+    expect(harness.wm.get('a')?.stage).toBe('minimized')
+    expect(harness.desktop.actions('nope').focus()).toBe(false)
+  })
+
   it('refuses to attach an unknown or already attached window', () => {
     const harness = makeHarness()
     harness.add({ id: 'a' })

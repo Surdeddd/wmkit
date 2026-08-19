@@ -1,4 +1,5 @@
 import type { Bounds, SnapZone, WindowManager, WindowState } from '../core/types'
+import { createActions } from './actions'
 import { flipFromTarget, flipToTarget } from './animate'
 import { type Announcer, createAnnouncer } from './announcer'
 import { createDragStarter } from './drag'
@@ -626,6 +627,7 @@ export function attachDesktop(
     element,
     wm,
     attachWindow,
+    actions: (id: string) => createActions(wm, id),
     destroy() {
       endDrag(true)
       for (const [, attached] of registry) {
