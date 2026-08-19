@@ -14,6 +14,7 @@
 
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
+- 🧱 **Your window, your markup** — build the whole frame from a template string, wire its buttons by attribute, and swap the skin on a live window without losing what it was showing
 - ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, all thin sugar over one core
 - 🗃️ **Tab groups** — drop one titlebar onto another and the windows share a frame, dockview style; the tab order is yours to reorder
 - ⊞ **Snap zones** — halves, quarters, thirds and drag-to-top maximize with a live preview
@@ -26,7 +27,7 @@
 - 💾 **Persistence** — one call to serialize the desktop, one call to restore it, with versioned migrations
 - 🎨 **Sixteen themes** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — or bring your own CSS
 - 🖼️ **Popout** *(experimental)* — send a window into Document Picture-in-Picture
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, ~10.7 kB brotli core
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 15 kB brotli core
 
 ## Install
 
@@ -394,9 +395,17 @@ Rows are patched in place rather than re-rendered, so keyboard focus inside the 
 }
 ```
 
-Fifteen more ready-made themes ship alongside — `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest` and `synth`. They all style the same `data-wm-*` attributes, so switching is a one-line import swap, and every one of them ships 24px pointer targets plus `prefers-reduced-motion` and `forced-colors` blocks.
+Fifteen more ready-made themes ship alongside — `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest` and `synth`. They all style the same `data-wm-*` attributes, so switching is a one-line import swap, and every one of them ships 24px pointer targets plus `prefers-reduced-motion` and `forced-colors` blocks. Every one is also held to WCAG AA contrast by a browser test that measures the rendered pixels of the demo under all sixteen.
 
-A theme dresses every window; a variant dresses one. Set `meta.variant` on a window and the desktop mirrors it to `data-wm-variant` for your CSS to pick up — see [docs/theming.md](docs/theming.md).
+Three layers, from the widest to the narrowest:
+
+| layer | reaches | changes |
+| --- | --- | --- |
+| theme | every window | the tokens |
+| variant | one window | the tokens, through `data-wm-variant` |
+| skin | one window | the markup itself |
+
+A theme and a variant repaint what is there; a skin replaces it. Set `meta.variant` for the first two and `meta.skin` for the third — see [docs/theming.md](docs/theming.md).
 
 Skip the import entirely and the library stays headless: state attributes (`data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `data-wm-flash`, `[hidden]`) are yours to style.
 
@@ -413,7 +422,7 @@ This README is the tour. The reference lives in [`docs/`](./docs/README.md):
 | [API reference](./docs/api.md) | every export, option, method, event and type |
 | [Adapters](./docs/adapters.md) | complete React, Vue, Svelte, Solid and Angular integrations |
 | [Theming](./docs/theming.md) | `data-wm-*` contract, CSS variables, writing a theme from scratch |
-| [Recipes](./docs/recipes.md) | taskbar, modals, persistence, workspaces, SSR, testing, performance |
+| [Recipes](./docs/recipes.md) | building a window from scratch, taskbar, modals, persistence, workspaces, SSR, testing, performance |
 | [Browser support](./docs/browser-support.md) | baselines per entry point and what degrades where |
 
 ## Comparison
