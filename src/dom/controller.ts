@@ -23,6 +23,7 @@ import { restack, type StackingTarget, UNASSIGNED } from './stacking'
 interface AttachedWindow {
   element: HTMLElement
   handle: HTMLElement | null
+  title: HTMLElement | null
   handles: HTMLElement[]
   lastState: WindowState | null
   lastZ: number
@@ -286,6 +287,9 @@ export function attachDesktop(
       }
       el.hidden = hide
       el.setAttribute('aria-label', win.title)
+      if (attached.title && attached.title.textContent !== win.title) {
+        attached.title.textContent = win.title
+      }
       if (win.layer === 'modal') el.setAttribute('aria-modal', 'true')
       else el.removeAttribute('aria-modal')
       for (const handle of attached.handles) {
@@ -449,6 +453,7 @@ export function attachDesktop(
     const attached: AttachedWindow = {
       element: windowElement,
       handle: null,
+      title: null,
       handles: [],
       lastState: null,
       lastZ: UNASSIGNED,
@@ -464,8 +469,9 @@ export function attachDesktop(
     windowElement.style.left = '0'
     windowElement.style.top = '0'
 
-    const titleEl = windowElement.querySelector('[data-wm-title]')
+    const titleEl = windowElement.querySelector<HTMLElement>('[data-wm-title]')
     if (titleEl) {
+      attached.title = titleEl
       if (!titleEl.id) titleEl.id = `wmkit-title-${id}`
       windowElement.setAttribute('aria-labelledby', titleEl.id)
     }
