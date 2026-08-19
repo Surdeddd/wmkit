@@ -10,6 +10,7 @@
   --wm-text: #b8f5cd;
   --wm-text-dim: rgba(184, 245, 205, 0.55);
   --wm-accent: #4ade80;
+  --wm-accent-ink: #4ade80;
   --wm-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --wm-transition: 120ms linear;
   position: relative;

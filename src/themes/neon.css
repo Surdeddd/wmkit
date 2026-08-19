@@ -10,6 +10,7 @@
   --wm-text: #f3e9ff;
   --wm-text-dim: rgba(243, 233, 255, 0.55);
   --wm-accent: #ec4899;
+  --wm-accent-ink: #ec4899;
   --wm-accent-alt: #38bdf8;
   --wm-blur: 20px;
   --wm-transition: 260ms cubic-bezier(0.32, 0.72, 0, 1);

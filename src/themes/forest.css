@@ -10,6 +10,7 @@
   --wm-text: #e6f0e2;
   --wm-text-dim: rgba(230, 240, 226, 0.58);
   --wm-accent: #9abe8c;
+  --wm-accent-ink: #9abe8c;
   --wm-serif: "Iowan Old Style", Palatino, Georgia, serif;
   --wm-title-font: var(--wm-serif);
   --wm-title-size: 14px;

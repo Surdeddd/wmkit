@@ -8,8 +8,9 @@
   --wm-shadow-focused: 0 18px 44px rgba(236, 130, 175, 0.3);
   --wm-titlebar-bg: linear-gradient(90deg, rgba(255, 214, 233, 0.9), rgba(214, 233, 255, 0.9));
   --wm-text: #5b3a52;
-  --wm-text-dim: rgba(91, 58, 82, 0.6);
+  --wm-text-dim: rgba(91, 58, 82, 0.82);
   --wm-accent: #ec82af;
+  --wm-accent-ink: #c81e66;
   --wm-title-size: 13px;
   --wm-title-weight: 700;
   --wm-titlebar-padding: 11px 16px;

@@ -1,15 +1,16 @@
 [data-wm-desktop] {
   --wm-radius: 12px;
-  --wm-bg: rgba(255, 255, 255, 0.78);
-  --wm-bg-focused: rgba(255, 255, 255, 0.94);
+  --wm-bg: rgba(255, 255, 255, 0.9);
+  --wm-bg-focused: rgba(255, 255, 255, 0.96);
   --wm-border: rgba(15, 23, 42, 0.1);
   --wm-border-focused: rgba(15, 23, 42, 0.22);
   --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
   --wm-shadow-focused: 0 16px 44px rgba(15, 23, 42, 0.2);
   --wm-titlebar-bg: rgba(15, 23, 42, 0.03);
   --wm-text: rgba(15, 23, 42, 0.92);
-  --wm-text-dim: rgba(15, 23, 42, 0.55);
+  --wm-text-dim: rgba(15, 23, 42, 0.64);
   --wm-accent: #4f46e5;
+  --wm-accent-ink: #4f46e5;
   --wm-blur: 18px;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;

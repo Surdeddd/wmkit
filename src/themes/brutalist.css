@@ -11,6 +11,7 @@
   --wm-text: #111111;
   --wm-text-dim: rgba(17, 17, 17, 0.6);
   --wm-accent: #ff3b00;
+  --wm-accent-ink: #cf3000;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;

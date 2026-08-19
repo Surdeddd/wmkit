@@ -11,8 +11,9 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 0 26px rgba(255, 176, 46, 0.22);
   --wm-titlebar-bg: rgba(255, 176, 46, 0.09);
   --wm-text: #ffc356;
-  --wm-text-dim: rgba(255, 195, 86, 0.55);
+  --wm-text-dim: rgba(255, 195, 86, 0.72);
   --wm-accent: #ffb02e;
+  --wm-accent-ink: #ffb02e;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -320,7 +321,7 @@ export const themeCss: Record<ThemeName, string> = {
 `,
   aqua: `[data-wm-desktop] {
   --wm-radius: 10px;
-  --wm-bg: rgba(238, 241, 246, 0.86);
+  --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
   --wm-border: rgba(60, 80, 110, 0.28);
   --wm-border-focused: rgba(40, 70, 120, 0.45);
@@ -328,8 +329,9 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 16px 40px rgba(20, 40, 80, 0.32);
   --wm-titlebar-bg: linear-gradient(180deg, #fdfdfe 0%, #e4eaf3 48%, #d4dced 52%, #e8edf5 100%);
   --wm-text: #1d2733;
-  --wm-text-dim: rgba(29, 39, 51, 0.62);
+  --wm-text-dim: rgba(29, 39, 51, 0.7);
   --wm-accent: #2f6fd0;
+  --wm-accent-ink: #2962b7;
   --wm-blur: 14px;
   --wm-title-size: 13px;
   --wm-title-weight: 600;
@@ -614,8 +616,9 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 0 0 1px rgba(215, 235, 255, 0.45);
   --wm-titlebar-bg: rgba(190, 220, 255, 0.1);
   --wm-text: #e8f2ff;
-  --wm-text-dim: rgba(232, 242, 255, 0.6);
+  --wm-text-dim: rgba(232, 242, 255, 0.74);
   --wm-accent: #9ecbff;
+  --wm-accent-ink: #9ecbff;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -921,6 +924,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #111111;
   --wm-text-dim: rgba(17, 17, 17, 0.6);
   --wm-accent: #ff3b00;
+  --wm-accent-ink: #cf3000;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -1226,8 +1230,9 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 18px 44px rgba(236, 130, 175, 0.3);
   --wm-titlebar-bg: linear-gradient(90deg, rgba(255, 214, 233, 0.9), rgba(214, 233, 255, 0.9));
   --wm-text: #5b3a52;
-  --wm-text-dim: rgba(91, 58, 82, 0.6);
+  --wm-text-dim: rgba(91, 58, 82, 0.82);
   --wm-accent: #ec82af;
+  --wm-accent-ink: #c81e66;
   --wm-title-size: 13px;
   --wm-title-weight: 700;
   --wm-titlebar-padding: 11px 16px;
@@ -1506,6 +1511,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #f4f4f4;
   --wm-text-dim: #a8a8a8;
   --wm-accent: #4589ff;
+  --wm-accent-ink: #4589ff;
   --wm-title-size: 13px;
   --wm-title-weight: 500;
   --wm-title-tracking: 0;
@@ -1804,6 +1810,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #e6f0e2;
   --wm-text-dim: rgba(230, 240, 226, 0.58);
   --wm-accent: #9abe8c;
+  --wm-accent-ink: #9abe8c;
   --wm-serif: "Iowan Old Style", Palatino, Georgia, serif;
   --wm-title-font: var(--wm-serif);
   --wm-title-size: 14px;
@@ -2073,16 +2080,17 @@ export const themeCss: Record<ThemeName, string> = {
 `,
   frost: `[data-wm-desktop] {
   --wm-radius: 18px;
-  --wm-bg: rgba(255, 255, 255, 0.48);
-  --wm-bg-focused: rgba(255, 255, 255, 0.66);
+  --wm-bg: rgba(255, 255, 255, 0.82);
+  --wm-bg-focused: rgba(255, 255, 255, 0.96);
   --wm-border: rgba(255, 255, 255, 0.6);
   --wm-border-focused: rgba(255, 255, 255, 0.92);
   --wm-shadow: 0 8px 30px rgba(80, 110, 150, 0.18);
   --wm-shadow-focused: 0 20px 60px rgba(80, 110, 150, 0.3);
   --wm-titlebar-bg: rgba(255, 255, 255, 0.3);
   --wm-text: #20303f;
-  --wm-text-dim: rgba(32, 48, 63, 0.55);
+  --wm-text-dim: rgba(32, 48, 63, 0.75);
   --wm-accent: #0ea5e9;
+  --wm-accent-ink: #086087;
   --wm-blur: 28px;
   --wm-title-size: 13px;
   --wm-title-weight: 600;
@@ -2363,6 +2371,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: rgba(240, 242, 250, 0.92);
   --wm-text-dim: rgba(240, 242, 250, 0.55);
   --wm-accent: #7c6cff;
+  --wm-accent-ink: #7c6cff;
   --wm-blur: 22px;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;
@@ -2623,16 +2632,17 @@ export const themeCss: Record<ThemeName, string> = {
 `,
   light: `[data-wm-desktop] {
   --wm-radius: 12px;
-  --wm-bg: rgba(255, 255, 255, 0.78);
-  --wm-bg-focused: rgba(255, 255, 255, 0.94);
+  --wm-bg: rgba(255, 255, 255, 0.9);
+  --wm-bg-focused: rgba(255, 255, 255, 0.96);
   --wm-border: rgba(15, 23, 42, 0.1);
   --wm-border-focused: rgba(15, 23, 42, 0.22);
   --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
   --wm-shadow-focused: 0 16px 44px rgba(15, 23, 42, 0.2);
   --wm-titlebar-bg: rgba(15, 23, 42, 0.03);
   --wm-text: rgba(15, 23, 42, 0.92);
-  --wm-text-dim: rgba(15, 23, 42, 0.55);
+  --wm-text-dim: rgba(15, 23, 42, 0.64);
   --wm-accent: #4f46e5;
+  --wm-accent-ink: #4f46e5;
   --wm-blur: 18px;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;
@@ -2903,6 +2913,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #f3e9ff;
   --wm-text-dim: rgba(243, 233, 255, 0.55);
   --wm-accent: #ec4899;
+  --wm-accent-ink: #ec4899;
   --wm-accent-alt: #38bdf8;
   --wm-blur: 20px;
   --wm-transition: 260ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -3193,6 +3204,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #ffffff;
   --wm-text-dim: rgba(255, 255, 255, 0.55);
   --wm-accent: #ffffff;
+  --wm-accent-ink: #ffffff;
   --wm-title-size: 11px;
   --wm-title-weight: 600;
   --wm-title-tracking: 0.24em;
@@ -3474,8 +3486,9 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 4px 6px 0 rgba(84, 71, 51, 0.16);
   --wm-titlebar-bg: rgba(84, 71, 51, 0.05);
   --wm-text: #3f382c;
-  --wm-text-dim: rgba(63, 56, 44, 0.6);
+  --wm-text-dim: rgba(63, 56, 44, 0.73);
   --wm-accent: #a8571b;
+  --wm-accent-ink: #a8571b;
   --wm-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --wm-transition: 220ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;
@@ -3729,12 +3742,14 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-face-dark: #808080;
   --wm-face-darker: #404040;
   --wm-title-active-a: #000080;
-  --wm-title-active-b: #1084d0;
-  --wm-title-inactive: #808080;
+  --wm-title-active-b: #0f6fb0;
+  --wm-title-inactive: #8c8c8c;
   --wm-text: #000000;
   --wm-text-dim: #404040;
   --wm-accent: #000080;
+  --wm-accent-ink: #000080;
   --wm-title-text: #ffffff;
+  --wm-title-text-inactive: #1a1a1a;
   position: relative;
   overflow: hidden;
   background: #008080;
@@ -3792,11 +3807,15 @@ export const themeCss: Record<ThemeName, string> = {
   flex: 1;
   font-size: 12px;
   font-weight: 700;
-  color: var(--wm-title-text);
+  color: var(--wm-title-text-inactive);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0;
+}
+
+[data-wm-window][data-wm-focused] [data-wm-title] {
+  color: var(--wm-title-text);
 }
 
 [data-wm-window] [data-wm-controls] {
@@ -3943,6 +3962,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #ffeaf7;
   --wm-text-dim: rgba(255, 234, 247, 0.62);
   --wm-accent: #ff7ac6;
+  --wm-accent-ink: #ff7ac6;
   --wm-blur: 16px;
   --wm-title-size: 12px;
   --wm-title-weight: 700;
@@ -4227,6 +4247,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-text: #b8f5cd;
   --wm-text-dim: rgba(184, 245, 205, 0.55);
   --wm-accent: #4ade80;
+  --wm-accent-ink: #4ade80;
   --wm-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --wm-transition: 120ms linear;
   position: relative;
@@ -4502,8 +4523,9 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 0 26px rgba(255, 176, 46, 0.22);
   --wm-titlebar-bg: rgba(255, 176, 46, 0.09);
   --wm-text: #ffc356;
-  --wm-text-dim: rgba(255, 195, 86, 0.55);
+  --wm-text-dim: rgba(255, 195, 86, 0.72);
   --wm-accent: #ffb02e;
+  --wm-accent-ink: #ffb02e;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -4796,7 +4818,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
 `,
   aqua: `:host {
   --wm-radius: 10px;
-  --wm-bg: rgba(238, 241, 246, 0.86);
+  --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
   --wm-border: rgba(60, 80, 110, 0.28);
   --wm-border-focused: rgba(40, 70, 120, 0.45);
@@ -4804,8 +4826,9 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 16px 40px rgba(20, 40, 80, 0.32);
   --wm-titlebar-bg: linear-gradient(180deg, #fdfdfe 0%, #e4eaf3 48%, #d4dced 52%, #e8edf5 100%);
   --wm-text: #1d2733;
-  --wm-text-dim: rgba(29, 39, 51, 0.62);
+  --wm-text-dim: rgba(29, 39, 51, 0.7);
   --wm-accent: #2f6fd0;
+  --wm-accent-ink: #2962b7;
   --wm-blur: 14px;
   --wm-title-size: 13px;
   --wm-title-weight: 600;
@@ -5074,8 +5097,9 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 0 0 1px rgba(215, 235, 255, 0.45);
   --wm-titlebar-bg: rgba(190, 220, 255, 0.1);
   --wm-text: #e8f2ff;
-  --wm-text-dim: rgba(232, 242, 255, 0.6);
+  --wm-text-dim: rgba(232, 242, 255, 0.74);
   --wm-accent: #9ecbff;
+  --wm-accent-ink: #9ecbff;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -5361,6 +5385,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #111111;
   --wm-text-dim: rgba(17, 17, 17, 0.6);
   --wm-accent: #ff3b00;
+  --wm-accent-ink: #cf3000;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;
@@ -5650,8 +5675,9 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 0 18px 44px rgba(236, 130, 175, 0.3);
   --wm-titlebar-bg: linear-gradient(90deg, rgba(255, 214, 233, 0.9), rgba(214, 233, 255, 0.9));
   --wm-text: #5b3a52;
-  --wm-text-dim: rgba(91, 58, 82, 0.6);
+  --wm-text-dim: rgba(91, 58, 82, 0.82);
   --wm-accent: #ec82af;
+  --wm-accent-ink: #c81e66;
   --wm-title-size: 13px;
   --wm-title-weight: 700;
   --wm-titlebar-padding: 11px 16px;
@@ -5914,6 +5940,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #f4f4f4;
   --wm-text-dim: #a8a8a8;
   --wm-accent: #4589ff;
+  --wm-accent-ink: #4589ff;
   --wm-title-size: 13px;
   --wm-title-weight: 500;
   --wm-title-tracking: 0;
@@ -6196,6 +6223,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #e6f0e2;
   --wm-text-dim: rgba(230, 240, 226, 0.58);
   --wm-accent: #9abe8c;
+  --wm-accent-ink: #9abe8c;
   --wm-serif: "Iowan Old Style", Palatino, Georgia, serif;
   --wm-title-font: var(--wm-serif);
   --wm-title-size: 14px;
@@ -6449,16 +6477,17 @@ export const themeShadowCss: Record<ThemeName, string> = {
 `,
   frost: `:host {
   --wm-radius: 18px;
-  --wm-bg: rgba(255, 255, 255, 0.48);
-  --wm-bg-focused: rgba(255, 255, 255, 0.66);
+  --wm-bg: rgba(255, 255, 255, 0.82);
+  --wm-bg-focused: rgba(255, 255, 255, 0.96);
   --wm-border: rgba(255, 255, 255, 0.6);
   --wm-border-focused: rgba(255, 255, 255, 0.92);
   --wm-shadow: 0 8px 30px rgba(80, 110, 150, 0.18);
   --wm-shadow-focused: 0 20px 60px rgba(80, 110, 150, 0.3);
   --wm-titlebar-bg: rgba(255, 255, 255, 0.3);
   --wm-text: #20303f;
-  --wm-text-dim: rgba(32, 48, 63, 0.55);
+  --wm-text-dim: rgba(32, 48, 63, 0.75);
   --wm-accent: #0ea5e9;
+  --wm-accent-ink: #086087;
   --wm-blur: 28px;
   --wm-title-size: 13px;
   --wm-title-weight: 600;
@@ -6723,6 +6752,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: rgba(240, 242, 250, 0.92);
   --wm-text-dim: rgba(240, 242, 250, 0.55);
   --wm-accent: #7c6cff;
+  --wm-accent-ink: #7c6cff;
   --wm-blur: 22px;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -6965,16 +6995,17 @@ export const themeShadowCss: Record<ThemeName, string> = {
 `,
   light: `:host {
   --wm-radius: 12px;
-  --wm-bg: rgba(255, 255, 255, 0.78);
-  --wm-bg-focused: rgba(255, 255, 255, 0.94);
+  --wm-bg: rgba(255, 255, 255, 0.9);
+  --wm-bg-focused: rgba(255, 255, 255, 0.96);
   --wm-border: rgba(15, 23, 42, 0.1);
   --wm-border-focused: rgba(15, 23, 42, 0.22);
   --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
   --wm-shadow-focused: 0 16px 44px rgba(15, 23, 42, 0.2);
   --wm-titlebar-bg: rgba(15, 23, 42, 0.03);
   --wm-text: rgba(15, 23, 42, 0.92);
-  --wm-text-dim: rgba(15, 23, 42, 0.55);
+  --wm-text-dim: rgba(15, 23, 42, 0.64);
   --wm-accent: #4f46e5;
+  --wm-accent-ink: #4f46e5;
   --wm-blur: 18px;
   --wm-transition: 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -7227,6 +7258,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #f3e9ff;
   --wm-text-dim: rgba(243, 233, 255, 0.55);
   --wm-accent: #ec4899;
+  --wm-accent-ink: #ec4899;
   --wm-accent-alt: #38bdf8;
   --wm-blur: 20px;
   --wm-transition: 260ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -7497,6 +7529,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #ffffff;
   --wm-text-dim: rgba(255, 255, 255, 0.55);
   --wm-accent: #ffffff;
+  --wm-accent-ink: #ffffff;
   --wm-title-size: 11px;
   --wm-title-weight: 600;
   --wm-title-tracking: 0.24em;
@@ -7757,8 +7790,9 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-shadow-focused: 4px 6px 0 rgba(84, 71, 51, 0.16);
   --wm-titlebar-bg: rgba(84, 71, 51, 0.05);
   --wm-text: #3f382c;
-  --wm-text-dim: rgba(63, 56, 44, 0.6);
+  --wm-text-dim: rgba(63, 56, 44, 0.73);
   --wm-accent: #a8571b;
+  --wm-accent-ink: #a8571b;
   --wm-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --wm-transition: 220ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -7996,12 +8030,14 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-face-dark: #808080;
   --wm-face-darker: #404040;
   --wm-title-active-a: #000080;
-  --wm-title-active-b: #1084d0;
-  --wm-title-inactive: #808080;
+  --wm-title-active-b: #0f6fb0;
+  --wm-title-inactive: #8c8c8c;
   --wm-text: #000000;
   --wm-text-dim: #404040;
   --wm-accent: #000080;
+  --wm-accent-ink: #000080;
   --wm-title-text: #ffffff;
+  --wm-title-text-inactive: #1a1a1a;
 }
 
 :host {
@@ -8056,11 +8092,15 @@ export const themeShadowCss: Record<ThemeName, string> = {
   flex: 1;
   font-size: 12px;
   font-weight: 700;
-  color: var(--wm-title-text);
+  color: var(--wm-title-text-inactive);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0;
+}
+
+:host([data-wm-focused]) [data-wm-title] {
+  color: var(--wm-title-text);
 }
 
 [data-wm-controls] {
@@ -8200,6 +8240,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #ffeaf7;
   --wm-text-dim: rgba(255, 234, 247, 0.62);
   --wm-accent: #ff7ac6;
+  --wm-accent-ink: #ff7ac6;
   --wm-blur: 16px;
   --wm-title-size: 12px;
   --wm-title-weight: 700;
@@ -8468,6 +8509,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-text: #b8f5cd;
   --wm-text-dim: rgba(184, 245, 205, 0.55);
   --wm-accent: #4ade80;
+  --wm-accent-ink: #4ade80;
   --wm-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --wm-transition: 120ms linear;
 }

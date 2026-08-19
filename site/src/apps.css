@@ -91,7 +91,7 @@
 }
 
 [data-wm-window] a {
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 [data-wm-window] code,
@@ -168,7 +168,7 @@
 .app-actions button:hover,
 .app-btn:hover {
   background: var(--wm-accent);
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   color: var(--signal-ink);
 }
 
@@ -209,7 +209,7 @@
 }
 
 .badges b {
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .term {
@@ -230,7 +230,7 @@
 
 .term-log .cmd::before {
   content: "› ";
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .term-log .out {
@@ -251,7 +251,7 @@
 
 .term-form::before {
   content: "›";
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .term-form input {
@@ -274,11 +274,11 @@
 }
 
 .state-tree .k {
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .state-tree .n {
-  color: var(--info);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .state-tree .s {
@@ -303,7 +303,7 @@
 }
 
 .evlog b {
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
   font-weight: 500;
   min-width: 84px;
 }
@@ -329,7 +329,7 @@
 
 .zone-pad button:hover {
   background: var(--wm-accent);
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   color: var(--signal-ink);
 }
 
@@ -385,7 +385,7 @@
 .tabs button[aria-selected="true"] {
   border-color: color-mix(in srgb, currentColor 24%, transparent);
   border-bottom-color: transparent;
-  color: var(--wm-accent);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .code {
@@ -406,7 +406,7 @@
 }
 
 .code .fn {
-  color: var(--info);
+  color: var(--wm-accent-ink, var(--wm-accent));
 }
 
 .code .com {
@@ -445,7 +445,7 @@
 
 .seg button[aria-pressed="true"] {
   background: var(--wm-accent);
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   color: var(--signal-ink);
 }
 
@@ -583,7 +583,7 @@
 }
 
 .skin-swatch[aria-pressed="true"] {
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   background: color-mix(in srgb, var(--wm-accent) 12%, transparent);
 }
 
@@ -700,7 +700,7 @@
 }
 
 .skin-variant[aria-pressed="true"] {
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   background: color-mix(in srgb, var(--wm-accent) 12%, transparent);
 }
 
@@ -752,7 +752,7 @@
 }
 
 .skin-layout-button[aria-pressed="true"] {
-  border-color: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
   background: color-mix(in srgb, var(--wm-accent) 12%, transparent);
 }
 

@@ -4,12 +4,14 @@
   --wm-face-dark: #808080;
   --wm-face-darker: #404040;
   --wm-title-active-a: #000080;
-  --wm-title-active-b: #1084d0;
-  --wm-title-inactive: #808080;
+  --wm-title-active-b: #0f6fb0;
+  --wm-title-inactive: #8c8c8c;
   --wm-text: #000000;
   --wm-text-dim: #404040;
   --wm-accent: #000080;
+  --wm-accent-ink: #000080;
   --wm-title-text: #ffffff;
+  --wm-title-text-inactive: #1a1a1a;
   position: relative;
   overflow: hidden;
   background: #008080;
@@ -67,11 +69,15 @@
   flex: 1;
   font-size: 12px;
   font-weight: 700;
-  color: var(--wm-title-text);
+  color: var(--wm-title-text-inactive);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0;
+}
+
+[data-wm-window][data-wm-focused] [data-wm-title] {
+  color: var(--wm-title-text);
 }
 
 [data-wm-window] [data-wm-controls] {
