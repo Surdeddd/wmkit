@@ -13,9 +13,12 @@ import {
   type DesktopSnapOptions,
   type GestureContext,
   INTERACTIVE_SELECTOR,
+  type MountedWindow,
   type Point,
   type SessionContext,
+  type SkinMount,
   type WindowAttachOptions,
+  type WindowSkin,
   windowOf,
 } from './shared'
 import { restack, type StackingTarget, UNASSIGNED } from './stacking'
@@ -24,6 +27,10 @@ interface AttachedWindow {
   element: HTMLElement
   handle: HTMLElement | null
   title: HTMLElement | null
+  skin: string | null
+  mount: SkinMount | null
+  mountOptions: WindowAttachOptions
+  release: (() => void) | null
   handles: HTMLElement[]
   lastState: WindowState | null
   lastZ: number
@@ -253,6 +260,11 @@ export function attachDesktop(
     activeTab: boolean,
   ): void {
     const el = attached.element
+    const wanted = typeof win.meta.skin === 'string' ? win.meta.skin : null
+    if (attached.skin !== null && wanted !== null && wanted !== attached.skin) {
+      remount(attached, win, wanted)
+      return
+    }
     const firstSync = attached.lastState === null
     if (firstSync) el.style.transition = 'none'
     if (
@@ -454,6 +466,10 @@ export function attachDesktop(
       element: windowElement,
       handle: null,
       title: null,
+      skin: null,
+      mount: null,
+      mountOptions: windowOptions,
+      release: null,
       handles: [],
       lastState: null,
       lastZ: UNASSIGNED,
@@ -671,10 +687,66 @@ export function attachDesktop(
     return detach
   }
 
+  function resolveSkin(skin: WindowSkin | string): WindowSkin {
+    if (typeof skin !== 'string') return skin
+    const found = options.skins?.[skin]
+    if (!found) throw new Error(`wmkit: unknown skin "${skin}"`)
+    return found
+  }
+
+  function buildSkin(
+    id: string,
+    skin: WindowSkin | string,
+    windowOptions: WindowAttachOptions,
+  ): SkinMount {
+    const win = wm.get(id)
+    if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
+    const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
+    element.append(mount.element)
+    const release = attachWindow(id, mount.element, windowOptions)
+    const attached = registry.get(id) as AttachedWindow
+    attached.skin = typeof skin === 'string' ? skin : null
+    attached.mount = mount
+    attached.mountOptions = windowOptions
+    attached.release = release
+    return mount
+  }
+
+  function remount(attached: AttachedWindow, win: WindowState, name: string): void {
+    const previous = attached.mount as SkinMount
+    const carried = [...previous.content.childNodes]
+    const windowOptions = attached.mountOptions
+    ;(attached.release as () => void)()
+    previous.element.remove()
+    const mount = buildSkin(win.id, name, windowOptions)
+    mount.content.append(...carried)
+    previous.destroy?.()
+  }
+
+  function mountWindow(
+    id: string,
+    skin: WindowSkin | string,
+    windowOptions: WindowAttachOptions = {},
+  ): MountedWindow {
+    const mount = buildSkin(id, skin, windowOptions)
+    const attached = registry.get(id) as AttachedWindow
+    const release = attached.release as () => void
+    return {
+      element: mount.element,
+      content: mount.content,
+      detach() {
+        release()
+        mount.element.remove()
+        mount.destroy?.()
+      },
+    }
+  }
+
   return {
     element,
     wm,
     attachWindow,
+    mountWindow,
     actions: (id: string) => createActions(wm, id),
     destroy() {
       endDrag(true)

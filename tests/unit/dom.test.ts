@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
-import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
 import { windowOf } from '../../src/dom/shared'
 
 const VIEWPORT = { width: 800, height: 600 }
@@ -1520,5 +1520,126 @@ describe('window appearance variants', () => {
 
     expect(modal.root.dataset.wmVariant).toBe('sheet')
     expect(plain.root.dataset.wmVariant).toBeUndefined()
+  })
+})
+
+function makeSkin(look: string, extra: { destroy?: () => void } = {}): WindowSkin {
+  return ({ doc, actions }) => {
+    const element = doc.createElement('section')
+    element.dataset.look = look
+    const header = doc.createElement('header')
+    header.dataset.wmDrag = ''
+    const title = doc.createElement('b')
+    title.dataset.wmTitle = ''
+    const close = doc.createElement('button')
+    close.className = 'shut'
+    close.addEventListener('click', () => actions.close())
+    header.append(title, close)
+    const content = doc.createElement('div')
+    element.append(header, content)
+    return { element, content, ...extra }
+  }
+}
+
+describe('window skins', () => {
+  it('mounts a window from a skin and hands back the content node', () => {
+    const stripe = makeSkin('stripe')
+    const harness = makeHarness({ skins: { stripe } })
+    harness.wm.open({ id: 'a', title: 'Hello', width: 200, height: 150 })
+
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+
+    expect(mounted.element.dataset.wmWindow).toBe('a')
+    expect(mounted.element.dataset.look).toBe('stripe')
+    expect(mounted.element.querySelector('[data-wm-title]')?.textContent).toBe('Hello')
+    expect(harness.element.contains(mounted.element)).toBe(true)
+
+    mounted.content.append(document.createTextNode('body'))
+    mounted.element.querySelector<HTMLButtonElement>('.shut')?.click()
+    expect(harness.wm.get('a')).toBeUndefined()
+  })
+
+  it('takes a skin object as well as a registered name', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+
+    const mounted = harness.desktop.mountWindow('a', makeSkin('inline'))
+    expect(mounted.element.dataset.look).toBe('inline')
+  })
+
+  it('refuses a skin name it does not know, and an unknown window', () => {
+    const harness = makeHarness({ skins: { stripe: makeSkin('stripe') } })
+    harness.wm.open({ id: 'a' })
+
+    expect(() => harness.desktop.mountWindow('a', 'nope')).toThrow(/unknown skin/)
+    expect(() => harness.desktop.mountWindow('ghost', 'stripe')).toThrow(/unknown window/)
+  })
+
+  it('rebuilds the window when the skin changes and carries the content over', () => {
+    const destroyed: string[] = []
+    const harness = makeHarness({
+      skins: {
+        stripe: makeSkin('stripe', { destroy: () => destroyed.push('stripe') }),
+        plain: makeSkin('plain'),
+      },
+    })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+    const live = document.createElement('canvas')
+    mounted.content.append(live)
+
+    harness.wm.update('a', { meta: { skin: 'plain' } })
+
+    const now = harness.element.querySelector<HTMLElement>('[data-wm-window="a"]')
+    expect(now?.dataset.look).toBe('plain')
+    expect(now?.contains(live)).toBe(true)
+    expect(mounted.element.isConnected).toBe(false)
+    expect(destroyed).toEqual(['stripe'])
+    expect(harness.wm.get('a')?.title).toBe('Hello')
+    expect(now?.querySelector('[data-wm-title]')?.textContent).toBe('Hello')
+  })
+
+  it('keeps driving the manager from the rebuilt chrome', () => {
+    const harness = makeHarness({
+      skins: { stripe: makeSkin('stripe'), plain: makeSkin('plain') },
+    })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    harness.desktop.mountWindow('a', 'stripe')
+
+    harness.wm.update('a', { meta: { skin: 'plain' } })
+    const now = harness.element.querySelector<HTMLElement>('[data-wm-window="a"]')
+    now?.querySelector<HTMLButtonElement>('.shut')?.click()
+
+    expect(harness.wm.get('a')).toBeUndefined()
+  })
+
+  it('leaves the window alone when the skin name is unchanged or dropped', () => {
+    const harness = makeHarness({ skins: { stripe: makeSkin('stripe') } })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+
+    harness.wm.update('a', { title: 'Same skin' })
+    expect(harness.element.querySelector('[data-wm-window="a"]')).toBe(mounted.element)
+
+    harness.wm.update('a', { meta: { skin: 7 } })
+    expect(harness.element.querySelector('[data-wm-window="a"]')).toBe(mounted.element)
+  })
+
+  it('never rebuilds a window that was attached rather than mounted', () => {
+    const harness = makeHarness({ skins: { stripe: makeSkin('stripe') } })
+    const { root } = harness.add({ id: 'a', title: 'Hello' })
+
+    harness.wm.update('a', { meta: { skin: 'stripe' } })
+    expect(harness.element.querySelector('[data-wm-window="a"]')).toBe(root)
+  })
+
+  it('detaches a mounted window and takes its element with it', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow('a', makeSkin('inline'))
+
+    mounted.detach()
+    expect(mounted.element.isConnected).toBe(false)
+    expect(harness.element.querySelector('[data-wm-window="a"]')).toBeNull()
   })
 })
