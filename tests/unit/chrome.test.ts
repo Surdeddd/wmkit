@@ -188,3 +188,148 @@ describe('skin()', () => {
     )
   })
 })
+
+const SHADOW_TEMPLATE =
+  '<section><header data-wm-drag><span data-wm-title>{{title}}</span></header>' +
+  '<div data-wm-content></div></section>'
+
+function stubConstructableSheets(): () => void {
+  const owned = new WeakMap<ShadowRoot, readonly CSSStyleSheet[]>()
+  Object.defineProperty(CSSStyleSheet.prototype, 'replaceSync', {
+    configurable: true,
+    value(this: { cssText: string }, css: string) {
+      this.cssText = css
+    },
+  })
+  Object.defineProperty(ShadowRoot.prototype, 'adoptedStyleSheets', {
+    configurable: true,
+    get(this: ShadowRoot) {
+      return owned.get(this) ?? []
+    },
+    set(this: ShadowRoot, sheets: readonly CSSStyleSheet[]) {
+      owned.set(this, sheets)
+    },
+  })
+  return () => {
+    Reflect.deleteProperty(CSSStyleSheet.prototype, 'replaceSync')
+    Reflect.deleteProperty(ShadowRoot.prototype, 'adoptedStyleSheets')
+  }
+}
+
+describe('shadow skins', () => {
+  it('mounts the chrome in a shadow root and projects the content', () => {
+    const harness = makeHarness()
+    const isolated = skin({ name: 'iso', shadow: true, template: SHADOW_TEMPLATE })
+    harness.wm.open({ id: 'a', title: 'Notes' })
+    const mounted = harness.desktop.mountWindow('a', isolated)
+
+    expect(mounted.element.shadowRoot).not.toBeNull()
+    expect(mounted.element.dataset.wmSkin).toBe('iso')
+    expect(mounted.element.shadowRoot?.querySelector('[data-wm-title]')?.textContent).toBe('Notes')
+    expect(mounted.element.querySelector('[data-wm-drag]')).toBeNull()
+    expect(mounted.element.shadowRoot?.querySelector('slot')).not.toBeNull()
+    expect(mounted.content.getRootNode()).toBe(document)
+    expect(mounted.content.parentElement).toBe(mounted.element)
+  })
+
+  it('keeps the resize grips out of reach of page css', () => {
+    const harness = makeHarness()
+    const isolated = skin({ name: 'iso', shadow: true, template: SHADOW_TEMPLATE })
+    harness.wm.open({ id: 'a', title: 'Notes' })
+    const mounted = harness.desktop.mountWindow('a', isolated)
+
+    expect(mounted.element.querySelector('[data-wm-resize]')).toBeNull()
+    expect(mounted.element.shadowRoot?.querySelectorAll('[data-wm-resize]')).toHaveLength(8)
+
+    mounted.detach()
+    expect(mounted.element.shadowRoot?.querySelector('[data-wm-resize]')).toBeNull()
+  })
+
+  it('renames a shadow window through the boundary', () => {
+    const harness = makeHarness()
+    const isolated = skin({ name: 'iso', shadow: true, template: SHADOW_TEMPLATE })
+    harness.wm.open({ id: 'a', title: 'Notes' })
+    const mounted = harness.desktop.mountWindow('a', isolated)
+
+    harness.wm.update('a', { title: 'Renamed' })
+    expect(mounted.element.shadowRoot?.querySelector('[data-wm-title]')?.textContent).toBe(
+      'Renamed',
+    )
+    expect(mounted.element.getAttribute('aria-label')).toBe('Renamed')
+    expect(mounted.element.hasAttribute('aria-labelledby')).toBe(false)
+  })
+
+  it('falls back to a style tag where constructable sheets are missing', () => {
+    const harness = makeHarness()
+    const isolated = skin({
+      name: 'iso',
+      shadow: true,
+      styles: ':host { display: block }',
+      template: SHADOW_TEMPLATE,
+    })
+    harness.wm.open({ id: 'a' })
+    const mounted = harness.desktop.mountWindow('a', isolated)
+
+    const tag = mounted.element.shadowRoot?.querySelector('style')
+    expect(tag?.textContent).toBe(':host { display: block }')
+    expect(document.head.querySelector('style')).toBeNull()
+  })
+
+  it('shares one stylesheet between every window of a shadow skin', () => {
+    const restore = stubConstructableSheets()
+    try {
+      const harness = makeHarness()
+      const isolated = skin({
+        name: 'iso',
+        shadow: true,
+        styles: ':host { display: block }',
+        template: SHADOW_TEMPLATE,
+      })
+      harness.wm.open({ id: 'a' })
+      harness.wm.open({ id: 'b' })
+      const first = harness.desktop.mountWindow('a', isolated)
+      const second = harness.desktop.mountWindow('b', isolated)
+
+      const sheet = first.element.shadowRoot?.adoptedStyleSheets[0]
+      expect(sheet).toBeDefined()
+      expect(second.element.shadowRoot?.adoptedStyleSheets[0]).toBe(sheet)
+      expect((sheet as unknown as { cssText: string }).cssText).toBe(':host { display: block }')
+      expect(first.element.shadowRoot?.querySelector('style')).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+
+  it('gives a second skin a stylesheet of its own', () => {
+    const restore = stubConstructableSheets()
+    try {
+      const harness = makeHarness()
+      const one = skin({ name: 'one', shadow: true, styles: 'a{}', template: SHADOW_TEMPLATE })
+      const two = skin({ name: 'two', shadow: true, styles: 'b{}', template: SHADOW_TEMPLATE })
+      harness.wm.open({ id: 'a' })
+      harness.wm.open({ id: 'b' })
+
+      expect(
+        harness.desktop.mountWindow('a', one).element.shadowRoot?.adoptedStyleSheets[0],
+      ).not.toBe(harness.desktop.mountWindow('b', two).element.shadowRoot?.adoptedStyleSheets[0])
+    } finally {
+      restore()
+    }
+  })
+
+  it('mounts a shadow skin that brings no styles at all', () => {
+    const restore = stubConstructableSheets()
+    try {
+      const harness = makeHarness()
+      harness.wm.open({ id: 'a' })
+      const mounted = harness.desktop.mountWindow(
+        'a',
+        skin({ shadow: true, template: SHADOW_TEMPLATE }),
+      )
+      expect(mounted.element.shadowRoot?.adoptedStyleSheets).toHaveLength(0)
+      expect(mounted.element.dataset.wmSkin).toBeUndefined()
+    } finally {
+      restore()
+    }
+  })
+})

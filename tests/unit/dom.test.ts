@@ -1643,3 +1643,164 @@ describe('window skins', () => {
     expect(harness.element.querySelector('[data-wm-window="a"]')).toBeNull()
   })
 })
+
+function shadowWindow(harness: Harness, init: WindowInit, markup: string): HTMLElement {
+  harness.wm.open(init)
+  const host = document.createElement('section')
+  const root = host.attachShadow({ mode: 'open' })
+  root.innerHTML = markup
+  harness.element.append(host)
+  harness.desktop.attachWindow(init.id as string, host)
+  return host
+}
+
+describe('windows built inside a shadow root', () => {
+  it('names the window by string when its title lives across the boundary', () => {
+    const harness = makeHarness()
+    const host = shadowWindow(
+      harness,
+      { id: 'a', title: 'Notes' },
+      '<header data-wm-drag><span data-wm-title></span></header>',
+    )
+
+    expect(host.getAttribute('aria-label')).toBe('Notes')
+    expect(host.hasAttribute('aria-labelledby')).toBe(false)
+    expect(host.shadowRoot?.querySelector('[data-wm-title]')?.textContent).toBe('Notes')
+
+    harness.wm.update('a', { title: 'Renamed' })
+    expect(host.shadowRoot?.querySelector('[data-wm-title]')?.textContent).toBe('Renamed')
+  })
+
+  it('still points at a light title by reference', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', title: 'Notes' })
+    const title = root.querySelector('[data-wm-title]') as HTMLElement
+
+    expect(root.getAttribute('aria-labelledby')).toBe(title.id)
+  })
+
+  it('finds a drop target whose titlebar is inside a shadow root', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    const host = shadowWindow(
+      harness,
+      { id: 'target', x: 400, y: 400, width: 200, height: 150 },
+      '<header data-wm-drag><span data-wm-title></span></header>',
+    )
+    const root = host.shadowRoot as ShadowRoot
+    const inner = root.querySelector('[data-wm-drag]') as HTMLElement
+    Object.assign(root, { elementFromPoint: () => inner })
+    document.elementsFromPoint = () => [host]
+
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
+    handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
+    harness.flushFrames()
+
+    expect(host.dataset.wmTabTarget).toBe('')
+
+    handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(harness.wm.get('moving')?.groupId).toBeTruthy()
+  })
+
+  it('gives up on a shadow root that cannot answer where a point lands', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    const host = shadowWindow(
+      harness,
+      { id: 'target', x: 400, y: 400, width: 200, height: 150 },
+      '<header data-wm-drag></header>',
+    )
+    document.elementsFromPoint = () => [host]
+
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    drag(harness, handle, [60, 20], [450, 410])
+
+    expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+  })
+
+  it('gives up on a shadow root that keeps answering with its own host', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    const host = shadowWindow(
+      harness,
+      { id: 'target', x: 400, y: 400, width: 200, height: 150 },
+      '<header data-wm-drag></header>',
+    )
+    Object.assign(host.shadowRoot as ShadowRoot, { elementFromPoint: () => host })
+    document.elementsFromPoint = () => [host]
+
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    drag(harness, handle, [60, 20], [450, 410])
+
+    expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
+  })
+
+  it('ignores a hit that belongs to no window at all', () => {
+    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
+    const stray = document.createElement('div')
+    stray.dataset.wmDrag = ''
+    document.body.append(stray)
+    document.elementsFromPoint = () => [stray]
+
+    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    drag(harness, handle, [60, 20], [450, 410])
+
+    expect(harness.wm.get('moving')?.groupId).toBeNull()
+  })
+
+  it('wraps the tab key across the boundary and through the projected content', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'm', layer: 'modal', width: 200, height: 150 })
+    const host = document.createElement('section')
+    const root = host.attachShadow({ mode: 'open' })
+    root.innerHTML =
+      '<header data-wm-drag><button id="shut">x</button></header>' +
+      '<div><slot></slot></div>' +
+      '<footer><button id="help">?</button></footer>'
+    const body = document.createElement('div')
+    const field = document.createElement('input')
+    body.append(field)
+    host.append(body)
+    harness.element.append(host)
+    harness.desktop.attachWindow('m', host)
+
+    const shut = root.querySelector<HTMLElement>('#shut') as HTMLElement
+    const help = root.querySelector<HTMLElement>('#help') as HTMLElement
+    for (const node of [shut, help, field]) {
+      Object.defineProperty(node, 'offsetParent', { configurable: true, value: host })
+    }
+
+    help.focus()
+    expect(keydown(host, 'Tab').defaultPrevented).toBe(true)
+    expect(root.activeElement).toBe(shut)
+
+    expect(keydown(host, 'Tab', { shiftKey: true }).defaultPrevented).toBe(true)
+    expect(root.activeElement).toBe(help)
+
+    field.focus()
+    expect(keydown(host, 'Tab').defaultPrevented).toBe(false)
+    expect(document.activeElement).toBe(field)
+  })
+
+  it('counts a projected control that is focused but has no layout', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'm', layer: 'modal', width: 200, height: 150 })
+    const host = document.createElement('section')
+    const root = host.attachShadow({ mode: 'open' })
+    root.innerHTML = '<header data-wm-drag></header><slot></slot>'
+    const only = document.createElement('button')
+    host.append(only)
+    harness.element.append(host)
+    harness.desktop.attachWindow('m', host)
+
+    only.focus()
+    expect(keydown(host, 'Tab').defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(only)
+  })
+
+  it('leaves a shadow window without a titlebar unlabelled by reference', () => {
+    const harness = makeHarness()
+    const host = shadowWindow(harness, { id: 'a', title: 'Notes' }, '<div>no titlebar</div>')
+
+    expect(host.hasAttribute('aria-labelledby')).toBe(false)
+    expect(host.getAttribute('aria-label')).toBe('Notes')
+  })
+})

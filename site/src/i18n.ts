@@ -72,7 +72,7 @@ const en: Dict = {
   meta: {
     title: 'wmkit — headless window manager for the web',
     description:
-      'Draggable, resizable, snappable windows for any web app. Headless core under 14 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps.',
+      'Draggable, resizable, snappable windows for any web app. Headless core under 15 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps.',
   },
   ui: {
     skip: 'Skip to documentation',
@@ -157,7 +157,7 @@ const en: Dict = {
     body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid and Angular are thin wrappers over the same object — around 60 lines each.',
     badges: [
       ['0', 'dependencies'],
-      ['<14 kB', 'brotli core'],
+      ['<15 kB', 'brotli core'],
       ['100%', 'core coverage'],
       ['MIT', 'license'],
     ],
@@ -367,7 +367,7 @@ const en: Dict = {
     {
       label: 'Bundle (brotli)',
       cells: [
-        { text: '~13 kB', tone: 'good' },
+        { text: '~14 kB', tone: 'plain' },
         { text: '~14 kB', tone: 'plain' },
         { text: '~60 kB', tone: 'bad' },
         { text: '~10 kB', tone: 'good' },
@@ -381,7 +381,7 @@ const ru: Dict = {
   meta: {
     title: 'wmkit — headless-оконный менеджер для веба',
     description:
-      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 14 кБ, адаптеры для React, Vue, Svelte, Solid и Angular, рабочие столы, undo/redo, доступность и 60fps.',
+      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 15 кБ, адаптеры для React, Vue, Svelte, Solid и Angular, рабочие столы, undo/redo, доступность и 60fps.',
   },
   ui: {
     skip: 'Перейти к документации',
@@ -466,7 +466,7 @@ const ru: Dict = {
     body: 'Ядро это чистая машина состояний: границы, порядок, стадии и фокус — и ни одного обращения к DOM. DOM-слой превращает события указателя в переходы состояний на 60fps, а адаптеры для React, Vue, Svelte, Solid и Angular — тонкие обёртки над тем же объектом.',
     badges: [
       ['0', 'зависимостей'],
-      ['<14 кБ', 'ядро в brotli'],
+      ['<15 кБ', 'ядро в brotli'],
       ['100%', 'покрытие ядра'],
       ['MIT', 'лицензия'],
     ],
@@ -676,7 +676,7 @@ const ru: Dict = {
     {
       label: 'Размер (brotli)',
       cells: [
-        { text: '~13 кБ', tone: 'good' },
+        { text: '~14 кБ', tone: 'plain' },
         { text: '~14 кБ', tone: 'plain' },
         { text: '~60 кБ', tone: 'bad' },
         { text: '~10 кБ', tone: 'good' },

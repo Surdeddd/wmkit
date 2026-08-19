@@ -64,7 +64,7 @@ desktop.attachWindow(win.id, el, { removeOnClose: true })
 | Атрибут | Смысл |
 | --- | --- |
 | `data-wm-drag` | ручка перетаскивания (обычно тайтлбар); двойной клик — toggle maximize |
-| `data-wm-title` | узел заголовка, связывается через `aria-labelledby` |
+| `data-wm-title` | узел заголовка: его текст следует за состоянием, а связь через `aria-labelledby` ставится, когда узел лежит в том же корне, что и окно |
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | кнопки управления, работают через делегирование |
 | `data-wm-content` | скроллируемая область контента |
 

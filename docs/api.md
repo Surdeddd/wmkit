@@ -418,7 +418,7 @@ A window that the manager closes — including one that `undo` takes away — is
 
 ### What the controller writes
 
-On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` exists), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`.
+On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`.
 
 ### Touch
 
