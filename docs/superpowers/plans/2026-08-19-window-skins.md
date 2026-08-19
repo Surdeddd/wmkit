@@ -17,6 +17,7 @@
 - Coverage thresholds stay green: `src/core/**` 100/100/100/100, `src/dom/**` 100 statements/lines/functions and 90 branches, `src/plugins/**` 100/100/100/97, `src/adapters/**` 100/100/100/98.
 - `dist/index.js` stays under the 14 kB size-limit budget. New entry `dist/chrome.js` budget: 3 kB.
 - Every behavioural claim gets a mutation check: revert the line, confirm a named test dies.
+- **Branch headroom is the binding constraint of Task 6.** `src/dom/**` sits at 552/607 = 90.94% against a floor of 90, so roughly six uncovered branches exist for the whole shadow fix. Measure after each fix, not at the end. jsdom leaves `shadowRoot.elementFromPoint` undefined but **assignable**, so a shadow hit test is coverable by stubbing it exactly the way `tests/unit/dom.test.ts` already stubs `document.elementsFromPoint`.
 - Additive only. `attachWindow(id, element, options?)` keeps working untouched.
 - Verify by exit code, never by eyeballing a tail of the output.
 
@@ -807,21 +808,55 @@ function sheetFor(doc: Document, name: string, css: string): CSSStyleSheet {
 
 The host gets `attachShadow({ mode: 'open' })`; the compiled tree goes inside; the `[data-wm-content]` node is replaced by `<slot></slot>`; a light `<div data-wm-content>` is appended to the host and returned as `mount.content`.
 
-- [ ] **Step 4: Fix the drop target in `src/dom/drag.ts`**
+- [ ] **Step 4: Fix the drop target in `src/dom/controller.ts`, not with `composedPath`**
 
-Replace the `ctx.groupTarget(clientX, clientY, id)` call path so the session remembers the last pointer event and resolves the target from `event.composedPath()`, falling back to `elementsFromPoint` when the path holds nothing useful. Keep the existing signature so the light-DOM tests stay valid.
+The original plan said `composedPath()`. That is wrong, for two reasons that hold structurally in this code:
+
+1. `src/dom/drag.ts` calls `handle.setPointerCapture(event.pointerId)` on the **dragged** window's own titlebar, so every later `pointermove` is dispatched at that handle. `composedPath()` then describes the moving window, never the window under the cursor.
+2. `groupTarget` is called from `flush()`, which runs inside `requestAnimationFrame`. By then dispatch is over and `composedPath()` returns an empty array by spec.
+
+Applied there it would be permanently dead code that reads like a fix. Pierce the shadow root inside `groupTarget` instead; `drag.ts` and the `SessionContext` signature stay untouched.
+
+```ts
+function handleAtPoint(node: Element, clientX: number, clientY: number): Element | null {
+  let current: Element | null = node
+  while (current !== null) {
+    const found = current.closest?.('[data-wm-drag]')
+    if (found) return found
+    const root: ShadowRoot | null = current.shadowRoot
+    if (!root || typeof root.elementFromPoint !== 'function') return null
+    const inner: Element | null = root.elementFromPoint(clientX, clientY)
+    current = inner === current ? null : inner
+  }
+  return null
+}
+
+function windowElementOf(node: Element): HTMLElement | null {
+  let current: Element | null = node
+  while (current !== null) {
+    const found = current.closest<HTMLElement>('[data-wm-window]')
+    if (found) return found
+    current = (current.getRootNode() as ShadowRoot).host ?? null
+  }
+  return null
+}
+```
+
+The light path returns on the first `closest`, so every existing window keeps the old behaviour and the hot path is unchanged. `windowElementOf` exists because `closest` stops at the shadow boundary and the climb has to go through `getRootNode().host`. Both `: ShadowRoot | null` and `: Element | null` annotations are required — without them TypeScript reports TS7022 on the circular inference through the loop.
+
+No depth cap: the `inner === current` identity check already prevents the only realistic cycle, and a cap costs a branch out of a budget of six.
+
+`composedPath()` is still the right tool at dispatch time — the keyboard and click handlers — and must not be confused with this. Say so in the commit message or it will be reintroduced.
 
 - [ ] **Step 5: Fix the focus trap and the label in `src/dom/controller.ts`**
 
-```ts
-const roots: ParentNode[] = [windowElement]
-if (windowElement.shadowRoot) roots.push(windowElement.shadowRoot)
-const focusables = roots
-  .flatMap((root) => [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)])
-  .filter((node) => node.offsetParent !== null || node === doc.activeElement)
-```
+This is the highest-risk fix in the plan: it replaces a native `querySelectorAll` on a path three green tests already exercise, and its failure mode is silent — focus escapes, nothing throws. Do it last, and measure branches immediately after.
 
-For the label, look the title node up in the shadow root as well, and only set `aria-labelledby` when the node shares a root with the window element.
+Two facts drive the shape. `document.activeElement` retargets to the host when focus is inside a shadow root, so the existing `node === doc.activeElement` comparison can never match a shadow node; the real node is `shadowRoot.activeElement`. And naive `[...light, ...shadow]` concatenation gives the wrong order whenever content is projected through a `<slot>`, because the flattened order interleaves.
+
+Keep the change as small as the budget allows: resolve the active element by descending `shadowRoot.activeElement`, and collect focusables across the flattened tree. Do not add a `containsDeep` helper for nested hosts — that case does not exist yet and costs branches there is no room for.
+
+For the label, look the title node up in the shadow root as well, and only set `aria-labelledby` when the node shares a root with the window element. Four places document that linkage unconditionally and have to change with it: `docs/api.md`, `docs/theming.md`, `README.md`, `README.ru.md`.
 
 - [ ] **Step 6: Run the whole unit suite with coverage**
 
@@ -988,6 +1023,6 @@ git commit -m "feat(site): build a window skin in the demo"
 
 **Risks worth naming before starting.**
 
-1. **Task 6 is the whole risk of this plan.** It touches drag, the focus trap and the accessible name — three things covered by tests I trust. If `composedPath` cannot be threaded through the drag session cleanly, the honest fallback is to probe `host.shadowRoot.elementFromPoint` for each candidate host, and it is worth stopping to re-decide rather than forcing it.
+1. **Task 6 is the whole risk of this plan**, and a four-agent recon run before implementation already overturned its first draft: `composedPath` cannot work in `groupTarget` because of pointer capture and the rAF hop. Order the three fixes by risk — accessible name first (smallest, mutation-checkable), then the drop target, then the focus trap last. The gate that will actually fail is the branch threshold, not a red assertion.
 2. **`adoptedStyleSheets` and `CSSStyleSheet` are not in jsdom.** The shadow tests need a small stub, and the real assertion for sharing has to be repeated in a browser e2e; a jsdom-only claim about stylesheet sharing would be theatre.
 3. **Task 7 may reveal that `glass`, `light` and `retro` do not round-trip** through the generator. Say so and exclude them explicitly rather than bending the generator to reproduce hand-written files byte for byte.
