@@ -19,6 +19,9 @@ export default defineConfig({
       '@surdeddd/wmkit/gestures': fileURLToPath(
         new URL('../src/plugins/gestures.ts', import.meta.url),
       ),
+      '@surdeddd/wmkit/chrome': fileURLToPath(
+        new URL('../src/plugins/chrome/index.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit/popout': fileURLToPath(new URL('../src/plugins/popout.ts', import.meta.url)),
       '@surdeddd/wmkit/devtools': fileURLToPath(
         new URL('../src/plugins/devtools/index.ts', import.meta.url),

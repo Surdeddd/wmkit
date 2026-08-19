@@ -7,6 +7,7 @@ export default defineConfig({
       '@surdeddd/wmkit/devtools': new URL('./src/plugins/devtools/index.ts', import.meta.url)
         .pathname,
       '@surdeddd/wmkit/gestures': new URL('./src/plugins/gestures.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/chrome': new URL('./src/plugins/chrome/index.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/popout': new URL('./src/plugins/popout.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/react': new URL('./src/adapters/react.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/vue': new URL('./src/adapters/vue.ts', import.meta.url).pathname,

@@ -144,6 +144,16 @@
         "default": "./dist/devtools.cjs"
       }
     },
+    "./chrome": {
+      "import": {
+        "types": "./dist/chrome.d.ts",
+        "default": "./dist/chrome.js"
+      },
+      "require": {
+        "types": "./dist/chrome.d.cts",
+        "default": "./dist/chrome.cjs"
+      }
+    },
     "./themes/*": "./dist/themes/*",
     "./package.json": "./package.json"
   },
@@ -223,12 +233,12 @@
     {
       "name": "core",
       "path": "dist/index.js",
-      "limit": "14 kB"
+      "limit": "15 kB"
     },
     {
       "name": "react adapter",
       "path": "dist/react.js",
-      "limit": "14 kB",
+      "limit": "15 kB",
       "ignore": [
         "react"
       ]
@@ -236,7 +246,7 @@
     {
       "name": "vue adapter",
       "path": "dist/vue.js",
-      "limit": "14 kB",
+      "limit": "15 kB",
       "ignore": [
         "vue"
       ]
@@ -244,7 +254,7 @@
     {
       "name": "svelte adapter",
       "path": "dist/svelte.js",
-      "limit": "14 kB",
+      "limit": "15 kB",
       "ignore": [
         "svelte"
       ]
@@ -252,7 +262,7 @@
     {
       "name": "solid adapter",
       "path": "dist/solid.js",
-      "limit": "14 kB",
+      "limit": "15 kB",
       "ignore": [
         "solid-js"
       ]
@@ -260,7 +270,7 @@
     {
       "name": "angular adapter",
       "path": "dist/angular.js",
-      "limit": "14 kB",
+      "limit": "15 kB",
       "ignore": [
         "@angular/core"
       ]
@@ -284,6 +294,11 @@
       "name": "devtools plugin",
       "path": "dist/devtools.js",
       "limit": "5 kB"
+    },
+    {
+      "name": "chrome plugin",
+      "path": "dist/chrome.js",
+      "limit": "3 kB"
     }
   ],
   "typesVersions": {
@@ -314,6 +329,9 @@
       ],
       "angular": [
         "./dist/angular.d.ts"
+      ],
+      "chrome": [
+        "./dist/chrome.d.ts"
       ]
     }
   }

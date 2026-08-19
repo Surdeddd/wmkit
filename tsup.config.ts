@@ -13,6 +13,7 @@ export default defineConfig({
     popout: 'src/plugins/popout.ts',
     devtools: 'src/plugins/devtools/index.ts',
     gestures: 'src/plugins/gestures.ts',
+    chrome: 'src/plugins/chrome/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
