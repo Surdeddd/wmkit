@@ -339,6 +339,28 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 
 A gesture is just a function that takes a `GestureContext` and returns its teardown, so your own gestures cooperate with the built-in drag and resize through the same `claim`/`busy` pair — see [docs/api.md](docs/api.md).
 
+### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
+
+Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 802 B brotlied.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { skin } from '@surdeddd/wmkit/chrome'
+
+const mine = skin({
+  name: 'mine',
+  template:
+    '<section><header data-wm-drag><span data-wm-title>{{title}}</span>' +
+    '<button data-wm-close aria-label="Close {{title}}"></button></header>' +
+    '<div data-wm-content></div></section>',
+})
+
+const desktop = attachDesktop(wm, root, { skins: { mine } })
+desktop.mountWindow('notes', 'mine').content.append(myApp)
+```
+
+`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` and `data-wm-to-workspace="2"` are read straight off your markup. Every `{{placeholder}}` is HTML-escaped. `shadow: true` seals the chrome inside an open shadow root without losing grouping, focus trapping or the accessible name — see [docs/recipes.md](docs/recipes.md).
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 An opt-in panel that shows the live window table, an event log and the manager controls, so you can see what the state machine is doing without a debugger. It follows the manager, never the DOM, so it works with any adapter or none.

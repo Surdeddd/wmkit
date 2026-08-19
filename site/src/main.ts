@@ -3,10 +3,13 @@ import {
   createWindowManager,
   type DesktopController,
   type DesktopOptions,
+  type MountedWindow,
   prefersReducedMotion,
   type WindowInit,
+  type WindowSkin,
   type WindowState,
 } from '@surdeddd/wmkit'
+import { skin } from '@surdeddd/wmkit/chrome'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
 import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
 import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
@@ -24,7 +27,7 @@ import paperUrl from '@surdeddd/wmkit/themes/paper.css?url'
 import retroUrl from '@surdeddd/wmkit/themes/retro.css?url'
 import synthUrl from '@surdeddd/wmkit/themes/synth.css?url'
 import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
-import type { AppContext, AppInstance, AppSpec, ThemeName } from './apps'
+import type { AppContext, AppInstance, AppSpec, SkinLayout, ThemeName } from './apps'
 import { apps, isThemeName } from './apps'
 import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
 import './os.css'
@@ -99,10 +102,9 @@ const options = { magnetism: true, snap: true, announce: true }
 const wm = createWindowManager({ historyLimit: 60 })
 
 interface Mounted {
-  element: HTMLElement
+  window: MountedWindow | null
   instance: AppInstance | null
   spec: AppSpec | null
-  detach: (() => void) | null
 }
 
 const mounted = new Map<string, Mounted>()
@@ -118,12 +120,82 @@ function applyTheme(): void {
   localStorage.setItem('wmkit-theme', theme)
 }
 
+export const SKIN_LAYOUTS: readonly SkinLayout[] = ['left', 'right', 'bare']
+
+let customTemplate: string | null = null
+let customShadow = false
+
+function controlMarkup(): string {
+  const labels = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
+  return labels
+    .map(
+      ([selector, label]) =>
+        `<button type="button" ${selector.slice(1, -1)} aria-label="${label} {{title}}"></button>`,
+    )
+    .join('')
+}
+
+export function layoutTemplate(layout: SkinLayout): string {
+  const controls = layout === 'bare' ? '' : `<span data-wm-controls>${controlMarkup()}</span>`
+  const title = '<span data-wm-title>{{title}}</span>'
+  const tabs = '<span class="win-tabs" hidden></span>'
+  const bar =
+    layout === 'left'
+      ? `<header data-wm-drag data-side="left">${controls}${title}${tabs}</header>`
+      : layout === 'bare'
+        ? `<header data-wm-drag data-side="none">${title}${tabs}</header>`
+        : `<header data-wm-drag data-side="right">${title}${tabs}${controls}</header>`
+  return `<section data-testid="window-{{id}}">${bar}<div data-wm-content></div></section>`
+}
+
+export function currentSkinCode(): string {
+  return customTemplate ?? layoutTemplate(skinLayout)
+}
+
+export function currentSkinShadow(): boolean {
+  return customShadow
+}
+
+function layoutSkin(layout: SkinLayout): WindowSkin {
+  return (context) => skin({ template: layoutTemplate(layout) })(context)
+}
+
+const demoSkins: Record<string, WindowSkin> = {
+  left: layoutSkin('left'),
+  right: layoutSkin('right'),
+  bare: layoutSkin('bare'),
+}
+
+let skinLayout: SkinLayout = 'left'
+
+export function skinOf(): SkinLayout {
+  return skinLayout
+}
+
+export function setSkinLayout(layout: SkinLayout): void {
+  skinLayout = layout
+  customTemplate = null
+  for (const id of mounted.keys()) {
+    if (wm.get(id)) wm.update(id, { meta: { skin: layout } })
+  }
+}
+
+export function applyCustomSkin(template: string, shadow: boolean): void {
+  customTemplate = template
+  customShadow = shadow
+  const built = skin({ template, shadow })
+  for (const id of mounted.keys()) {
+    if (wm.get(id)) desktop.mountWindow(id, built, { removeOnClose: true })
+  }
+}
+
 function desktopOptions(): DesktopOptions {
   return {
     magnetism: options.magnetism,
     snap: options.snap,
     announce: options.announce,
     gestures: [touchGestures({ swipe: { workspaces: WORKSPACES } })],
+    skins: demoSkins,
     minimizeTarget: (win) => dockEl.querySelector(`[data-task="${win.id}"]`) ?? dockEl,
     onTitlebarContextMenu: (win) => {
       wm.sendToBack(win.id)
@@ -153,6 +225,12 @@ const ctx: AppContext = {
   },
   size: () => ({ width: desktopEl.clientWidth, height: desktopEl.clientHeight }),
   safeArea,
+  skinLayouts: SKIN_LAYOUTS,
+  skinLayout: skinOf,
+  setSkinLayout,
+  skinCode: currentSkinCode,
+  skinShadow: currentSkinShadow,
+  applySkin: applyCustomSkin,
 }
 
 function safeArea(): { x: number; y: number; width: number; height: number } {
@@ -175,60 +253,30 @@ function safeArea(): { x: number; y: number; width: number; height: number } {
 }
 
 function remountDesktop(): void {
-  for (const entry of mounted.values()) entry.detach = null
+  for (const entry of mounted.values()) entry.window = null
   desktop.destroy()
+  desktopEl.replaceChildren()
   desktop = attachDesktop(wm, desktopEl, desktopOptions())
   for (const [id, entry] of mounted) {
-    if (wm.get(id)) entry.detach = desktop.attachWindow(id, entry.element, { removeOnClose: true })
+    if (wm.get(id)) activate(id, entry)
   }
 }
 
-function chrome(id: string, title: string): HTMLElement {
-  const element = document.createElement('section')
-  element.dataset.testid = `window-${id}`
-  const header = document.createElement('header')
-  header.dataset.wmDrag = ''
-  const controls = document.createElement('span')
-  controls.dataset.wmControls = ''
-  for (const [attribute, label] of [
-    ['wmClose', lang === 'ru' ? RU_CONTROLS[0][1] : EN_CONTROLS[0][1]],
-    ['wmMinimize', lang === 'ru' ? RU_CONTROLS[1][1] : EN_CONTROLS[1][1]],
-    ['wmMaximize', lang === 'ru' ? RU_CONTROLS[2][1] : EN_CONTROLS[2][1]],
-  ] as const) {
-    const control = document.createElement('button')
-    control.type = 'button'
-    control.dataset[attribute] = ''
-    control.setAttribute('aria-label', `${label} ${title}`)
-    controls.append(control)
-  }
-  const titleEl = document.createElement('span')
-  titleEl.dataset.wmTitle = ''
-  titleEl.textContent = title
-  const tabs = document.createElement('span')
-  tabs.className = 'win-tabs'
-  tabs.hidden = true
-  header.append(controls, titleEl, tabs)
-  const content = document.createElement('div')
-  content.dataset.wmContent = ''
-  element.append(header, content)
-  return element
-}
-
-function contentOf(element: HTMLElement): HTMLElement {
-  return must(element.querySelector<HTMLElement>('[data-wm-content]'), 'window content')
-}
-
-function mount(id: string, title: string, spec: AppSpec | null): Mounted {
-  const element = chrome(id, title)
-  desktopEl.append(element)
-  const entry: Mounted = { element, instance: null, spec, detach: null }
+function mount(id: string, spec: AppSpec | null): Mounted {
+  const entry: Mounted = { window: null, instance: null, spec }
   mounted.set(id, entry)
   return entry
 }
 
 function activate(id: string, entry: Mounted): void {
-  entry.detach = desktop.attachWindow(id, entry.element, { removeOnClose: true })
-  if (entry.spec) entry.instance = entry.spec.render(contentOf(entry.element), ctx) ?? null
+  const named = customTemplate === null
+  entry.window = desktop.mountWindow(
+    id,
+    named ? skinLayout : skin({ template: customTemplate as string, shadow: customShadow }),
+    { removeOnClose: true },
+  )
+  if (named) wm.update(id, { meta: { ...wm.get(id)?.meta, skin: skinLayout } })
+  if (entry.spec) entry.instance = entry.spec.render(entry.window.content, ctx) ?? null
 }
 
 function openApp(id: AppId): void {
@@ -240,33 +288,32 @@ function openApp(id: AppId): void {
   }
   const init = spec.init(ctx)
   const title = dict().apps[id].title
-  const entry = mount(id, title, spec)
+  const entry = mount(id, spec)
   wm.open({ ...init, id, title, workspace: wm.workspace() })
   activate(id, entry)
 }
 
-function adopt(id: string, title: string): void {
+function adopt(id: string): void {
   if (mounted.has(id)) return
   const spec = specById.get(id as AppId) ?? null
-  const entry = mount(id, title, spec)
+  const entry = mount(id, spec)
+  activate(id, entry)
   if (!spec) {
-    contentOf(entry.element).append(
+    entry.window?.content.append(
       Object.assign(document.createElement('p'), { className: 'app-note', textContent: id }),
     )
   }
-  activate(id, entry)
 }
 
 function release(id: string): void {
   const entry = mounted.get(id)
   if (!entry) return
   entry.instance?.destroy?.()
-  entry.detach?.()
-  entry.element.remove()
+  entry.window?.detach()
   mounted.delete(id)
 }
 
-wm.on('open', ({ window: win }) => adopt(win.id, win.title))
+wm.on('open', ({ window: win }) => adopt(win.id))
 
 wm.on('close', ({ window: win }) => {
   const entry = mounted.get(win.id)
@@ -393,7 +440,7 @@ function startTabDrag(event: PointerEvent, id: string): void {
 function focusTab(id: string): void {
   const active = wm.getState().groups[wm.get(id)?.groupId ?? '']?.activeId
   if (!active) return
-  const host = mounted.get(active)?.element
+  const host = mounted.get(active)?.window?.element
   host?.querySelector<HTMLElement>(`.win-tab[data-tab="${id}"]`)?.focus()
 }
 
@@ -427,8 +474,8 @@ function onTabKeydown(event: KeyboardEvent, id: string): void {
 function syncTabs(): void {
   const state = wm.getState()
   for (const [id, entry] of mounted) {
-    const strip = entry.element.querySelector<HTMLElement>('.win-tabs')
-    const titleEl = entry.element.querySelector<HTMLElement>('[data-wm-title]')
+    const strip = entry.window?.element.querySelector<HTMLElement>('.win-tabs')
+    const titleEl = entry.window?.element.querySelector<HTMLElement>('[data-wm-title]')
     const win = state.windows[id]
     const group = win?.groupId ? state.groups[win.groupId] : undefined
     if (!strip || !titleEl) continue
@@ -487,7 +534,7 @@ function reconcile(): void {
   }
   for (const id of state.order) {
     const win = state.windows[id]
-    if (win) adopt(id, win.title)
+    if (win) adopt(id)
   }
 }
 
@@ -770,17 +817,17 @@ function relabelAll(): void {
     if (!spec) continue
     const title = dict().apps[spec.id].title
     if (wm.get(id)?.title !== title) wm.update(id, { title })
-    const titleEl = entry.element.querySelector('[data-wm-title]')
+    const titleEl = entry.window?.element.querySelector('[data-wm-title]')
     if (titleEl) titleEl.textContent = title
     const aria = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
     for (const [selector, label] of aria) {
-      entry.element.querySelector(selector)?.setAttribute('aria-label', `${label} ${title}`)
+      entry.window?.element.querySelector(selector)?.setAttribute('aria-label', `${label} ${title}`)
     }
     if (entry.instance?.relabel) {
       entry.instance.relabel()
     } else {
       entry.instance?.destroy?.()
-      entry.instance = spec.render(contentOf(entry.element), ctx) ?? null
+      if (entry.window) entry.instance = spec.render(entry.window.content, ctx) ?? null
     }
   }
 }

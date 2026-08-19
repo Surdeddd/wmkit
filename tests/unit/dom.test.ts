@@ -1585,6 +1585,7 @@ describe('window skins', () => {
     })
     harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
     const mounted = harness.desktop.mountWindow('a', 'stripe')
+    const shed = mounted.element
     const live = document.createElement('canvas')
     mounted.content.append(live)
 
@@ -1593,7 +1594,7 @@ describe('window skins', () => {
     const now = harness.element.querySelector<HTMLElement>('[data-wm-window="a"]')
     expect(now?.dataset.look).toBe('plain')
     expect(now?.contains(live)).toBe(true)
-    expect(mounted.element.isConnected).toBe(false)
+    expect(shed.isConnected).toBe(false)
     expect(destroyed).toEqual(['stripe'])
     expect(harness.wm.get('a')?.title).toBe('Hello')
     expect(now?.querySelector('[data-wm-title]')?.textContent).toBe('Hello')
@@ -1631,6 +1632,66 @@ describe('window skins', () => {
 
     harness.wm.update('a', { meta: { skin: 'stripe' } })
     expect(harness.element.querySelector('[data-wm-window="a"]')).toBe(root)
+  })
+
+  it('keeps pointing at the window it mounted after a rebuild', () => {
+    const harness = makeHarness({
+      skins: { stripe: makeSkin('stripe'), plain: makeSkin('plain') },
+    })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+    const before = mounted.element
+
+    harness.wm.update('a', { meta: { skin: 'plain' } })
+
+    expect(mounted.element).not.toBe(before)
+    expect(mounted.element.dataset.look).toBe('plain')
+    expect(mounted.content.parentElement).toBe(mounted.element)
+
+    mounted.content.append(document.createTextNode('late'))
+    expect(mounted.element.textContent).toContain('late')
+  })
+
+  it('rebuilds in place when the same window is mounted again', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow('a', makeSkin('one'))
+    const live = document.createElement('canvas')
+    mounted.content.append(live)
+    const shed = mounted.element
+
+    harness.desktop.mountWindow('a', makeSkin('two'))
+
+    expect(harness.element.querySelectorAll('[data-wm-window="a"]')).toHaveLength(1)
+    expect(mounted.element.dataset.look).toBe('two')
+    expect(mounted.content.contains(live)).toBe(true)
+    expect(shed.isConnected).toBe(false)
+
+    mounted.element.querySelector<HTMLButtonElement>('.shut')?.click()
+    expect(harness.wm.get('a')).toBeUndefined()
+  })
+
+  it('survives a detach after the window has already closed', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow('a', makeSkin('inline'))
+
+    harness.wm.close('a')
+    expect(() => mounted.detach()).not.toThrow()
+    expect(mounted.element.isConnected).toBe(false)
+  })
+
+  it('runs the skin teardown when a mounted window is detached', () => {
+    const gone: string[] = []
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow(
+      'a',
+      makeSkin('inline', { destroy: () => gone.push('inline') }),
+    )
+
+    mounted.detach()
+    expect(gone).toEqual(['inline'])
   })
 
   it('detaches a mounted window and takes its element with it', () => {

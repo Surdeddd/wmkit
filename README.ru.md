@@ -275,6 +275,28 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 
 Жест — это просто функция: принимает `GestureContext`, возвращает свою отписку. Свои жесты уживаются со встроенными драгом и ресайзом через ту же пару `claim`/`busy` — подробности в [docs/api.md](docs/api.md).
 
+### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
+
+Собирает само окно из строки разметки: можно принести свою обвязку и свои кнопки, не написав ни одного обработчика. 802 Б в brotli.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { skin } from '@surdeddd/wmkit/chrome'
+
+const mine = skin({
+  name: 'mine',
+  template:
+    '<section><header data-wm-drag><span data-wm-title>{{title}}</span>' +
+    '<button data-wm-close aria-label="Закрыть {{title}}"></button></header>' +
+    '<div data-wm-content></div></section>',
+})
+
+const desktop = attachDesktop(wm, root, { skins: { mine } })
+desktop.mountWindow('notes', 'mine').content.append(myApp)
+```
+
+`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` и `data-wm-to-workspace="2"` читаются прямо из вашей разметки. Каждая подстановка `{{...}}` экранируется. `shadow: true` запечатывает обвязку в открытом теневом корне, не теряя ни группировку, ни ловушку фокуса, ни доступное имя — подробности в [docs/recipes.md](docs/recipes.md).
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 Панель, которую подключают по желанию: живая таблица окон, журнал событий и управление менеджером — чтобы видеть, что делает машина состояний, без отладчика. Она следит за менеджером, а не за DOM, поэтому работает с любым адаптером и без него.

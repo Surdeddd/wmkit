@@ -293,7 +293,7 @@ export function attachDesktop(
     const el = attached.element
     const wanted = typeof win.meta.skin === 'string' ? win.meta.skin : null
     if (attached.skin !== null && wanted !== null && wanted !== attached.skin) {
-      remount(attached, win, wanted)
+      buildSkin(win.id, wanted, attached.mountOptions)
       return
     }
     const firstSync = attached.lastState === null
@@ -734,6 +734,12 @@ export function attachDesktop(
   ): SkinMount {
     const win = wm.get(id)
     if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
+    const previous = registry.get(id)?.mount ?? null
+    const carried = previous === null ? [] : [...previous.content.childNodes]
+    if (previous !== null) {
+      registry.get(id)?.release?.()
+      previous.element.remove()
+    }
     const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
     element.append(mount.element)
     const release = attachWindow(id, mount.element, windowOptions)
@@ -742,18 +748,9 @@ export function attachDesktop(
     attached.mount = mount
     attached.mountOptions = windowOptions
     attached.release = release
-    return mount
-  }
-
-  function remount(attached: AttachedWindow, win: WindowState, name: string): void {
-    const previous = attached.mount as SkinMount
-    const carried = [...previous.content.childNodes]
-    const windowOptions = attached.mountOptions
-    ;(attached.release as () => void)()
-    previous.element.remove()
-    const mount = buildSkin(win.id, name, windowOptions)
     mount.content.append(...carried)
-    previous.destroy?.()
+    previous?.destroy?.()
+    return mount
   }
 
   function mountWindow(
@@ -761,14 +758,21 @@ export function attachDesktop(
     skin: WindowSkin | string,
     windowOptions: WindowAttachOptions = {},
   ): MountedWindow {
-    const mount = buildSkin(id, skin, windowOptions)
-    const attached = registry.get(id) as AttachedWindow
-    const release = attached.release as () => void
+    let last = buildSkin(id, skin, windowOptions)
+    const live = () => {
+      last = registry.get(id)?.mount ?? last
+      return last
+    }
     return {
-      element: mount.element,
-      content: mount.content,
+      get element() {
+        return live().element
+      },
+      get content() {
+        return live().content
+      },
       detach() {
-        release()
+        const mount = live()
+        registry.get(id)?.release?.()
         mount.element.remove()
         mount.destroy?.()
       },

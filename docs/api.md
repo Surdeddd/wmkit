@@ -416,6 +416,65 @@ interface WindowAttachOptions {
 
 A window that the manager closes — including one that `undo` takes away — is detached for you: its listeners and resize handles go, and the element loses `data-wm-window` so nothing mistakes it for a live window afterwards. The element itself stays in the page unless you passed `removeOnClose`, and the detach function you were handed is safe to call again at any point, including after you have attached that same element to a different window.
 
+### `desktop.actions(id)`
+
+The same ten moves the manager exposes, already bound to one window, so a button handler never has to close over an id:
+
+```js
+const act = desktop.actions('notes')
+closeButton.onclick = () => act.close()
+```
+
+`focus`, `close`, `minimize`, `maximize`, `toggleMaximize`, `restore`, `center`, `sendToBack`, `snap(zone)` and `moveToWorkspace(n)`. Each returns the same boolean the manager returns, and each returns `false` once the window is gone rather than throwing.
+
+### Driving a window from markup
+
+Any element inside a window can carry one of these and the controller will act on it, with no listener of your own:
+
+| attribute | effect |
+| --- | --- |
+| `data-wm-close` | closes the window |
+| `data-wm-minimize` | minimizes it |
+| `data-wm-maximize` | toggles maximized |
+| `data-wm-restore` | returns it to its stored bounds |
+| `data-wm-center` | centres it in the viewport |
+| `data-wm-send-back` | drops it to the bottom of the stack |
+| `data-wm-snap="left"` | snaps it to that zone, if the window is snappable |
+| `data-wm-to-workspace="2"` | moves it to that workspace |
+
+An unknown snap zone is ignored rather than thrown, so a typo in a template never takes the page down with it.
+
+### `desktop.mountWindow(id, skin, options?)`
+
+Builds a window's element from a skin instead of taking one you already made.
+
+```ts
+type WindowSkin = (context: SkinContext) => SkinMount
+
+interface SkinContext {
+  doc: Document
+  id: string
+  window: WindowState
+  actions: WindowActions
+}
+
+interface SkinMount {
+  element: HTMLElement
+  content: HTMLElement
+  destroy?(): void
+}
+
+interface MountedWindow {
+  readonly element: HTMLElement
+  readonly content: HTMLElement
+  detach(): void
+}
+```
+
+`skin` is either a factory or the name of one registered in `attachDesktop(wm, root, { skins })`; an unregistered name throws. The returned `element` and `content` are live: after the window is rebuilt they point at the new nodes, so a reference you took at mount time never goes stale.
+
+A window is rebuilt when `meta.skin` changes to another registered name, or when you call `mountWindow` again for the same id. Either way the content children move across, the id, geometry, focus and stacking survive, and the previous skin's `destroy` runs after the swap. Windows you attached yourself with `attachWindow` are never rebuilt behind your back.
+
 ### What the controller writes
 
 On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`.

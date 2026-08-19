@@ -325,6 +325,51 @@ What still matters on your side:
 - **Do not animate `transform` in your theme during a gesture.** The shipped themes already switch the transition off; a custom theme must do the same.
 
 
+## Build a window from scratch
+
+`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { skin } from '@surdeddd/wmkit/chrome'
+
+const brutal = skin({
+  name: 'brutal',
+  styles: '[data-wm-skin="brutal"] { border: 3px solid #111 }',
+  template: `
+    <section>
+      <header data-wm-drag>
+        <span data-wm-title>{{title}}</span>
+        <button type="button" data-wm-to-workspace="1" aria-label="Send to workspace 2">→</button>
+        <button type="button" data-wm-close aria-label="Close {{title}}">×</button>
+      </header>
+      <div data-wm-content></div>
+    </section>
+  `,
+})
+
+const desktop = attachDesktop(wm, root, { skins: { brutal } })
+wm.open({ id: 'notes', title: 'Notes' })
+const notes = desktop.mountWindow('notes', 'brutal')
+notes.content.append(myApp)
+```
+
+The buttons need no handlers: `data-wm-close` and its siblings are read by the controller. `styles` are injected once per skin and never rewritten — the window carries `data-wm-skin="brutal"` so your rules have something to hold on to.
+
+The template must contain exactly one `[data-wm-content]`; anything else throws while you are writing the skin rather than silently dropping your app.
+
+### Sealing it off
+
+`shadow: true` builds the chrome inside an open shadow root and projects your content through a `<slot>`. Page CSS cannot reach in, the window's own CSS cannot leak out, and the styles become one constructable stylesheet shared by every window of that skin.
+
+```js
+import { themeStyle } from '@surdeddd/wmkit/themes'
+
+const sealed = skin({ name: 'sealed', shadow: true, styles: themeStyle('carbon'), template: TEMPLATE })
+```
+
+Inside a shadow root, write `:host` where you would have written the window selector. Grouping by drag, the modal focus trap and the resize grips all keep working across the boundary; the accessible name switches from `aria-labelledby` to `aria-label`, because an IDREF cannot cross it.
+
 ## Touch gestures
 
 Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.46 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.

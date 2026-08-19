@@ -59,6 +59,17 @@ export interface Dict {
     none: string
     focus: string
     variants: Array<[string, string]>
+    skin: string
+    skinLead: string
+    layouts: Array<[string, string]>
+    template: string
+    shadow: string
+    shadowNote: string
+    apply: string
+    reset: string
+    copy: string
+    copied: string
+    broken: string
   }
   shortcuts: Array<[string, string]>
   features: Array<{ title: string; text: string }>
@@ -210,6 +221,22 @@ const en: Dict = {
       ['ghost', 'no shadow, slightly translucent'],
       ['sharp', 'square corners'],
     ],
+    skin: 'skin',
+    skinLead:
+      'A skin is the window itself. Pick a layout and every window is rebuilt from that template, keeping its position, its focus and whatever it was showing.',
+    layouts: [
+      ['controls left', 'the buttons lead, the title follows'],
+      ['controls right', 'the title leads, the buttons close the bar'],
+      ['no controls', 'a titlebar you can only drag'],
+    ],
+    template: 'template',
+    shadow: 'shadow root',
+    shadowNote: 'Isolate the chrome so page CSS cannot reach it.',
+    apply: 'apply',
+    reset: 'reset',
+    copy: 'copy as code',
+    copied: 'copied',
+    broken: 'A template needs exactly one [data-wm-content].',
   },
   shortcuts: [
     ['drag titlebar', 'move the window'],
@@ -519,6 +546,22 @@ const ru: Dict = {
       ['ghost', 'без тени, чуть прозрачное'],
       ['sharp', 'прямые углы'],
     ],
+    skin: 'скин',
+    skinLead:
+      'Скин — это само окно. Выберите раскладку, и каждое окно пересоберётся по этому шаблону, сохранив место, фокус и всё, что показывало.',
+    layouts: [
+      ['кнопки слева', 'сначала кнопки, потом заголовок'],
+      ['кнопки справа', 'сначала заголовок, кнопки закрывают строку'],
+      ['без кнопок', 'заголовок, за который можно только тянуть'],
+    ],
+    template: 'шаблон',
+    shadow: 'теневой корень',
+    shadowNote: 'Изолировать обвязку, чтобы CSS страницы до неё не дотянулся.',
+    apply: 'применить',
+    reset: 'сбросить',
+    copy: 'скопировать код',
+    copied: 'скопировано',
+    broken: 'В шаблоне должен быть ровно один [data-wm-content].',
   },
   shortcuts: [
     ['тащить заголовок', 'двигать окно'],
