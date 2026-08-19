@@ -34,6 +34,14 @@
   display: none;
 }
 
+[data-wm-window][data-wm-dragging],
+[data-wm-window][data-wm-resizing],
+[data-wm-window][data-wm-pinching] {
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 2px 2px 0 var(--wm-face-dark);
+}
+
 [data-wm-window][data-wm-flash] {
   animation: wm-flash 320ms ease;
 }

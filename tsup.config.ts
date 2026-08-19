@@ -14,6 +14,7 @@ export default defineConfig({
     devtools: 'src/plugins/devtools/index.ts',
     gestures: 'src/plugins/gestures.ts',
     chrome: 'src/plugins/chrome/index.ts',
+    themes: 'src/themes/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
@@ -25,6 +26,9 @@ export default defineConfig({
   splitting: true,
   sourcemap: true,
   async onSuccess() {
-    await cp('src/themes', 'dist/themes', { recursive: true })
+    await cp('src/themes', 'dist/themes', {
+      recursive: true,
+      filter: (source) => !source.endsWith('.ts'),
+    })
   },
 })

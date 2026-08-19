@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const source = join(root, 'src', 'themes')
+
+const outFlag = process.argv.indexOf('--out')
+const out = outFlag === -1 ? source : process.argv[outFlag + 1]
+mkdirSync(out, { recursive: true })
+
+const names = readdirSync(source)
+  .filter((file) => file.endsWith('.css'))
+  .map((file) => file.slice(0, -4))
+  .sort()
+
+if (names.length === 0) throw new Error('wmkit: no theme stylesheets found')
+
+const quote = (css) => css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
+
+const css = [
+  "import type { ThemeName } from './index'",
+  '',
+  'export const themeCss: Record<ThemeName, string> = {',
+  ...names.map(
+    (name) => `  ${name}: \`${quote(readFileSync(join(source, `${name}.css`), 'utf8'))}\`,`,
+  ),
+  '}',
+  '',
+].join('\n')
+
+const index = [
+  "import { themeCss } from './css'",
+  '',
+  'export const themeNames = [',
+  ...names.map((name) => `  '${name}',`),
+  '] as const',
+  '',
+  'export type ThemeName = (typeof themeNames)[number]',
+  '',
+  'export { themeCss }',
+  '',
+  'export function themeStyle(name: ThemeName): string {',
+  '  return themeCss[name]',
+  '}',
+  '',
+].join('\n')
+
+writeFileSync(join(out, 'css.ts'), css)
+writeFileSync(join(out, 'index.ts'), index)
+
+process.stdout.write(`wmkit: wrote ${names.length} themes to ${out}\n`)
