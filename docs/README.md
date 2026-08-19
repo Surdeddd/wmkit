@@ -7,7 +7,7 @@ Headless window manager for the web. The [root README](../README.md) is the tour
 | [API reference](./api.md) | every export, option, method, event and type |
 | [Adapters](./adapters.md) | complete React, Vue, Svelte, Solid and Angular integrations |
 | [Theming](./theming.md) | `data-wm-*` contract, CSS variables, writing a theme from scratch |
-| [Recipes](./recipes.md) | taskbar, modals, persistence, workspaces, SSR, testing |
+| [Recipes](./recipes.md) | building a window from scratch, taskbar, modals, persistence, workspaces, SSR, testing |
 | [Browser support](./browser-support.md) | baselines per entry point and what degrades where |
 
 ## Mental model

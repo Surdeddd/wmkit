@@ -106,9 +106,29 @@ Geometry is inline `transform: translate3d()`, `width`, `height` and `z-index`. 
 | `--wm-shadow`, `--wm-shadow-focused` | window shadow |
 | `--wm-titlebar-bg` | titlebar fill |
 | `--wm-text`, `--wm-text-dim` | content and secondary text |
-| `--wm-accent` | focus rings and the snap preview |
+| `--wm-accent` | focus rings, borders and the snap preview |
+| `--wm-accent-ink` | the accent where it has to be *read* — see below |
 | `--wm-blur` | backdrop blur radius |
 | `--wm-transition` | move and resize easing |
+
+### Why the accent comes in two
+
+`--wm-accent` is picked to sing against the window: a vivid border, a focus ring, a snap preview. The same colour set as small text is often unreadable — `frost`'s sky blue scores 1.4:1 on its own surface, and `candy`'s pink 2.1:1, both far below the 4.5:1 that WCAG AA asks of body text.
+
+So every theme also ships `--wm-accent-ink`: the same hue, walked toward the readable side until it clears 4.5:1 on that theme's window background. On dark themes the two are usually identical. Colour text with it and keep `--wm-accent` for everything that is not read:
+
+```css
+.my-value { color: var(--wm-accent-ink, var(--wm-accent)); }
+.my-chip  { border-color: var(--wm-accent); }
+```
+
+The fallback matters: a hand-written theme that predates the token still works, it just loses the guarantee.
+
+### Translucency has a floor
+
+A theme with a see-through window composites against whatever is behind it. `frost` used to sit at 48% white, which is a bright frosted pane on a light page and a flat mid-grey on a dark one — and mid-grey defeats every text colour a light theme owns. The shipped translucent themes are now solid enough that their surface stays recognisable on any desktop; the blur is what sells the frosted look, not the alpha.
+
+If you write your own translucent theme, check it against a dark backdrop before shipping it. `tests/e2e/theme-contrast.spec.ts` measures the rendered pixels of the demo under all sixteen shipped themes and fails below 4.5:1.
 
 `retro.css` is a different visual system and exposes `--wm-face`, `--wm-face-light`, `--wm-face-dark`, `--wm-face-darker`, `--wm-title-active-a`, `--wm-title-active-b`, `--wm-title-inactive`, `--wm-title-text`, plus the shared `--wm-text`, `--wm-text-dim` and `--wm-accent`.
 
