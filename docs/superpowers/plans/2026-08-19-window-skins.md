@@ -72,7 +72,7 @@
 - An id with no window returns `false` from every method and never throws — a button can outlive its window by a frame.
 - The object is built per call; it holds no state.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('drives the manager and never throws on a window that is gone', () => {
@@ -104,12 +104,12 @@ it('drives the manager and never throws on a window that is gone', () => {
 })
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `pnpm exec vitest run tests/unit/actions.test.ts --coverage.enabled=false`
 Expected: FAIL — `createActions` is not exported.
 
-- [ ] **Step 3: Implement `src/dom/actions.ts`**
+- [x] **Step 3: Implement `src/dom/actions.ts`**
 
 ```ts
 import type { SnapZone, WindowManager } from '../core/types'
@@ -145,12 +145,12 @@ export function createActions(wm: WindowManager, id: string): WindowActions {
 
 Expose it on the controller: add `actions: (id: string) => createActions(wm, id)` to the returned object in `attachDesktop`, and `actions(id: string): WindowActions` to `DesktopController` in `src/dom/shared.ts`.
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
 Run: `pnpm exec vitest run tests/unit/actions.test.ts --coverage.enabled=false`
 Expected: PASS.
 
-- [ ] **Step 5: Add the controller test**
+- [x] **Step 5: Add the controller test**
 
 ```ts
 it('hands out actions for a window from the desktop', () => {
@@ -165,11 +165,11 @@ it('hands out actions for a window from the desktop', () => {
 
 Add it to `tests/unit/dom.test.ts`, then run `pnpm exec vitest run tests/unit/dom.test.ts --coverage.enabled=false`.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Point `snap` at `wm.focus` instead; confirm the actions test fails. Restore.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/dom/actions.ts src/dom/shared.ts src/dom/controller.ts tests/unit
@@ -196,7 +196,7 @@ git commit -m "feat(dom): expose the window actions as a typed object"
 - The attribute may sit on any element inside the window, at any depth — the handler already delegates from the window root.
 - `INTERACTIVE_SELECTOR` grows the new attributes so a control never starts a drag.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('drives snap, restore, centre, back and workspace from window attributes', () => {
@@ -238,12 +238,12 @@ it('ignores an unknown zone, a bad workspace and a locked window', () => {
 })
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `pnpm exec vitest run tests/unit/dom.test.ts -t attributes --coverage.enabled=false`
 Expected: FAIL — nothing happens on click.
 
-- [ ] **Step 3: Extend the delegation**
+- [x] **Step 3: Extend the delegation**
 
 In `attachWindow`'s `onClick`, after the existing three branches:
 
@@ -286,15 +286,15 @@ const SNAP_ZONES = new Set<string>([
 
 Extend `INTERACTIVE_SELECTOR` in `src/dom/shared.ts` with `[data-wm-snap], [data-wm-restore], [data-wm-center], [data-wm-send-back], [data-wm-workspace]`.
 
-- [ ] **Step 4: Run them to verify they pass**
+- [x] **Step 4: Run them to verify they pass**
 
 Run: `pnpm exec vitest run tests/unit/dom.test.ts --coverage.enabled=false`
 
-- [ ] **Step 5: Mutation-check**
+- [x] **Step 5: Mutation-check**
 
 Drop the `SNAP_ZONES.has(zone)` guard; confirm the unknown-zone test fails. Drop `Number.isInteger`; confirm the bad-workspace test fails. Restore both.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/dom/controller.ts src/dom/shared.ts tests/unit/dom.test.ts
@@ -321,7 +321,7 @@ git commit -m "feat(dom): drive snap, restore, centre, back and workspace from w
 
 Rationale: a skin's markup comes from a template string, so nothing outside the library can keep the title current. Today the demo does it by hand.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('keeps the title node in step with the window title', () => {
@@ -338,12 +338,12 @@ it('keeps the title node in step with the window title', () => {
 
 The harness builds `<header data-wm-drag><span data-wm-title>t</span></header>`, so the first assertion fails today: the text stays `t`.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `pnpm exec vitest run tests/unit/dom.test.ts -t "title node" --coverage.enabled=false`
 Expected: FAIL — received `t`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Store the node on the registry entry: add `title: HTMLElement | null` to `AttachedWindow`, set it where `titleEl` is already looked up, and in `syncWindow`, inside the block that already writes `aria-label`:
 
@@ -353,13 +353,13 @@ if (attached.title && attached.title.textContent !== win.title) {
 }
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
-- [ ] **Step 5: Mutation-check**
+- [x] **Step 5: Mutation-check**
 
 Remove the `!==` guard so it writes unconditionally; confirm no test fails, then add one that does: focus a `contenteditable` title, fire an unrelated state change, and assert the selection survived. Keep whichever version the test justifies.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/dom/controller.ts tests/unit/dom.test.ts
@@ -406,7 +406,7 @@ git commit -m "feat(dom): keep the title node in step with the window title"
 - Remounting preserves attachment: the window keeps its id, geometry and focus.
 - Windows created through `attachWindow` have no skin and never remount.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 const stripe: WindowSkin = ({ doc, actions }) => {
@@ -460,12 +460,12 @@ it('rebuilds the window when the skin changes and carries the content over', () 
 })
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `pnpm exec vitest run tests/unit/dom.test.ts -t skin --coverage.enabled=false`
 Expected: FAIL — `mountWindow` is not a function.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to the registry entry: `skinName: string | null`, `skinMount: SkinMount | null`, `content: HTMLElement | null`.
 
@@ -537,18 +537,18 @@ Keep `remount` honest and small: it detaches the old attachment, then runs the s
 
 Export the new types from `src/index.ts`.
 
-- [ ] **Step 4: Run them to verify they pass**
+- [x] **Step 4: Run them to verify they pass**
 
-- [ ] **Step 5: Run the whole unit suite with coverage**
+- [x] **Step 5: Run the whole unit suite with coverage**
 
 Run: `pnpm exec vitest run --coverage`
 Expected: exit 0, thresholds green.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Replace `next.content.append(...carried.childNodes)` with nothing; confirm the carry-over test fails. Replace the unknown-skin throw with a silent return; confirm the throw test fails. Restore both.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/dom src/index.ts tests/unit/dom.test.ts
@@ -589,7 +589,7 @@ git commit -m "feat(dom): mount a window from a skin and rebuild it when the ski
 - `styles` without `shadow` is injected once per skin into `doc.head` verbatim, and the window carries `data-wm-skin="<name>"` so the author can scope their own rules. The library never rewrites the CSS.
 - `defaultSkin` renders a titlebar with a title and close/minimize/maximize buttons wired by attribute; `barebones` renders a titlebar with the title only and no controls.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('expands placeholders and escapes every substitution', () => {
@@ -652,11 +652,11 @@ it('ships a default skin with working controls and a bare one without', () => {
 })
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `pnpm exec vitest run tests/unit/chrome.test.ts --coverage.enabled=false`
 
-- [ ] **Step 3: Implement the compiler**
+- [x] **Step 3: Implement the compiler**
 
 ```ts
 const ESCAPES: Record<string, string> = {
@@ -680,17 +680,17 @@ export function compileTemplate(template: string): (values: Record<string, strin
 }
 ```
 
-- [ ] **Step 4: Implement `skin()`**
+- [x] **Step 4: Implement `skin()`**
 
 Build the element with a `<template>` element so the markup is parsed inert, read `[data-wm-content]`, count it, set `data-wm-skin` when `spec.name` is given, and inject `spec.styles` once per name into `doc.head` as `<style data-wm-skin-styles="<name>">`.
 
-- [ ] **Step 5: Wire the entry**
+- [x] **Step 5: Wire the entry**
 
 `tsup.config.ts` gains `chrome: 'src/plugins/chrome/index.ts'`; `package.json` gains the `./chrome` export block, the `typesVersions` entry `"chrome": ["./dist/chrome.d.ts"]` and a size-limit entry `{ "name": "chrome plugin", "path": "dist/chrome.js", "limit": "3 kB" }`; `vitest.config.ts`, `tsconfig.json` and `site/vite.config.ts` gain the `@surdeddd/wmkit/chrome` alias.
 
 The `typesVersions` entry is not optional: without it `attw` reports a failed node10 resolution and the release job stops, exactly as it did for `gestures` and `devtools`.
 
-- [ ] **Step 6: Run the tests and the package checks**
+- [x] **Step 6: Run the tests and the package checks**
 
 ```bash
 pnpm exec vitest run tests/unit/chrome.test.ts --coverage.enabled=false
@@ -700,11 +700,11 @@ pnpm attw; echo "attw exit=$?"
 ```
 Expected: every exit code 0.
 
-- [ ] **Step 7: Mutation-check**
+- [x] **Step 7: Mutation-check**
 
 Remove the `escape` call; confirm the escaping test fails. Change the content-slot count check to `>= 1`; confirm the refusal test fails. Restore both.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/plugins/chrome tsup.config.ts package.json vitest.config.ts tsconfig.json site/vite.config.ts tests/unit/chrome.test.ts
@@ -731,7 +731,7 @@ git commit -m "feat(chrome): build a window from a template string"
 - The modal focus trap keeps working: the focusable walk descends into the window's shadow root.
 - The accessible name keeps working: when the title node lives in a shadow root the library sets `aria-label` and does not set `aria-labelledby`, because an IDREF cannot cross the boundary.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('mounts the chrome in a shadow root and projects the content', () => {
@@ -785,11 +785,11 @@ it('finds a drop target whose titlebar is inside a shadow root', () => {
 })
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `pnpm exec vitest run tests/unit/chrome.test.ts --coverage.enabled=false`
 
-- [ ] **Step 3: Implement shadow mounting in `chrome`**
+- [x] **Step 3: Implement shadow mounting in `chrome`**
 
 ```ts
 const sheets = new WeakMap<Document, Map<string, CSSStyleSheet>>()
@@ -808,7 +808,7 @@ function sheetFor(doc: Document, name: string, css: string): CSSStyleSheet {
 
 The host gets `attachShadow({ mode: 'open' })`; the compiled tree goes inside; the `[data-wm-content]` node is replaced by `<slot></slot>`; a light `<div data-wm-content>` is appended to the host and returned as `mount.content`.
 
-- [ ] **Step 4: Fix the drop target in `src/dom/controller.ts`, not with `composedPath`**
+- [x] **Step 4: Fix the drop target in `src/dom/controller.ts`, not with `composedPath`**
 
 The original plan said `composedPath()`. That is wrong, for two reasons that hold structurally in this code:
 
@@ -848,7 +848,7 @@ No depth cap: the `inner === current` identity check already prevents the only r
 
 `composedPath()` is still the right tool at dispatch time — the keyboard and click handlers — and must not be confused with this. Say so in the commit message or it will be reintroduced.
 
-- [ ] **Step 5: Fix the focus trap and the label in `src/dom/controller.ts`**
+- [x] **Step 5: Fix the focus trap and the label in `src/dom/controller.ts`**
 
 This is the highest-risk fix in the plan: it replaces a native `querySelectorAll` on a path three green tests already exercise, and its failure mode is silent — focus escapes, nothing throws. Do it last, and measure branches immediately after.
 
@@ -858,15 +858,15 @@ Keep the change as small as the budget allows: resolve the active element by des
 
 For the label, look the title node up in the shadow root as well, and only set `aria-labelledby` when the node shares a root with the window element. Four places document that linkage unconditionally and have to change with it: `docs/api.md`, `docs/theming.md`, `README.md`, `README.ru.md`.
 
-- [ ] **Step 6: Run the whole unit suite with coverage**
+- [x] **Step 6: Run the whole unit suite with coverage**
 
 Run: `pnpm exec vitest run --coverage`; expected exit 0.
 
-- [ ] **Step 7: Mutation-check each of the three fixes**
+- [x] **Step 7: Mutation-check each of the three fixes**
 
 Revert the `composedPath` resolution; confirm the drop-target test fails. Revert the shadow root walk; confirm the trap test fails. Set `aria-labelledby` unconditionally; confirm the label test fails. Restore all three.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/plugins/chrome src/dom tests/unit
@@ -894,11 +894,11 @@ git commit -m "feat(chrome): isolate a skin in a shadow root without losing grou
 
 Rationale: the thirteen themes added on 2026-08-14 were produced by a script that was never committed, so today they cannot be reproduced or safely changed in bulk. The duplicate-`color` defect that broke the release came from exactly that gap.
 
-- [ ] **Step 1: Move the generator into the repo**
+- [x] **Step 1: Move the generator into the repo**
 
 Port the generator to `scripts/themes.mjs`, keeping the control presets (`dots`, `squares`, `outline`, `glossy`) and the per-theme token tables. Add `"themes": "node scripts/themes.mjs"` to `package.json` scripts.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```ts
 it('every shipped theme comes out of the generator unchanged', async () => {
@@ -912,19 +912,19 @@ it('every shipped theme comes out of the generator unchanged', async () => {
 })
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Expected: FAIL — the script does not exist yet, or the committed files differ.
 
-- [ ] **Step 4: Regenerate and reconcile**
+- [x] **Step 4: Regenerate and reconcile**
 
 Run `pnpm themes`, review the diff, and commit the regenerated files. `glass`, `light` and `retro` predate the generator: either bring them under it or list them as hand-written and exclude them from the test — do not pretend they are generated.
 
-- [ ] **Step 5: Add the themes entry**
+- [x] **Step 5: Add the themes entry**
 
 `src/themes/index.ts` exports `themeNames` and `themeCss`. Add the tsup entry, the `./themes` export block, the `typesVersions` entry and a size-limit budget of `20 kB` (it is sixteen stylesheets as strings; the number is large on purpose and only paid by whoever imports it).
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 pnpm exec vitest run tests/unit/themes.test.ts --coverage.enabled=false
@@ -932,7 +932,7 @@ pnpm exec biome check .; echo "lint exit=$?"
 pnpm build && pnpm size; echo "size exit=$?"
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts src/themes package.json tsup.config.ts tsconfig.json vitest.config.ts tests/unit/themes.test.ts
@@ -955,11 +955,11 @@ git commit -m "build(themes): commit the generator and publish the themes as tex
 - Copy is the only export: nothing is persisted.
 - Every new string is in both catalogs, English and Russian.
 
-- [ ] **Step 1: Extend the demo app**
+- [x] **Step 1: Extend the demo app**
 
 Register the layouts as skins on the demo's `attachDesktop` call, and drive them from `meta.skin`.
 
-- [ ] **Step 2: Write the e2e**
+- [x] **Step 2: Write the e2e**
 
 ```ts
 test('the constructor restyles a live window', async ({ page }) => {
@@ -979,7 +979,7 @@ test('the constructor restyles a live window', async ({ page }) => {
 test('the constructor copies the skin as code', async ({ page }) => { /* clipboard read */ })
 ```
 
-- [ ] **Step 3: Run the demo suites**
+- [x] **Step 3: Run the demo suites**
 
 ```bash
 CI=1 pnpm exec playwright test --project=chromium --workers=1 \
@@ -987,11 +987,11 @@ CI=1 pnpm exec playwright test --project=chromium --workers=1 \
 ```
 Expected: exit 0, no new axe violations. The launcher count assertion in `landing.spec.ts` stays at 11 — the constructor extends an existing app rather than adding one.
 
-- [ ] **Step 4: Document**
+- [x] **Step 4: Document**
 
 `docs/api.md`: `actions()`, `mountWindow()`, the skin protocol types, the new attributes. `docs/theming.md`: skins beside themes and variants — theme dresses every window, variant retunes one, skin rebuilds one. `docs/recipes.md`: "Build a window from scratch", showing a template, its buttons and the shadow flag. Both READMEs: the `@surdeddd/wmkit/chrome` entry beside `gestures` and `devtools`.
 
-- [ ] **Step 5: Full gate, by exit code**
+- [x] **Step 5: Full gate, by exit code**
 
 ```bash
 pnpm exec biome check .; echo "lint=$?"
@@ -1008,7 +1008,7 @@ done
 ```
 Every number must be 0. Run one Playwright project at a time: this machine runs out of memory with several engines at once, and the failures look like product defects.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add site docs README.md README.ru.md tests/e2e/skins.spec.ts
