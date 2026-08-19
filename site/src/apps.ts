@@ -850,12 +850,6 @@ const skins: AppSpec = {
     const status = el('p', 'app-note skin-status')
     status.setAttribute('role', 'status')
     body.replaceChildren(
-      lead,
-      themeLabel,
-      themeGrid,
-      variantLabel,
-      variantList,
-      hint,
       skinLabel,
       skinLead,
       layoutList,
@@ -864,6 +858,12 @@ const skins: AppSpec = {
       shadowRow,
       actions,
       status,
+      lead,
+      themeLabel,
+      themeGrid,
+      variantLabel,
+      variantList,
+      hint,
     )
 
     const themeButtons = THEME_NAMES.map((name) => {
