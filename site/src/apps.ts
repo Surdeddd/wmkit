@@ -43,7 +43,15 @@ export interface AppContext {
   setOption(name: 'magnetism' | 'snap' | 'announce', value: boolean): void
   size(): { width: number; height: number }
   safeArea(): { x: number; y: number; width: number; height: number }
+  skinLayouts: readonly SkinLayout[]
+  skinLayout(): SkinLayout
+  setSkinLayout(layout: SkinLayout): void
+  skinCode(): string
+  skinShadow(): boolean
+  applySkin(template: string, shadow: boolean): void
 }
+
+export type SkinLayout = 'left' | 'right' | 'bare'
 
 export interface AppInstance {
   destroy?(): void
@@ -817,7 +825,46 @@ const skins: AppSpec = {
     const variantLabel = el('h4', 'skin-head')
     const variantList = el('div', 'skin-list')
     const hint = el('p', 'app-note')
-    body.replaceChildren(lead, themeLabel, themeGrid, variantLabel, variantList, hint)
+    const skinLabel = el('h4', 'skin-head')
+    const skinLead = el('p', 'app-note')
+    const layoutList = el('div', 'skin-layout')
+    const templateLabel = el('h4', 'skin-head')
+    const template = document.createElement('textarea')
+    template.className = 'skin-template'
+    template.rows = 5
+    template.spellcheck = false
+    const shadowRow = el('label', 'skin-toggle')
+    const shadowBox = document.createElement('input')
+    shadowBox.type = 'checkbox'
+    const shadowText = el('span', 'skin-toggle-text')
+    const shadowNote = el('span', 'skin-toggle-note')
+    shadowRow.append(shadowBox, shadowText, shadowNote)
+    const actions = el('div', 'skin-actions')
+    const applyButton = el('button', 'skin-action')
+    applyButton.type = 'button'
+    const resetButton = el('button', 'skin-action')
+    resetButton.type = 'button'
+    const copyButton = el('button', 'skin-action skin-action-copy')
+    copyButton.type = 'button'
+    actions.append(applyButton, resetButton, copyButton)
+    const status = el('p', 'app-note skin-status')
+    status.setAttribute('role', 'status')
+    body.replaceChildren(
+      lead,
+      themeLabel,
+      themeGrid,
+      variantLabel,
+      variantList,
+      hint,
+      skinLabel,
+      skinLead,
+      layoutList,
+      templateLabel,
+      template,
+      shadowRow,
+      actions,
+      status,
+    )
 
     const themeButtons = THEME_NAMES.map((name) => {
       const node = el('button', `skin-swatch skin-${name}`)
@@ -842,6 +889,57 @@ const skins: AppSpec = {
       return node
     })
 
+    const layoutButtons = ctx.skinLayouts.map((layout) => {
+      const node = el('button', 'skin-layout-button')
+      node.type = 'button'
+      node.dataset.layout = layout
+      node.append(el('span', 'skin-variant-name'), el('span', 'skin-variant-note'))
+      node.addEventListener('click', () => {
+        ctx.setSkinLayout(layout)
+        template.value = ctx.skinCode()
+        status.textContent = ''
+        sync()
+      })
+      layoutList.append(node)
+      return node
+    })
+
+    applyButton.addEventListener('click', () => {
+      try {
+        ctx.applySkin(template.value, shadowBox.checked)
+        status.textContent = ''
+      } catch {
+        status.textContent = ctx.dict().skins.broken
+      }
+      sync()
+    })
+
+    resetButton.addEventListener('click', () => {
+      ctx.setSkinLayout(ctx.skinLayout())
+      shadowBox.checked = false
+      template.value = ctx.skinCode()
+      status.textContent = ''
+      sync()
+    })
+
+    copyButton.addEventListener('click', () => {
+      const code = `skin({\n  template: \`${template.value}\`,\n  shadow: ${shadowBox.checked},\n})`
+      const done = () => {
+        status.textContent = ctx.dict().skins.copied
+      }
+      const clipboard = navigator.clipboard
+      if (clipboard) {
+        clipboard.writeText(code).then(done, () => {
+          template.value = code
+          template.select()
+        })
+        return
+      }
+      template.value = code
+      template.select()
+      done()
+    })
+
     function currentVariant(): string {
       const focused = ctx.wm.getState().focusedId
       if (focused === null) return ''
@@ -859,6 +957,14 @@ const skins: AppSpec = {
         node.setAttribute('aria-pressed', String(active === variantIds[index]))
         node.disabled = focused === null
       }
+      const custom = template.value !== ctx.skinCode() || shadowBox.checked !== ctx.skinShadow()
+      for (const node of layoutButtons) {
+        node.setAttribute(
+          'aria-pressed',
+          String(!custom && node.dataset.layout === ctx.skinLayout()),
+        )
+      }
+      resetButton.disabled = !custom
     }
 
     function relabel(): void {
@@ -875,6 +981,23 @@ const skins: AppSpec = {
         if (name) name.textContent = entry?.[0] ?? ''
         if (note) note.textContent = entry?.[1] ?? ''
       }
+      skinLabel.textContent = copy.skin
+      skinLead.textContent = copy.skinLead
+      templateLabel.textContent = copy.template
+      shadowText.textContent = copy.shadow
+      shadowNote.textContent = copy.shadowNote
+      applyButton.textContent = copy.apply
+      resetButton.textContent = copy.reset
+      copyButton.textContent = copy.copy
+      for (const [index, node] of layoutButtons.entries()) {
+        const entry = copy.layouts[index]
+        const name = node.querySelector('.skin-variant-name')
+        const note = node.querySelector('.skin-variant-note')
+        if (name) name.textContent = entry?.[0] ?? ''
+        if (note) note.textContent = entry?.[1] ?? ''
+      }
+      template.value = ctx.skinCode()
+      shadowBox.checked = ctx.skinShadow()
       sync()
     }
 

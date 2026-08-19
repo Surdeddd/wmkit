@@ -144,6 +144,32 @@ export function setTheme(name) {
 
 The `data-theme` attribute lets you scope your own overrides to one theme without leaking into the others — that is exactly how the demo does it.
 
+## Theme, variant, skin
+
+Three layers, from the widest to the narrowest:
+
+| layer | reaches | changes |
+| --- | --- | --- |
+| theme | every window on the desktop | the tokens |
+| variant | one window | the tokens, through `data-wm-variant` |
+| skin | one window | the markup itself |
+
+A theme and a variant repaint what is already there. A skin replaces it: different elements, different buttons, a different titlebar. Reach for a skin when the window's *structure* differs, and for a variant when only its colours do.
+
+```js
+import { skin } from '@surdeddd/wmkit/chrome'
+
+const desktop = attachDesktop(wm, root, {
+  skins: {
+    plain: skin({ template: PLAIN }),
+    compact: skin({ template: COMPACT }),
+  },
+})
+
+desktop.mountWindow('notes', 'plain')
+wm.update('notes', { meta: { skin: 'compact' } })  // rebuilt in place
+```
+
 ## Themes as text
 
 A stylesheet loaded into `document.head` cannot reach inside a shadow root, so a skin built with `shadow: true` never sees it. For that case the same sixteen themes ship as strings:
