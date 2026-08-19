@@ -1,5 +1,6 @@
 import type { SnapDetectOptions } from '../core/geometry'
 import type { Bounds, WindowManager, WindowState } from '../core/types'
+import type { WindowActions } from './actions'
 import type { AnnouncerMessages } from './announcer'
 
 export const INTERACTIVE_SELECTOR =
@@ -75,6 +76,7 @@ export interface DesktopController {
   element: HTMLElement
   wm: WindowManager
   attachWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
+  actions(id: string): WindowActions
   destroy(): void
 }
 
