@@ -154,11 +154,22 @@
         "default": "./dist/chrome.cjs"
       }
     },
+    "./themes": {
+      "import": {
+        "types": "./dist/themes.d.ts",
+        "default": "./dist/themes.js"
+      },
+      "require": {
+        "types": "./dist/themes.d.cts",
+        "default": "./dist/themes.cjs"
+      }
+    },
     "./themes/*": "./dist/themes/*",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsup",
+    "themes": "node scripts/themes.mjs",
     "dev": "vite site",
     "site:build": "vite build site",
     "site:preview": "vite preview site",
@@ -299,6 +310,11 @@
       "name": "chrome plugin",
       "path": "dist/chrome.js",
       "limit": "3 kB"
+    },
+    {
+      "name": "themes as text",
+      "path": "dist/themes.js",
+      "limit": "8 kB"
     }
   ],
   "typesVersions": {
@@ -332,6 +348,9 @@
       ],
       "chrome": [
         "./dist/chrome.d.ts"
+      ],
+      "themes": [
+        "./dist/themes.d.ts"
       ]
     }
   }

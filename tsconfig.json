@@ -31,6 +31,7 @@
       "@surdeddd/wmkit/devtools": ["./src/plugins/devtools/index.ts"],
       "@surdeddd/wmkit/gestures": ["./src/plugins/gestures.ts"],
       "@surdeddd/wmkit/chrome": ["./src/plugins/chrome/index.ts"],
+      "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"]
     }
   },
