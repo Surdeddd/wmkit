@@ -291,11 +291,6 @@ export function attachDesktop(
     activeTab: boolean,
   ): void {
     const el = attached.element
-    const wanted = typeof win.meta.skin === 'string' ? win.meta.skin : null
-    if (attached.skin !== null && wanted !== null && wanted !== attached.skin) {
-      buildSkin(win.id, wanted, attached.mountOptions)
-      return
-    }
     const firstSync = attached.lastState === null
     if (firstSync) el.style.transition = 'none'
     if (
@@ -374,10 +369,17 @@ export function attachDesktop(
   function syncAll(): void {
     const state = wm.getState()
     const orderChanged = state.order !== lastOrder
+    let restyle: Array<[string, string]> | null = null
     for (const id of state.order) {
       const attached = registry.get(id)
       const win = state.windows[id]
       if (!attached || !win) continue
+      const wanted = typeof win.meta.skin === 'string' ? win.meta.skin : null
+      if (attached.skin !== null && wanted !== null && wanted !== attached.skin) {
+        restyle = restyle ?? []
+        restyle.push([id, wanted])
+        continue
+      }
       const activeTab = win.groupId === null || state.groups[win.groupId]?.activeId === win.id
       if (
         attached.lastState !== win ||
@@ -386,6 +388,14 @@ export function attachDesktop(
       ) {
         syncWindow(attached, win, state.workspace, activeTab)
       }
+    }
+    if (restyle !== null) {
+      for (const [id, wanted] of restyle) {
+        const attached = registry.get(id)
+        if (attached && attached.skin !== wanted) buildSkin(id, wanted, attached.mountOptions)
+      }
+      syncAll()
+      return
     }
     if (orderChanged) applyStacking(state.order)
     const wanted = state.focusedId ? (registry.get(state.focusedId)?.element ?? null) : null
@@ -734,10 +744,12 @@ export function attachDesktop(
   ): SkinMount {
     const win = wm.get(id)
     if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
-    const previous = registry.get(id)?.mount ?? null
+    const standing = registry.get(id)
+    const previous = standing?.mount ?? null
     const carried = previous === null ? [] : [...previous.content.childNodes]
     if (previous !== null) {
-      registry.get(id)?.release?.()
+      registry.delete(id)
+      standing?.release?.()
       previous.element.remove()
     }
     const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
