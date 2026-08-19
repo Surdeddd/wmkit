@@ -1,3 +1,10 @@
+## [0.9.1](https://github.com/Surdeddd/wmkit/compare/v0.9.0...v0.9.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **site:** lead the skins app with the constructor instead of burying it ([aebe480](https://github.com/Surdeddd/wmkit/commit/aebe480494ecd7812dfb1f55968f4f70f37ba811))
+
 # [0.9.0](https://github.com/Surdeddd/wmkit/compare/v0.8.0...v0.9.0) (2026-08-19)
 
 
