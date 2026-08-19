@@ -53,6 +53,7 @@ export interface DesktopOptions {
   stacking?: StackingOptions
   animation?: boolean | AnimationOptions
   gestures?: readonly DesktopGesture[]
+  skins?: Readonly<Record<string, WindowSkin>>
   interactiveSelector?: string
   // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
   beforeClose?: (window: WindowState) => boolean | void
@@ -72,10 +73,32 @@ export interface WindowAttachOptions {
   removeOnClose?: boolean
 }
 
+export interface SkinContext {
+  doc: Document
+  id: string
+  window: WindowState
+  actions: WindowActions
+}
+
+export interface SkinMount {
+  element: HTMLElement
+  content: HTMLElement
+  destroy?(): void
+}
+
+export type WindowSkin = (ctx: SkinContext) => SkinMount
+
+export interface MountedWindow {
+  element: HTMLElement
+  content: HTMLElement
+  detach(): void
+}
+
 export interface DesktopController {
   element: HTMLElement
   wm: WindowManager
   attachWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
+  mountWindow(id: string, skin: WindowSkin | string, options?: WindowAttachOptions): MountedWindow
   actions(id: string): WindowActions
   destroy(): void
 }

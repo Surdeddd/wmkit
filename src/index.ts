@@ -31,6 +31,7 @@ export type {
   WindowState,
   WindowUpdate,
 } from './core/types'
+export type { WindowActions } from './dom/actions'
 export type { FlipGhostOptions } from './dom/animate'
 export { flipFromTarget, flipToTarget, prefersReducedMotion } from './dom/animate'
 export type { Announcer, AnnouncerMessages } from './dom/announcer'
@@ -48,5 +49,9 @@ export type {
   GestureContext,
   HitAreaOptions,
   MagnetismOptions,
+  MountedWindow,
+  SkinContext,
+  SkinMount,
   WindowAttachOptions,
+  WindowSkin,
 } from './dom/shared'
