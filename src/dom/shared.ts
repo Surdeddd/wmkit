@@ -4,7 +4,7 @@ import type { WindowActions } from './actions'
 import type { AnnouncerMessages } from './announcer'
 
 export const INTERACTIVE_SELECTOR =
-  'button, input, select, textarea, a[href], [contenteditable], [data-wm-close], [data-wm-minimize], [data-wm-maximize]'
+  'button, input, select, textarea, a[href], [contenteditable], [data-wm-close], [data-wm-minimize], [data-wm-maximize], [data-wm-snap], [data-wm-restore], [data-wm-center], [data-wm-send-back], [data-wm-to-workspace]'
 
 export interface Point {
   x: number
