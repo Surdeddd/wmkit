@@ -8,8 +8,9 @@
   --wm-shadow-focused: 0 0 0 1px rgba(215, 235, 255, 0.45);
   --wm-titlebar-bg: rgba(190, 220, 255, 0.1);
   --wm-text: #e8f2ff;
-  --wm-text-dim: rgba(232, 242, 255, 0.6);
+  --wm-text-dim: rgba(232, 242, 255, 0.74);
   --wm-accent: #9ecbff;
+  --wm-accent-ink: #9ecbff;
   --wm-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --wm-title-font: var(--wm-mono);
   --wm-title-size: 12px;

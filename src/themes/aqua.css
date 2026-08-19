@@ -1,6 +1,6 @@
 [data-wm-desktop] {
   --wm-radius: 10px;
-  --wm-bg: rgba(238, 241, 246, 0.86);
+  --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
   --wm-border: rgba(60, 80, 110, 0.28);
   --wm-border-focused: rgba(40, 70, 120, 0.45);
@@ -8,8 +8,9 @@
   --wm-shadow-focused: 0 16px 40px rgba(20, 40, 80, 0.32);
   --wm-titlebar-bg: linear-gradient(180deg, #fdfdfe 0%, #e4eaf3 48%, #d4dced 52%, #e8edf5 100%);
   --wm-text: #1d2733;
-  --wm-text-dim: rgba(29, 39, 51, 0.62);
+  --wm-text-dim: rgba(29, 39, 51, 0.7);
   --wm-accent: #2f6fd0;
+  --wm-accent-ink: #2962b7;
   --wm-blur: 14px;
   --wm-title-size: 13px;
   --wm-title-weight: 600;

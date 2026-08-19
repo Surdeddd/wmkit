@@ -8,8 +8,9 @@
   --wm-shadow-focused: 4px 6px 0 rgba(84, 71, 51, 0.16);
   --wm-titlebar-bg: rgba(84, 71, 51, 0.05);
   --wm-text: #3f382c;
-  --wm-text-dim: rgba(63, 56, 44, 0.6);
+  --wm-text-dim: rgba(63, 56, 44, 0.73);
   --wm-accent: #a8571b;
+  --wm-accent-ink: #a8571b;
   --wm-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --wm-transition: 220ms cubic-bezier(0.32, 0.72, 0, 1);
   position: relative;
