@@ -1,3 +1,11 @@
+## [0.9.2](https://github.com/Surdeddd/wmkit/compare/v0.9.1...v0.9.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* **site:** stop the desktop from covering the landing copy, and settle the contrast gate ([9c0364d](https://github.com/Surdeddd/wmkit/commit/9c0364d84bd458e7049242cde3bf8d64e919a06c))
+* **themes:** make every shipped theme readable, and measure it from now on ([98ebc91](https://github.com/Surdeddd/wmkit/commit/98ebc91ba51e3de4e962803728a7f7a104e79110))
+
 ## [0.9.1](https://github.com/Surdeddd/wmkit/compare/v0.9.0...v0.9.1) (2026-08-19)
 
 
