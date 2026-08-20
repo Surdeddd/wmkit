@@ -97,8 +97,22 @@ function focusablesOf(el: HTMLElement): HTMLElement[] {
 function dragHandleAt(node: Element, clientX: number, clientY: number): Element | null {
   const handle = node.closest?.('[data-wm-drag]')
   if (handle) return handle
-  const inner = node.shadowRoot?.elementFromPoint?.(clientX, clientY) ?? null
-  return inner === null || inner === node ? null : dragHandleAt(inner, clientX, clientY)
+  const root = node.shadowRoot
+  if (!root) return null
+  // elementFromPoint on a shadow root is not portable: Chromium and WebKit hand back
+  // the topmost element even when it belongs to another tree, so ask geometry instead
+  for (const candidate of root.querySelectorAll('[data-wm-drag]')) {
+    const box = candidate.getBoundingClientRect()
+    if (
+      clientX >= box.left &&
+      clientX <= box.right &&
+      clientY >= box.top &&
+      clientY <= box.bottom
+    ) {
+      return candidate
+    }
+  }
+  return null
 }
 
 function windowElementOf(node: Element): HTMLElement | null {
