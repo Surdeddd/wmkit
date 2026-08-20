@@ -1,3 +1,19 @@
+# [0.10.0](https://github.com/Surdeddd/wmkit/compare/v0.9.2...v0.10.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* **dom:** find a shadow window's titlebar by geometry, not by elementFromPoint ([ef9a214](https://github.com/Surdeddd/wmkit/commit/ef9a2140aa6ac0accd94c9eb7ff67f7df582b77e))
+* **dom:** make a shadow window answer its own chrome ([8fb03fd](https://github.com/Surdeddd/wmkit/commit/8fb03fdd88eeabd430c2cc2ebba4a059444b3f9a))
+* **dom:** six ways a mounted window came apart ([5f5394b](https://github.com/Surdeddd/wmkit/commit/5f5394b764d995da643dd971c29d4a95f313bf0a))
+* **site:** switch themes without a frame of no theme at all ([1f94b33](https://github.com/Surdeddd/wmkit/commit/1f94b33afcb4cb6b08c3e1155d6a8ac840b4cd87))
+
+
+### Features
+
+* **site:** put the skin constructor in the hero, and label what it builds ([7a54009](https://github.com/Surdeddd/wmkit/commit/7a54009d044bff4912977b92dccdece811c3801c))
+* **site:** put the window builder on the page itself ([9649c79](https://github.com/Surdeddd/wmkit/commit/9649c79ba68c54b35e3566aea1f850e670482226))
+
 ## [0.9.2](https://github.com/Surdeddd/wmkit/compare/v0.9.1...v0.9.2) (2026-08-20)
 
 
