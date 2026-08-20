@@ -4,6 +4,7 @@ import {
   type WindowInit,
   type WindowState,
 } from '@surdeddd/wmkit'
+import { skin } from '@surdeddd/wmkit/chrome'
 import { persist } from '@surdeddd/wmkit/persist'
 import '@surdeddd/wmkit/themes/glass.css'
 
@@ -136,6 +137,30 @@ document.querySelector('#btn-stress')?.addEventListener('click', () => {
       })
     }
   })
+})
+
+const shadowSkin = skin({
+  name: 'e2e-shadow',
+  shadow: true,
+  styles: ':host { display: flex; flex-direction: column; background: #1a1e2a; color: #eef }',
+  template:
+    '<section data-testid="window-{{id}}">' +
+    '<header data-wm-drag style="display:flex;gap:8px;padding:8px;background:#2a2f3d">' +
+    '<span data-wm-title>{{title}}</span>' +
+    '<button type="button" data-wm-minimize aria-label="Minimize">_</button>' +
+    '<button type="button" data-wm-maximize aria-label="Maximize">□</button>' +
+    '<button type="button" data-wm-close aria-label="Close">×</button>' +
+    '</header>' +
+    '<div data-wm-content style="flex:1;padding:12px"></div>' +
+    '</section>',
+})
+
+document.querySelector('#btn-open-shadow')?.addEventListener('click', () => {
+  wm.open({ id: 'shadow', title: 'Shadow', x: 80, y: 80, width: 360, height: 260 })
+  const mounted = desktop.mountWindow('shadow', shadowSkin, { removeOnClose: true })
+  const text = document.createElement('p')
+  text.textContent = 'projected content'
+  mounted.content.append(text)
 })
 
 document.querySelector('#btn-clear')?.addEventListener('click', () => {
