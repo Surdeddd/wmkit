@@ -136,17 +136,31 @@ test.describe('a window whose chrome lives in a shadow root', () => {
 
   test('resizes from a grip the page cannot reach', async ({ page }) => {
     await openShadowWindow(page)
+    // a phone viewport is narrower than the fixture window: bring the grip on screen
+    await page.evaluate(() => {
+      window.__wm.move('shadow', 10, 10)
+      window.__wm.resize('shadow', { width: 240, height: 200 })
+    })
+    // the move animates; take the grip's position only once the box has landed
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const box = document.querySelector('[data-wm-window="shadow"]')?.getBoundingClientRect()
+          return box ? Math.round(box.width) : 0
+        }),
+      )
+      .toBe(240)
     const before = await state(page)
     const grip = await centreOf(page, '[data-wm-resize="se"]')
     expect(grip).not.toBeNull()
 
     await page.mouse.move(grip?.x ?? 0, grip?.y ?? 0)
     await page.mouse.down()
-    await page.mouse.move((grip?.x ?? 0) + 90, (grip?.y ?? 0) + 70, { steps: 10 })
+    await page.mouse.move((grip?.x ?? 0) + 60, (grip?.y ?? 0) + 50, { steps: 10 })
     await page.mouse.up()
 
     await expect
       .poll(async () => Math.round((await state(page))?.width ?? 0))
-      .toBe(Math.round((before?.width ?? 0) + 90))
+      .toBe(Math.round((before?.width ?? 0) + 60))
   })
 })

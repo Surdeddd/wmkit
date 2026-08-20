@@ -112,12 +112,22 @@ interface Mounted {
 const mounted = new Map<string, Mounted>()
 const specById = new Map<AppId, AppSpec>(apps.map((spec) => [spec.id, spec]))
 
-const themeLink = document.createElement('link')
-themeLink.rel = 'stylesheet'
-document.head.append(themeLink)
+let themeLink: HTMLLinkElement | null = null
 
 function applyTheme(): void {
-  themeLink.href = THEME_URLS[theme]
+  // load the next theme beside the current one and only then let the old go,
+  // so the desktop is never left without a theme mid-swap
+  const next = document.createElement('link')
+  next.rel = 'stylesheet'
+  next.href = THEME_URLS[theme]
+  const previous = themeLink
+  themeLink = next
+  next.addEventListener('load', () => {
+    if (themeLink === next) previous?.remove()
+    else next.remove()
+  })
+  next.addEventListener('error', () => next.remove())
+  document.head.append(next)
   desktopEl.dataset.theme = theme
   localStorage.setItem('wmkit-theme', theme)
 }
