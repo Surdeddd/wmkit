@@ -568,6 +568,95 @@ function openDefaults(): void {
   wm.focus(width >= 720 ? 'terminal' : 'readme')
 }
 
+const builderHost = document.querySelector<HTMLElement>('#builder-app')
+
+function renderBuilder(): void {
+  if (!builderHost) return
+  builderHost.replaceChildren()
+
+  const layoutRow = document.createElement('div')
+  layoutRow.className = 'builder-layouts'
+  const editor = document.createElement('textarea')
+  editor.className = 'builder-editor'
+  editor.rows = 12
+  editor.spellcheck = false
+  editor.id = 'builder-editor'
+  editor.setAttribute('aria-label', dict().skins.template)
+  editor.value = layoutTemplate(skinOf())
+
+  const shadowRow = document.createElement('label')
+  shadowRow.className = 'builder-toggle'
+  const shadowBox = document.createElement('input')
+  shadowBox.type = 'checkbox'
+  const shadowText = document.createElement('span')
+  shadowText.textContent = dict().skins.shadow
+  shadowRow.append(shadowBox, shadowText)
+
+  const actions = document.createElement('div')
+  actions.className = 'builder-actions'
+  const applyBtn = document.createElement('button')
+  applyBtn.type = 'button'
+  applyBtn.className = 'btn btn-primary'
+  applyBtn.textContent = dict().skins.apply
+  const copyBtn = document.createElement('button')
+  copyBtn.type = 'button'
+  copyBtn.className = 'btn'
+  copyBtn.textContent = dict().skins.copy
+  const status = document.createElement('p')
+  status.className = 'builder-status'
+  status.setAttribute('role', 'status')
+  actions.append(applyBtn, copyBtn)
+
+  for (const layout of SKIN_LAYOUTS) {
+    const node = document.createElement('button')
+    node.type = 'button'
+    node.className = 'builder-chip'
+    node.dataset.layout = layout
+    node.textContent = dict().skins.layouts[SKIN_LAYOUTS.indexOf(layout)]?.[0] ?? layout
+    node.setAttribute('aria-pressed', String(layout === skinOf()))
+    node.addEventListener('click', () => {
+      setSkinLayout(layout)
+      editor.value = layoutTemplate(layout)
+      status.textContent = ''
+      for (const chip of layoutRow.querySelectorAll('button')) {
+        chip.setAttribute('aria-pressed', String(chip === node))
+      }
+    })
+    layoutRow.append(node)
+  }
+
+  applyBtn.addEventListener('click', () => {
+    if (!wm.get('skins')) openApp('skins')
+    try {
+      applyCustomSkin(editor.value, shadowBox.checked)
+      status.textContent = ''
+      wm.focus('skins')
+      document.querySelector('#demo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch (error) {
+      // the engine's message names the actual reason; the catalogue line is the fallback
+      status.textContent = error instanceof Error ? error.message : dict().skins.broken
+    }
+  })
+
+  copyBtn.addEventListener('click', () => {
+    const code = `skin({\n  template: \`${editor.value}\`,\n  shadow: ${shadowBox.checked},\n})`
+    const done = () => {
+      status.textContent = dict().skins.copied
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code).then(done, () => {
+        status.textContent = ''
+      })
+      return
+    }
+    status.textContent = ''
+  })
+
+  builderHost.append(layoutRow, editor, shadowRow, actions, status)
+}
+
+renderBuilder()
+
 wallSkinsEl.addEventListener('click', () => {
   openApp('skins')
   wm.focus('skins')
@@ -863,6 +952,7 @@ function setLang(next: Lang): void {
   renderCompare()
   relabelAll()
   renderDock()
+  renderBuilder()
 }
 
 wm.subscribe(() => {

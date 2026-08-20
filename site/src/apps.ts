@@ -911,8 +911,8 @@ const skins: AppSpec = {
       try {
         ctx.applySkin(template.value, shadowBox.checked)
         status.textContent = ''
-      } catch {
-        status.textContent = ctx.dict().skins.broken
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : ctx.dict().skins.broken
       }
       sync()
     })
