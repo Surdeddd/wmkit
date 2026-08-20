@@ -117,6 +117,7 @@ function probe(): Finding[] {
 }
 
 test('every shipped theme keeps the demo readable', async ({ page }) => {
+  test.slow()
   await page.goto('?lang=en')
   await page.click('#launcher button[data-app="terminal"]')
   await page.click('#launcher button[data-app="skins"]')
@@ -128,17 +129,28 @@ test('every shipped theme keeps the demo readable', async ({ page }) => {
       await page.locator(`.skin-${theme}`).click()
       await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
     }
-    // the attribute flips at once; the stylesheet, the re-render and the repaint
-    // follow, so read the page until two consecutive reads agree
+    // the attribute flips at once; the stylesheet has to arrive before anything
+    // measured here means the theme, and the re-render lands after that
+    await page.waitForFunction(
+      (name) =>
+        [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].some(
+          (link) => link.href.includes(`/${name}-`) && link.sheet !== null,
+        ),
+      theme,
+      { timeout: 20_000 },
+    )
+
+    // then read until two consecutive reads agree, so nothing is measured mid-paint
     let seen: Finding[] = []
     let previous = ''
-    for (let attempt = 0; attempt < 25; attempt += 1) {
+    const deadline = Date.now() + 20_000
+    while (Date.now() < deadline) {
       const now = await page.evaluate(probe)
       const shape = JSON.stringify(now)
+      seen = now
       if (shape === previous) break
       previous = shape
-      seen = now
-      await page.waitForTimeout(80)
+      await page.waitForTimeout(100)
     }
 
     for (const finding of seen) {
