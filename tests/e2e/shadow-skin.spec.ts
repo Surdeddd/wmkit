@@ -104,6 +104,36 @@ test.describe('a window whose chrome lives in a shadow root', () => {
     await expect.poll(async () => (await state(page))?.stage).toBe('maximized')
   })
 
+  test('can be grouped into by dropping another titlebar on it', async ({ page }) => {
+    await openShadowWindow(page)
+    await page.click('#btn-open')
+    const moving = await page.evaluate(
+      () => window.__wm.getState().order.find((id) => id !== 'shadow') ?? '',
+    )
+    expect(moving).not.toBe('')
+
+    const target = await centreOf(page, '[data-wm-drag]')
+    const from = await page.evaluate((id) => {
+      const bar = document.querySelector('[data-wm-window="' + id + '"] [data-wm-drag]')
+      if (!bar) return null
+      const box = bar.getBoundingClientRect()
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    }, moving)
+    expect(from).not.toBeNull()
+
+    await page.mouse.move(from?.x ?? 0, from?.y ?? 0)
+    await page.mouse.down()
+    await page.mouse.move(target?.x ?? 0, target?.y ?? 0, { steps: 20 })
+    await page.mouse.move((target?.x ?? 0) + 2, (target?.y ?? 0) + 1, { steps: 2 })
+    // the drop target is only taken after the dwell, with no further motion
+    await expect(page.locator('[data-wm-tab-target]')).toHaveAttribute('data-wm-window', 'shadow')
+    await page.mouse.up()
+
+    await expect
+      .poll(() => page.evaluate((id) => window.__wm.get(id)?.groupId ?? null, moving))
+      .not.toBeNull()
+  })
+
   test('resizes from a grip the page cannot reach', async ({ page }) => {
     await openShadowWindow(page)
     const before = await state(page)

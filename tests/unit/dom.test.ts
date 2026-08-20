@@ -1840,7 +1840,18 @@ describe('windows built inside a shadow root', () => {
     )
     const root = host.shadowRoot as ShadowRoot
     const inner = root.querySelector('[data-wm-drag]') as HTMLElement
-    Object.assign(root, { elementFromPoint: () => inner })
+    // the handle is found by geometry inside the root, so give it one
+    inner.getBoundingClientRect = () =>
+      ({
+        left: 400,
+        top: 400,
+        right: 600,
+        bottom: 440,
+        x: 400,
+        y: 400,
+        width: 200,
+        height: 40,
+      }) as DOMRect
     document.elementsFromPoint = () => [host]
 
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
