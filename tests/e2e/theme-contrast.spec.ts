@@ -124,11 +124,24 @@ test('every shipped theme keeps the demo readable', async ({ page }) => {
 
   const failures: string[] = []
   for (const theme of THEMES) {
-    await page.locator(`.skin-${theme}`).click()
-    await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
-    await page.waitForTimeout(120)
+    if ((await page.getAttribute('#desktop', 'data-theme')) !== theme) {
+      await page.locator(`.skin-${theme}`).click()
+      await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
+    }
+    // the attribute flips at once; the stylesheet, the re-render and the repaint
+    // follow, so read the page until two consecutive reads agree
+    let seen: Finding[] = []
+    let previous = ''
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const now = await page.evaluate(probe)
+      const shape = JSON.stringify(now)
+      if (shape === previous) break
+      previous = shape
+      seen = now
+      await page.waitForTimeout(80)
+    }
 
-    for (const finding of await page.evaluate(probe)) {
+    for (const finding of seen) {
       if (finding.ratio >= AA) continue
       failures.push(
         `${theme}: ${finding.ratio}:1 — <${finding.node}> "${finding.text}" ` +

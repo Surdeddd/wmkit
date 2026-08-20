@@ -266,7 +266,9 @@ function safeArea(): { x: number; y: number; width: number; height: number } {
 function remountDesktop(): void {
   for (const entry of mounted.values()) entry.window = null
   desktop.destroy()
-  desktopEl.replaceChildren()
+  for (const node of [...desktopEl.children]) {
+    if (!node.classList.contains('wallpaper')) node.remove()
+  }
   desktop = attachDesktop(wm, desktopEl, desktopOptions())
   for (const [id, entry] of mounted) {
     if (wm.get(id)) activate(id, entry)
