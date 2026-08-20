@@ -1694,6 +1694,97 @@ describe('window skins', () => {
     expect(gone).toEqual(['inline'])
   })
 
+  it('clears away what it mounted when the desktop is destroyed', () => {
+    const gone: string[] = []
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow(
+      'a',
+      makeSkin('inline', { destroy: () => gone.push('inline') }),
+    )
+
+    harness.desktop.destroy()
+
+    expect(mounted.element.isConnected).toBe(false)
+    expect(gone).toEqual(['inline'])
+  })
+
+  it('leaves a window standing when its next skin is not registered', () => {
+    const harness = makeHarness({ skins: { stripe: makeSkin('stripe') } })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+    const live = document.createElement('canvas')
+    mounted.content.append(live)
+
+    expect(() => harness.wm.update('a', { meta: { skin: 'nope' } })).toThrow(/unknown skin/)
+
+    expect(harness.wm.get('a')).toBeDefined()
+    expect(mounted.element.isConnected).toBe(true)
+    expect(mounted.element.dataset.look).toBe('stripe')
+    expect(mounted.content.contains(live)).toBe(true)
+  })
+
+  it('takes the mounted element away when the window closes', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const mounted = harness.desktop.mountWindow('a', makeSkin('inline'))
+
+    harness.wm.close('a')
+    expect(mounted.element.isConnected).toBe(false)
+  })
+
+  it('keeps the window where the pointer left it when the skin changes mid-drag', () => {
+    const harness = makeHarness({
+      magnetism: false,
+      snap: false,
+      skins: { stripe: makeSkin('stripe'), plain: makeSkin('plain') },
+    })
+    harness.wm.open({ id: 'a', title: 'Hello', x: 100, y: 100, meta: { skin: 'stripe' } })
+    harness.desktop.mountWindow('a', 'stripe')
+    const handle = harness.handleOf('a')
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 150, 120))
+    handle.dispatchEvent(pointerEvent('pointermove', 250, 220))
+    harness.flushFrames()
+    const dragged = harness.wm.get('a')?.bounds
+
+    harness.wm.update('a', { meta: { skin: 'plain' } })
+
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: dragged?.x, y: dragged?.y })
+  })
+
+  it('does not tear down the window that took the place of a spent handle', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'Hello' })
+    const first = harness.desktop.mountWindow('a', makeSkin('one'))
+    first.detach()
+
+    const second = harness.desktop.mountWindow('a', makeSkin('two'))
+    first.detach()
+
+    expect(second.element.isConnected).toBe(true)
+    expect(harness.element.querySelector('[data-wm-window="a"]')).toBe(second.element)
+  })
+
+  it('leaves behind content the app moved to another document', () => {
+    const harness = makeHarness({
+      skins: { stripe: makeSkin('stripe'), plain: makeSkin('plain') },
+    })
+    harness.wm.open({ id: 'a', title: 'Hello', meta: { skin: 'stripe' } })
+    const mounted = harness.desktop.mountWindow('a', 'stripe')
+    const travelled = document.createElement('p')
+    mounted.content.append(travelled)
+    // this is what popout does: it moves the content element into another document
+    const elsewhere = document.implementation.createHTMLDocument('popout')
+    elsewhere.body.append(mounted.content)
+
+    harness.wm.update('a', { meta: { skin: 'plain' } })
+
+    expect(mounted.element.dataset.look).toBe('plain')
+    expect(travelled.ownerDocument).toBe(elsewhere)
+    expect(mounted.content.contains(travelled)).toBe(false)
+  })
+
   it('detaches a mounted window and takes its element with it', () => {
     const harness = makeHarness()
     harness.wm.open({ id: 'a', title: 'Hello' })
