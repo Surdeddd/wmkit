@@ -71,3 +71,10 @@ export async function dragTo(
 export async function desktopBox(page: Page) {
   return boxOf(page.locator('#desktop'))
 }
+
+export async function closeAllBut(page: Page, ...keep: string[]): Promise<void> {
+  await page.evaluate((ids) => {
+    const { wm } = window.__wmDemo
+    for (const id of [...wm.getState().order]) if (!ids.includes(id)) wm.close(id)
+  }, keep)
+}
