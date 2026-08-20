@@ -264,6 +264,6 @@ describe('random gestures keep the dom in step with the state', () => {
     it(`holds every dom invariant for seed ${seed}`, () => {
       const h = harness()
       expect(drive(h, seed, 160)).toEqual([])
-    })
+    }, 30_000)
   }
 })

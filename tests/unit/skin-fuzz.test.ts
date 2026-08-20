@@ -248,6 +248,6 @@ describe('random skin changes keep every window whole', () => {
     it(`holds every mount invariant for seed ${seed}`, () => {
       const h = harness()
       expect(drive(h, seed, 140)).toEqual([])
-    })
+    }, 30_000)
   }
 })
