@@ -79,7 +79,7 @@ test.describe('the landing tells the truth', () => {
       await page.addInitScript((name) => localStorage.setItem('wmkit-theme', name), theme)
       await page.goto('?lang=en')
       await expect(page.locator(readme)).toBeVisible()
-      await expect(page.locator('[data-wm-desktop]')).toHaveAttribute('data-theme', theme)
+      await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
       const loaded = await page.evaluate(
         (name) => [...document.styleSheets].some((sheet) => sheet.href?.includes(name)),
         theme,

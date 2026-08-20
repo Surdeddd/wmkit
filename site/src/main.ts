@@ -30,6 +30,7 @@ import synthUrl from '@surdeddd/wmkit/themes/synth.css?url'
 import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
 import type { AppContext, AppInstance, AppSpec, SkinLayout, ThemeName } from './apps'
 import { apps, isThemeName } from './apps'
+import { initBuilder } from './builder'
 import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
 import './os.css'
 import './apps.css'
@@ -129,6 +130,7 @@ function applyTheme(): void {
   next.addEventListener('error', () => next.remove())
   document.head.append(next)
   desktopEl.dataset.theme = theme
+  builder.syncTheme(theme)
   localStorage.setItem('wmkit-theme', theme)
 }
 
@@ -197,14 +199,16 @@ export function setSkinLayout(layout: SkinLayout): void {
   }
 }
 
-export function applyCustomSkin(template: string, shadow: boolean): void {
+export function applyCustomSkin(template: string, shadow: boolean, styles?: string): void {
   customTemplate = template
   customShadow = shadow
+  const chosen = styles ?? (shadow ? themeStyle(theme, { shadow: true }) : undefined)
+  document.head.querySelector('style[data-wm-skin-styles="custom"]')?.remove()
   const built = skin({
     name: 'custom',
     template,
     shadow,
-    ...(shadow ? { styles: themeStyle(theme, { shadow: true }) } : {}),
+    ...(chosen === undefined || chosen.trim() === '' ? {} : { styles: chosen }),
   })
   for (const id of mounted.keys()) {
     if (wm.get(id)) desktop.mountWindow(id, built, { removeOnClose: true })
@@ -578,94 +582,17 @@ function openDefaults(): void {
   wm.focus(width >= 720 ? 'terminal' : 'readme')
 }
 
-const builderHost = document.querySelector<HTMLElement>('#builder-app')
-
-function renderBuilder(): void {
-  if (!builderHost) return
-  builderHost.replaceChildren()
-
-  const layoutRow = document.createElement('div')
-  layoutRow.className = 'builder-layouts'
-  const editor = document.createElement('textarea')
-  editor.className = 'builder-editor'
-  editor.rows = 12
-  editor.spellcheck = false
-  editor.id = 'builder-editor'
-  editor.setAttribute('aria-label', dict().skins.template)
-  editor.value = layoutTemplate(skinOf())
-
-  const shadowRow = document.createElement('label')
-  shadowRow.className = 'builder-toggle'
-  const shadowBox = document.createElement('input')
-  shadowBox.type = 'checkbox'
-  const shadowText = document.createElement('span')
-  shadowText.textContent = dict().skins.shadow
-  shadowRow.append(shadowBox, shadowText)
-
-  const actions = document.createElement('div')
-  actions.className = 'builder-actions'
-  const applyBtn = document.createElement('button')
-  applyBtn.type = 'button'
-  applyBtn.className = 'btn btn-primary'
-  applyBtn.textContent = dict().skins.apply
-  const copyBtn = document.createElement('button')
-  copyBtn.type = 'button'
-  copyBtn.className = 'btn'
-  copyBtn.textContent = dict().skins.copy
-  const status = document.createElement('p')
-  status.className = 'builder-status'
-  status.setAttribute('role', 'status')
-  actions.append(applyBtn, copyBtn)
-
-  for (const layout of SKIN_LAYOUTS) {
-    const node = document.createElement('button')
-    node.type = 'button'
-    node.className = 'builder-chip'
-    node.dataset.layout = layout
-    node.textContent = dict().skins.layouts[SKIN_LAYOUTS.indexOf(layout)]?.[0] ?? layout
-    node.setAttribute('aria-pressed', String(layout === skinOf()))
-    node.addEventListener('click', () => {
-      setSkinLayout(layout)
-      editor.value = layoutTemplate(layout)
-      status.textContent = ''
-      for (const chip of layoutRow.querySelectorAll('button')) {
-        chip.setAttribute('aria-pressed', String(chip === node))
-      }
-    })
-    layoutRow.append(node)
-  }
-
-  applyBtn.addEventListener('click', () => {
+const builder = initBuilder({
+  dict,
+  themeTemplate: () => layoutTemplate('left'),
+  currentTheme: () => theme,
+  toDesktop(template, shadow, styles) {
     if (!wm.get('skins')) openApp('skins')
-    try {
-      applyCustomSkin(editor.value, shadowBox.checked)
-      status.textContent = ''
-      wm.focus('skins')
-      document.querySelector('#demo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } catch (error) {
-      // the engine's message names the actual reason; the catalogue line is the fallback
-      status.textContent = error instanceof Error ? error.message : dict().skins.broken
-    }
-  })
-
-  copyBtn.addEventListener('click', () => {
-    const code = `skin({\n  template: \`${editor.value}\`,\n  shadow: ${shadowBox.checked},\n})`
-    const done = () => {
-      status.textContent = dict().skins.copied
-    }
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(code).then(done, () => {
-        status.textContent = ''
-      })
-      return
-    }
-    status.textContent = ''
-  })
-
-  builderHost.append(layoutRow, editor, shadowRow, actions, status)
-}
-
-renderBuilder()
+    applyCustomSkin(template, shadow, styles)
+    wm.focus('skins')
+    document.querySelector('#demo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  },
+})
 
 wallSkinsEl.addEventListener('click', () => {
   openApp('skins')
@@ -962,7 +889,7 @@ function setLang(next: Lang): void {
   renderCompare()
   relabelAll()
   renderDock()
-  renderBuilder()
+  builder.relabel()
 }
 
 wm.subscribe(() => {
