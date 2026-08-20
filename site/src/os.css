@@ -1121,3 +1121,8 @@ body {
 .builder-status:empty {
   display: none;
 }
+
+.win-lead {
+  font-weight: 600;
+  margin: 0 0 6px;
+}

@@ -16,6 +16,8 @@ export interface BuilderController {
 
 const SCOPE = '[data-wm-desktop] [data-wm-window][data-wm-skin="custom"]'
 
+const CONTENT_SLOT = '<div data-wm-content></div>'
+
 const MAC_TEMPLATE = `<section>
   <header data-wm-drag>
     <span class="lights">
@@ -26,7 +28,10 @@ const MAC_TEMPLATE = `<section>
     <span data-wm-title>{{title}}</span>
     <span class="lights-spacer"></span>
   </header>
-  <div data-wm-content></div>
+  <div data-wm-content>
+    <p class="win-lead">{{title}}</p>
+    <p>__BODY__</p>
+  </div>
 </section>`
 
 const MAC_CSS = `${SCOPE} {
@@ -85,7 +90,10 @@ const WIN95_TEMPLATE = `<section>
       <button type="button" data-wm-close aria-label="Close {{title}}">×</button>
     </span>
   </header>
-  <div data-wm-content></div>
+  <div data-wm-content>
+    <p class="win-lead">{{title}}</p>
+    <p>__BODY__</p>
+  </div>
 </section>`
 
 const WIN95_CSS = `${SCOPE} {
@@ -133,7 +141,10 @@ const TERMINAL_TEMPLATE = `<section>
     <span data-wm-title>{{title}}</span>
     <button type="button" class="tx" data-wm-close aria-label="Close {{title}}">[x]</button>
   </header>
-  <div data-wm-content></div>
+  <div data-wm-content>
+    <p class="win-lead">{{title}}</p>
+    <p>__BODY__</p>
+  </div>
 </section>`
 
 const TERMINAL_CSS = `${SCOPE} {
@@ -173,7 +184,10 @@ ${SCOPE} [data-wm-content] {
 
 const CARD_TEMPLATE = `<section>
   <header data-wm-drag><span data-wm-title>{{title}}</span></header>
-  <div data-wm-content></div>
+  <div data-wm-content>
+    <p class="win-lead">{{title}}</p>
+    <p>__BODY__</p>
+  </div>
 </section>`
 
 const CARD_CSS = `${SCOPE} {
@@ -216,12 +230,20 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
   const host = document.querySelector<HTMLElement>('#builder-app')
   if (!host) return { relabel() {}, syncTheme() {} }
 
+  const withBody = (source: string): string =>
+    source
+      .replace('__BODY__', deps.dict().builderUi.windowBody)
+      .replace(
+        CONTENT_SLOT,
+        `<div data-wm-content>\n    <p class="win-lead">{{title}}</p>\n    <p>${deps.dict().builderUi.windowBody}</p>\n  </div>`,
+      )
+
   const presets: Record<string, { template: () => string; css: string }> = {
-    theme: { template: () => deps.themeTemplate(), css: '' },
-    mac: { template: () => MAC_TEMPLATE, css: MAC_CSS },
-    win95: { template: () => WIN95_TEMPLATE, css: WIN95_CSS },
-    terminal: { template: () => TERMINAL_TEMPLATE, css: TERMINAL_CSS },
-    card: { template: () => CARD_TEMPLATE, css: CARD_CSS },
+    theme: { template: () => withBody(deps.themeTemplate()), css: '' },
+    mac: { template: () => withBody(MAC_TEMPLATE), css: MAC_CSS },
+    win95: { template: () => withBody(WIN95_TEMPLATE), css: WIN95_CSS },
+    terminal: { template: () => withBody(TERMINAL_TEMPLATE), css: TERMINAL_CSS },
+    card: { template: () => withBody(CARD_TEMPLATE), css: CARD_CSS },
   }
 
   const controls = el('div', 'builder-controls')
@@ -277,8 +299,7 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
 
   const previewWm: WindowManager = createWindowManager()
   const previewDesktop = attachDesktop(previewWm, stage, { announce: false })
-  const contentTitle = el('p', 'builder-window-lead')
-  const contentBody = el('p', 'builder-window-body')
+  let lastMount: { content: HTMLElement } | null = null
 
   const stageWidth = Math.max(stage.clientWidth, 320)
   previewWm.open({
@@ -308,9 +329,17 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
         shadow,
         ...(css.trim() === '' ? {} : { styles: css }),
       })
+      lastMount?.content.replaceChildren()
       const mountedPreview = previewDesktop.mountWindow('preview', built, { removeOnClose: true })
-      if (!mountedPreview.content.contains(contentTitle)) {
-        mountedPreview.content.replaceChildren(contentTitle, contentBody)
+      lastMount = mountedPreview
+      if (shadow) {
+        const held = document.createElement('template')
+        held.innerHTML = template
+        const inline = held.content.querySelector('[data-wm-content]')?.innerHTML ?? ''
+        mountedPreview.content.innerHTML = inline.replace(
+          /\{\{\s*title\s*\}\}/g,
+          previewWm.get('preview')?.title ?? '',
+        )
       }
       applied = { template, css, shadow }
       status.textContent = ''
@@ -437,8 +466,6 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
       const entry = copy.presets.find(([id]) => id === chip.dataset.preset)
       chip.textContent = entry?.[1] ?? chip.dataset.preset ?? ''
     }
-    contentTitle.textContent = copy.windowTitle
-    contentBody.textContent = copy.windowBody
     const win = previewWm.get('preview')
     if (win) previewWm.update('preview', { title: copy.windowTitle })
   }
