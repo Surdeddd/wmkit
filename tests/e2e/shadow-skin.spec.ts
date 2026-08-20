@@ -68,7 +68,7 @@ test.describe('a window whose chrome lives in a shadow root', () => {
   test('drags by a titlebar the page cannot see', async ({ page }) => {
     await openShadowWindow(page)
     const before = await state(page)
-    const bar = await centreOf(page, '[data-wm-drag]')
+    const bar = await centreOf(page, '[data-wm-title]')
     expect(bar, 'the titlebar is inside the shadow root').not.toBeNull()
 
     await page.mouse.move(bar?.x ?? 0, bar?.y ?? 0)
@@ -99,7 +99,7 @@ test.describe('a window whose chrome lives in a shadow root', () => {
 
   test('maximizes on a double click of the titlebar', async ({ page }) => {
     await openShadowWindow(page)
-    const bar = await centreOf(page, '[data-wm-drag]')
+    const bar = await centreOf(page, '[data-wm-title]')
     await page.mouse.dblclick(bar?.x ?? 0, bar?.y ?? 0)
     await expect.poll(async () => (await state(page))?.stage).toBe('maximized')
   })

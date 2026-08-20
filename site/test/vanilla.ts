@@ -145,8 +145,8 @@ const shadowSkin = skin({
   styles: ':host { display: flex; flex-direction: column; background: #1a1e2a; color: #eef }',
   template:
     '<section data-testid="window-{{id}}">' +
-    '<header data-wm-drag style="display:flex;gap:8px;padding:8px;background:#2a2f3d">' +
-    '<span data-wm-title>{{title}}</span>' +
+    '<header data-wm-drag style="display:flex;gap:8px;padding:8px;background:#2a2f3d;min-height:32px;align-items:center">' +
+    '<span data-wm-title style="flex:1;min-width:80px">{{title}}</span>' +
     '<button type="button" data-wm-minimize aria-label="Minimize">_</button>' +
     '<button type="button" data-wm-maximize aria-label="Maximize">□</button>' +
     '<button type="button" data-wm-close aria-label="Close">×</button>' +

@@ -97,16 +97,20 @@ const en: Dict = {
     'hero.docs': 'Read the docs',
     'hero.hint':
       'drag a titlebar to a screen edge to snap · ⌘⌥← / → snap · ⌘Z undo · F6 cycle · ? help',
-    'features.kicker': '01 — capabilities',
+    'builder.kicker': '01 — build a window',
+    'builder.title': 'Your markup, our engine',
+    'builder.sub':
+      "Write the window's own HTML below. Placeholders are escaped, the buttons need no handlers, and Apply rebuilds the live window on the desktop above.",
+    'features.kicker': '02 — capabilities',
     'features.title': 'Everything a desktop has',
     'features.sub':
       'The core keeps state, the DOM layer moves pixels, your framework renders content. Each piece is replaceable.',
-    'fw.kicker': '02 — adapters',
+    'fw.kicker': '03 — adapters',
     'fw.title': 'One core, six ways to hold it',
     'fw.sub':
       'Window content always lives in your own component tree — no innerHTML, no portals into the void. Adapters are thin sugar over the same state machine.',
     'fw.open': 'Open code.ts in the desktop ↗',
-    'cmp.kicker': '03 — landscape',
+    'cmp.kicker': '04 — landscape',
     'cmp.title': 'Honest comparison',
     'cmp.sub': 'The floating-window niche went quiet years ago. That is exactly why wmkit exists.',
     'cmp.note': 'Checked on July 26, 2026: last commits, npm downloads, open feature requests.',
@@ -423,16 +427,20 @@ const ru: Dict = {
     'hero.docs': 'Документация',
     'hero.hint':
       'тащите заголовок к краю для прилипания · ⌘⌥← / → прилипание · ⌘Z отмена · F6 обход · ? помощь',
-    'features.kicker': '01 — возможности',
+    'builder.kicker': '01 — собери окно',
+    'builder.title': 'Ваша разметка, наш движок',
+    'builder.sub':
+      'Напишите HTML окна прямо здесь. Подстановки экранируются, кнопкам не нужны обработчики, а «Применить» пересобирает живое окно на десктопе выше.',
+    'features.kicker': '02 — возможности',
     'features.title': 'Всё, что есть у рабочего стола',
     'features.sub':
       'Ядро хранит состояние, DOM-слой двигает пиксели, ваш фреймворк рисует содержимое. Любую часть можно заменить.',
-    'fw.kicker': '02 — адаптеры',
+    'fw.kicker': '03 — адаптеры',
     'fw.title': 'Одно ядро, шесть способов взять его в руки',
     'fw.sub':
       'Содержимое окна всегда живёт в вашем дереве компонентов — никакого innerHTML и порталов в пустоту. Адаптеры это тонкий сахар над одной и той же машиной состояний.',
     'fw.open': 'Открыть код.ts на рабочем столе ↗',
-    'cmp.kicker': '03 — рынок',
+    'cmp.kicker': '04 — рынок',
     'cmp.title': 'Честное сравнение',
     'cmp.sub': 'Ниша плавающих окон затихла много лет назад. Ровно поэтому wmkit и существует.',
     'cmp.note': 'Проверено 26 июля 2026: последние коммиты, загрузки npm, открытые запросы фич.',
