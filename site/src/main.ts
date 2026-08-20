@@ -77,6 +77,7 @@ const dockEl = must(document.querySelector<HTMLElement>('#dock'), '#dock')
 const launcherEl = must(document.querySelector<HTMLElement>('#launcher'), '#launcher')
 const menusEl = must(document.querySelector<HTMLElement>('#menus'), '#menus')
 const workspacesEl = must(document.querySelector<HTMLElement>('#workspaces'), '#workspaces')
+const wallSkinsEl = must(document.querySelector<HTMLElement>('#wall-skins'), '#wall-skins')
 const bootEl = must(document.querySelector<HTMLElement>('#boot'), '#boot')
 const bootLog = must(document.querySelector<HTMLElement>('#boot-log'), '#boot-log')
 const statWin = must(document.querySelector<HTMLElement>('#stat-win'), '#stat-win')
@@ -566,6 +567,11 @@ function openDefaults(): void {
   if (width >= 720) openApp('terminal')
   wm.focus(width >= 720 ? 'terminal' : 'readme')
 }
+
+wallSkinsEl.addEventListener('click', () => {
+  openApp('skins')
+  wm.focus('skins')
+})
 
 function renderDock(): void {
   const minimized = wm.minimized()

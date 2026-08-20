@@ -820,17 +820,20 @@ const skins: AppSpec = {
   },
   render(body, ctx) {
     const lead = el('p', 'app-note')
-    const themeLabel = el('h4', 'skin-head')
+    const themeLabel = el('h2', 'skin-head')
     const themeGrid = el('div', 'skin-grid')
-    const variantLabel = el('h4', 'skin-head')
+    const variantLabel = el('h2', 'skin-head')
     const variantList = el('div', 'skin-list')
     const hint = el('p', 'app-note')
-    const skinLabel = el('h4', 'skin-head')
+    const skinLabel = el('h2', 'skin-head')
     const skinLead = el('p', 'app-note')
     const layoutList = el('div', 'skin-layout')
-    const templateLabel = el('h4', 'skin-head')
+    const templateLabel = el('h2', 'skin-head')
     const template = document.createElement('textarea')
     template.className = 'skin-template'
+    template.id = 'skin-template-field'
+    templateLabel.id = 'skin-template-label'
+    template.setAttribute('aria-labelledby', templateLabel.id)
     template.rows = 9
     template.spellcheck = false
     const shadowRow = el('label', 'skin-toggle')

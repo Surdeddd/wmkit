@@ -1,11 +1,13 @@
 import { expect, type Page, test } from '@playwright/test'
-import { boxOf, dragBy, settle } from './utils'
+import { boxOf, closeAllBut, dragBy, settle } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('?lang=en')
   await expect(page.locator(readme)).toBeVisible()
+  // these tests drag by coordinate, so they need a desktop they chose themselves
+  await closeAllBut(page, 'readme', 'terminal', 'inspector')
 })
 
 async function launch(page: Page, app: string) {

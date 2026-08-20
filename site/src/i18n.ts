@@ -93,6 +93,7 @@ const en: Dict = {
     'hero.lede':
       'Drag, resize, snap, minimize, undo — a real desktop inside the page. Every window you see is the library doing its job. Grab one.',
     'hero.launch': 'Open the desktop',
+    'hero.build': 'Build a window',
     'hero.docs': 'Read the docs',
     'hero.hint':
       'drag a titlebar to a screen edge to snap · ⌘⌥← / → snap · ⌘Z undo · F6 cycle · ? help',
@@ -418,6 +419,7 @@ const ru: Dict = {
     'hero.lede':
       'Тащить, растягивать, прилипать, сворачивать, отменять — настоящий рабочий стол внутри страницы. Каждое окно здесь это работа самой библиотеки. Возьмите любое.',
     'hero.launch': 'Открыть рабочий стол',
+    'hero.build': 'Собрать окно',
     'hero.docs': 'Документация',
     'hero.hint':
       'тащите заголовок к краю для прилипания · ⌘⌥← / → прилипание · ⌘Z отмена · F6 обход · ? помощь',
