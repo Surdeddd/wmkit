@@ -12,6 +12,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,6 +32,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -40,6 +42,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium webkit firefox
+        timeout-minutes: 12
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
