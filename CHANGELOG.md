@@ -1,3 +1,10 @@
+# [0.11.0](https://github.com/Surdeddd/wmkit/compare/v0.10.0...v0.11.0) (2026-08-20)
+
+
+### Features
+
+* **site:** grow the builder into a window designer ([e4b6cb8](https://github.com/Surdeddd/wmkit/commit/e4b6cb8651a6430b86477e7b475d11f4c72bbf26))
+
 # [0.10.0](https://github.com/Surdeddd/wmkit/compare/v0.9.2...v0.10.0) (2026-08-20)
 
 
