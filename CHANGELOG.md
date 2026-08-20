@@ -1,3 +1,10 @@
+## [0.11.1](https://github.com/Surdeddd/wmkit/compare/v0.11.0...v0.11.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **site:** the window's text belongs in the markup ([299a9b5](https://github.com/Surdeddd/wmkit/commit/299a9b558b738f35d8a3ec03c66aa7d8165c98a7))
+
 # [0.11.0](https://github.com/Surdeddd/wmkit/compare/v0.10.0...v0.11.0) (2026-08-20)
 
 
