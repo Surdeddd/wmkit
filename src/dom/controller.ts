@@ -63,6 +63,20 @@ const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+function firedOn(event: Event): Element | null {
+  const path = event.composedPath()
+  const first = path.length > 0 ? path[0] : event.target
+  return first instanceof Element ? first : null
+}
+
+function findInWindow(el: HTMLElement, selector: string): HTMLElement | null {
+  return (
+    el.querySelector<HTMLElement>(selector) ??
+    el.shadowRoot?.querySelector<HTMLElement>(selector) ??
+    null
+  )
+}
+
 function focusablesOf(el: HTMLElement): HTMLElement[] {
   const root = el.shadowRoot
   if (!root) return [...el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
@@ -458,7 +472,7 @@ export function attachDesktop(
       }
       if (!event.ctrlKey && !event.metaKey) return
       if (drag) return
-      const target = event.target as Element | null
+      const target = firedOn(event)
       if (target?.closest(interactiveSelector)) return
       if (historyShortcuts && (event.key === 'z' || event.key === 'Z')) {
         event.preventDefault()
@@ -527,8 +541,7 @@ export function attachDesktop(
     windowElement.style.top = '0'
 
     const lightTitle = windowElement.querySelector<HTMLElement>('[data-wm-title]')
-    attached.title =
-      lightTitle ?? windowElement.shadowRoot?.querySelector<HTMLElement>('[data-wm-title]') ?? null
+    attached.title = lightTitle ?? findInWindow(windowElement, '[data-wm-title]')
     if (lightTitle) {
       if (!lightTitle.id) lightTitle.id = `wmkit-title-${id}`
       windowElement.setAttribute('aria-labelledby', lightTitle.id)
@@ -536,8 +549,8 @@ export function attachDesktop(
 
     const handle =
       typeof windowOptions.handle === 'string'
-        ? windowElement.querySelector<HTMLElement>(windowOptions.handle)
-        : (windowOptions.handle ?? windowElement.querySelector<HTMLElement>('[data-wm-drag]'))
+        ? findInWindow(windowElement, windowOptions.handle)
+        : (windowOptions.handle ?? findInWindow(windowElement, '[data-wm-drag]'))
     attached.handle = handle
     if (handle && !handle.hasAttribute('role') && LANDMARK_TAGS.has(handle.localName)) {
       handle.setAttribute('role', 'presentation')
@@ -552,7 +565,7 @@ export function attachDesktop(
     )
 
     const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null
+      const target = firedOn(event)
       if (!target) return
       const current = wm.get(id)
       if (!current) return
@@ -602,7 +615,7 @@ export function attachDesktop(
       attached.cleanup.push(() => handle.removeEventListener('pointerdown', onHandleDown))
 
       const onDoubleClick = (event: MouseEvent) => {
-        const target = event.target as Element | null
+        const target = firedOn(event)
         if (target?.closest(interactiveSelector)) return
         const current = wm.get(id)
         if (current?.maximizable) wm.toggleMaximize(id)
@@ -637,7 +650,7 @@ export function attachDesktop(
     }
 
     const onWindowKeydown = (event: KeyboardEvent) => {
-      const target = event.target as Element | null
+      const target = firedOn(event)
       if (target?.closest(interactiveSelector)) return
       const current = wm.get(id)
       if (!current) return
