@@ -382,12 +382,28 @@ body {
 .wallpaper {
   position: absolute;
   inset: 0;
+  z-index: -1;
+  isolation: isolate;
   padding: clamp(20px, 5vw, 68px);
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 18px;
   max-width: min(620px, 44%);
+  pointer-events: none;
+}
+
+.wallpaper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    var(--ink-900) 0%,
+    color-mix(in srgb, var(--ink-900) 88%, transparent) 62%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 
