@@ -380,7 +380,26 @@ export function attachDesktop(
     stackRows.length = length
   }
 
+  let syncing = false
+  let syncAgain = false
+
   function syncAll(): void {
+    if (syncing) {
+      syncAgain = true
+      return
+    }
+    syncing = true
+    try {
+      do {
+        syncAgain = false
+        syncPass()
+      } while (syncAgain)
+    } finally {
+      syncing = false
+    }
+  }
+
+  function syncPass(): void {
     const state = wm.getState()
     const orderChanged = state.order !== lastOrder
     let restyle: Array<[string, string]> | null = null
@@ -408,7 +427,7 @@ export function attachDesktop(
         const attached = registry.get(id)
         if (attached && attached.skin !== wanted) buildSkin(id, wanted, attached.mountOptions)
       }
-      syncAll()
+      syncAgain = true
       return
     }
     if (orderChanged) applyStacking(state.order)
@@ -503,6 +522,8 @@ export function attachDesktop(
     element.addEventListener('keydown', onDesktopKeydown)
     cleanup.push(() => element.removeEventListener('keydown', onDesktopKeydown))
   }
+
+  let rebuilding = false
 
   function endDrag(cancelled: boolean): void {
     if (drag) drag.finish(cancelled)
@@ -712,7 +733,8 @@ export function attachDesktop(
     const detach = () => {
       if (detached) return
       detached = true
-      if (drag?.id === id) endDrag(true)
+      // a rebuild is not a cancellation: keep where the pointer left the window
+      if (drag?.id === id) endDrag(!rebuilding)
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)
@@ -757,15 +779,27 @@ export function attachDesktop(
   ): SkinMount {
     const win = wm.get(id)
     if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
+    // resolve before anything is torn down, so an unknown name leaves the window standing
+    const build = resolveSkin(skin)
     const standing = registry.get(id)
     const previous = standing?.mount ?? null
-    const carried = previous === null ? [] : [...previous.content.childNodes]
+    // a popout moves the content element into another document; what lives there now
+    // belongs to that window, not to the rebuild
+    const carried =
+      previous === null || previous.content.ownerDocument !== doc
+        ? []
+        : [...previous.content.childNodes]
     if (previous !== null) {
       registry.delete(id)
-      standing?.release?.()
+      rebuilding = true
+      try {
+        standing?.release?.()
+      } finally {
+        rebuilding = false
+      }
       previous.element.remove()
     }
-    const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
+    const mount = build({ doc, id, window: win, actions: createActions(wm, id) })
     element.append(mount.element)
     const release = attachWindow(id, mount.element, windowOptions)
     const attached = registry.get(id) as AttachedWindow
@@ -781,11 +815,17 @@ export function attachDesktop(
   function mountWindow(
     id: string,
     skin: WindowSkin | string,
-    windowOptions: WindowAttachOptions = {},
+    options: WindowAttachOptions = {},
   ): MountedWindow {
+    // the library created this element, so it is the library that clears it away
+    const windowOptions: WindowAttachOptions = { removeOnClose: true, ...options }
     let last = buildSkin(id, skin, windowOptions)
+    let spent = false
+    // follow the window across rebuilds, but never adopt a mount this handle did not make
     const live = () => {
-      last = registry.get(id)?.mount ?? last
+      if (spent) return last
+      const now = registry.get(id)?.mount
+      if (now) last = now
       return last
     }
     return {
@@ -796,8 +836,10 @@ export function attachDesktop(
         return live().content
       },
       detach() {
+        if (spent) return
         const mount = live()
-        registry.get(id)?.release?.()
+        spent = true
+        if (registry.get(id)?.mount === mount) registry.get(id)?.release?.()
         mount.element.remove()
         mount.destroy?.()
       },
@@ -815,6 +857,11 @@ export function attachDesktop(
       for (const [, attached] of registry) {
         for (const dispose of attached.cleanup) dispose()
         for (const resizeHandle of attached.handles) resizeHandle.remove()
+        // elements the library built are the library's to clear away
+        if (attached.mount) {
+          attached.mount.element.remove()
+          attached.mount.destroy?.()
+        }
       }
       registry.clear()
       for (const dispose of cleanup) dispose()
