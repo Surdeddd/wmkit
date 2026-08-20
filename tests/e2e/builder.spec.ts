@@ -29,6 +29,19 @@ test.describe('the window designer', () => {
     await expect(page.locator('#builder h2')).toHaveText('Ваша разметка, наш движок')
   })
 
+  test('the window text lives in the markup and follows an edit', async ({ page }) => {
+    await openBuilder(page)
+    const markup = page.locator(MARKUP)
+    await expect(markup).toHaveValue(/the engine does the rest/)
+    await expect(page.locator(PREVIEW)).toContainText('the engine does the rest')
+
+    const value = await markup.inputValue()
+    await markup.fill(value.replace('A real window', 'Text straight from the markup'))
+    await expect(page.locator(PREVIEW)).toContainText('Text straight from the markup', {
+      timeout: 10_000,
+    })
+  })
+
   test('a preset restyles the live window', async ({ page }) => {
     await openBuilder(page)
     await page.locator('.builder-chip[data-preset="win95"]').click()
