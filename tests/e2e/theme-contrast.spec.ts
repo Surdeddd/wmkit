@@ -125,32 +125,56 @@ test('every shipped theme keeps the demo readable', async ({ page }) => {
 
   const failures: string[] = []
   for (const theme of THEMES) {
+    const surfaceOf = () =>
+      page.evaluate(() => {
+        const win = document.querySelector('[data-wm-window="readme"]')
+        return win ? getComputedStyle(win).backgroundColor : ''
+      })
+    // during the swap Firefox drops the old sheet before the new one applies, and
+    // the desktop briefly has no theme at all; every theme defines --wm-text, so a
+    // non-empty token is the moment a theme is actually in force
+    const themed = () =>
+      page.evaluate(
+        () =>
+          getComputedStyle(document.querySelector('#desktop') as Element)
+            .getPropertyValue('--wm-text')
+            .trim() !== '',
+      )
+
     if ((await page.getAttribute('#desktop', 'data-theme')) !== theme) {
+      const before = await surfaceOf()
       await page.locator(`.skin-${theme}`).click()
       await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
+      await page.waitForFunction(
+        (name) =>
+          [...document.styleSheets].some((sheet) => sheet.href?.includes(`/${name}-`) === true),
+        theme,
+        { timeout: 20_000 },
+      )
+      await expect.poll(themed, { timeout: 20_000 }).toBe(true)
+      await expect.poll(surfaceOf, { timeout: 20_000 }).not.toBe(before)
+    } else {
+      await expect.poll(themed, { timeout: 20_000 }).toBe(true)
     }
-    // the attribute flips at once; the stylesheet has to arrive before anything
-    // measured here means the theme, and the re-render lands after that
-    await page.waitForFunction(
-      (name) =>
-        [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].some(
-          (link) => link.href.includes(`/${name}-`) && link.sheet !== null,
-        ),
-      theme,
-      { timeout: 20_000 },
-    )
 
     // then read until two consecutive reads agree, so nothing is measured mid-paint
     let seen: Finding[] = []
     let previous = ''
+    let agreed = 0
     const deadline = Date.now() + 20_000
     while (Date.now() < deadline) {
+      // a frame between reads: Firefox applies a loading stylesheet progressively,
+      // and a read can land on the half-frame where only part of it is in force
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+      )
       const now = await page.evaluate(probe)
       const shape = JSON.stringify(now)
       seen = now
-      if (shape === previous) break
+      agreed = shape === previous ? agreed + 1 : 0
+      if (agreed >= 2) break
       previous = shape
-      await page.waitForTimeout(100)
+      await page.waitForTimeout(80)
     }
 
     for (const finding of seen) {
