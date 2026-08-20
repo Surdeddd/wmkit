@@ -1,52 +1,111 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
-test.describe('the page-level window builder', () => {
-  test('is a visible section of the landing, in both languages', async ({ page }) => {
-    await page.goto('?lang=en')
-    const band = page.locator('#builder')
-    await expect(band).toBeVisible()
-    await expect(band.locator('h2')).toHaveText('Your markup, our engine')
-    await expect(band.locator('.builder-chip')).toHaveCount(3)
-    await expect(band.locator('.builder-editor')).toBeVisible()
+const PREVIEW = '.builder-stage [data-wm-window="preview"]'
+const MARKUP = '.builder-editor:not(.builder-css)'
+const SCOPE = '[data-wm-desktop] [data-wm-window][data-wm-skin="custom"]'
 
-    await page.goto('?lang=ru')
+async function openBuilder(page: Page, lang = 'en'): Promise<void> {
+  await page.goto(`?lang=${lang}`)
+  await page.locator('#builder').scrollIntoViewIfNeeded()
+  await expect(page.locator(PREVIEW)).toBeVisible()
+}
+
+function previewBg(page: Page) {
+  return page.evaluate(() => {
+    const win = document.querySelector('.builder-stage [data-wm-window="preview"]')
+    return win ? getComputedStyle(win).backgroundColor : ''
+  })
+}
+
+test.describe('the window designer', () => {
+  test('shows a live window beside the controls, in both languages', async ({ page }) => {
+    await openBuilder(page)
+    await expect(page.locator(`${PREVIEW} [data-wm-title]`)).toHaveText('my window')
+    await expect(page.locator('.builder-chip')).toHaveCount(5)
+    await expect(page.locator('.builder-axis input')).toHaveCount(4)
+
+    await openBuilder(page, 'ru')
+    await expect(page.locator(`${PREVIEW} [data-wm-title]`)).toHaveText('моё окно')
     await expect(page.locator('#builder h2')).toHaveText('Ваша разметка, наш движок')
   })
 
-  test('applies an edited template to the live window on the desktop', async ({ page }) => {
-    await page.goto('?lang=en')
-    await page.locator('#builder').scrollIntoViewIfNeeded()
-    await page
-      .locator('.builder-editor')
-      .fill(
-        '<section data-testid="window-{{id}}" data-built="page">' +
-          '<header data-wm-drag><b data-wm-title>{{title}}</b>' +
-          '<button data-wm-close aria-label="Close"></button></header>' +
-          '<div data-wm-content></div></section>',
+  test('a preset restyles the live window', async ({ page }) => {
+    await openBuilder(page)
+    await page.locator('.builder-chip[data-preset="win95"]').click()
+    await expect(page.locator('.builder-chip[data-preset="win95"]')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(page.locator(MARKUP)).toHaveValue(/w95/)
+    await expect.poll(() => previewBg(page)).toBe('rgb(192, 192, 192)')
+  })
+
+  test('css typed into the editor lands on the window', async ({ page }) => {
+    await openBuilder(page)
+    await page.locator('.builder-css').fill(`${SCOPE} { background: rgb(9, 99, 199) !important; }`)
+    await expect.poll(() => previewBg(page), { timeout: 10_000 }).toBe('rgb(9, 99, 199)')
+  })
+
+  test('placement runs both ways', async ({ page }) => {
+    await openBuilder(page)
+    const width = page.locator('.builder-axis input').nth(2)
+    await width.fill('320')
+    await width.blur()
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const box = document
+            .querySelector('.builder-stage [data-wm-window="preview"]')
+            ?.getBoundingClientRect()
+          return box ? Math.round(box.width) : 0
+        }),
       )
+      .toBe(320)
+
+    await page.waitForTimeout(350)
+    const xInput = page.locator('.builder-axis input').nth(0)
+    const before = Number.parseInt(await xInput.inputValue(), 10)
+    const bar = await page.locator(`${PREVIEW} [data-wm-title]`).boundingBox()
+    expect(bar).not.toBeNull()
+    const barBox = bar as { x: number; y: number; width: number; height: number }
+    await page.mouse.move(barBox.x + barBox.width / 2, barBox.y + barBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(barBox.x + barBox.width / 2 + 100, barBox.y + barBox.height / 2 + 30, {
+      steps: 10,
+    })
+    await page.mouse.up()
+    await expect
+      .poll(async () => Number.parseInt(await xInput.inputValue(), 10), { timeout: 10_000 })
+      .not.toBe(before)
+  })
+
+  test('a broken template is refused out loud and the window survives', async ({ page }) => {
+    await openBuilder(page)
+    await page.locator(MARKUP).fill('<section><header data-wm-drag></header></section>')
+    await expect(page.locator('.builder-status')).toHaveText(/exactly one/, { timeout: 10_000 })
+    await expect(page.locator(PREVIEW)).toBeVisible()
+  })
+
+  test('copies a complete runnable snippet', async ({ page, context, browserName }) => {
+    test.skip(browserName !== 'chromium', 'clipboard permissions are chromium-only here')
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await openBuilder(page)
+    await page.locator('.builder-actions .btn:not(.btn-primary)').click()
+    await expect(page.locator('.builder-status')).toHaveText(/copied|скопировано/)
+
+    const code = await page.evaluate(() => navigator.clipboard.readText())
+    expect(code).toContain("import { skin } from '@surdeddd/wmkit/chrome'")
+    expect(code).toContain('styles: `')
+    expect(code).toContain("desktop.mountWindow('app', 'mine')")
+  })
+
+  test('sends the skin to the demo desktop above', async ({ page }) => {
+    await openBuilder(page)
     await page.locator('.builder-actions .btn-primary').click()
 
     const win = page.locator('[data-wm-window="skins"]')
     await expect(win).toBeVisible()
-    await expect(win).toHaveAttribute('data-built', 'page')
+    await expect(win).toHaveAttribute('data-wm-skin', 'custom')
     await expect(win).toHaveAttribute('data-wm-focused', '')
-  })
-
-  test('says out loud when a template has no content slot', async ({ page }) => {
-    await page.goto('?lang=en')
-    await page.locator('#builder').scrollIntoViewIfNeeded()
-    await page.locator('.builder-editor').fill('<section><header data-wm-drag></header></section>')
-    await page.locator('.builder-actions .btn-primary').click()
-
-    await expect(page.locator('.builder-status')).toHaveText(/exactly one/)
-  })
-
-  test('a layout chip rewrites the editor and marks itself pressed', async ({ page }) => {
-    await page.goto('?lang=en')
-    const chips = page.locator('.builder-chip')
-    await chips.nth(1).click()
-    await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true')
-    await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'false')
-    await expect(page.locator('.builder-editor')).toHaveValue(/data-side="right"/)
   })
 })

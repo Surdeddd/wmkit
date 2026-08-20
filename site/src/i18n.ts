@@ -71,6 +71,20 @@ export interface Dict {
     copied: string
     broken: string
   }
+  builderUi: {
+    markup: string
+    css: string
+    geometry: string
+    axes: [string, string, string, string]
+    presets: Array<[string, string]>
+    shadow: string
+    shadowHint: string
+    toDesktop: string
+    copy: string
+    copied: string
+    windowTitle: string
+    windowBody: string
+  }
   shortcuts: Array<[string, string]>
   features: Array<{ title: string; text: string }>
   frameworks: Array<[string, string]>
@@ -100,7 +114,7 @@ const en: Dict = {
     'builder.kicker': '01 — build a window',
     'builder.title': 'Your markup, our engine',
     'builder.sub':
-      "Write the window's own HTML below. Placeholders are escaped, the buttons need no handlers, and Apply rebuilds the live window on the desktop above.",
+      'A full editor: markup, CSS and placement on the left, a live window on the right. Drag it, restyle it, then copy the code or send it to the desktop above.',
     'features.kicker': '02 — capabilities',
     'features.title': 'Everything a desktop has',
     'features.sub':
@@ -242,6 +256,27 @@ const en: Dict = {
     copy: 'copy as code',
     copied: 'copied',
     broken: 'A template needs exactly one [data-wm-content].',
+  },
+  builderUi: {
+    markup: 'markup',
+    css: 'css — style it however you like',
+    geometry: 'placement',
+    axes: ['x', 'y', 'width', 'height'],
+    presets: [
+      ['theme', 'site theme'],
+      ['mac', 'macOS'],
+      ['win95', 'win95'],
+      ['terminal', 'terminal'],
+      ['card', 'glass card'],
+    ],
+    shadow: 'shadow root',
+    shadowHint: 'Inside a shadow root, write :host instead of [data-wm-window]…',
+    toDesktop: 'try on the desktop above',
+    copy: 'copy as code',
+    copied: 'copied',
+    windowTitle: 'my window',
+    windowBody:
+      'A real window: drag it, resize it, snap it to an edge. Your markup and CSS — the engine does the rest.',
   },
   shortcuts: [
     ['drag titlebar', 'move the window'],
@@ -430,7 +465,7 @@ const ru: Dict = {
     'builder.kicker': '01 — собери окно',
     'builder.title': 'Ваша разметка, наш движок',
     'builder.sub':
-      'Напишите HTML окна прямо здесь. Подстановки экранируются, кнопкам не нужны обработчики, а «Применить» пересобирает живое окно на десктопе выше.',
+      'Полноценный редактор: слева разметка, CSS и размещение, справа — живое окно. Тяните его, перекрашивайте, копируйте код или отправьте на рабочий стол выше.',
     'features.kicker': '02 — возможности',
     'features.title': 'Всё, что есть у рабочего стола',
     'features.sub':
@@ -572,6 +607,27 @@ const ru: Dict = {
     copy: 'скопировать код',
     copied: 'скопировано',
     broken: 'В шаблоне должен быть ровно один [data-wm-content].',
+  },
+  builderUi: {
+    markup: 'разметка',
+    css: 'css — стилизуйте как угодно',
+    geometry: 'размещение',
+    axes: ['x', 'y', 'ширина', 'высота'],
+    presets: [
+      ['theme', 'тема сайта'],
+      ['mac', 'macOS'],
+      ['win95', 'win95'],
+      ['terminal', 'терминал'],
+      ['card', 'стеклянная карточка'],
+    ],
+    shadow: 'теневой корень',
+    shadowHint: 'Внутри теневого корня пишите :host вместо [data-wm-window]…',
+    toDesktop: 'на рабочий стол выше',
+    copy: 'скопировать код',
+    copied: 'скопировано',
+    windowTitle: 'моё окно',
+    windowBody:
+      'Настоящее окно: тяните, растягивайте, прилепляйте к краю. Ваша разметка и CSS — остальное делает движок.',
   },
   shortcuts: [
     ['тащить заголовок', 'двигать окно'],

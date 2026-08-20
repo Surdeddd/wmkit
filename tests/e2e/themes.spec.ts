@@ -59,7 +59,7 @@ test.describe('theme pointer targets', () => {
       }, theme)
       await page.goto('?lang=en')
       await expect(page.locator(readme)).toBeVisible()
-      await expect(page.locator('[data-wm-desktop]')).toHaveAttribute('data-theme', theme)
+      await expect(page.locator('#desktop')).toHaveAttribute('data-theme', theme)
       await page.waitForFunction(() => document.styleSheets.length > 0)
       await page.waitForTimeout(200)
 
