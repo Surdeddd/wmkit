@@ -40,4 +40,4 @@ The manager never reads or writes the DOM, so it runs in Node and during SSR. Th
 pnpm add @surdeddd/wmkit
 ```
 
-Entry points: `.` (core + DOM), `./react`, `./vue`, `./svelte`, `./solid`, `./angular`, `./persist`, `./popout`, `./themes/*.css`. ESM and CJS, types per condition, zero dependencies.
+Entry points: `.` (core + DOM), `./react`, `./vue`, `./svelte`, `./solid`, `./angular`, `./persist`, `./popout`, `./gestures`, `./devtools`, `./chrome`, `./themes` (the stylesheets as text) and `./themes/*.css`. ESM and CJS, types per condition, zero dependencies.

@@ -349,7 +349,10 @@ interface DesktopOptions {
   beforeClose?: (window: WindowState) => boolean | void  // return false to keep it open
   minimizeTarget?: (window: WindowState) => Element | null
   onTitlebarContextMenu?: (window: WindowState, event: MouseEvent) => void
+  skins?: Readonly<Record<string, WindowSkin>>  // named skins for mountWindow and meta.skin
+  windowVariant?: (window: WindowState) => string | null  // defaults to meta.variant
 }
+```
 
 ### Gestures
 
@@ -398,17 +401,20 @@ interface GestureContext {
 desktop holds one interaction at a time, and `busy()` tells you whether it is
 already taken.
 
+```ts
 interface DesktopController {
   element: HTMLElement
   wm: WindowManager
   attachWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
+  mountWindow(id: string, skin: WindowSkin | string, options?: WindowAttachOptions): MountedWindow
+  actions(id: string): WindowActions
   destroy(): void
 }
 
 interface WindowAttachOptions {
   handle?: HTMLElement | string   // defaults to [data-wm-drag]
   resizeHandles?: boolean         // true
-  removeOnClose?: boolean         // false
+  removeOnClose?: boolean         // false for attachWindow, true for mountWindow
 }
 ```
 
@@ -586,6 +592,52 @@ interface Emitter<Events> {
 ```
 
 Listeners are snapshotted before dispatch, so subscribing or unsubscribing inside a handler is safe.
+
+## `skin(spec)` — `@surdeddd/wmkit/chrome`
+
+Turns a markup string into a `WindowSkin`, the factory `mountWindow` and the `skins` registry take.
+
+```ts
+interface SkinSpec {
+  template: string      // one [data-wm-content], {{placeholders}} always escaped
+  styles?: string       // injected once per skin; needs a name to scope it
+  shadow?: boolean      // build the chrome inside an open shadow root
+  name?: string         // lands on the window as data-wm-skin
+}
+
+function skin(spec: SkinSpec): WindowSkin
+function compileTemplate(template: string): (values: Record<string, string>) => string
+function windowChrome(messages?: ChromeMessages): WindowSkin
+const defaultSkin: WindowSkin    // titlebar, title and the three controls
+const barebones: WindowSkin      // titlebar and title, nothing else
+
+interface ChromeMessages {
+  minimize: string
+  maximize: string
+  close: string
+}
+const chromeMessages: ChromeMessages    // English
+const chromeMessagesRu: ChromeMessages  // Russian
+```
+
+Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out, so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.
+
+A template must contain exactly one `[data-wm-content]`, and `skin()` throws while you are writing it rather than silently dropping your content. `styles` without a `name` throws too — there would be nothing to scope the rules to.
+
+With `shadow: true` the chrome is built inside an open shadow root and your content is projected through a `<slot>`; the template's root element is unwrapped, so `:host` is the box the titlebar and content sit in. Styles become one constructable stylesheet per skin per document, with a `<style>` element as the fallback where constructable sheets are missing.
+
+## `themeNames`, `themeStyle(name, options?)` — `@surdeddd/wmkit/themes`
+
+The sixteen shipped stylesheets as strings, for skins that cannot be reached by a stylesheet in `document.head`.
+
+```ts
+const themeNames: readonly ThemeName[]
+const themeCss: Record<ThemeName, string>        // byte for byte the .css files
+const themeShadowCss: Record<ThemeName, string>  // the same rules re-anchored to :host
+function themeStyle(name: ThemeName, options?: { shadow?: boolean }): string
+```
+
+Pass `{ shadow: true }` for a shadow skin. Custom properties inherit through a shadow boundary, so the plain text delivers a theme's tokens and none of its rules — every rule is written from `[data-wm-window]`, and inside a shadow root nothing carries that attribute. See [theming.md](theming.md).
 
 ## `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 

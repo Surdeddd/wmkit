@@ -26,9 +26,9 @@ function ownClaims(): Array<{ where: string; size: number }> {
   for (const match of html.matchAll(/core under\s*(\d+(?:\.\d+)?)\s*kB/g)) {
     found.push({ where: 'index.html description', size: Number(match[1]) })
   }
-  for (const match of i18n.matchAll(
-    /label: '(?:Bundle \(brotli\)|Вес \(brotli\))',\s*cells: \[\s*\{ text: '~(\d+(?:\.\d+)?)/g,
-  )) {
+  // matched by the shape of the cell, not by its label: a renamed row must not
+  // slip out of this guard the way the Russian one did
+  for (const match of i18n.matchAll(/cells: \[\s*\{ text: '~(\d+(?:\.\d+)?)\s*(?:kB|кБ)'/g)) {
     found.push({ where: 'comparison row', size: Number(match[1]) })
   }
   return found
@@ -41,6 +41,10 @@ describe('the numbers the project advertises', () => {
 
     const claims = ownClaims()
     expect(claims.length, 'no size claim was found to check').toBeGreaterThanOrEqual(6)
+    expect(
+      claims.filter((claim) => claim.where === 'comparison row').length,
+      'both languages carry a comparison row',
+    ).toBe(2)
     for (const claim of claims) {
       expect(
         claim.size,

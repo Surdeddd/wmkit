@@ -329,7 +329,7 @@ Moves a window's content into a [Document Picture-in-Picture](https://developer.
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.46 kB brotlied.
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.47 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -342,7 +342,7 @@ A gesture is just a function that takes a `GestureContext` and returns its teard
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 802 B brotlied.
+Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 1.02 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -443,8 +443,8 @@ This README is the tour. The reference lives in [`docs/`](./docs/README.md):
 
 ## Quality
 
-- 250 unit tests: **100%** line/branch/function/statement coverage on the core state machine and persistence, with enforced floors on the DOM layer and the adapters
-- 190+ Playwright scenarios on Chromium, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, workspaces, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
+- 565 unit tests: **100%** line/branch/function/statement coverage on the core state machine, the chrome plugin and persistence, with enforced floors on the DOM layer and the adapters
+- 550+ Playwright scenarios on Chromium, Firefox, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, workspaces, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
 - performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~150 ms, a move among 50 windows costs ~1.2 µs, a full 100-step undo/redo sweep ~52 µs
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
 
