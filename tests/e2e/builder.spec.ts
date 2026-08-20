@@ -46,7 +46,7 @@ test.describe('the window designer', () => {
     await expect.poll(() => previewBg(page), { timeout: 10_000 }).toBe('rgb(9, 99, 199)')
   })
 
-  test('placement runs both ways', async ({ page }) => {
+  test('placement runs both ways', async ({ page, isMobile }) => {
     await openBuilder(page)
     const width = page.locator('.builder-axis input').nth(2)
     await width.fill('320')
@@ -62,6 +62,7 @@ test.describe('the window designer', () => {
       )
       .toBe(320)
 
+    test.skip(isMobile, 'the drag half needs a mouse; touch drags are covered by drag.spec')
     await page.waitForTimeout(350)
     const xInput = page.locator('.builder-axis input').nth(0)
     const before = Number.parseInt(await xInput.inputValue(), 10)
