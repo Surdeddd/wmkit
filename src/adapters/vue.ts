@@ -1,12 +1,15 @@
 import {
   type ComputedRef,
   computed,
+  getCurrentInstance,
   getCurrentScope,
+  inject,
   type MaybeRefOrGetter,
   onScopeDispose,
   type Ref,
-  type ShallowRef,
   shallowRef,
+  ssrContextKey,
+  toRef,
   toValue,
   watch,
 } from 'vue'
@@ -19,28 +22,35 @@ function disposeWithScope(dispose: () => void): void {
   if (getCurrentScope()) onScopeDispose(dispose)
 }
 
+function follow<T>(wm: WindowManager, read: () => T): ComputedRef<T> {
+  if (getCurrentInstance() && inject(ssrContextKey, null)) return toRef(read) as ComputedRef<T>
+  const seen = shallowRef(read())
+  disposeWithScope(
+    wm.subscribe(() => {
+      seen.value = read()
+    }),
+  )
+  return computed(() => {
+    seen.value
+    return read()
+  })
+}
+
 export function useWindowManager(options?: ManagerOptions): WindowManager {
   const wm = createWindowManager(options)
-  disposeWithScope(() => wm.destroy())
+  disposeWithScope(wm.destroy)
   return wm
 }
 
-export function useWmState(wm: WindowManager): ShallowRef<ManagerState> {
-  const state = shallowRef(wm.getState())
-  disposeWithScope(
-    wm.subscribe((next) => {
-      state.value = next
-    }),
-  )
-  return state
+export function useWmState(wm: WindowManager): ComputedRef<ManagerState> {
+  return follow(wm, wm.getState)
 }
 
 export function useWmWindow(
   wm: WindowManager,
   id: MaybeRefOrGetter<string>,
 ): ComputedRef<WindowState | undefined> {
-  const state = useWmState(wm)
-  return computed(() => state.value.windows[toValue(id)])
+  return follow(wm, () => wm.get(toValue(id)))
 }
 
 export function useDesktop(
@@ -49,7 +59,7 @@ export function useDesktop(
   options?: DesktopOptions,
 ): DesktopBinder {
   const binder = createDesktopBinder(wm, options)
-  disposeWithScope(() => binder.destroy())
+  disposeWithScope(binder.destroy)
   watch(
     target,
     (element, _previous, onCleanup) => {

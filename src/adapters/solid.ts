@@ -1,4 +1,12 @@
-import { type Accessor, createSignal, getOwner, onCleanup } from 'solid-js'
+import {
+  type Accessor,
+  createMemo,
+  createSignal,
+  getOwner,
+  onCleanup,
+  onMount,
+  untrack,
+} from 'solid-js'
 import { createWindowManager } from '../core/manager'
 import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
 import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
@@ -6,6 +14,11 @@ import type { DesktopOptions, WindowAttachOptions } from '../dom/shared'
 
 function disposeWithOwner(dispose: () => void): void {
   if (getOwner()) onCleanup(dispose)
+}
+
+function bindMounted(bind: () => () => void): void {
+  if (getOwner()) onMount(() => onCleanup(bind()))
+  else bind()
 }
 
 export function useWindowManager(options?: ManagerOptions): WindowManager {
@@ -16,7 +29,7 @@ export function useWindowManager(options?: ManagerOptions): WindowManager {
 
 export function useWmState(wm: WindowManager): Accessor<ManagerState> {
   const [state, setState] = createSignal(wm.getState())
-  disposeWithOwner(wm.subscribe((next) => setState(next)))
+  disposeWithOwner(wm.subscribe(setState))
   return state
 }
 
@@ -25,7 +38,13 @@ export function useWmWindow(
   id: string | Accessor<string>,
 ): Accessor<WindowState | undefined> {
   const state = useWmState(wm)
-  return () => state().windows[typeof id === 'function' ? id() : id]
+  const read = () => state().windows[typeof id === 'function' ? id() : id]
+  if (!getOwner()) return read
+  const win = createMemo(read)
+  return () => {
+    win()
+    return untrack(read)
+  }
 }
 
 export interface SolidDesktop {
@@ -40,14 +59,10 @@ export function createDesktop(wm: WindowManager, options?: DesktopOptions): Soli
   return {
     binder,
     desktop(element) {
-      const unbind = binder.bindDesktop(element)
-      disposeWithOwner(unbind)
+      bindMounted(() => binder.bindDesktop(element))
     },
     window(id, options) {
-      return (element) => {
-        const unbind = binder.bindWindow(id, element, options)
-        disposeWithOwner(unbind)
-      }
+      return (element) => bindMounted(() => binder.bindWindow(id, element, options))
     },
   }
 }

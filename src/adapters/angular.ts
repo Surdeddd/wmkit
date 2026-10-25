@@ -1,4 +1,4 @@
-import { computed, DestroyRef, inject, type Signal, signal } from '@angular/core'
+import { computed, DestroyRef, inject, type Signal, signal, untracked } from '@angular/core'
 import { createWindowManager } from '../core/manager'
 import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
 import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
@@ -22,7 +22,7 @@ export function useWindowManager(options?: ManagerOptions): WindowManager {
 
 export function useWmState(wm: WindowManager): Signal<ManagerState> {
   const state = signal(wm.getState())
-  const stop = wm.subscribe((next) => state.set(next))
+  const stop = wm.subscribe((next) => untracked(() => state.set(next)))
   onDestroy(stop)
   return state.asReadonly()
 }

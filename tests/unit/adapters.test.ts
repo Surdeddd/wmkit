@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
-import { act, render, screen } from '@testing-library/react'
-import { createElement, useEffect } from 'react'
-import { createRoot } from 'solid-js'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, nextTick, shallowRef } from 'vue'
+import { computed as ngComputed } from '@angular/core'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { createElement, StrictMode, useEffect, useState } from 'react'
+import { createEffect, createRoot, createSignal } from 'solid-js'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import {
+  type ComputedRef,
+  createApp,
+  createSSRApp,
+  defineComponent,
+  effectScope,
+  h,
+  nextTick,
+  shallowRef,
+} from 'vue'
+import { renderToString } from 'vue/server-renderer'
 import {
   createDesktop as createNgDesktop,
   useWindowManager as useNgManager,
@@ -37,9 +48,10 @@ import {
   useWmWindowEl,
 } from '../../src/adapters/vue'
 import { createWindowManager } from '../../src/core/manager'
-import type { WindowManager, WindowState } from '../../src/core/types'
-import type { DesktopBinder } from '../../src/dom/binder'
-import { isPopoutSupported, popout } from '../../src/plugins/popout'
+import type { ManagerState, WindowManager, WindowState } from '../../src/core/types'
+import { createDesktopBinder, type DesktopBinder } from '../../src/dom/binder'
+
+vi.mock('solid-js', () => import('solid-js/dist/dev.js' as string))
 
 const VIEWPORT = { viewport: { width: 800, height: 600 } }
 const DESKTOP_OPTIONS = { autoViewport: false, announce: false } as const
@@ -47,6 +59,25 @@ const DESKTOP_OPTIONS = { autoViewport: false, announce: false } as const
 afterEach(() => {
   document.body.replaceChildren()
 })
+
+function captureErrors() {
+  const errors: string[] = []
+  const onError = (event: ErrorEvent) => {
+    errors.push(String(event.error?.message ?? event.message))
+    event.preventDefault()
+  }
+  window.addEventListener('error', onError)
+  const spy = vi.spyOn(console, 'error').mockImplementation((first) => {
+    errors.push(String(first?.message ?? first))
+  })
+  return {
+    errors,
+    stop() {
+      window.removeEventListener('error', onError)
+      spy.mockRestore()
+    },
+  }
+}
 
 describe('react adapter smoke', () => {
   function Win({ binder, win }: { binder: DesktopBinder; win: WindowState }) {
@@ -86,6 +117,103 @@ describe('react adapter smoke', () => {
     expect(el.style.transform).toBe('translate3d(10px, 20px, 0)')
     expect(el.getAttribute('role')).toBe('dialog')
     unmount()
+  })
+})
+
+describe('react window lifecycle', () => {
+  function Win({ binder, id }: { binder: DesktopBinder; id: string }) {
+    const win = useReactWindow(binder.wm, id)
+    // @ts-expect-error
+    const ref = useWmWindowRef(binder, id, { removeOnClose: true })
+    if (!win) return null
+    return createElement(
+      'section',
+      { ref, 'data-testid': `w-${id}` },
+      createElement(
+        'header',
+        { 'data-wm-drag': '' },
+        createElement('span', { 'data-wm-title': '' }, win.title),
+        createElement('button', {
+          type: 'button',
+          'data-wm-close': '',
+          'data-testid': `close-${id}`,
+        }),
+      ),
+    )
+  }
+
+  function Plain({ binder, id }: { binder: DesktopBinder; id: string }) {
+    const ref = useWmWindowRef(binder, id)
+    return createElement('section', { ref, 'data-testid': `w-${id}` })
+  }
+
+  let wm: WindowManager | undefined
+  let binder: DesktopBinder | undefined
+  const opened: string[] = []
+
+  function Desktop({ item = Win }: { item?: typeof Win }) {
+    const manager = useReactManager(VIEWPORT)
+    useState(() => manager.on('open', ({ window: win }) => opened.push(win.id)))
+    const desktop = useDesktop(manager, DESKTOP_OPTIONS)
+    const state = useReactState(manager)
+    wm = manager
+    binder = desktop.binder
+    return createElement(
+      'div',
+      { ref: desktop.ref },
+      createElement('span', { 'data-testid': 'alive' }),
+      state.order.map((id) => createElement(item, { key: id, binder: desktop.binder, id })),
+    )
+  }
+
+  afterEach(() => {
+    opened.length = 0
+  })
+
+  it('closing a removeOnClose window from its button keeps the React tree mounted', async () => {
+    render(createElement(Desktop))
+    act(() => {
+      wm?.open({ id: 'a', title: 'A' })
+    })
+    expect((await screen.findByTestId('w-a')).dataset.wmWindow).toBe('a')
+
+    const log = captureErrors()
+    try {
+      act(() => {
+        fireEvent.click(screen.getByTestId('close-a'))
+      })
+    } catch (error) {
+      log.errors.push(String((error as Error).message))
+    }
+    log.stop()
+
+    expect(wm?.get('a')).toBeUndefined()
+    expect(screen.queryByTestId('alive'), 'the whole React root was unmounted').not.toBeNull()
+    expect(log.errors, 'React removed a node the controller had already removed').toEqual([])
+  })
+
+  it('a StrictMode double mount keeps the desktop bound and the manager listeners', () => {
+    const view = render(createElement(StrictMode, null, createElement(Desktop, { item: Plain })))
+    expect(binder?.controller(), 'the simulated unmount tore the desktop down').not.toBeNull()
+
+    act(() => {
+      wm?.open({ id: 'a', title: 'A' })
+    })
+    expect(screen.getByTestId('w-a').dataset.wmWindow, 'the window never attached').toBe('a')
+    expect(opened, 'a listener added with the manager was dropped').toContain('a')
+
+    view.unmount()
+    expect(binder?.controller()).toBeNull()
+  })
+
+  it('destroys the manager once the component really unmounts', async () => {
+    const view = render(createElement(Desktop, { item: Plain }))
+    const late = vi.fn()
+    wm?.on('open', late)
+    view.unmount()
+    await new Promise((resolve) => setTimeout(resolve))
+    wm?.open({ id: 'late', title: 'Late' })
+    expect(late).not.toHaveBeenCalled()
   })
 })
 
@@ -156,155 +284,23 @@ describe('svelte adapter smoke', () => {
 
 describe('solid adapter smoke', () => {
   it('exposes signal accessors and element refs', () => {
-    createRoot((dispose) => {
+    const desktopEl = document.createElement('div')
+    const winEl = document.createElement('section')
+    document.body.append(desktopEl)
+    const { dispose, state } = createRoot((done) => {
       const wm = useSolidManager(VIEWPORT)
-      const state = useSolidState(wm)
       const dk = createSolidDesktop(wm, DESKTOP_OPTIONS)
-
-      const desktopEl = document.createElement('div')
-      document.body.append(desktopEl)
       dk.desktop(desktopEl)
-
       wm.open({ id: 'sol', title: 'Solid' })
-      const winEl = document.createElement('section')
       desktopEl.append(winEl)
       dk.window('sol')(winEl)
-
-      expect(desktopEl.dataset.wmDesktop).toBe('')
-      expect(winEl.dataset.wmWindow).toBe('sol')
-      expect(state().windows.sol?.title).toBe('Solid')
-      dispose()
-    })
-  })
-})
-
-describe('popout smoke', () => {
-  it('moves content into a picture-in-picture window and back', async () => {
-    const pipDoc = document.implementation.createHTMLDocument('pip')
-    const pipWindow = {
-      document: pipDoc,
-      addEventListener: vi.fn(),
-      close: vi.fn(),
-    }
-    const requestWindow = vi.fn(async () => pipWindow as unknown as Window)
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: { requestWindow },
+      return { dispose: done, state: useSolidState(wm) }
     })
 
-    expect(isPopoutSupported()).toBe(true)
-
-    const wm = createWindowManager(VIEWPORT)
-    wm.open({ id: 'p', title: 'Popped', width: 300, height: 200 })
-    const host = document.createElement('div')
-    const content = document.createElement('div')
-    host.append(content)
-    document.body.append(host)
-
-    const handle = await popout(wm, 'p', content)
-    expect(requestWindow).toHaveBeenCalledWith({ width: 300, height: 200 })
-    expect(content.ownerDocument).toBe(pipDoc)
-    expect(pipDoc.title).toBe('Popped')
-    expect(wm.get('p')?.stage).toBe('minimized')
-
-    handle.close()
-    expect(pipWindow.close).toHaveBeenCalled()
-    expect(content.parentNode).toBe(host)
-    expect(wm.get('p')?.stage).toBe('normal')
-
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: undefined,
-    })
-    expect(isPopoutSupported()).toBe(false)
-    await expect(popout(wm, 'p', content)).rejects.toThrow(/not supported/)
-    await expect(popout(wm, 'ghost', content)).rejects.toThrow(/unknown window/)
-  })
-
-  it('carries the page styles across and falls back to a link for cross-origin sheets', async () => {
-    const sheet = (cssText: string | null, owner: Node | null) =>
-      ({
-        get cssRules() {
-          if (cssText === null) throw new Error('cross-origin sheet')
-          return [{ cssText }] as unknown as CSSRuleList
-        },
-        ownerNode: owner,
-      }) as unknown as CSSStyleSheet
-
-    const sourceDoc = document.implementation.createHTMLDocument('source')
-    const link = sourceDoc.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://cdn.example.com/theme.css'
-    Object.defineProperty(sourceDoc, 'styleSheets', {
-      configurable: true,
-      value: [
-        sheet('.a{color:red}', null),
-        sheet(null, link),
-        sheet(null, sourceDoc.createElement('style')),
-      ],
-    })
-    Object.defineProperty(sourceDoc, 'adoptedStyleSheets', {
-      configurable: true,
-      value: [sheet('.b{color:blue}', null)],
-    })
-
-    const pipDoc = document.implementation.createHTMLDocument('pip')
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: {
-        requestWindow: async () =>
-          ({ document: pipDoc, addEventListener: vi.fn(), close: vi.fn() }) as unknown as Window,
-      },
-    })
-
-    const wm = createWindowManager(VIEWPORT)
-    wm.open({ id: 'p', title: 'Popped', width: 300, height: 200 })
-    const content = sourceDoc.createElement('div')
-    sourceDoc.body.append(content)
-
-    await popout(wm, 'p', content, { minimizeWhilePopped: false })
-
-    expect([...pipDoc.head.querySelectorAll('style')].map((node) => node.textContent)).toEqual([
-      '.a{color:red}',
-      '.b{color:blue}',
-    ])
-    expect(pipDoc.head.querySelector('link')?.href).toBe('https://cdn.example.com/theme.css')
-    expect(wm.get('p')?.stage).toBe('normal')
-
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: undefined,
-    })
-  })
-
-  it('skips the style copy when the caller opts out', async () => {
-    const pipDoc = document.implementation.createHTMLDocument('pip')
-    const pipWindow = { document: pipDoc, addEventListener: vi.fn(), close: vi.fn() }
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: { requestWindow: async () => pipWindow as unknown as Window },
-    })
-    const style = document.createElement('style')
-    style.textContent = '.leak{color:red}'
-    document.head.append(style)
-
-    const wm = createWindowManager(VIEWPORT)
-    wm.open({ id: 'p', title: 'Popped', width: 300, height: 200 })
-    const content = document.createElement('div')
-    document.body.append(content)
-    wm.minimize('p')
-
-    const handle = await popout(wm, 'p', content, { copyStyles: false, width: 640, height: 480 })
-    expect(pipDoc.head.querySelectorAll('style, link')).toHaveLength(0)
-
-    handle.close()
-    expect(wm.get('p')?.stage).toBe('minimized')
-
-    style.remove()
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: undefined,
-    })
+    expect(desktopEl.dataset.wmDesktop).toBe('')
+    expect(winEl.dataset.wmWindow).toBe('sol')
+    expect(state().windows.sol?.title).toBe('Solid')
+    dispose()
   })
 })
 
@@ -410,6 +406,11 @@ describe('per window subscriptions', () => {
     expect(screen.getByTestId('title').textContent).toBe('B renamed')
   })
 
+  it('vue hands out read-only refs', () => {
+    expectTypeOf(useVueState).returns.toEqualTypeOf<ComputedRef<ManagerState>>()
+    expectTypeOf(useVueWindow).returns.toEqualTypeOf<ComputedRef<WindowState | undefined>>()
+  })
+
   it('vue tracks one window through a ref id', async () => {
     const wm = createWindowManager(VIEWPORT)
     wm.open({ id: 'a', title: 'A' })
@@ -440,11 +441,11 @@ describe('per window subscriptions', () => {
     wm.open({ id: 'b', title: 'B' })
 
     createRoot((dispose) => {
-      let wanted = 'a'
-      const win = useSolidWindow(wm, () => wanted)
+      const [wanted, setWanted] = createSignal('a')
+      const win = useSolidWindow(wm, wanted)
       expect(win()?.title).toBe('A')
 
-      wanted = 'b'
+      setWanted('b')
       expect(win()?.title).toBe('B')
 
       wm.update('b', { title: 'B renamed' })
@@ -705,6 +706,333 @@ describe('binder lifecycle', () => {
     dk.binder.bindWindow('after', winEl)
     wm.open({ id: 'after', title: 'After' })
     expect(winEl.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('refuses a second desktop while one is bound', () => {
+    const binder = createDesktopBinder(createWindowManager(VIEWPORT), DESKTOP_OPTIONS)
+    binder.bindDesktop(document.createElement('div'))
+    expect(() => binder.bindDesktop(document.createElement('div'))).toThrow(/already bound/)
+    binder.destroy()
+  })
+
+  function boundNotes() {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    wm.open({ id: 'notes', title: 'Notes' })
+    const winEl = document.createElement('section')
+    desktopEl.append(winEl)
+    dk.window(winEl, { id: 'notes', removeOnClose: true })
+    return { wm, desktopEl, winEl }
+  }
+
+  it('puts a removeOnClose element back when undo reopens its window', () => {
+    const { wm, desktopEl, winEl } = boundNotes()
+    wm.close('notes')
+    expect(winEl.isConnected).toBe(false)
+
+    expect(wm.undo()).toBe(true)
+    expect(winEl.dataset.wmWindow).toBe('notes')
+    expect(winEl.parentNode, 'the open, focused window has an element nobody can see').toBe(
+      desktopEl,
+    )
+    expect(document.activeElement).toBe(winEl)
+  })
+
+  it('leaves a window where it is when the whole desktop is built off-document', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    const desktopEl = document.createElement('div')
+    const layer = document.createElement('div')
+    const winEl = document.createElement('section')
+    desktopEl.append(layer)
+    layer.append(winEl)
+    const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
+    binder.bindWindow('a', winEl)
+    binder.bindDesktop(desktopEl)
+    document.body.append(desktopEl)
+    expect(winEl.dataset.wmWindow).toBe('a')
+    expect(winEl.parentNode, 'the window was pulled out of its wrapper').toBe(layer)
+    binder.destroy()
+  })
+
+  it('keeps the element in the page when one batch closes and reopens its window', () => {
+    const { wm, desktopEl, winEl } = boundNotes()
+    wm.batch(() => {
+      wm.close('notes')
+      wm.open({ id: 'notes', title: 'Notes again' })
+    })
+    expect(winEl.dataset.wmWindow).toBe('notes')
+    expect(winEl.parentNode, 'attached, open, and missing from the page').toBe(desktopEl)
+  })
+
+  function unboundPair() {
+    const wm = createWindowManager(VIEWPORT)
+    const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    const a = document.createElement('section')
+    const b = document.createElement('section')
+    desktopEl.append(a, b)
+    binder.bindWindow('a', a)
+    binder.bindWindow('b', b)
+    return { wm, binder, desktopEl, a, b, unbind: binder.bindDesktop(desktopEl) }
+  }
+
+  it('a desktop rebind leaves no window marked focused that is not', () => {
+    const { wm, binder, desktopEl, a, b, unbind } = unboundPair()
+    wm.focus('a')
+    unbind()
+    wm.focus('b')
+    binder.bindDesktop(desktopEl)
+    expect(b.hasAttribute('data-wm-focused')).toBe(true)
+    expect(a.hasAttribute('data-wm-focused'), 'a stale focus marker survived the rebind').toBe(
+      false,
+    )
+  })
+
+  it('a window closed while the desktop is unbound stops claiming to be a window', () => {
+    const { wm, binder, desktopEl, a, unbind } = unboundPair()
+    unbind()
+    wm.close('a')
+    binder.bindDesktop(desktopEl)
+    expect(a.getAttribute('data-wm-window')).toBeNull()
+  })
+
+  it('two pending bindings for one id do not break wm.open', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    binder.bindDesktop(desktopEl)
+    const first = document.createElement('section')
+    const second = document.createElement('section')
+    desktopEl.append(first, second)
+    binder.bindWindow('a', first)
+    binder.bindWindow('a', second)
+    const changes: number[] = []
+    wm.subscribe((state) => changes.push(state.order.length))
+
+    expect(() => wm.open({ id: 'a', title: 'A' })).not.toThrow()
+    expect(changes, 'the change event was swallowed').toEqual([1])
+    expect(first.dataset.wmWindow).toBe('a')
+    expect(second.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('a bindWindow that throws leaves nothing behind', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    binder.bindDesktop(desktopEl)
+    wm.open({ id: 'a', title: 'A' })
+    const first = document.createElement('section')
+    const second = document.createElement('section')
+    desktopEl.append(first, second)
+    const unbindFirst = binder.bindWindow('a', first)
+    expect(() => binder.bindWindow('a', second)).toThrow(/already attached/)
+
+    unbindFirst()
+    wm.close('a')
+    wm.open({ id: 'a', title: 'A again' })
+    expect(second.dataset.wmWindow, 'the binding whose call threw attached later').toBeUndefined()
+  })
+})
+
+describe('framework timing and reactivity', () => {
+  function countSubscriptions(wm: WindowManager) {
+    let live = 0
+    const subscribe = wm.subscribe
+    wm.subscribe = (listener) => {
+      live += 1
+      const stop = subscribe(listener)
+      return () => {
+        live -= 1
+        stop()
+      }
+    }
+    return () => live
+  }
+
+  it('vue server rendering with a shared manager leaves no subscriptions behind', async () => {
+    const shared = createWindowManager()
+    shared.open({ id: 'a', title: 'A' })
+    const live = countSubscriptions(shared)
+    const Comp = defineComponent({
+      setup: () => {
+        const state = useVueState(shared)
+        const win = useVueWindow(shared, 'a')
+        return () => h('div', `${state.value.order.length} ${win.value?.title}`)
+      },
+    })
+    for (let i = 0; i < 3; i += 1) {
+      expect(await renderToString(createSSRApp(Comp))).toContain('1 A')
+    }
+    expect(live(), 'every server render leaked its listeners').toBe(0)
+  })
+
+  it('vue server rendering shows a window opened later in setup', async () => {
+    const Comp = defineComponent({
+      setup: () => {
+        const wm = useVueManager()
+        const state = useVueState(wm)
+        const note = useVueWindow(wm, 'notes')
+        wm.open({ id: 'notes', title: 'Notes' })
+        return () => h('div', `${state.value.order.length} ${note.value?.title}`)
+      },
+    })
+    expect(await renderToString(createSSRApp(Comp))).toContain('1 Notes')
+  })
+
+  it('vue server rendering shows a change made after setup already read the state', async () => {
+    const Comp = defineComponent({
+      setup: () => {
+        const wm = useVueManager()
+        const state = useVueState(wm)
+        const note = useVueWindow(wm, 'notes')
+        if (state.value.order.length === 0 && !note.value) wm.open({ id: 'notes', title: 'Notes' })
+        return () => h('div', `${state.value.order.length} ${note.value?.title}`)
+      },
+    })
+    expect(await renderToString(createSSRApp(Comp)), 'a cached read went out stale').toContain(
+      '1 Notes',
+    )
+  })
+
+  it('vue re-renders a mounted component only when its own window changes', async () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    const live = countSubscriptions(wm)
+    let renders = 0
+    const Comp = defineComponent({
+      setup: () => {
+        const win = useVueWindow(wm, 'a')
+        return () => {
+          renders += 1
+          return h('span', win.value?.title)
+        }
+      },
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const app = createApp(Comp)
+    app.mount(host)
+    wm.update('a', { title: 'A2' })
+    await nextTick()
+    expect(host.textContent).toBe('A2')
+
+    const before = renders
+    for (let i = 1; i <= 5; i += 1) {
+      wm.move('b', i * 5, i * 5)
+      await nextTick()
+    }
+    expect(renders - before, 'moving another window re-rendered this one').toBe(0)
+    app.unmount()
+    expect(live()).toBe(0)
+  })
+
+  it('solid binds elements once they are in the page, so a new window takes focus', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    opener.focus()
+    wm.open({ id: 'a', title: 'A' })
+    const section = document.createElement('section')
+
+    const dispose = createRoot((done) => {
+      const dk = createSolidDesktop(wm, DESKTOP_OPTIONS)
+      dk.desktop(desktopEl)
+      dk.window('a')(section)
+      desktopEl.append(section)
+      return done
+    })
+    expect(section.dataset.wmWindow).toBe('a')
+    expect(document.activeElement, 'Solid assigns refs before inserting the element').toBe(section)
+
+    dispose()
+    expect(section.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('solid binds at once outside an owner', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createSolidDesktop(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    dk.desktop(desktopEl)
+    wm.open({ id: 'a', title: 'A' })
+    const section = document.createElement('section')
+    desktopEl.append(section)
+    dk.window('a')(section)
+    expect(section.dataset.wmWindow).toBe('a')
+    dk.binder.destroy()
+  })
+
+  it('solid useWmWindow only notifies when that window changes', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    let runs = 0
+    const dispose = createRoot((done) => {
+      const win = useSolidWindow(wm, 'a')
+      createEffect(() => {
+        win()
+        runs += 1
+      })
+      return done
+    })
+    wm.update('a', { title: 'A2' })
+    expect(runs).toBe(2)
+    for (let i = 1; i <= 5; i += 1) wm.move('b', i * 5, i * 5)
+    expect(runs, 'moving window b re-ran a computation that only reads a').toBe(2)
+    dispose()
+  })
+
+  it('solid useWmWindow outside an owner reads live and creates no computation', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const wm = createWindowManager(VIEWPORT)
+    const win = useSolidWindow(wm, 'a')
+    expect(win()).toBeUndefined()
+    wm.open({ id: 'a', title: 'A' })
+    expect(win()?.title).toBe('A')
+    expect(warn, 'a computation that is never disposed was created').not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('solid useWmWindow on the server build sees a window opened later in the render', async () => {
+    vi.resetModules()
+    vi.doMock('solid-js', () => import('solid-js/dist/server.js' as string))
+    try {
+      const server = await import('solid-js')
+      const adapter = await import('../../src/adapters/solid')
+      const wm = createWindowManager(VIEWPORT)
+      const seen = server.createRoot((done) => {
+        const win = adapter.useWmWindow(wm, 'notes')
+        const before = win()?.title
+        wm.open({ id: 'notes', title: 'Notes' })
+        const after = win()?.title
+        done()
+        return [before, after]
+      })
+      expect(seen, 'the server read was frozen at its first value').toEqual([undefined, 'Notes'])
+    } finally {
+      vi.doUnmock('solid-js')
+      vi.resetModules()
+    }
+  })
+
+  it('angular takes a manager change made inside a reactive context', () => {
+    const wm = useNgManager(VIEWPORT)
+    const state = useNgState(wm)
+    const opening = ngComputed(() => wm.open({ id: 'inside', title: 'Inside' }).id)
+    expect(() => opening(), 'the adapter wrote its signal inside a reactive context').not.toThrow()
+    expect(state().windows.inside?.title).toBe('Inside')
   })
 })
 

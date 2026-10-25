@@ -8,7 +8,13 @@ export type ElementRef = (node: HTMLElement | null) => void
 
 export function useWindowManager(options?: ManagerOptions): WindowManager {
   const [wm] = useState(() => createWindowManager(options))
-  useEffect(() => () => wm.destroy(), [wm])
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => {
+    clearTimeout(pending.current)
+    return () => {
+      pending.current = setTimeout(wm.destroy)
+    }
+  }, [wm])
   return wm
 }
 
@@ -30,7 +36,6 @@ export interface UseDesktopResult {
 export function useDesktop(wm: WindowManager, options?: DesktopOptions): UseDesktopResult {
   const optionsRef = useRef(options)
   const binder = useMemo(() => createDesktopBinder(wm, optionsRef.current), [wm])
-  useEffect(() => () => binder.destroy(), [binder])
   const cleanupRef = useRef<(() => void) | null>(null)
   const ref = useCallback<ElementRef>(
     (node) => {
@@ -49,14 +54,17 @@ export function useDesktop(wm: WindowManager, options?: DesktopOptions): UseDesk
 export function useWmWindowRef(
   binder: DesktopBinder,
   id: string,
-  options?: WindowAttachOptions,
+  options?: Omit<WindowAttachOptions, 'removeOnClose'>,
 ): ElementRef {
   const optionsRef = useRef(options)
   const cleanupRef = useRef<(() => void) | null>(null)
   return useCallback<ElementRef>(
     (node) => {
       if (node) {
-        cleanupRef.current = binder.bindWindow(id, node, optionsRef.current)
+        cleanupRef.current = binder.bindWindow(id, node, {
+          ...optionsRef.current,
+          removeOnClose: false,
+        })
       } else {
         cleanupRef.current?.()
         cleanupRef.current = null
