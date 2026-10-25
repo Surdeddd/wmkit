@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { boundsEqual, clampToViewport } from '../../src/core/geometry'
 import { createWindowManager } from '../../src/core/manager'
 import type { ManagerState, SnapZone, WindowManager, WindowState } from '../../src/core/types'
 
@@ -23,6 +24,40 @@ function rng(seed: number): () => number {
     state = (state * 1664525 + 1013904223) >>> 0
     return state / 4294967296
   }
+}
+
+function visibleIds(state: ManagerState): string[] {
+  return state.order.filter((id) => {
+    const win = state.windows[id]
+    return (
+      win !== undefined &&
+      win.stage !== 'minimized' &&
+      win.workspace === state.workspace &&
+      (win.groupId === null || state.groups[win.groupId]?.activeId === id)
+    )
+  })
+}
+
+function modalsOf(state: ManagerState, ids: string[]): string[] {
+  return ids.filter((id) => state.windows[id]?.layer === 'modal')
+}
+
+function unreachable(wm: WindowManager, label: string): string[] {
+  const found: string[] = []
+  for (const direction of [1, -1] as const) {
+    const copy = createWindowManager({ viewport: wm.getState().viewport })
+    copy.hydrate(wm.serialize())
+    const visible = visibleIds(copy.getState())
+    const modals = modalsOf(copy.getState(), visible)
+    const targets = modals.length > 0 ? modals : visible
+    const seen = new Set(
+      targets.flatMap(() => [copy.cycleFocus(direction), copy.cycleFocus(direction)]),
+    )
+    for (const id of targets) {
+      if (!seen.has(id)) found.push(`${label}: cycleFocus(${direction}) never reaches ${id}`)
+    }
+  }
+  return found
 }
 
 function violations(state: ManagerState, label: string): string[] {
@@ -65,6 +100,18 @@ function violations(state: ManagerState, label: string): string[] {
     if (win.stage !== 'minimized' && win.restoreStage === 'minimized') {
       found.push(`${label}: ${id} would restore into a minimized stage`)
     }
+    if (
+      win.stage === 'normal' &&
+      !boundsEqual(clampToViewport(win.bounds, state.viewport, 48), win.bounds)
+    ) {
+      found.push(`${label}: ${id} sits outside the viewport`)
+    }
+  }
+
+  const modal = modalsOf(state, visibleIds(state))[0]
+  const focused = state.focusedId ? state.windows[state.focusedId] : undefined
+  if (modal && focused && focused.layer !== 'modal') {
+    found.push(`${label}: focus sits on ${focused.id} behind modal ${modal}`)
   }
 
   if (state.focusedId !== null) {
@@ -128,10 +175,18 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
     return ids.length === 0 ? null : (pick(ids) as string)
   }
   const found: string[] = []
+  const echoes: string[] = []
+  let announced: string | undefined
+  wm.on('focus', ({ window: win, previous }) => {
+    if (previous === win.id) echoes.push(win.id)
+    announced = win.id
+  })
 
   for (let step = 0; step < steps; step += 1) {
     const id = anyId()
-    const action = Math.floor(random() * 24)
+    const before = wm.getState().focusedId
+    announced = undefined
+    const action = Math.floor(random() * 27)
     switch (action) {
       case 0:
         wm.open({
@@ -219,11 +274,26 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
       case 22:
         wm.cycleTab(random() < 0.5 ? 1 : -1)
         break
+      case 24:
+        wm.blur()
+        break
+      case 25:
+        wm.hydrate(wm.serialize())
+        break
+      case 26:
+        random() < 0.5 ? wm.saveLayout('l') : wm.loadLayout('l')
+        break
       default:
         wm.cycleFocus(random() < 0.5 ? 1 : -1)
         break
     }
-    found.push(...violations(wm.getState(), `seed ${seed} step ${step} action ${action}`))
+    const label = `seed ${seed} step ${step} action ${action}`
+    found.push(...violations(wm.getState(), label), ...unreachable(wm, label))
+    for (const id of echoes.splice(0)) found.push(`${label}: focus re-announced ${id}`)
+    const after = wm.getState().focusedId
+    if (after !== null && (announced ?? before) !== after) {
+      found.push(`${label}: focus moved to ${after} but the last focus event named ${announced}`)
+    }
     if (found.length > 0) return found
   }
   return found
@@ -248,5 +318,33 @@ describe('random operation sequences keep the state machine honest', () => {
       expect(violations(copy.getState(), `hydrated seed ${seed}`)).toEqual([])
       expect(copy.serialize()).toEqual(data)
     }
+  })
+
+  it('re-syncs a hand-edited snapshot whose group members drifted apart', () => {
+    const viewport = { width: 1280, height: 800 }
+    const donor = createWindowManager({ viewport })
+    donor.open({ id: 'a', x: 40, y: 40, width: 400, height: 300 })
+    donor.open({ id: 'b' })
+    donor.open({ id: 'c' })
+    donor.group(['a', 'b'])
+    donor.open({ id: 'f', layer: 'floating' })
+    const data = donor.serialize()
+    const raw = (id: string) => data.windows.find((win) => win.id === id) as object
+    Object.assign(raw('b'), {
+      bounds: { x: 900, y: 500, width: 120, height: 90 },
+      stage: 'minimized',
+      layer: 'modal',
+      workspace: 2,
+    })
+
+    const wm = createWindowManager({ viewport })
+    expect(wm.hydrate(data)).toBe(true)
+    expect(violations(wm.getState(), 'hand-edited')).toEqual([])
+    expect(wm.get('b')).toMatchObject({
+      bounds: wm.get('a')?.bounds,
+      stage: 'normal',
+      layer: 'normal',
+      workspace: 0,
+    })
   })
 })

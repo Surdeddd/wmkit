@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
-import type { ManagerOptions, SerializedState } from '../../src/core/types'
+import type {
+  Bounds,
+  ManagerOptions,
+  ManagerState,
+  SerializedState,
+  WindowState,
+} from '../../src/core/types'
 
 function makeWm(options: ManagerOptions = {}) {
   return createWindowManager({ viewport: { width: 1000, height: 800 }, ...options })
@@ -820,6 +826,16 @@ describe('serialize and hydrate', () => {
     expect(wm.hydrate(data)).toBe(true)
     expect(wm.getState().order).toEqual(['b', 'a', 'm'])
     expect(wm.getState().focusedId).toBe('m')
+  })
+
+  it('falls back to the default minimum size when the saved one is null', () => {
+    const donor = makeWm()
+    donor.open({ id: 'w', minWidth: 300, minHeight: 200 })
+    const data = donor.serialize()
+    ;(data.windows[0] as unknown as Record<string, unknown>).minSize = null
+    const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.get('w')?.minSize).toEqual({ width: 160, height: 100 })
   })
 
   it('preserves valid max size constraints through hydration', () => {
@@ -2515,5 +2531,1051 @@ describe('viewport changes stay out of history', () => {
     expect(wm.canUndo()).toBe(false)
     wm.setViewport({ width: 400, height: 300 })
     expect(wm.canUndo()).toBe(false)
+  })
+})
+
+describe('focus, modals and cycling', () => {
+  it('restores a minimized window inside a viewport that shrank meanwhile', () => {
+    const wm = createWindowManager({ viewport: { width: 1600, height: 1000 } })
+    wm.open({ id: 'a', x: 1200, y: 800, width: 300, height: 150 })
+    wm.minimize('a')
+    wm.setViewport({ width: 600, height: 400 })
+    wm.restore('a')
+    expect(wm.get('a')?.bounds).toEqual({ x: 552, y: 352, width: 300, height: 150 })
+  })
+
+  it('restores a window hydrated minimized before mount inside the viewport', () => {
+    const donor = createWindowManager({ viewport: { width: 1920, height: 1080 } })
+    donor.open({ id: 'a', x: 1500, y: 900, width: 300, height: 150 })
+    donor.minimize('a')
+    const wm = createWindowManager()
+    wm.hydrate(donor.serialize())
+    wm.setViewport({ width: 390, height: 844 })
+    expect(wm.focus('a')).toBe(true)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 342, y: 796 })
+  })
+
+  it('restores a minimized window in place when it may leave the viewport', () => {
+    const wm = createWindowManager({
+      viewport: { width: 1600, height: 1000 },
+      keepInViewport: false,
+    })
+    wm.open({ id: 'a', x: 1200, y: 800, width: 300, height: 150 })
+    wm.minimize('a')
+    wm.setViewport({ width: 600, height: 400 })
+    wm.restore('a')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 1200, y: 800 })
+  })
+
+  it('hands focus to the remaining modal when the focused modal is demoted', () => {
+    const wm = makeWm()
+    wm.open({ id: 'n' })
+    wm.open({ id: 'm1', layer: 'modal' })
+    wm.open({ id: 'm2', layer: 'modal' })
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    wm.update('m2', { layer: 'normal' })
+    expect(wm.getState().focusedId).toBe('m1')
+    expect(focused).toHaveBeenCalledWith({
+      window: expect.objectContaining({ id: 'm1' }),
+      previous: 'm2',
+    })
+    expect(wm.focus('n')).toBe(false)
+  })
+
+  it('keeps focus on a demoted modal when no other modal is up', () => {
+    const wm = makeWm()
+    wm.open({ id: 'n' })
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.update('m', { layer: 'normal' })
+    expect(wm.getState().focusedId).toBe('m')
+  })
+
+  it('leaves a blurred desktop blurred when a modal is demoted', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm1', layer: 'modal' })
+    wm.open({ id: 'm2', layer: 'modal' })
+    wm.blur()
+    wm.update('m2', { layer: 'normal' })
+    expect(wm.getState().focusedId).toBeNull()
+  })
+
+  it('hands focus to a group promoted to modal through a hidden tab', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.group(['a', 'b'])
+    wm.open({ id: 'x' })
+    wm.update('b', { layer: 'modal' })
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('hands focus to a modal group arriving through a hidden tab', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', layer: 'modal', workspace: 1 })
+    wm.open({ id: 'b', layer: 'modal', workspace: 1 })
+    wm.group(['a', 'b'])
+    wm.open({ id: 'x' })
+    expect(wm.getState().focusedId).toBe('x')
+    wm.moveToWorkspace('b', 0)
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('hands focus to a modal arriving above the focused modal', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm1', layer: 'modal' })
+    wm.open({ id: 'm2', layer: 'modal', workspace: 1 })
+    expect(wm.getState().focusedId).toBe('m1')
+    wm.moveToWorkspace('m2', 0)
+    expect(wm.getState().focusedId).toBe('m2')
+  })
+
+  it('hands focus to a modal group arriving through a hidden tab above the focused modal', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.open({ id: 'a', layer: 'modal', workspace: 1 })
+    wm.open({ id: 'b', layer: 'modal', workspace: 1 })
+    wm.group(['a', 'b'])
+    expect(wm.getState().focusedId).toBe('m')
+    wm.moveToWorkspace('b', 0)
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('hands focus from a blurred desktop to a group promoted through a hidden tab', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.group(['a', 'b'])
+    wm.blur()
+    wm.update('b', { layer: 'modal' })
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('focuses a minimized modal group restored through a hidden tab', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', layer: 'modal' })
+    wm.open({ id: 'b', layer: 'modal' })
+    wm.group(['a', 'b'])
+    wm.minimize('a')
+    wm.open({ id: 'x' })
+    expect(wm.getState().focusedId).toBe('x')
+    wm.restore('b')
+    expect(wm.getState().focusedId).toBe('b')
+  })
+
+  it('focuses a minimized modal under another modal like a visible one', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm1', layer: 'modal' })
+    wm.open({ id: 'm2', layer: 'modal' })
+    wm.minimize('m1')
+    expect(wm.focus('m1')).toBe(true)
+    expect(wm.getState().focusedId).toBe('m1')
+    expect(wm.get('m1')?.stage).toBe('normal')
+  })
+
+  it('cycles backwards through every window and undoes a forward step', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    const visited = [1, 2, 3, 4, 5, 6].map(() => wm.cycleFocus(-1))
+    expect(visited).toEqual(['b', 'a', 'c', 'b', 'a', 'c'])
+    const before = wm.getState().order
+    wm.cycleFocus(1)
+    wm.cycleFocus(-1)
+    expect(wm.getState().order).toEqual(before)
+    expect(wm.getState().focusedId).toBe('c')
+  })
+
+  it('cycles both ways across layers with one focus event per press', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'f1', layer: 'floating' })
+    wm.open({ id: 'f2', layer: 'floating' })
+    const start = { order: wm.getState().order, focusedId: wm.getState().focusedId }
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    const presses = [1, 2, 3, 4, 5, 6, 7, 8]
+    expect(presses.map(() => wm.cycleFocus(-1))).toEqual([
+      'b',
+      'f1',
+      'a',
+      'f2',
+      'b',
+      'f1',
+      'a',
+      'f2',
+    ])
+    expect(presses.map(() => wm.cycleFocus(1))).toEqual([
+      'a',
+      'f1',
+      'b',
+      'f2',
+      'a',
+      'f1',
+      'b',
+      'f2',
+    ])
+    expect(focused).toHaveBeenCalledTimes(16)
+    for (const [first, second] of [
+      [1, -1],
+      [-1, 1],
+    ] as const) {
+      wm.cycleFocus(first)
+      wm.cycleFocus(second)
+      expect({ order: wm.getState().order, focusedId: wm.getState().focusedId }).toEqual(start)
+    }
+  })
+
+  it('cycles backwards through a top layer of three windows into the layer below', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    for (const id of ['f1', 'f2', 'f3']) wm.open({ id, layer: 'floating' })
+    const presses = [1, 2, 3, 4, 5, 6]
+    expect(presses.map(() => wm.cycleFocus(-1))).toEqual(['a', 'f2', 'a', 'f1', 'a', 'f3'])
+    expect(presses.map(() => wm.cycleFocus(1))).toEqual(['a', 'f1', 'a', 'f2', 'a', 'f3'])
+  })
+
+  it('cycles a lone window in either direction without touching the state', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm', stage: 'minimized' })
+    wm.open({ id: 'a' })
+    wm.clearHistory()
+    const before = wm.getState()
+    const change = vi.fn()
+    wm.subscribe(change)
+    expect(wm.cycleFocus(-1)).toBe('a')
+    expect(wm.cycleFocus(1)).toBe('a')
+    expect(wm.getState()).toBe(before)
+    expect(change).not.toHaveBeenCalled()
+    expect(wm.canUndo()).toBe(false)
+  })
+
+  it('does not emit focus when the focused window is only raised', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'hidden', stage: 'minimized' })
+    const focused = vi.fn()
+    const ordered = vi.fn()
+    wm.on('focus', focused)
+    wm.on('order', ordered)
+    expect(wm.focus('a')).toBe(true)
+    expect(focused).not.toHaveBeenCalled()
+    expect(ordered).toHaveBeenCalledTimes(1)
+    expect(wm.getState().order).toEqual(['hidden', 'a'])
+  })
+
+  it('does not emit focus when sendToBack keeps the focus', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm', stage: 'minimized' })
+    wm.open({ id: 'a' })
+    wm.sendToBack('m')
+    wm.open({ id: 'm2', stage: 'minimized' })
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    expect(wm.sendToBack('a')).toBe(true)
+    expect(wm.getState().focusedId).toBe('a')
+    expect(focused).not.toHaveBeenCalled()
+  })
+
+  it('does not flash the modal when stage changes reach a background window', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'gate', layer: 'modal' })
+    const blocked = vi.fn()
+    wm.on('modalblocked', blocked)
+    wm.maximize('a')
+    wm.snap('a', 'left')
+    const groupId = wm.group(['a', 'b'])
+    expect(groupId).not.toBeNull()
+    wm.ungroup('b')
+    expect(blocked).not.toHaveBeenCalled()
+    expect(wm.getState().focusedId).toBe('gate')
+  })
+
+  it('brings the workspace of a window forward when its stage changes', () => {
+    const wm = makeWm()
+    wm.open({ id: 'here' })
+    wm.open({ id: 'there', workspace: 2 })
+    wm.snap('there', 'left')
+    expect(wm.workspace()).toBe(2)
+    expect(wm.getState().focusedId).toBe('there')
+  })
+
+  it('brings the workspace forward even when a modal is up on the current one', () => {
+    const wm = makeWm()
+    wm.open({ id: 'gate', layer: 'modal' })
+    wm.open({ id: 'there', workspace: 2 })
+    wm.maximize('there')
+    expect(wm.workspace()).toBe(2)
+    expect(wm.getState().focusedId).toBe('there')
+  })
+
+  it('restores a window on another workspace there even when a modal is up here', () => {
+    for (const run of [
+      (wm: ReturnType<typeof makeWm>) => wm.restore('there'),
+      (wm: ReturnType<typeof makeWm>) =>
+        wm.restoreTo('there', { x: 40, y: 40, width: 300, height: 200 }),
+    ]) {
+      const wm = makeWm()
+      wm.open({ id: 'gate', layer: 'modal' })
+      wm.open({ id: 'there', workspace: 2, stage: 'minimized' })
+      expect(run(wm)).toBe(true)
+      expect(wm.workspace()).toBe(2)
+      expect(wm.getState().focusedId).toBe('there')
+      expect(wm.get('there')?.stage).toBe('normal')
+    }
+  })
+
+  it('keeps the state object and skips subscribers on a modal-blocked focus', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'gate', layer: 'modal' })
+    const before = wm.getState()
+    const change = vi.fn()
+    const blocked = vi.fn()
+    wm.subscribe(change)
+    wm.on('modalblocked', blocked)
+    expect(wm.focus('a')).toBe(false)
+    expect(wm.getState()).toBe(before)
+    expect(change).not.toHaveBeenCalled()
+    expect(blocked).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('history, events and serialization', () => {
+  it('hands every subscriber the latest state when one of them mutates the manager', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 100, y: 100 })
+    let fixed = false
+    wm.subscribe((state) => {
+      if (fixed || (state.windows.a?.bounds.x ?? 0) <= 500) return
+      fixed = true
+      wm.move('a', 500, 100)
+    })
+    const seen: number[] = []
+    let last: ManagerState | null = null
+    wm.subscribe((state) => {
+      seen.push(state.windows.a?.bounds.x as number)
+      last = state
+    })
+    wm.move('a', 700, 100)
+    expect(seen).toEqual([700, 500])
+    expect(last).toBe(wm.getState())
+    wm.undo()
+    expect(wm.get('a')?.bounds.x).toBe(700)
+  })
+
+  it('reports each workspace switch as it happened when a listener chains them', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.setWorkspace(1)
+    wm.open({ id: 'b' })
+    const seen: string[] = []
+    wm.on('workspace', ({ workspace, previous }) => seen.push(`${previous}->${workspace}`))
+    let once = true
+    wm.on('move', () => {
+      if (!once) return
+      once = false
+      wm.undo()
+      wm.undo()
+      wm.undo()
+      wm.setWorkspace(2)
+    })
+    wm.move('b', 400, 400)
+    expect(seen).toEqual(['1->0', '0->2'])
+    expect(wm.workspace()).toBe(2)
+    const donor = makeWm({ workspace: 1 })
+    let again = true
+    wm.on('move', () => {
+      if (!again) return
+      again = false
+      wm.hydrate(donor.serialize())
+      wm.setWorkspace(0)
+    })
+    seen.length = 0
+    wm.move('a', 300, 300)
+    expect(seen).toEqual(['2->1', '1->0'])
+  })
+
+  it('delivers the events of a transaction a listener starts after the current ones', () => {
+    const wm = makeWm()
+    wm.open({ id: 'child' })
+    wm.open({ id: 'parent' })
+    const log: string[] = []
+    wm.on('close', ({ window: win }) => {
+      log.push(`close:${win.id}`)
+      if (win.id === 'parent') wm.close('child')
+    })
+    wm.on('focus', ({ window: win }) => log.push(`focus:${win.id}`))
+    const states: ManagerState[] = []
+    wm.subscribe((state) => states.push(state))
+    wm.close('parent')
+    expect(log).toEqual(['close:parent', 'focus:child', 'close:child'])
+    expect(states).toHaveLength(1)
+    expect(states[0]).toBe(wm.getState())
+    expect(wm.getState().order).toEqual([])
+  })
+
+  it('stops a listener that keeps changing the state instead of hanging', () => {
+    const wm = makeWm({ historyLimit: 5 })
+    wm.open({ id: 'a', x: 0, y: 0 })
+    let calls = 0
+    const stop = wm.subscribe(() => {
+      calls += 1
+      if (calls < 50_000) wm.move('a', calls % 500, 0)
+    })
+    expect(() => wm.move('a', 1, 1)).toThrow(/^wmkit: /)
+    expect(calls).toBeLessThan(10_000)
+    stop()
+    const change = vi.fn()
+    wm.subscribe(change)
+    wm.move('a', 200, 200)
+    expect(change).toHaveBeenCalledTimes(1)
+  })
+
+  it('delivers the rest of a transaction when a listener throws, then rethrows', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const moved: string[] = []
+    let fail = true
+    wm.on('move', ({ window: win }) => {
+      moved.push(win.id)
+      if (fail && win.id === 'a') {
+        fail = false
+        throw new Error('listener bug')
+      }
+    })
+    const states: ManagerState[] = []
+    wm.subscribe((state) => states.push(state))
+    expect(() =>
+      wm.batch(() => {
+        wm.move('a', 200, 200)
+        wm.move('b', 300, 300)
+      }),
+    ).toThrow('listener bug')
+    expect(moved).toEqual(['a', 'b'])
+    expect(states).toEqual([wm.getState()])
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 200, y: 200 })
+    wm.move('a', 250, 250)
+    expect(states).toHaveLength(2)
+  })
+
+  it('emits focus when undo, redo, loadLayout or hydrate move the focus', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.saveLayout('b-front')
+    wm.focus('a')
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    wm.undo()
+    expect(focused).toHaveBeenLastCalledWith({ window: wm.get('b'), previous: 'a' })
+    wm.redo()
+    expect(focused).toHaveBeenLastCalledWith({ window: wm.get('a'), previous: 'b' })
+    wm.loadLayout('b-front')
+    expect(focused).toHaveBeenLastCalledWith({ window: wm.get('b'), previous: 'a' })
+    const donor = makeWm()
+    donor.open({ id: 'b' })
+    donor.open({ id: 'a' })
+    wm.hydrate(donor.serialize())
+    expect(focused).toHaveBeenLastCalledWith({ window: wm.get('a'), previous: 'b' })
+    expect(focused).toHaveBeenCalledTimes(4)
+    wm.move('a', 300, 300)
+    wm.undo()
+    wm.hydrate(wm.serialize())
+    expect(focused).toHaveBeenCalledTimes(4)
+  })
+
+  it('reports a window brought back by undo before handing it the focus', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.close('b')
+    const log: string[] = []
+    for (const type of ['open', 'close', 'focus'] as const) {
+      wm.on(type, ({ window: win }) => log.push(`${type}:${win.id}`))
+    }
+    wm.undo()
+    wm.redo()
+    expect(log).toEqual(['open:b', 'focus:b', 'close:b', 'focus:a'])
+  })
+
+  it('emits focus for the modal that takes the focus when a window opens behind it', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.blur()
+    const focused = vi.fn()
+    wm.on('focus', focused)
+    wm.open({ id: 'x' })
+    expect(wm.getState().focusedId).toBe('m')
+    expect(focused).toHaveBeenCalledWith({ window: wm.get('m'), previous: null })
+    wm.open({ id: 'y' })
+    expect(focused).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the final geometry in the open events of undo and hydrate', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.group(['a', 'b'])
+    wm.snap('a', 'right')
+    wm.close('b')
+    wm.open({ id: 'm' })
+    wm.maximize('m')
+    wm.close('m')
+    wm.setViewport({ width: 600, height: 400 })
+    const events: Array<[string, string, Bounds]> = []
+    for (const type of ['open', 'move', 'resize'] as const) {
+      wm.on(type, ({ window: win }) => events.push([type, win.id, win.bounds]))
+    }
+    wm.undo()
+    expect(events).toEqual([
+      ['resize', 'a', { x: 300, y: 0, width: 300, height: 400 }],
+      ['open', 'm', { x: 0, y: 0, width: 600, height: 400 }],
+    ])
+    events.length = 0
+    wm.undo()
+    wm.undo()
+    wm.undo()
+    expect(wm.get('b')?.bounds).toEqual({ x: 300, y: 0, width: 300, height: 400 })
+    expect(events.filter(([, id]) => id === 'b')).toEqual([['open', 'b', wm.get('b')?.bounds]])
+    const donor = makeWm()
+    donor.open({ id: 'd' })
+    donor.maximize('d')
+    events.length = 0
+    wm.hydrate(donor.serialize())
+    expect(events).toEqual([['open', 'd', { x: 0, y: 0, width: 600, height: 400 }]])
+  })
+
+  it('reports the synced group frame in the move and update payloads', () => {
+    for (const run of [
+      (wm: ReturnType<typeof makeWm>) => wm.setViewport({ width: 600, height: 400 }),
+      (wm: ReturnType<typeof makeWm>) => wm.moveToWorkspace('a', 1),
+    ]) {
+      const wm = makeWm()
+      wm.open({ id: 'a', x: 900, y: 700, width: 200, height: 150, aspectRatio: 1 })
+      wm.open({ id: 'b', minWidth: 300 })
+      wm.group(['a', 'b'])
+      const payloads: WindowState[] = []
+      wm.on('move', ({ window: win }) => payloads.push(win))
+      wm.on('update', ({ window: win }) => payloads.push(win))
+      run(wm)
+      expect(payloads).toEqual([wm.get('a')])
+    }
+  })
+
+  it('keeps a blurred desktop blurred through serialize and hydrate', () => {
+    for (const layer of ['normal', 'modal'] as const) {
+      const wm = makeWm()
+      wm.open({ id: 'a', layer })
+      wm.blur()
+      const data = wm.serialize()
+      const copy = makeWm()
+      expect(copy.hydrate(data)).toBe(true)
+      expect(copy.serialize()).toEqual(data)
+    }
+  })
+
+  it('round-trips snapshots whose sizes break their own limits, into any viewport', () => {
+    const sources = [
+      () => {
+        const wm = makeWm()
+        wm.open({ id: 'portrait', aspectRatio: 9 / 16, maxHeight: 200 })
+        return wm
+      },
+      () => {
+        const wm = makeWm()
+        wm.open({ id: 'crossed', minWidth: 500, maxWidth: 300 })
+        return wm
+      },
+      () => {
+        const wm = createWindowManager({ viewport: { width: 390, height: 700 } })
+        wm.open({ id: 'wide', minWidth: 600 })
+        wm.maximize('wide')
+        return wm
+      },
+      () => {
+        const wm = makeWm()
+        wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150, aspectRatio: 1 })
+        wm.open({ id: 'b', minWidth: 300 })
+        wm.group(['a', 'b'])
+        return wm
+      },
+    ]
+    for (const make of sources) {
+      const source = make()
+      const data = source.serialize()
+      for (const viewport of [source.getState().viewport, { width: 0, height: 0 }]) {
+        const copy = createWindowManager({ viewport })
+        expect(copy.hydrate(structuredClone(data))).toBe(true)
+        expect(copy.serialize()).toEqual(data)
+      }
+    }
+  })
+
+  it('focuses the top window of a snapshot that carries no focus at all', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a' })
+    donor.open({ id: 'b' })
+    donor.focus('a')
+    const data = donor.serialize()
+    delete (data as Partial<SerializedState>).focusedId
+    const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.getState().focusedId).toBe('a')
+  })
+
+  it('gives a window opened with an empty id a generated one', () => {
+    const wm = makeWm()
+    expect(wm.open({ id: '' }).id).toBe('wm-1')
+    expect(makeWm().hydrate(wm.serialize())).toBe(true)
+  })
+
+  it('treats an update whose values are all unchanged as a no-op', () => {
+    const wm = makeWm()
+    const a = wm.open({ id: 'a', title: 'T', meta: { n: 1 } })
+    wm.clearHistory()
+    const change = vi.fn()
+    const updated = vi.fn()
+    wm.subscribe(change)
+    wm.on('update', updated)
+    expect(
+      wm.update('a', {
+        title: 'T',
+        layer: 'normal',
+        minSize: a.minSize,
+        maxSize: null,
+        aspectRatio: null,
+        draggable: true,
+      }),
+    ).toBe(true)
+    expect(wm.get('a')).toBe(a)
+    expect(change).not.toHaveBeenCalled()
+    expect(updated).not.toHaveBeenCalled()
+    expect(wm.canUndo()).toBe(false)
+    wm.update('a', { meta: { n: 1 } })
+    expect(updated).toHaveBeenCalledTimes(1)
+  })
+
+  it('copies meta out of the objects it was handed', () => {
+    const meta = { n: 1 }
+    const wm = makeWm()
+    wm.open({ id: 'a', meta })
+    meta.n = 2
+    expect(wm.get('a')?.meta.n).toBe(1)
+    const data = wm.serialize()
+    const copy = makeWm()
+    copy.hydrate(data)
+    ;(data.windows[0]?.meta as Record<string, unknown>).n = 3
+    expect(copy.get('a')?.meta.n).toBe(1)
+  })
+
+  it('starts a new history step when a gesture goes on after an undo', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 0, y: 0 })
+    wm.beginInteraction()
+    wm.move('a', 10, 10)
+    wm.undo()
+    wm.move('a', 50, 50)
+    wm.endInteraction()
+    expect(wm.canRedo()).toBe(false)
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('keeps the own frame of a window maximized before the viewport is known', () => {
+    const wm = createWindowManager()
+    wm.open({ id: 'a', stage: 'maximized', width: 400, height: 300 })
+    wm.open({ id: 'b', x: 10, y: 20, width: 300, height: 200 })
+    wm.maximize('b')
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 400, height: 300 })
+    expect(wm.get('b')?.bounds).toEqual({ x: 10, y: 20, width: 300, height: 200 })
+    wm.minimize('b')
+    wm.restore('b')
+    wm.undo()
+    wm.redo()
+    expect(wm.get('b')).toMatchObject({ stage: 'maximized', bounds: { width: 300, height: 200 } })
+    wm.setViewport({ width: 1000, height: 800 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 1000, height: 800 })
+    wm.restore('b')
+    expect(wm.get('b')?.bounds).toEqual({ x: 10, y: 20, width: 300, height: 200 })
+  })
+
+  it('leaves snapped windows alone through hydrate and undo until the viewport is known', () => {
+    const donor = makeWm()
+    donor.open({ id: 's' })
+    donor.snap('s', 'right')
+    const wm = createWindowManager()
+    wm.hydrate(donor.serialize())
+    wm.open({ id: 'x' })
+    wm.undo()
+    expect(wm.get('s')?.bounds).toEqual({ x: 500, y: 0, width: 500, height: 800 })
+  })
+
+  it('ignores a viewport with a zero dimension, as a hidden desktop reports', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.maximize('a')
+    wm.open({ id: 'b' })
+    wm.snap('b', 'right')
+    const before = wm.getState()
+    const change = vi.fn()
+    wm.subscribe(change)
+    for (const size of [
+      { width: 0, height: 0 },
+      { width: 0, height: 800 },
+      { width: 1000, height: 0 },
+      { width: -5, height: 600 },
+    ]) {
+      wm.setViewport(size)
+    }
+    expect(wm.getState()).toBe(before)
+    expect(change).not.toHaveBeenCalled()
+    wm.setViewport({ width: 600, height: 400 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 600, height: 400 })
+  })
+
+  it('starts the history at a hydrate or clearHistory inside a batch', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a', x: 100, y: 100 })
+    const data = donor.serialize()
+    for (const reset of [
+      (wm: ReturnType<typeof makeWm>) => wm.hydrate(structuredClone(data)),
+      (wm: ReturnType<typeof makeWm>) => {
+        wm.open({ id: 'a', x: 100, y: 100 })
+        wm.clearHistory()
+      },
+    ]) {
+      const wm = makeWm()
+      wm.open({ id: 'old' })
+      wm.batch(() => {
+        reset(wm)
+        wm.move('a', 300, 300)
+      })
+      expect(wm.undo()).toBe(true)
+      expect(wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+      expect(wm.canUndo()).toBe(false)
+    }
+  })
+
+  it('clears the history recorded earlier in the same batch', () => {
+    const wm = makeWm()
+    wm.batch(() => {
+      wm.open({ id: 'a' })
+      wm.clearHistory()
+    })
+    expect(wm.canUndo()).toBe(false)
+    wm.batch(() => {
+      wm.move('a', 300, 300)
+      wm.clearHistory()
+      wm.move('a', 400, 400)
+    })
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 300, y: 300 })
+    expect(wm.canUndo()).toBe(false)
+  })
+})
+
+describe('ids that look like Object.prototype keys', () => {
+  it('treats every id as a plain key', () => {
+    const wm = makeWm()
+    for (const id of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+      expect(wm.get(id)).toBeUndefined()
+      expect(wm.close(id)).toBe(false)
+      expect(wm.focus(id)).toBe(false)
+      expect(() => wm.open({ id })).not.toThrow()
+      expect(wm.get(id)?.id).toBe(id)
+    }
+    expect(wm.getState().order).toEqual(['constructor', 'toString', 'hasOwnProperty', '__proto__'])
+    expect(Object.getPrototypeOf(wm.getState().windows)).toBeNull()
+  })
+
+  it('round-trips such ids through serialize and hydrate', () => {
+    const wm = makeWm()
+    wm.open({ id: 'valueOf' })
+    wm.open({ id: '__proto__' })
+    const data = wm.serialize()
+    const copy = makeWm()
+    expect(copy.hydrate(data)).toBe(true)
+    expect(copy.get('valueOf')?.id).toBe('valueOf')
+    expect(copy.get('__proto__')?.id).toBe('__proto__')
+    expect(copy.serialize()).toEqual(data)
+  })
+})
+
+describe('group frames follow the stage', () => {
+  it('fills the viewport when a grouped window maximizes over a member with an aspect ratio', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b', aspectRatio: 1 })
+    wm.group(['a', 'b'])
+    wm.maximize('a')
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 1000, height: 800 })
+    expect(wm.get('b')?.bounds).toEqual({ x: 0, y: 0, width: 1000, height: 800 })
+    wm.setViewport({ width: 900, height: 700 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 900, height: 700 })
+  })
+
+  it('keeps a grouped window on its zone when a member has a minimum size', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b', minWidth: 700 })
+    wm.group(['a', 'b'])
+    wm.snap('a', 'right')
+    const frame = wm.get('a')?.bounds as Bounds
+    expect(frame.x + frame.width).toBeLessThanOrEqual(1000)
+  })
+
+  it('still sizes a normal group frame for every member', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', width: 200, height: 150 })
+    wm.open({ id: 'b', minWidth: 300 })
+    wm.group(['a', 'b'])
+    expect(wm.get('a')?.bounds.width).toBe(300)
+  })
+
+  it('grouping onto a maximized window keeps it filling the viewport', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.maximize('a')
+    wm.open({ id: 'b', aspectRatio: 1 })
+    wm.group(['a', 'b'])
+    expect(wm.get('b')?.bounds).toEqual({ x: 0, y: 0, width: 1000, height: 800 })
+  })
+})
+
+describe('ungroup keeps the group together', () => {
+  it('keeps the remaining members contiguous when the detached member is not focused', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    wm.open({ id: 'd' })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    wm.minimize('a')
+    const orders: (readonly string[])[] = []
+    wm.on('order', ({ order }) => orders.push(order))
+    wm.ungroup('b')
+    const { order, groups } = wm.getState()
+    const slots = (groups[groupId]?.members ?? []).map((id) => order.indexOf(id))
+    expect(slots).toEqual([slots[0], (slots[0] as number) + 1])
+    expect(order.indexOf('b')).toBe((slots[1] as number) + 1)
+    expect(orders.at(-1)).toEqual(order)
+  })
+})
+
+describe('constraint updates on a snapped window', () => {
+  it('leaves a snapped group alone when a tab only changes its title', () => {
+    const wm = createWindowManager({ viewport: { width: 1280, height: 800 } })
+    wm.open({ id: 'video', aspectRatio: 16 / 9 })
+    wm.open({ id: 'notes' })
+    wm.group(['video', 'notes'])
+    wm.snap('video', 'left')
+    const frame = wm.get('video')?.bounds
+    const resized = vi.fn()
+    wm.on('resize', resized)
+    wm.update('notes', { title: 'notes — saved', meta: { saved: true } })
+    expect(wm.get('video')?.bounds).toEqual(frame)
+    expect(wm.get('notes')?.bounds).toEqual(frame)
+    expect(resized).not.toHaveBeenCalled()
+  })
+
+  it('re-derives the zone when a minimum size grows past it', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.snap('a', 'right')
+    wm.update('a', { minSize: { width: 700, height: 100 } })
+    const bounds = wm.get('a')?.bounds as Bounds
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(1000)
+    expect(bounds.width).toBe(700)
+    expect(wm.get('a')?.stage).toBe('snapped')
+  })
+
+  it('fills the zone again when a maximum size is cleared', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', maxWidth: 300, maxHeight: 200 })
+    wm.snap('a', 'left')
+    wm.update('a', { maxSize: null })
+    expect(wm.get('a')?.bounds).toEqual({ x: 0, y: 0, width: 500, height: 800 })
+  })
+})
+
+describe('group events on membership changes', () => {
+  it('fires when a member of a three-tab group closes', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    const groupId = wm.group(['a', 'b', 'c']) as string
+    wm.activateTab('a')
+    const events: unknown[] = []
+    wm.on('group', (payload) => events.push(payload))
+    wm.close('a')
+    expect(events).toEqual([{ groupId, members: ['b', 'c'], activeId: 'b', previous: 'a' }])
+  })
+
+  it('fires with no members when a group dissolves', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const groupId = wm.group(['a', 'b']) as string
+    const events: unknown[] = []
+    wm.on('group', (payload) => events.push(payload))
+    wm.ungroup('b')
+    expect(events).toEqual([{ groupId, members: [], activeId: '', previous: null }])
+    wm.group(['a', 'b'])
+    events.length = 0
+    wm.close('a')
+    expect(events).toEqual([
+      { groupId: expect.any(String), members: [], activeId: '', previous: null },
+    ])
+  })
+})
+
+describe('snapping to a rectangle', () => {
+  const RIGHT = { x: 0.5, y: 0, width: 0.5, height: 1 }
+
+  it('fills the rectangle in viewport fractions and follows the viewport', () => {
+    const wm = makeWm()
+    const win = wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.open({ id: 'b' })
+    expect(wm.snapTo('a', RIGHT)).toBe(true)
+    expect(wm.get('a')).toMatchObject({
+      stage: 'snapped',
+      snapZone: null,
+      snapRect: RIGHT,
+      restoreBounds: win.bounds,
+      bounds: { x: 500, y: 0, width: 500, height: 800 },
+    })
+    expect(wm.get('a')?.snapRect).not.toBe(RIGHT)
+    expect(wm.getState().focusedId).toBe('b')
+    expect(wm.getState().order).toEqual(['a', 'b'])
+    wm.setViewport({ width: 1201, height: 600 })
+    expect(wm.get('a')?.bounds).toEqual({ x: 601, y: 0, width: 600, height: 600 })
+    expect(wm.snap('a', 'left')).toBe(true)
+    expect(wm.get('a')).toMatchObject({
+      snapZone: 'left',
+      snapRect: null,
+      restoreBounds: win.bounds,
+    })
+  })
+
+  it('leaves the rectangle on restore, restoreTo and resize', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.snapTo('a', RIGHT)
+    wm.restore('a')
+    expect(wm.get('a')).toMatchObject({ stage: 'normal', snapRect: null })
+    wm.snapTo('a', RIGHT)
+    wm.restoreTo('a', { x: 10, y: 10, width: 200, height: 150 })
+    expect(wm.get('a')).toMatchObject({ stage: 'normal', snapRect: null })
+    wm.snapTo('a', RIGHT)
+    wm.resize('a', { width: 300 })
+    expect(wm.get('a')).toMatchObject({ stage: 'normal', snapRect: null })
+  })
+
+  it('comes back to the rectangle from maximized and from minimized', () => {
+    const wm = makeWm()
+    const win = wm.open({ id: 'a', x: 40, y: 40, width: 300, height: 200 })
+    wm.snapTo('a', RIGHT)
+    wm.maximize('a')
+    expect(wm.get('a')).toMatchObject({ stage: 'maximized', snapRect: RIGHT })
+    wm.restore('a')
+    expect(wm.get('a')).toMatchObject({
+      stage: 'snapped',
+      bounds: { x: 500, y: 0, width: 500, height: 800 },
+      restoreBounds: win.bounds,
+    })
+    wm.minimize('a')
+    wm.restore('a')
+    expect(wm.get('a')).toMatchObject({ stage: 'snapped', bounds: { x: 500, width: 500 } })
+    wm.restore('a')
+    expect(wm.get('a')).toMatchObject({ stage: 'normal', bounds: win.bounds })
+  })
+
+  it('re-derives the rectangle when the constraints change, and shares it with the group', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.snapTo('a', { x: 0, y: 0, width: 0.1, height: 1 })
+    expect(wm.get('a')?.bounds.width).toBe(160)
+    wm.update('a', { minSize: { width: 240, height: 100 } })
+    expect(wm.get('a')?.bounds.width).toBe(240)
+    wm.group(['a', 'b'])
+    expect(wm.get('b')).toMatchObject({ stage: 'snapped', snapRect: wm.get('a')?.snapRect })
+    wm.snapTo('a', RIGHT)
+    expect(wm.get('b')).toMatchObject({ snapRect: RIGHT, bounds: { x: 500, width: 500 } })
+  })
+
+  it('round trips through serialize and hydrate and drops a broken rectangle', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a' })
+    donor.snapTo('a', RIGHT)
+    const data = donor.serialize()
+    expect(rawWindow(data).snapRect).toEqual(RIGHT)
+    expect(rawWindow(data).snapRect).not.toBe(donor.get('a')?.snapRect)
+    const wm = makeWm({ viewport: { width: 600, height: 400 } })
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.get('a')).toMatchObject({ snapRect: RIGHT, bounds: { x: 300, width: 300 } })
+    rawWindow(data).snapRect = { x: 'left' }
+    wm.hydrate(data)
+    expect(wm.get('a')?.snapRect).toBeNull()
+  })
+
+  it('cannot snap a window that does not exist', () => {
+    expect(makeWm().snapTo('ghost', RIGHT)).toBe(false)
+  })
+})
+
+describe('extension state', () => {
+  it('stores plugin state, drops it on undefined and ignores the same value', () => {
+    const wm = makeWm()
+    const changes = vi.fn()
+    wm.subscribe(changes)
+    const tree = { root: null }
+    wm.setExtension('dock', tree)
+    expect(wm.getState().extensions).toEqual({ dock: tree })
+    expect(changes).toHaveBeenCalledTimes(1)
+    wm.setExtension('dock', tree)
+    expect(changes).toHaveBeenCalledTimes(1)
+    wm.setExtension('other', 1)
+    wm.setExtension('dock', undefined)
+    expect(wm.getState().extensions).toEqual({ other: 1 })
+    wm.setExtension('missing', undefined)
+    expect(changes).toHaveBeenCalledTimes(3)
+  })
+
+  it('is recorded in history, so a batch of plugin and window changes undoes in one step', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.batch(() => {
+      wm.setExtension('dock', { docked: ['a'] })
+      wm.snapTo('a', { x: 0, y: 0, width: 0.5, height: 1 })
+    })
+    expect(wm.undo()).toBe(true)
+    expect(wm.getState().extensions).toEqual({})
+    expect(wm.get('a')?.stage).toBe('normal')
+    expect(wm.redo()).toBe(true)
+    expect(wm.getState().extensions).toEqual({ dock: { docked: ['a'] } })
+    expect(wm.get('a')?.stage).toBe('snapped')
+  })
+
+  it('round trips through serialize and hydrate, and reads a missing or broken field as empty', () => {
+    const donor = makeWm()
+    donor.setExtension('dock', { root: 'x' })
+    const data = donor.serialize()
+    expect(data.extensions).toEqual({ dock: { root: 'x' } })
+    expect(data.extensions).not.toBe(donor.getState().extensions)
+    const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.getState().extensions).toEqual({ dock: { root: 'x' } })
+    for (const broken of [undefined, null, ['dock'], 'dock']) {
+      expect(wm.hydrate({ ...data, extensions: broken } as unknown as SerializedState)).toBe(true)
+      expect(wm.getState().extensions).toEqual({})
+    }
   })
 })

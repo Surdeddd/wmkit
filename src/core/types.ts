@@ -46,6 +46,7 @@ export interface WindowState extends WindowFlags {
   restoreStage: WindowStage | null
   stage: WindowStage
   snapZone: SnapZone | null
+  snapRect: Bounds | null
   layer: WindowLayer
   workspace: number
   groupId: string | null
@@ -80,6 +81,7 @@ export interface HistoryEntry {
   focusedId: string | null
   workspace: number
   activeTabs: Readonly<Record<string, string>>
+  extensions: Readonly<Record<string, unknown>>
 }
 
 export interface WindowGroup {
@@ -95,6 +97,7 @@ export interface ManagerState {
   viewport: Size
   workspace: number
   groups: Readonly<Record<string, WindowGroup>>
+  extensions: Readonly<Record<string, unknown>>
 }
 
 export interface SerializedMaxSize {
@@ -113,6 +116,7 @@ export interface SerializedState {
   focusedId: string | null
   workspace: number
   activeTabs: Record<string, string>
+  extensions?: Record<string, unknown>
 }
 
 export interface ManagerEvents {
@@ -170,6 +174,7 @@ export interface WindowManager {
   restore(id: string): boolean
   restoreTo(id: string, bounds: Bounds): boolean
   snap(id: string, zone: SnapZone): boolean
+  snapTo(id: string, rect: Bounds): boolean
   move(id: string, x: number, y: number): boolean
   moveBy(id: string, dx: number, dy: number): boolean
   center(id: string): boolean
@@ -190,6 +195,7 @@ export interface WindowManager {
   cycleTab(direction?: 1 | -1): string | null
   groupMembers(groupId: string): readonly WindowState[]
   batch(run: () => void): void
+  setExtension(key: string, value: unknown): void
   serialize(): SerializedState
   hydrate(data: SerializedState): boolean
   undo(): boolean
