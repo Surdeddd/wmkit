@@ -67,10 +67,9 @@ function App() {
         <span data-testid="window-count">{state.order.length}</span>
       </div>
       <div ref={ref} style={{ flex: 1, minHeight: 0 }}>
-        {state.order.map((id) => {
-          const win = state.windows[id]
-          return win ? <Win key={id} binder={binder} win={win} /> : null
-        })}
+        {Object.values(state.windows).map((win) => (
+          <Win key={win.id} binder={binder} win={win} />
+        ))}
       </div>
       <Taskbar wm={wm} />
     </div>

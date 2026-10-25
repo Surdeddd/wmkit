@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 import { boxOf } from './utils'
 
 const readme = '[data-testid="window-readme"]'

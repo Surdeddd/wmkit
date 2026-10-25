@@ -6,6 +6,7 @@ import {
 } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
 import { persist } from '@surdeddd/wmkit/persist'
+import { popout } from '@surdeddd/wmkit/popout'
 import '@surdeddd/wmkit/themes/glass.css'
 
 function must<T>(value: T | null): T {
@@ -184,7 +185,11 @@ declare global {
   interface Window {
     __wm: typeof wm
     __spawn: typeof spawn
+    __desktop: typeof desktop
+    __popout: typeof popout
   }
 }
 window.__wm = wm
 window.__spawn = spawn
+window.__desktop = desktop
+window.__popout = popout

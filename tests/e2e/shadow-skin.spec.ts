@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 import { openVanilla } from './utils'
 
 const HOST = '[data-wm-window="shadow"]'
@@ -114,7 +114,7 @@ test.describe('a window whose chrome lives in a shadow root', () => {
 
     const target = await centreOf(page, '[data-wm-drag]')
     const from = await page.evaluate((id) => {
-      const bar = document.querySelector('[data-wm-window="' + id + '"] [data-wm-drag]')
+      const bar = document.querySelector(`[data-wm-window="${id}"] [data-wm-drag]`)
       if (!bar) return null
       const box = bar.getBoundingClientRect()
       return { x: box.x + box.width / 2, y: box.y + box.height / 2 }

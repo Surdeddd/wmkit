@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { boxOf, openVanilla, spawn, win } from './utils'
 
 test.beforeEach(async ({ page }) => {
@@ -86,11 +86,24 @@ test('modal blocks focus on background windows and flashes', async ({ page }) =>
   const doc = win(page, 't1')
   const modal = win(page, 'modal2')
   await expect(modal).toHaveAttribute('aria-modal', 'true')
+  await modal.evaluate((el) => {
+    const seen = { flashed: false }
+    Object.assign(window, { flashSeen: seen })
+    new MutationObserver(() => {
+      if (el.hasAttribute('data-wm-flash')) seen.flashed = true
+    }).observe(el, { attributes: true, attributeFilter: ['data-wm-flash'] })
+  })
 
   await doc.locator('[data-wm-content]').click({ position: { x: 10, y: 10 } })
   await expect(modal).toHaveAttribute('data-wm-focused', '')
   await expect(doc).not.toHaveAttribute('data-wm-focused', '')
-  await expect(modal).toHaveAttribute('data-wm-flash', '')
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { flashSeen: { flashed: boolean } }).flashSeen.flashed,
+      ),
+    )
+    .toBe(true)
 
   await modal.locator('[data-wm-close]').click()
   await doc.locator('[data-wm-content]').click({ position: { x: 10, y: 10 } })

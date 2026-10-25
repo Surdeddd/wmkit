@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 
 const SIZES = [
   { name: 'phone', width: 390, height: 844 },
@@ -38,21 +38,31 @@ async function boxes(page: Page) {
   })
 }
 
+async function expectHeroClear(page: Page, name: string): Promise<void> {
+  const found = await boxes(page)
+  expect(found.windows.length).toBeGreaterThan(0)
+  for (const key of ['wordmark', 'lede', 'actions'] as const) {
+    const copy = found[key]
+    expect(copy, `${key} missing`).not.toBeNull()
+    for (const win of found.windows) {
+      expect(overlap(copy as Box, win), `${key} covered on ${name}`).toBe(0)
+    }
+  }
+}
+
+function later(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+const FONT_CSS = 'https://fonts.googleapis.com/**'
+const FONT_FILES = 'https://fonts.gstatic.com/**'
+
 for (const size of SIZES) {
   test(`the hero stays clear of the demo windows on ${size.name}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height })
     await page.goto('?lang=en')
     await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
-
-    const found = await boxes(page)
-    expect(found.windows.length).toBeGreaterThan(0)
-    for (const key of ['wordmark', 'lede', 'actions'] as const) {
-      const copy = found[key]
-      expect(copy, `${key} missing`).not.toBeNull()
-      for (const win of found.windows) {
-        expect(overlap(copy as Box, win), `${key} covered on ${size.name}`).toBe(0)
-      }
-    }
+    await expectHeroClear(page, size.name)
   })
 
   test(`the boot windows do not pile up on ${size.name}`, async ({ page }) => {
@@ -102,4 +112,44 @@ test('the boot overlay leaves no ghost behind the windows', async ({ page }) => 
   expect(boot.done).toBe('')
   expect(boot.opacity).toBe('0')
   expect(boot.visibility).toBe('hidden')
+})
+
+for (const size of SIZES.filter((entry) => entry.width < 1100)) {
+  test(`the hero stays clear when the page styles arrive late on ${size.name}`, async ({
+    page,
+  }) => {
+    await page.route('**/assets/main-*.css', async (route) => {
+      await later(2500)
+      await route.continue()
+    })
+    await page.setViewportSize({ width: size.width, height: size.height })
+    await page.goto('?lang=en')
+    await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+    await expectHeroClear(page, size.name)
+  })
+
+  test(`the hero stays clear when the font stylesheet is slow on ${size.name}`, async ({
+    page,
+  }) => {
+    await page.route(FONT_CSS, async (route) => {
+      await later(3000)
+      await route.fulfill({ status: 200, contentType: 'text/css', body: '' })
+    })
+    await page.route(FONT_FILES, (route) => route.abort())
+    await page.setViewportSize({ width: size.width, height: size.height })
+    await page.goto('?lang=en')
+    await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+    await expectHeroClear(page, size.name)
+  })
+}
+
+test('the desktop does not wait for the web fonts', async ({ page }) => {
+  await page.route(FONT_CSS, async (route) => {
+    await later(15_000)
+    await route.fulfill({ status: 200, contentType: 'text/css', body: '' }).catch(() => {})
+  })
+  await page.goto('?lang=en', { waitUntil: 'commit' })
+  await expect(page.locator('[data-testid="window-readme"]')).toBeVisible({ timeout: 5000 })
+  await expectHeroClear(page, 'the default viewport')
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
 })

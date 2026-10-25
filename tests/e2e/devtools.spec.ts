@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 const panel = '[data-wm-devtools]'
 const rows = `${panel} [data-wm-devtools-row]`

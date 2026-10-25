@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 
 const readme = '[data-testid="window-readme"]'
 const CONTROLS = ['[data-wm-close]', '[data-wm-minimize]', '[data-wm-maximize]'] as const

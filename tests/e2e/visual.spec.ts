@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { desktopBox, dragTo, handle, openVanilla, settle, spawn, win } from './utils'
 
 test.describe('visual regression', () => {

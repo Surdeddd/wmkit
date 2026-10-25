@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { boxOf, openVanilla, spawn, win } from './utils'
 
 test.beforeEach(async ({ page }) => {

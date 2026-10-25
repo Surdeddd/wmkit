@@ -1,5 +1,5 @@
 import type { CDPSession, Page } from '@playwright/test'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 const readme = '[data-testid="window-readme"]'
 

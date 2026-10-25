@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wmkit web components page</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #101218;
+        font-family: system-ui, sans-serif;
+      }
+      wm-desktop {
+        display: block;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <wm-desktop>
+      <wm-window window-id="notes" label="Notes" x="20" y="20" width="260" height="180">
+        <textarea id="notes-field">hello</textarea>
+      </wm-window>
+      <wm-window window-id="chart" label="Chart" x="300" y="40" width="260" height="180">
+        <button slot="actions" id="refresh" type="button">↻</button>
+        <p id="chart-body">chart</p>
+      </wm-window>
+      <wm-window window-id="later" label="Later" closed x="40" y="240" width="220" height="140">
+        <p>opened later</p>
+      </wm-window>
+    </wm-desktop>
+    <script type="module" src="./elements.ts"></script>
+  </body>
+</html>

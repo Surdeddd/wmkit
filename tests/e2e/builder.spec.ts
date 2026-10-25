@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 
 const PREVIEW = '.builder-stage [data-wm-window="preview"]'
 const MARKUP = '.builder-editor:not(.builder-css)'
@@ -121,5 +121,70 @@ test.describe('the window designer', () => {
     await expect(win).toBeVisible()
     await expect(win).toHaveAttribute('data-wm-skin', 'custom')
     await expect(win).toHaveAttribute('data-wm-focused', '')
+  })
+})
+
+test.describe('the designer and the desktop keep their own styles', () => {
+  const MAC_BG = 'rgb(245, 245, 247)'
+
+  function backgroundOf(page: Page, selector: string) {
+    return page.evaluate((target) => {
+      const el = document.querySelector(target)
+      return el ? getComputedStyle(el).backgroundColor : ''
+    }, selector)
+  }
+
+  test('editing the designer leaves the windows already sent alone', async ({ page }) => {
+    await openBuilder(page)
+    await page.locator('.builder-actions .btn-primary').click()
+    await expect(page.locator('[data-wm-window="skins"]')).toHaveAttribute('data-wm-skin', 'custom')
+    await expect.poll(() => backgroundOf(page, '[data-wm-window="skins"]')).toBe(MAC_BG)
+
+    await page.locator('.builder-chip[data-preset="win95"]').click()
+    await expect.poll(() => previewBg(page)).toBe('rgb(192, 192, 192)')
+    expect(await backgroundOf(page, '[data-wm-window="skins"]')).toBe(MAC_BG)
+  })
+
+  test('applying a skin on the desktop leaves the designer dressed', async ({ page }) => {
+    await openBuilder(page)
+    await expect.poll(() => previewBg(page)).toBe(MAC_BG)
+    await page.locator('.builder-actions .btn-primary').click()
+    await page.locator('[data-wm-window="skins"] .skin-action', { hasText: 'apply' }).click()
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+    expect(await previewBg(page)).toBe(MAC_BG)
+  })
+
+  test('the site theme sent with a shadow root keeps its theme', async ({ page }) => {
+    await openBuilder(page)
+    await page.locator('.builder-chip[data-preset="theme"]').click()
+    await page.locator('.builder-toggle input').check()
+    await page.locator('.builder-actions .btn-primary').click()
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const root = document.querySelector('[data-wm-window="skins"]')?.shadowRoot
+          if (!root) return -1
+          const adopted = root.adoptedStyleSheets.reduce((n, sheet) => n + sheet.cssRules.length, 0)
+          const inline = [...root.querySelectorAll('style')].filter(
+            (tag) => tag.sheet?.cssRules.length,
+          )
+          return adopted + inline.length
+        }),
+      )
+      .toBeGreaterThan(0)
+  })
+
+  test('the copied snippet styles the skin it declares', async ({ page, context, browserName }) => {
+    test.skip(browserName !== 'chromium', 'clipboard permissions are chromium-only here')
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await openBuilder(page)
+    await page.locator('.builder-actions .btn:not(.btn-primary)').click()
+    await expect(page.locator('.builder-status')).toHaveText(/copied|скопировано/)
+
+    const code = await page.evaluate(() => navigator.clipboard.readText())
+    const declared = /name: '([^']+)'/.exec(code)?.[1]
+    const targeted = new Set([...code.matchAll(/\[data-wm-skin="([^"]+)"\]/g)].map((m) => m[1]))
+    expect(declared).toBeDefined()
+    expect(targeted).toEqual(new Set([declared]))
   })
 })

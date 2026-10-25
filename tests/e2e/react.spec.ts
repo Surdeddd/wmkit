@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { boxOf, dragBy } from './utils'
 
 test.beforeEach(async ({ page }) => {
@@ -38,4 +38,13 @@ test('react windows minimize into the taskbar and close cleanly', async ({ page 
   await window.locator('[data-wm-close]').click()
   await expect(window).toHaveCount(0)
   await expect(page.getByTestId('window-count')).toHaveText('0')
+})
+
+test('a control click on a back window lands although the press raises it', async ({ page }) => {
+  await page.click('#btn-open')
+  await page.click('#btn-open')
+  const back = page.getByTestId('window-r1')
+  await back.locator('[data-wm-minimize]').click()
+  await expect(back).toBeHidden()
+  await expect(back).toHaveAttribute('data-wm-stage', 'minimized')
 })
