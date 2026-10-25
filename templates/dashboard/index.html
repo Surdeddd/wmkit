@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wmkit dashboard</title>
+  </head>
+  <body>
+    <header class="bar">
+      <strong class="brand" data-text="title">Operations</strong>
+      <label class="field">
+        <span data-text="theme">Theme</span>
+        <select id="theme">
+          <option value="glass">glass</option>
+          <option value="light">light</option>
+          <option value="carbon">carbon</option>
+          <option value="retro">retro</option>
+        </select>
+      </label>
+      <button id="reset" type="button" data-text="reset">Reset layout</button>
+      <button id="lang" type="button">RU</button>
+      <span class="hint" data-text="hint">Drag a title to move a panel, hold Shift to float it.</span>
+    </header>
+    <wm-desktop persist="wmkit-dashboard" class="desk">
+      <wm-window window-id="kpis" label="Key figures">
+        <div class="kpis" id="kpi-list"></div>
+      </wm-window>
+      <wm-window window-id="chart" label="Revenue">
+        <svg id="chart" viewBox="0 0 400 160" preserveAspectRatio="none" role="img">
+          <title>Revenue</title>
+        </svg>
+      </wm-window>
+      <wm-window window-id="orders" label="Orders">
+        <table class="orders">
+          <thead><tr id="order-head"></tr></thead>
+          <tbody id="order-rows"></tbody>
+        </table>
+      </wm-window>
+      <wm-window window-id="log" label="Live log">
+        <ol class="log" id="log" aria-live="off"></ol>
+      </wm-window>
+    </wm-desktop>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
