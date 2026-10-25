@@ -31,20 +31,29 @@ function desktop(count: number): { wm: WindowManager; destroy: () => void } {
   }
 }
 
+const desktops = new Map<number, ReturnType<typeof desktop>>()
+
+function shared(count: number): ReturnType<typeof desktop> {
+  let entry = desktops.get(count)
+  if (!entry) {
+    entry = desktop(count)
+    desktops.set(count, entry)
+  }
+  return entry
+}
+
 describe('desktop sync', () => {
   for (const count of [50, 200, 800]) {
     bench(`move one window 200 times among ${count} attached`, () => {
-      const { wm, destroy } = desktop(count)
+      const { wm } = shared(count)
       for (let i = 0; i < 200; i += 1) wm.move('w7', 100 + (i % 300), 100 + (i % 200))
-      destroy()
     })
   }
 
   for (const count of [50, 200, 800]) {
     bench(`focus 200 different windows among ${count} attached`, () => {
-      const { wm, destroy } = desktop(count)
+      const { wm } = shared(count)
       for (let i = 0; i < 200; i += 1) wm.focus(`w${i % count}`)
-      destroy()
     })
   }
 })

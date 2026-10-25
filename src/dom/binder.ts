@@ -14,19 +14,17 @@ interface PendingWindow {
   id: string
   element: HTMLElement
   options: WindowAttachOptions | undefined
-  detach: (() => void) | null
+  detach?: (() => void) | null
 }
 
-export function createDesktopBinder(
-  wm: WindowManager,
-  options: DesktopOptions = {},
-): DesktopBinder {
+export function createDesktopBinder(wm: WindowManager, options?: DesktopOptions): DesktopBinder {
   let controller: DesktopController | null = null
   let stops: Array<() => void> = []
   const entries = new Set<PendingWindow>()
 
   function attachEntry(entry: PendingWindow): void {
     if (controller && !entry.detach && wm.get(entry.id)) {
+      if (!entry.element.parentNode) controller.element.append(entry.element)
       entry.detach = controller.attachWindow(entry.id, entry.element, entry.options)
     }
   }
@@ -48,7 +46,7 @@ export function createDesktopBinder(
       stops.push(
         wm.on('open', ({ window: win }) => {
           for (const entry of entries) {
-            if (entry.id === win.id) attachEntry(entry)
+            if (entry.id === win.id) return attachEntry(entry)
           }
         }),
         wm.on('close', ({ window: win }) => {
@@ -61,12 +59,11 @@ export function createDesktopBinder(
       return unbindDesktop
     },
     bindWindow(id, element, windowOptions) {
-      const entry: PendingWindow = { id, element, options: windowOptions, detach: null }
-      entries.add(entry)
+      const entry: PendingWindow = { id, element, options: windowOptions }
       attachEntry(entry)
+      entries.add(entry)
       return () => {
         entry.detach?.()
-        entry.detach = null
         entries.delete(entry)
       }
     },

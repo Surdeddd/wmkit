@@ -1,6 +1,6 @@
 import { clamp, detectSnapZone, magnetize, zoneBounds } from '../core/geometry'
 import type { Bounds, SnapZone, WindowStage } from '../core/types'
-import type { ActiveDrag, SessionContext } from './shared'
+import type { ActiveDrag, DropHit, SessionContext } from './shared'
 
 interface DragSession extends ActiveDrag {
   pointerId: number
@@ -10,11 +10,13 @@ interface DragSession extends ActiveDrag {
   startBounds: Bounds
   startStage: WindowStage
   startZone: SnapZone | null
+  startRect: Bounds | null
   startRestoreBounds: Bounds | null
   restored: boolean
   moved: boolean
   zone: SnapZone | 'maximize' | null
   groupTarget: string | null
+  drop: DropHit | null
   hoverId: string | null
   hoverTimer: number
   clientX: number
@@ -31,9 +33,14 @@ export function createDragStarter(ctx: SessionContext) {
   return function startDrag(id: string, handle: HTMLElement, event: PointerEvent): void {
     const win = wm.get(id)
     if (!win?.draggable || event.button !== 0 || ctx.currentDrag()) return
-    const target = event.target as Element | null
-    if (target?.closest(ctx.interactiveSelector)) return
+    const target = (event.composedPath()[0] ?? event.target) as Element | null
+    if (target?.closest?.(ctx.interactiveSelector)) return
     event.preventDefault()
+    try {
+      handle.setPointerCapture(event.pointerId)
+    } catch {
+      return
+    }
 
     const releaseRect = ctx.trackRect()
     const point = ctx.toLocal(event)
@@ -47,11 +54,13 @@ export function createDragStarter(ctx: SessionContext) {
       startBounds,
       startStage: win.stage,
       startZone: win.snapZone,
+      startRect: win.snapRect,
       startRestoreBounds: win.restoreBounds,
       restored: win.stage === 'normal',
       moved: false,
       zone: null,
       groupTarget: null,
+      drop: null,
       hoverId: null,
       hoverTimer: 0,
       clientX: event.clientX,
@@ -130,6 +139,17 @@ export function createDragStarter(ctx: SessionContext) {
         nextY = magnet.y
       }
       wm.move(id, nextX, nextY)
+
+      const drop = ctx.dropAt(session.clientX, session.clientY, id)
+      if (session.drop && !drop) ctx.hidePreview()
+      session.drop = drop
+      if (drop) {
+        session.hoverId = null
+        session.zone = null
+        clearHover()
+        ctx.showPreview(drop.preview, true)
+        return
+      }
 
       const candidate = ctx.groupTarget(session.clientX, session.clientY, id)
       if (candidate !== session.hoverId) {
@@ -216,13 +236,19 @@ export function createDragStarter(ctx: SessionContext) {
             if (session.startStage === 'maximized') {
               wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
               wm.maximize(id)
-            } else if (session.startStage === 'snapped' && session.startZone) {
+            } else if (
+              session.startStage === 'snapped' &&
+              (session.startRect || session.startZone)
+            ) {
               wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
-              wm.snap(id, session.startZone)
+              if (session.startRect) wm.snapTo(id, session.startRect)
+              else wm.snap(id, session.startZone as SnapZone)
             } else {
               wm.move(id, session.startBounds.x, session.startBounds.y)
             }
           }
+        } else if (session.moved && session.drop) {
+          session.drop.commit()
         } else if (session.moved && session.groupTarget) {
           if (wm.group([session.groupTarget, id])) wm.activateTab(id)
         } else if (session.moved && session.zone) {
@@ -235,6 +261,7 @@ export function createDragStarter(ctx: SessionContext) {
         handle.removeEventListener('pointermove', onMove)
         handle.removeEventListener('pointerup', onUp)
         handle.removeEventListener('pointercancel', onCancel)
+        handle.removeEventListener('lostpointercapture', onCancel)
         doc.removeEventListener('keydown', onKeydown, true)
         if (handle.hasPointerCapture(session.pointerId)) {
           handle.releasePointerCapture(session.pointerId)
@@ -253,10 +280,10 @@ export function createDragStarter(ctx: SessionContext) {
 
     wm.beginInteraction()
     ctx.claimDrag(session)
-    handle.setPointerCapture(event.pointerId)
     handle.addEventListener('pointermove', onMove)
     handle.addEventListener('pointerup', onUp)
     handle.addEventListener('pointercancel', onCancel)
+    handle.addEventListener('lostpointercapture', onCancel)
     doc.addEventListener('keydown', onKeydown, true)
   }
 }

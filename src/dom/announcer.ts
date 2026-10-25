@@ -46,7 +46,7 @@ export function createAnnouncer(
   let detailed = false
 
   function announce(message: string): void {
-    element.textContent = message
+    element.textContent = element.textContent === message ? `${message}\u00a0` : message
     if (clearTimer !== undefined) clearTimeout(clearTimer)
     clearTimer = setTimeout(() => {
       element.textContent = ''

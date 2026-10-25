@@ -11,6 +11,7 @@ import {
   type DesktopKeyboardOptions,
   type DesktopOptions,
   type DesktopSnapOptions,
+  type DropTarget,
   type GestureContext,
   INTERACTIVE_SELECTOR,
   type MountedWindow,
@@ -23,14 +24,20 @@ import {
 } from './shared'
 import { restack, type StackingTarget, UNASSIGNED } from './stacking'
 
+interface MountSlot {
+  mount: SkinMount
+  done: boolean
+}
+
 interface AttachedWindow {
   element: HTMLElement
   handle: HTMLElement | null
   title: HTMLElement | null
   skin: string | null
-  mount: SkinMount | null
+  slot: MountSlot | null
   mountOptions: WindowAttachOptions
   release: (() => void) | null
+  last: HTMLElement | null
   handles: HTMLElement[]
   lastState: WindowState | null
   lastZ: number
@@ -61,7 +68,46 @@ const SNAP_ZONES = new Set<string>([
 const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 
 const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable]:not([contenteditable=false]), iframe, summary, [controls]'
+
+const FRAMES = 'iframe, object, embed'
+
+let titleSeq = 0
+
+function setData(el: HTMLElement, key: string, value: string | null): void {
+  if (value === null) {
+    if (key in el.dataset) delete el.dataset[key]
+  } else if (el.dataset[key] !== value) {
+    el.dataset[key] = value
+  }
+}
+
+function setAttr(el: HTMLElement, name: string, value: string | null): void {
+  if (value === null) el.removeAttribute(name)
+  else if (el.getAttribute(name) !== value) el.setAttribute(name, value)
+}
+
+function setText(el: HTMLElement, text: string): void {
+  if (el.textContent === text) return
+  if (el.firstElementChild) {
+    el.textContent = text
+    return
+  }
+  let first: Text | null = null
+  for (const node of el.childNodes) {
+    if (node.nodeType !== Node.TEXT_NODE) continue
+    if (first) (node as Text).data = ''
+    else first = node as Text
+  }
+  if (first) first.data = text
+  else el.append(text)
+}
+
+function retire(slot: MountSlot): void {
+  if (slot.done) return
+  slot.done = true
+  slot.mount.destroy?.()
+}
 
 function firedOn(event: Event): Element | null {
   const path = event.composedPath()
@@ -99,8 +145,6 @@ function dragHandleAt(node: Element, clientX: number, clientY: number): Element 
   if (handle) return handle
   const root = node.shadowRoot
   if (!root) return null
-  // elementFromPoint on a shadow root is not portable: Chromium and WebKit hand back
-  // the topmost element even when it belongs to another tree, so ask geometry instead
   for (const candidate of root.querySelectorAll('[data-wm-drag]')) {
     const box = candidate.getBoundingClientRect()
     if (
@@ -194,8 +238,9 @@ export function attachDesktop(
   }
 
   let preview: HTMLElement | null = null
-  function showPreview(bounds: Bounds): void {
-    if (!snapPreviewEnabled) return
+  const dropTargets = new Set<DropTarget>()
+  function showPreview(bounds: Bounds, drop = false): void {
+    if (!snapPreviewEnabled && !drop) return
     if (!preview) {
       preview = doc.createElement('div')
       preview.dataset.wmSnapPreview = ''
@@ -204,6 +249,7 @@ export function attachDesktop(
       element.append(preview)
     }
     preview.style.display = 'block'
+    preview.toggleAttribute('data-wm-drop', drop)
     preview.style.transform = `translate3d(${bounds.x}px, ${bounds.y}px, 0)`
     preview.style.width = `${bounds.width}px`
     preview.style.height = `${bounds.height}px`
@@ -262,10 +308,18 @@ export function attachDesktop(
     groupTarget(clientX, clientY, selfId) {
       if (!groupingEnabled || typeof doc.elementsFromPoint !== 'function') return null
       for (const node of doc.elementsFromPoint(clientX, clientY)) {
-        const handle = dragHandleAt(node, clientX, clientY)
-        const host = handle && windowElementOf(handle)
+        const host = windowElementOf(node)
         const id = host?.dataset.wmWindow
-        if (id && id !== selfId && registry.get(id)?.element === host) return id
+        if (!id || id === selfId || registry.get(id)?.element !== host) continue
+        const handle = dragHandleAt(node, clientX, clientY)
+        return handle && windowElementOf(handle) === host ? id : null
+      }
+      return null
+    },
+    dropAt(clientX, clientY, id) {
+      for (const hit of dropTargets) {
+        const found = hit(clientX, clientY, id)
+        if (found) return found
       }
       return null
     },
@@ -312,6 +366,21 @@ export function attachDesktop(
     cleanup.push(() => observer.disconnect())
   }
 
+  function rescue(el: HTMLElement): void {
+    if (el.contains(doc.activeElement)) element.focus({ preventScroll: true })
+  }
+
+  function pull(attached: AttachedWindow): void {
+    const el = attached.element
+    if (el.contains(doc.activeElement)) return
+    const last = attached.last
+    if (last?.isConnected && windowElementOf(last) === el) last.focus({ preventScroll: true })
+    if (!el.contains(doc.activeElement)) el.focus({ preventScroll: true })
+  }
+
+  const modalUp = () =>
+    [...registry.values()].some(({ element: el }) => el.dataset.wmLayer === 'modal' && !el.hidden)
+
   function syncWindow(
     attached: AttachedWindow,
     win: WindowState,
@@ -319,56 +388,49 @@ export function attachDesktop(
     activeTab: boolean,
   ): void {
     const el = attached.element
-    const firstSync = attached.lastState === null
-    if (firstSync) el.style.transition = 'none'
+    const prev = attached.lastState
+    const transition = prev ? null : el.style.transition
+    if (transition !== null) el.style.transition = 'none'
     if (
-      attached.lastState !== win ||
+      prev !== win ||
       attached.lastWorkspace !== activeWorkspace ||
       attached.lastTab !== activeTab
     ) {
-      el.style.transform = `translate3d(${win.bounds.x}px, ${win.bounds.y}px, 0)`
-      el.style.width = `${win.bounds.width}px`
-      el.style.height = `${win.bounds.height}px`
-      el.dataset.wmStage = win.stage
-      el.dataset.wmLayer = win.layer
-      el.dataset.wmWorkspace = String(win.workspace)
-      const variant = windowVariant(win)
-      if (variant === null) delete el.dataset.wmVariant
-      else el.dataset.wmVariant = variant
-      if (win.groupId === null) {
-        delete el.dataset.wmGroup
-        delete el.dataset.wmTab
-      } else {
-        el.dataset.wmGroup = win.groupId
-        el.dataset.wmTab = activeTab ? 'active' : 'inactive'
+      const b = win.bounds
+      if (prev === null || prev.bounds.x !== b.x || prev.bounds.y !== b.y) {
+        el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`
       }
+      if (prev === null || prev.bounds.width !== b.width) el.style.width = `${b.width}px`
+      if (prev === null || prev.bounds.height !== b.height) el.style.height = `${b.height}px`
+      setData(el, 'wmStage', win.stage)
+      setData(el, 'wmLayer', win.layer)
+      setData(el, 'wmWorkspace', String(win.workspace))
+      setData(el, 'wmVariant', windowVariant(win))
+      setData(el, 'wmGroup', win.groupId)
+      setData(el, 'wmTab', win.groupId === null ? null : activeTab ? 'active' : 'inactive')
       const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace || !activeTab
-      if (hide && !el.hidden && el.contains(doc.activeElement)) {
-        element.focus({ preventScroll: true })
-      }
+      if (hide && !el.hidden) rescue(el)
       if (!hide && el.hidden && wm.getState().focusedId === win.id) {
         queueMicrotask(() => {
-          if (!el.hidden && !el.contains(doc.activeElement)) el.focus({ preventScroll: true })
+          if (!el.hidden) pull(attached)
         })
       }
-      el.hidden = hide
-      el.setAttribute('aria-label', win.title)
-      if (attached.title && attached.title.textContent !== win.title) {
-        attached.title.textContent = win.title
-      }
-      if (win.layer === 'modal') el.setAttribute('aria-modal', 'true')
-      else el.removeAttribute('aria-modal')
+      if (el.hidden !== hide) el.hidden = hide
+      setAttr(el, 'aria-label', win.title)
+      if (attached.title) setText(attached.title, win.title)
+      setAttr(el, 'aria-modal', win.layer === 'modal' ? 'true' : null)
+      const display =
+        win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
       for (const handle of attached.handles) {
-        handle.style.display =
-          win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
+        if (handle.style.display !== display) handle.style.display = display
       }
       attached.lastState = win
       attached.lastWorkspace = activeWorkspace
       attached.lastTab = activeTab
     }
-    if (firstSync) {
+    if (transition !== null) {
       void el.offsetWidth
-      el.style.transition = ''
+      el.style.transition = transition
     }
   }
 
@@ -396,6 +458,7 @@ export function attachDesktop(
 
   let syncing = false
   let syncAgain = false
+  let shielded = false
 
   function syncAll(): void {
     if (syncing) {
@@ -417,17 +480,30 @@ export function attachDesktop(
     const state = wm.getState()
     const orderChanged = state.order !== lastOrder
     let restyle: Array<[string, string]> | null = null
+    let modal = false
     for (const id of state.order) {
       const attached = registry.get(id)
       const win = state.windows[id]
       if (!attached || !win) continue
       const wanted = typeof win.meta.skin === 'string' ? win.meta.skin : null
-      if (attached.skin !== null && wanted !== null && wanted !== attached.skin) {
+      if (
+        attached.skin !== null &&
+        wanted !== null &&
+        wanted !== attached.skin &&
+        wanted !== attached.lastState?.meta.skin
+      ) {
         restyle = restyle ?? []
         restyle.push([id, wanted])
-        continue
       }
       const activeTab = win.groupId === null || state.groups[win.groupId]?.activeId === win.id
+      if (
+        win.layer === 'modal' &&
+        activeTab &&
+        win.stage !== 'minimized' &&
+        win.workspace === state.workspace
+      ) {
+        modal = true
+      }
       if (
         attached.lastState !== win ||
         attached.lastWorkspace !== state.workspace ||
@@ -445,6 +521,15 @@ export function attachDesktop(
       return
     }
     if (orderChanged) applyStacking(state.order)
+    if (modal !== shielded) {
+      shielded = modal
+      for (const { element: el } of registry.values()) {
+        if (el.dataset.wmLayer === 'modal') continue
+        for (const frame of el.querySelectorAll<HTMLElement>(FRAMES)) {
+          frame.style.pointerEvents = modal ? 'none' : ''
+        }
+      }
+    }
     const wanted = state.focusedId ? (registry.get(state.focusedId)?.element ?? null) : null
     if (wanted !== focusedEl) {
       if (focusedEl) delete focusedEl.dataset.wmFocused
@@ -461,11 +546,40 @@ export function attachDesktop(
       const attached = registry.get(win.id)
       if (!attached) return
       if (attached.element.hidden) syncAll()
-      if (!attached.element.contains(doc.activeElement)) {
-        attached.element.focus({ preventScroll: true })
-      }
+      pull(attached)
     }),
   )
+
+  function followFrame(): void {
+    const active = doc.activeElement
+    const host = active?.matches(FRAMES) ? windowElementOf(active) : null
+    const id = host?.dataset.wmWindow
+    if (id && registry.get(id)?.element === host && wm.getState().focusedId !== id && !shielded) {
+      wm.focus(id)
+    }
+  }
+  let frameWatch = 0
+  const watchFrame = () => {
+    followFrame()
+    frameWatch = view.requestAnimationFrame(watchFrame)
+  }
+  const onPointerOver = (event: Event) => {
+    const over = !!firedOn(event)?.matches(FRAMES)
+    if (over && !frameWatch) frameWatch = view.requestAnimationFrame(watchFrame)
+    else if (!over && frameWatch) {
+      view.cancelAnimationFrame(frameWatch)
+      frameWatch = 0
+      followFrame()
+    }
+  }
+  const onViewBlur = () => view.setTimeout(followFrame)
+  element.addEventListener('pointerover', onPointerOver)
+  view.addEventListener('blur', onViewBlur)
+  cleanup.push(() => {
+    element.removeEventListener('pointerover', onPointerOver)
+    view.removeEventListener('blur', onViewBlur)
+    view.cancelAnimationFrame(frameWatch)
+  })
 
   cleanup.push(
     wm.on('modalblocked', ({ window: win }) => {
@@ -507,7 +621,7 @@ export function attachDesktop(
       if (drag) return
       const target = firedOn(event)
       if (target?.closest(interactiveSelector)) return
-      if (historyShortcuts && (event.key === 'z' || event.key === 'Z')) {
+      if (historyShortcuts && (event.key === 'z' || event.key === 'Z' || event.keyCode === 90)) {
         event.preventDefault()
         if (event.shiftKey) wm.redo()
         else wm.undo()
@@ -557,9 +671,10 @@ export function attachDesktop(
       handle: null,
       title: null,
       skin: null,
-      mount: null,
+      slot: null,
       mountOptions: windowOptions,
       release: null,
+      last: null,
       handles: [],
       lastState: null,
       lastZ: UNASSIGNED,
@@ -578,7 +693,7 @@ export function attachDesktop(
     const lightTitle = windowElement.querySelector<HTMLElement>('[data-wm-title]')
     attached.title = lightTitle ?? findInWindow(windowElement, '[data-wm-title]')
     if (lightTitle) {
-      if (!lightTitle.id) lightTitle.id = `wmkit-title-${id}`
+      if (!lightTitle.id) lightTitle.id = `wmkit-title-${id}-${++titleSeq}`
       windowElement.setAttribute('aria-labelledby', lightTitle.id)
     }
 
@@ -591,13 +706,37 @@ export function attachDesktop(
       handle.setAttribute('role', 'presentation')
     }
 
-    const onPointerDownFocus = () => {
-      wm.focus(id)
+    const onPointerDownFocus = (event: Event) => {
+      if (drag) return
+      const target = firedOn(event) as HTMLElement | null
+      const chrome = !!target && (!!handle?.contains(target) || attached.handles.includes(target))
+      if (!chrome && !windowElement.contains(doc.activeElement)) attached.last = null
+      if (!wm.focus(id)) event.stopPropagation()
+      else if (chrome) pull(attached)
     }
     windowElement.addEventListener('pointerdown', onPointerDownFocus, true)
     attached.cleanup.push(() =>
       windowElement.removeEventListener('pointerdown', onPointerDownFocus, true),
     )
+
+    const onBlockedInput = (event: Event) => {
+      if (windowElement.dataset.wmLayer !== 'modal' && modalUp()) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    for (const type of ['mousedown', 'click', 'dblclick', 'contextmenu']) {
+      windowElement.addEventListener(type, onBlockedInput, true)
+      attached.cleanup.push(() => windowElement.removeEventListener(type, onBlockedInput, true))
+    }
+
+    const onFocusIn = (event: Event) => {
+      attached.last = firedOn(event) as HTMLElement | null
+    }
+    for (const scope of [windowElement, windowElement.shadowRoot]) {
+      scope?.addEventListener('focusin', onFocusIn)
+      attached.cleanup.push(() => scope?.removeEventListener('focusin', onFocusIn))
+    }
 
     const onClick = (event: MouseEvent) => {
       const target = firedOn(event)
@@ -661,7 +800,7 @@ export function attachDesktop(
       if (options.onTitlebarContextMenu) {
         const onContextMenu = (event: MouseEvent) => {
           const current = wm.get(id)
-          if (!current) return
+          if (!current || firedOn(event)?.closest(interactiveSelector)) return
           event.preventDefault()
           options.onTitlebarContextMenu?.(current, event)
         }
@@ -686,7 +825,8 @@ export function attachDesktop(
 
     const onWindowKeydown = (event: KeyboardEvent) => {
       const target = firedOn(event)
-      if (target?.closest(interactiveSelector)) return
+      if (drag || target?.closest(interactiveSelector)) return
+      if (target !== windowElement && !handle?.contains(target)) return
       const current = wm.get(id)
       if (!current) return
       const arrows: Record<string, [number, number]> = {
@@ -732,12 +872,14 @@ export function attachDesktop(
         ;(event.shiftKey ? last : first).focus()
         return
       }
-      if (event.shiftKey && active === first) {
+      const index = focusables.indexOf(active as HTMLElement)
+      if (
+        event.shiftKey
+          ? index < 1
+          : index === focusables.length - 1 || (index < 0 && active !== windowElement)
+      ) {
         event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
+        ;(event.shiftKey ? last : first).focus()
       }
     }
     windowElement.addEventListener('keydown', onModalTrap)
@@ -755,6 +897,7 @@ export function attachDesktop(
       if (registry.get(id)?.element !== windowElement) delete windowElement.dataset.wmWindow
       delete windowElement.dataset.wmFocused
       delete windowElement.dataset.wmTabTarget
+      delete windowElement.dataset.wmFlash
       if (focusedEl === windowElement) focusedEl = null
       if (groupTargetEl === windowElement) {
         groupTargetId = null
@@ -764,17 +907,18 @@ export function attachDesktop(
 
     const stopOnClose = wm.on('close', ({ window: closed }) => {
       if (closed.id !== id) return
+      rescue(windowElement)
       detach()
       if (windowOptions.removeOnClose) windowElement.remove()
+      if (attached.slot) retire(attached.slot)
     })
     attached.cleanup.push(stopOnClose)
 
+    attached.release = detach
     registry.set(id, attached)
     lastOrder = null
     syncAll()
-    if (wm.getState().focusedId === id && !windowElement.contains(doc.activeElement)) {
-      windowElement.focus({ preventScroll: true })
-    }
+    if (wm.getState().focusedId === id) pull(attached)
 
     return detach
   }
@@ -790,15 +934,12 @@ export function attachDesktop(
     id: string,
     skin: WindowSkin | string,
     windowOptions: WindowAttachOptions,
-  ): SkinMount {
+  ): MountSlot {
     const win = wm.get(id)
     if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
-    // resolve before anything is torn down, so an unknown name leaves the window standing
-    const build = resolveSkin(skin)
+    const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
     const standing = registry.get(id)
-    const previous = standing?.mount ?? null
-    // a popout moves the content element into another document; what lives there now
-    // belongs to that window, not to the rebuild
+    const previous = standing?.slot?.mount ?? null
     const carried =
       previous === null || previous.content.ownerDocument !== doc
         ? []
@@ -811,19 +952,29 @@ export function attachDesktop(
       } finally {
         rebuilding = false
       }
-      previous.element.remove()
     }
-    const mount = build({ doc, id, window: win, actions: createActions(wm, id) })
     element.append(mount.element)
-    const release = attachWindow(id, mount.element, windowOptions)
+    try {
+      attachWindow(id, mount.element, windowOptions)
+    } catch (error) {
+      mount.element.remove()
+      previous?.element.remove()
+      mount.destroy?.()
+      throw error
+    }
+    const into = mount.content as HTMLElement & { moveBefore?(node: Node, child: null): void }
+    for (const node of carried) {
+      if (into.moveBefore && node.isConnected) into.moveBefore(node, null)
+      else into.append(node)
+    }
+    previous?.element.remove()
     const attached = registry.get(id) as AttachedWindow
     attached.skin = typeof skin === 'string' ? skin : null
-    attached.mount = mount
-    attached.mountOptions = windowOptions
-    attached.release = release
-    mount.content.append(...carried)
+    const slot = standing?.slot ?? { mount, done: false }
+    slot.mount = mount
+    attached.slot = slot
     previous?.destroy?.()
-    return mount
+    return slot
   }
 
   function mountWindow(
@@ -832,30 +983,19 @@ export function attachDesktop(
     options: WindowAttachOptions = {},
   ): MountedWindow {
     // the library created this element, so it is the library that clears it away
-    const windowOptions: WindowAttachOptions = { removeOnClose: true, ...options }
-    let last = buildSkin(id, skin, windowOptions)
-    let spent = false
-    // follow the window across rebuilds, but never adopt a mount this handle did not make
-    const live = () => {
-      if (spent) return last
-      const now = registry.get(id)?.mount
-      if (now) last = now
-      return last
-    }
+    const slot = buildSkin(id, skin, { removeOnClose: true, ...options })
     return {
       get element() {
-        return live().element
+        return slot.mount.element
       },
       get content() {
-        return live().content
+        return slot.mount.content
       },
       detach() {
-        if (spent) return
-        const mount = live()
-        spent = true
-        if (registry.get(id)?.mount === mount) registry.get(id)?.release?.()
-        mount.element.remove()
-        mount.destroy?.()
+        const attached = registry.get(id)
+        if (attached?.slot === slot) attached.release?.()
+        slot.mount.element.remove()
+        retire(slot)
       },
     }
   }
@@ -866,15 +1006,20 @@ export function attachDesktop(
     attachWindow,
     mountWindow,
     actions: (id: string) => createActions(wm, id),
+    addDropTarget(target) {
+      dropTargets.add(target)
+      return () => {
+        dropTargets.delete(target)
+      }
+    },
     destroy() {
       endDrag(true)
       for (const [, attached] of registry) {
-        for (const dispose of attached.cleanup) dispose()
-        for (const resizeHandle of attached.handles) resizeHandle.remove()
+        attached.release?.()
         // elements the library built are the library's to clear away
-        if (attached.mount) {
-          attached.mount.element.remove()
-          attached.mount.destroy?.()
+        if (attached.slot) {
+          attached.slot.mount.element.remove()
+          retire(attached.slot)
         }
       }
       registry.clear()

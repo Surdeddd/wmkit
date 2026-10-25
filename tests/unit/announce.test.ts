@@ -116,6 +116,17 @@ describe('announcer', () => {
     wm.restoreTo('a', { x: 40, y: 40, width: 200, height: 150 })
     expect(announcer.element.textContent).toBe('')
   })
+
+  it('changes the live text when the same message is announced twice in a row', () => {
+    const { announcer } = makeAnnouncer()
+    announcer.announce('Saved')
+    const first = announcer.element.textContent
+    announcer.announce('Saved')
+    expect(announcer.element.textContent).not.toBe(first)
+    expect(announcer.element.textContent?.trim()).toBe('Saved')
+    announcer.announce('Saved')
+    expect(announcer.element.textContent).toBe(first)
+  })
 })
 
 describe('flip animations', () => {

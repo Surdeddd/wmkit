@@ -88,6 +88,13 @@ export interface SkinMount {
 
 export type WindowSkin = (ctx: SkinContext) => SkinMount
 
+export interface DropHit {
+  preview: Bounds
+  commit(): void
+}
+
+export type DropTarget = (clientX: number, clientY: number, id: string) => DropHit | null
+
 export interface MountedWindow {
   element: HTMLElement
   content: HTMLElement
@@ -100,6 +107,7 @@ export interface DesktopController {
   attachWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
   mountWindow(id: string, skin: WindowSkin | string, options?: WindowAttachOptions): MountedWindow
   actions(id: string): WindowActions
+  addDropTarget(target: DropTarget): () => void
   destroy(): void
 }
 
@@ -132,7 +140,7 @@ export interface SessionContext {
   toLocal(event: PointerEvent): Point
   trackRect(): () => void
   windowElement(id: string): HTMLElement | undefined
-  showPreview(bounds: Bounds): void
+  showPreview(bounds: Bounds, drop?: boolean): void
   hidePreview(): void
   snapEnabled: boolean
   snapDetect: Required<SnapDetectOptions>
@@ -143,6 +151,7 @@ export interface SessionContext {
   magnetThreshold: number
   groupDwell: number
   groupTarget(clientX: number, clientY: number, selfId: string): string | null
+  dropAt(clientX: number, clientY: number, id: string): DropHit | null
   markGroupTarget(id: string | null): void
   currentDrag(): ActiveDrag | null
   claimDrag(session: ActiveDrag): void

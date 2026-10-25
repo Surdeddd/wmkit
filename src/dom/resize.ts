@@ -1,5 +1,5 @@
 import { applyAspect, clampSize } from '../core/geometry'
-import type { Bounds } from '../core/types'
+import type { Bounds, SnapZone } from '../core/types'
 import type { ActiveDrag, SessionContext } from './shared'
 
 export const RESIZE_DIRECTIONS = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const
@@ -26,6 +26,11 @@ export function createResizeStarter(ctx: SessionContext) {
     event.stopPropagation()
 
     const handleEl = event.currentTarget as HTMLElement
+    try {
+      handleEl.setPointerCapture(event.pointerId)
+    } catch {
+      return
+    }
     const session: ActiveDrag = { id, finish: (cancelled) => finish(cancelled) }
     ctx.claimDrag(session)
     wm.beginInteraction()
@@ -34,6 +39,7 @@ export function createResizeStarter(ctx: SessionContext) {
     const start = win.bounds
     const startStage = win.stage
     const startZone = win.snapZone
+    const startRect = win.snapRect
     const startRestore = win.restoreBounds
     const minSize = win.minSize
     const maxSize = win.maxSize
@@ -99,9 +105,10 @@ export function createResizeStarter(ctx: SessionContext) {
         if (raf !== 0) view.cancelAnimationFrame(raf)
         if (hasPending && !cancelled) flush()
         if (cancelled && applied) {
-          if (startStage === 'snapped' && startZone) {
+          if (startStage === 'snapped' && (startRect || startZone)) {
             wm.restoreTo(id, startRestore ?? start)
-            wm.snap(id, startZone)
+            if (startRect) wm.snapTo(id, startRect)
+            else wm.snap(id, startZone as SnapZone)
           } else {
             wm.resize(id, start)
           }
@@ -112,6 +119,7 @@ export function createResizeStarter(ctx: SessionContext) {
         handleEl.removeEventListener('pointermove', onMove)
         handleEl.removeEventListener('pointerup', onUp)
         handleEl.removeEventListener('pointercancel', onCancelPointer)
+        handleEl.removeEventListener('lostpointercapture', onCancelPointer)
         doc.removeEventListener('keydown', onKeydown, true)
         if (handleEl.hasPointerCapture(event.pointerId)) {
           handleEl.releasePointerCapture(event.pointerId)
@@ -139,10 +147,10 @@ export function createResizeStarter(ctx: SessionContext) {
       }
     }
 
-    handleEl.setPointerCapture(event.pointerId)
     handleEl.addEventListener('pointermove', onMove)
     handleEl.addEventListener('pointerup', onUp)
     handleEl.addEventListener('pointercancel', onCancelPointer)
+    handleEl.addEventListener('lostpointercapture', onCancelPointer)
     doc.addEventListener('keydown', onKeydown, true)
   }
 }
