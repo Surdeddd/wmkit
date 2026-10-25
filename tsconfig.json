@@ -38,7 +38,8 @@
       "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"],
       "@surdeddd/wmkit/preact": ["./src/adapters/preact.ts"],
-      "@surdeddd/wmkit/lit": ["./src/adapters/lit.ts"]
+      "@surdeddd/wmkit/lit": ["./src/adapters/lit.ts"],
+      "@surdeddd/wmkit/qwik": ["./src/adapters/qwik.ts"]
     }
   },
   "include": [
