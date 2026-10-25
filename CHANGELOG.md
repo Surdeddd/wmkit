@@ -1,3 +1,10 @@
+## [0.12.1](https://github.com/Surdeddd/wmkit/compare/v0.12.0...v0.12.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **site:** placement fields never show a size the window cannot have ([d5d39a3](https://github.com/Surdeddd/wmkit/commit/d5d39a3b6d15d5c872e1855005f6f42b2943a0c1))
+
 # [0.12.0](https://github.com/Surdeddd/wmkit/compare/v0.11.1...v0.12.0) (2026-10-25)
 
 
