@@ -65,4 +65,9 @@ test('picture-in-picture where the engine has it', async ({ page }) => {
     .poll(() => page.evaluate(() => window.documentPictureInPicture?.window !== null))
     .toBe(true)
   await expect(win(page, 'fixed')).toBeHidden()
+  await page.evaluate(() => window.documentPictureInPicture?.window?.close())
+  await expect
+    .poll(() => page.evaluate(() => window.documentPictureInPicture?.window ?? null))
+    .toBeNull()
+  await expect(win(page, 'fixed')).toBeVisible()
 })
