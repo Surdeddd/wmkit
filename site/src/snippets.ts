@@ -29,8 +29,8 @@ function Desktop() {
 
   return (
     <div ref={ref} className="desktop">
-      {state.order.map((id) => (
-        <Win key={id} binder={binder} win={state.windows[id]} />
+      {Object.values(state.windows).map((win) => (
+        <Win key={win.id} binder={binder} win={win} />
       ))}
     </div>
   )

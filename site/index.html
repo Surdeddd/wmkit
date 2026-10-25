@@ -6,7 +6,7 @@
     <title>wmkit — headless window manager for the web</title>
     <meta
       name="description"
-      content="Draggable, resizable, snappable windows for any web app. Headless core under 15 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps."
+      content="Draggable, resizable, snappable windows for any web app. Headless core under 16 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps."
     />
     <meta property="og:title" content="wmkit — headless window manager for the web" />
     <meta
@@ -20,7 +20,15 @@
     <link
       href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0f12'/%3E%3Crect x='6' y='7' width='13' height='11' fill='none' stroke='%23d3ff4e' stroke-width='2'/%3E%3Crect x='13' y='14' width='13' height='11' fill='%23d3ff4e'/%3E%3C/svg%3E"
@@ -41,14 +49,20 @@
         <a class="brand" href="#demo">
           <span class="brand-mark" aria-hidden="true"></span>
           <span class="brand-name">wmkit</span>
-          <span class="brand-ver" id="brand-ver">v0.4</span>
+          <span class="brand-ver" id="brand-ver">v%WMKIT_VERSION%</span>
         </a>
 
-        <nav class="menus" id="menus" aria-label="Application"></nav>
+        <nav class="menus" id="menus" aria-label="Application" data-i18n-aria="aria.menus"></nav>
 
         <div class="menubar-spacer"></div>
 
-        <div class="workspaces" id="workspaces" role="tablist" aria-label="Workspaces"></div>
+        <div
+          class="workspaces"
+          id="workspaces"
+          role="tablist"
+          aria-label="Workspaces"
+          data-i18n-aria="aria.workspaces"
+        ></div>
 
         <div class="readouts" aria-hidden="true">
           <span class="readout"><b id="stat-fps">60</b>fps</span>
@@ -61,7 +75,7 @@
         </div>
       </header>
 
-      <section class="stage" id="demo" aria-label="Live wmkit desktop">
+      <section class="stage" id="demo" aria-label="Live wmkit desktop" data-i18n-aria="aria.demo">
         
 
         <div id="desktop" class="desktop">
@@ -92,9 +106,21 @@
       </section>
 
       <footer class="dock">
-        <div class="launcher" id="launcher" role="toolbar" aria-label="Launcher"></div>
+        <div
+          class="launcher"
+          id="launcher"
+          role="toolbar"
+          aria-label="Launcher"
+          data-i18n-aria="aria.launcher"
+        ></div>
         <div class="dock-sep" aria-hidden="true"></div>
-        <div class="tasks" id="dock" role="toolbar" aria-label="Taskbar"></div>
+        <div
+          class="tasks"
+          id="dock"
+          role="toolbar"
+          aria-label="Taskbar"
+          data-i18n-aria="aria.dock"
+        ></div>
       </footer>
     </div>
 
@@ -113,7 +139,7 @@
 
       <section class="band" id="features">
         <header class="band-head">
-          <p class="kicker" data-i18n="features.kicker">01 — capabilities</p>
+          <p class="kicker" data-i18n="features.kicker">02 — capabilities</p>
           <h2 data-i18n="features.title">Everything a desktop has</h2>
           <p class="band-sub" data-i18n="features.sub">
             The core keeps state, the DOM layer moves pixels, your framework renders content. Each
@@ -125,7 +151,7 @@
 
       <section class="band" id="frameworks">
         <header class="band-head">
-          <p class="kicker" data-i18n="fw.kicker">02 — adapters</p>
+          <p class="kicker" data-i18n="fw.kicker">03 — adapters</p>
           <h2 data-i18n="fw.title">One core, six ways to hold it</h2>
           <p class="band-sub" data-i18n="fw.sub">
             Window content always lives in your own component tree — no innerHTML, no portals into
@@ -142,7 +168,7 @@
 
       <section class="band" id="compare">
         <header class="band-head">
-          <p class="kicker" data-i18n="cmp.kicker">03 — landscape</p>
+          <p class="kicker" data-i18n="cmp.kicker">04 — landscape</p>
           <h2 data-i18n="cmp.title">Honest comparison</h2>
           <p class="band-sub" data-i18n="cmp.sub">
             The floating-window niche went quiet years ago. That is exactly why wmkit exists.
@@ -177,6 +203,7 @@
           <a class="btn btn-primary" href="https://github.com/Surdeddd/wmkit" rel="noreferrer">
             GitHub
           </a>
+          <a class="btn" href="docs/" data-i18n="cta.docs" data-i18n-href="link.docs">Docs</a>
           <a class="btn" href="https://www.npmjs.com/package/@surdeddd/wmkit" rel="noreferrer">
             npm
           </a>

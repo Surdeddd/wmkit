@@ -14,7 +14,9 @@ export interface BuilderController {
   syncTheme(name: string): void
 }
 
-const SCOPE = '[data-wm-desktop] [data-wm-window][data-wm-skin="custom"]'
+const SKIN = '[data-wm-skin="custom"]'
+
+const SCOPE = `[data-wm-desktop] [data-wm-window]${SKIN}`
 
 const CONTENT_SLOT = '<div data-wm-content></div>'
 
@@ -222,6 +224,10 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
+function rescope(css: string, name: string): string {
+  return css.split(SKIN).join(`[data-wm-skin="${name}"]`)
+}
+
 function quote(source: string): string {
   return source.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
 }
@@ -321,14 +327,14 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
     if (!previewWm.get('preview')) {
       previewWm.open({ id: 'preview', title: 'window', x: 24, y: 28, width: 340, height: 240 })
     }
-    document.head.querySelector('style[data-wm-skin-styles="custom"]')?.remove()
     try {
       const built = skin({
-        name: 'custom',
+        name: 'preview',
         template,
         shadow,
-        ...(css.trim() === '' ? {} : { styles: css }),
+        ...(css.trim() === '' ? {} : { styles: rescope(css, 'preview') }),
       })
+      document.head.querySelector('style[data-wm-skin-styles="preview"]')?.remove()
       lastMount?.content.replaceChildren()
       const mountedPreview = previewDesktop.mountWindow('preview', built, { removeOnClose: true })
       lastMount = mountedPreview
@@ -427,7 +433,7 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
       'const mine = skin({',
       "  name: 'mine',",
       ...(shadowBox.checked ? ['  shadow: true,'] : []),
-      ...(css === '' ? [] : ['  styles: `', quote(css), '`,']),
+      ...(css === '' ? [] : ['  styles: `', quote(rescope(css, 'mine')), '`,']),
       '  template: `',
       quote(editor.value),
       '`,',

@@ -43,6 +43,7 @@ export interface AppContext {
   setOption(name: 'magnetism' | 'snap' | 'announce', value: boolean): void
   size(): { width: number; height: number }
   safeArea(): { x: number; y: number; width: number; height: number }
+  workspaces: number
   skinLayouts: readonly SkinLayout[]
   skinLayout(): SkinLayout
   setSkinLayout(layout: SkinLayout): void
@@ -176,7 +177,7 @@ const readme: AppSpec = {
       const actions = el('div', 'app-actions')
       actions.append(
         button('npm i @surdeddd/wmkit', () => {
-          void navigator.clipboard?.writeText('pnpm add @surdeddd/wmkit')
+          void navigator.clipboard?.writeText('npm i @surdeddd/wmkit')
         }),
         button('github ↗', () => {
           window.open('https://github.com/Surdeddd/wmkit', '_blank', 'noreferrer')
@@ -207,7 +208,6 @@ const terminal: AppSpec = {
     input.type = 'text'
     input.autocomplete = 'off'
     input.spellcheck = false
-    input.setAttribute('aria-label', 'terminal input')
     form.append(input)
     wrap.append(log, form)
     body.replaceChildren(wrap)
@@ -228,6 +228,7 @@ const terminal: AppSpec = {
     const hello = () => {
       greetLead.textContent = ctx.dict().terminal.hello
       greetHelp.textContent = ctx.dict().terminal.help
+      input.setAttribute('aria-label', ctx.dict().terminal.input)
     }
     hello()
 
@@ -246,18 +247,18 @@ const terminal: AppSpec = {
           log.replaceChildren()
           return
         case 'open': {
-          const win = ctx.wm.open({ title: arg || 'window', width: 300, height: 200 })
+          const win = ctx.wm.open({ title: arg || copy.window, width: 300, height: 200 })
           write(`${win.id} · ${win.title}`)
           return
         }
         case 'close':
-          write(ctx.wm.close(arg) ? `closed ${arg}` : `${copy.gone} ${arg}`, 'out')
+          write(ctx.wm.close(arg) ? `${copy.closed} ${arg}` : `${copy.gone} ${arg}`, 'out')
           return
         case 'focus':
-          write(ctx.wm.focus(arg) ? `focused ${arg}` : `${copy.gone} ${arg}`, 'out')
+          write(ctx.wm.focus(arg) ? `${copy.focused} ${arg}` : `${copy.gone} ${arg}`, 'out')
           return
         case 'snap': {
-          if (!focused) return write('no focused window', 'err')
+          if (!focused) return write(copy.noFocus, 'err')
           if (!ZONES.includes(arg as SnapZone)) return write(`${copy.unknown} ${arg}`, 'err')
           ctx.wm.snap(focused, arg as SnapZone)
           write(`${focused} → ${arg}`)
@@ -266,19 +267,21 @@ const terminal: AppSpec = {
         case 'tile':
         case 'cascade':
           ctx.wm.arrange(command)
-          write(`arranged ${command}`)
+          write(`${copy.arranged} ${command}`)
           return
         case 'undo':
-          write(ctx.wm.undo() ? 'undo' : 'nothing to undo')
+          write(ctx.wm.undo() ? copy.undone : copy.noUndo)
           return
         case 'redo':
-          write(ctx.wm.redo() ? 'redo' : 'nothing to redo')
+          write(ctx.wm.redo() ? copy.redone : copy.noRedo)
           return
         case 'workspace': {
-          const index = Number.parseInt(arg, 10)
-          if (!Number.isInteger(index)) return write(`${copy.unknown} ${arg}`, 'err')
+          const index = Number(arg)
+          if (!Number.isInteger(index) || index < 1 || index > ctx.workspaces) {
+            return write(`${copy.noWorkspace} ${arg}`, 'err')
+          }
           ctx.wm.setWorkspace(index - 1)
-          write(`workspace ${index}`)
+          write(`${copy.workspace} ${index}`)
           return
         }
         case 'theme': {
@@ -286,15 +289,15 @@ const terminal: AppSpec = {
             return write(`${copy.unknown} ${arg}`, 'err')
           }
           ctx.setTheme(arg)
-          write(`theme ${arg}`)
+          write(`${copy.theme} ${arg}`)
           return
         }
         case 'state': {
           const state = ctx.wm.getState()
           write(
-            `windows ${state.order.length} · focused ${state.focusedId ?? '—'} · workspace ${
-              state.workspace + 1
-            }`,
+            `${copy.windows} ${state.order.length} · ${copy.focused} ${state.focusedId ?? '—'} · ${
+              copy.workspace
+            } ${state.workspace + 1}`,
           )
           return
         }
@@ -348,6 +351,7 @@ const inspector: AppSpec = {
     body.replaceChildren(tree, heading, list)
 
     const paint = () => {
+      const copy = ctx.dict().inspector
       const state = ctx.wm.getState()
       const rows = state.order.slice(0, 8).map((id) => {
         const win = state.windows[id]
@@ -360,15 +364,16 @@ const inspector: AppSpec = {
       })
       const hidden = state.order.length - Math.min(8, state.order.length)
       tree.innerHTML = [
-        `<span class="s">workspace</span> <span class="n">${state.workspace + 1}</span>  <span class="s">windows</span> <span class="n">${state.order.length}</span>`,
+        `<span class="s">${copy.workspace}</span> <span class="n">${state.workspace + 1}</span>  <span class="s">${copy.windows}</span> <span class="n">${state.order.length}</span>`,
         ...rows,
-        hidden > 0 ? `  <span class="s">+${hidden} more</span>` : '',
+        hidden > 0 ? `  <span class="s">+${hidden} ${copy.more}</span>` : '',
       ]
         .filter(Boolean)
         .join('\n')
     }
 
     const relabel = () => {
+      paint()
       heading.textContent = ctx.dict().inspector.events
       if (list.childElementCount === 0) {
         const empty = el('li')
@@ -407,7 +412,6 @@ const inspector: AppSpec = {
       ctx.wm.on('workspace', ({ workspace }) => push('workspace', String(workspace + 1))),
     ]
 
-    paint()
     relabel()
 
     return {
@@ -446,18 +450,17 @@ const layouts: AppSpec = {
       pad.append(node)
     }
 
-    const undoBtn = button('undo', () => ctx.wm.undo())
-    const redoBtn = button('redo', () => ctx.wm.redo())
+    const undoBtn = button('', () => ctx.wm.undo())
+    const redoBtn = button('', () => ctx.wm.redo())
     historyRow.append(undoBtn, redoBtn)
 
-    arrangeRow.append(
-      button('tile', () => ctx.wm.arrange('tile')),
-      button('cascade', () => ctx.wm.arrange('cascade')),
-      button('center', () => {
-        const id = active()
-        if (id) ctx.wm.center(id)
-      }),
-    )
+    const tileBtn = button('', () => ctx.wm.arrange('tile'))
+    const cascadeBtn = button('', () => ctx.wm.arrange('cascade'))
+    const centerBtn = button('', () => {
+      const id = active()
+      if (id) ctx.wm.center(id)
+    })
+    arrangeRow.append(tileBtn, cascadeBtn, centerBtn)
 
     const renderSaved = () => {
       const names = ctx.wm.layoutNames()
@@ -495,6 +498,11 @@ const layouts: AppSpec = {
       historyLabel.textContent = copy.history
       savedLabel.textContent = copy.saved
       saveBtn.textContent = copy.save
+      undoBtn.textContent = copy.undo
+      redoBtn.textContent = copy.redo
+      tileBtn.textContent = copy.tile
+      cascadeBtn.textContent = copy.cascade
+      centerBtn.textContent = copy.center
       renderSaved()
     }
 
@@ -600,7 +608,7 @@ const bench: AppSpec = {
       const rows: Array<[string, string]> = [
         [copy.opened, commit ? `${commit.toFixed(1)} ms` : '—'],
         [copy.frame, painted ? `${painted.toFixed(1)} ms` : '—'],
-        ['windows', String(ctx.wm.getState().order.length)],
+        [copy.windows, String(ctx.wm.getState().order.length)],
       ]
       for (const [key, value] of rows) {
         stats.append(el('dt', undefined, key), el('dd', undefined, value))
@@ -651,7 +659,6 @@ const paint: AppSpec = {
       node.dataset.swatch = value
       node.style.background = value
       node.setAttribute('aria-pressed', String(index === 0))
-      node.setAttribute('aria-label', `colour ${index + 1}`)
       tools.append(node)
     })
     const clear = button(
@@ -710,6 +717,9 @@ const paint: AppSpec = {
     const relabel = () => {
       lead.textContent = ctx.dict().paint.lead
       clear.textContent = ctx.dict().paint.clear
+      swatches.forEach((node, index) => {
+        node.setAttribute('aria-label', `${ctx.dict().paint.colour} ${index + 1}`)
+      })
     }
     relabel()
 
@@ -878,14 +888,22 @@ const skins: AppSpec = {
       return node
     })
 
+    let target: string | null = null
+    const remember = (id: string) => {
+      if (id !== 'skins') target = id
+    }
+    for (const id of ctx.wm.getState().order) remember(id)
+    const stopFocus = ctx.wm.on('focus', ({ window: win }) => remember(win.id))
+    const targetId = () => (target !== null && ctx.wm.get(target) ? target : null)
+
     const variantIds = ['', 'accent', 'ghost', 'sharp'] as const
     const variantButtons = variantIds.map((variant) => {
       const node = el('button', 'skin-variant')
       node.type = 'button'
       node.append(el('span', 'skin-variant-name'), el('span', 'skin-variant-note'))
       node.addEventListener('click', () => {
-        const focused = ctx.wm.getState().focusedId
-        if (focused !== null) ctx.wm.update(focused, { meta: { variant } })
+        const id = targetId()
+        if (id !== null) ctx.wm.update(id, { meta: { variant } })
         sync()
       })
       variantList.append(node)
@@ -944,15 +962,15 @@ const skins: AppSpec = {
     })
 
     function currentVariant(): string {
-      const focused = ctx.wm.getState().focusedId
-      if (focused === null) return ''
-      const value = ctx.wm.get(focused)?.meta.variant
+      const id = targetId()
+      if (id === null) return ''
+      const value = ctx.wm.get(id)?.meta.variant
       return typeof value === 'string' ? value : ''
     }
 
     function sync(): void {
       const active = currentVariant()
-      const focused = ctx.wm.getState().focusedId
+      const focused = targetId()
       for (const [index, node] of themeButtons.entries()) {
         node.setAttribute('aria-pressed', String(ctx.theme() === THEME_NAMES[index]))
       }
@@ -1004,9 +1022,17 @@ const skins: AppSpec = {
       sync()
     }
 
+    template.addEventListener('input', sync)
+    shadowBox.addEventListener('change', sync)
     relabel()
     const stop = ctx.wm.subscribe(() => sync())
-    return { relabel, destroy: stop }
+    return {
+      relabel,
+      destroy() {
+        stop()
+        stopFocus()
+      },
+    }
   },
 }
 

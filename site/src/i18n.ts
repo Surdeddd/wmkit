@@ -1,3 +1,5 @@
+import { type AnnouncerMessages, defaultMessages } from '@surdeddd/wmkit'
+
 export type Lang = 'en' | 'ru'
 
 export type AppId =
@@ -26,13 +28,33 @@ export interface MenuCopy {
 
 export interface Dict {
   lang: Lang
-  meta: { title: string; description: string }
+  meta: { title: string; description: string; og: string }
   ui: Record<string, string>
+  announce: AnnouncerMessages
   menus: MenuCopy[]
   apps: Record<AppId, { title: string; icon: string }>
   readme: { lead: string; body: string; badges: Array<[string, string]> }
-  terminal: { hello: string; help: string; unknown: string; gone: string }
-  inspector: { events: string; empty: string }
+  terminal: {
+    hello: string
+    help: string
+    unknown: string
+    gone: string
+    input: string
+    window: string
+    closed: string
+    focused: string
+    noFocus: string
+    arranged: string
+    undone: string
+    noUndo: string
+    redone: string
+    noRedo: string
+    workspace: string
+    noWorkspace: string
+    theme: string
+    windows: string
+  }
+  inspector: { events: string; empty: string; workspace: string; windows: string; more: string }
   layouts: {
     zones: string
     arrange: string
@@ -40,9 +62,21 @@ export interface Dict {
     saved: string
     save: string
     none: string
+    undo: string
+    redo: string
+    tile: string
+    cascade: string
+    center: string
   }
-  bench: { lead: string; run: string; opened: string; frame: string; note: string }
-  paint: { lead: string; clear: string }
+  bench: {
+    lead: string
+    run: string
+    opened: string
+    frame: string
+    windows: string
+    note: string
+  }
+  paint: { lead: string; clear: string; colour: string }
   settings: {
     theme: string
     magnetism: string
@@ -97,7 +131,8 @@ const en: Dict = {
   meta: {
     title: 'wmkit — headless window manager for the web',
     description:
-      'Draggable, resizable, snappable windows for any web app. Headless core under 15 kB, adapters for React, Vue, Svelte, Solid and Angular, workspaces, undo/redo, first-class accessibility, 60fps.',
+      'Draggable, resizable, snappable windows for any web app. Headless core under 16 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
+    og: 'A whole desktop inside the page: windows, dock, workspaces, snapping, undo. This page is the demo — it runs on the library.',
   },
   ui: {
     skip: 'Skip to documentation',
@@ -130,9 +165,18 @@ const en: Dict = {
     'cmp.note': 'Checked on July 26, 2026: last commits, npm downloads, open feature requests.',
     'outro.title': 'Give your app windows',
     'footer.made': 'This page runs on wmkit itself.',
+    'cta.docs': 'Docs',
+    'link.docs': 'docs/',
     'footer.back': '↑ Back to the demo',
     'copy.aria': 'Copy install command',
+    'aria.menus': 'Application',
+    'aria.workspaces': 'Workspaces',
+    'aria.demo': 'Live wmkit desktop',
+    'aria.launcher': 'Launcher',
+    'aria.dock': 'Taskbar',
+    'ws.tab': 'workspace',
   },
+  announce: defaultMessages,
   menus: [
     {
       id: 'window',
@@ -184,10 +228,10 @@ const en: Dict = {
   },
   readme: {
     lead: 'A window manager with no opinion about your UI.',
-    body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid and Angular are thin wrappers over the same object — around 60 lines each.',
+    body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, and the web components, are thin wrappers over the same object.',
     badges: [
       ['0', 'dependencies'],
-      ['<15 kB', 'brotli core'],
+      ['<16 kB', 'brotli core'],
       ['100%', 'core coverage'],
       ['MIT', 'license'],
     ],
@@ -197,8 +241,28 @@ const en: Dict = {
     help: 'open [title] · close <id> · focus <id> · snap <zone> · tile · cascade · undo · redo · workspace <n> · theme <name> · state · clear',
     unknown: 'unknown command:',
     gone: 'no such window:',
+    input: 'terminal input',
+    window: 'window',
+    closed: 'closed',
+    focused: 'focused',
+    noFocus: 'no focused window',
+    arranged: 'arranged',
+    undone: 'undo',
+    noUndo: 'nothing to undo',
+    redone: 'redo',
+    noRedo: 'nothing to redo',
+    workspace: 'workspace',
+    noWorkspace: 'no such workspace:',
+    theme: 'theme',
+    windows: 'windows',
   },
-  inspector: { events: 'event log', empty: 'no events yet — move a window' },
+  inspector: {
+    events: 'event log',
+    empty: 'no events yet — move a window',
+    workspace: 'workspace',
+    windows: 'windows',
+    more: 'more',
+  },
   layouts: {
     zones: 'snap the active window',
     arrange: 'arrange',
@@ -206,17 +270,24 @@ const en: Dict = {
     saved: 'saved layouts',
     save: 'save current',
     none: 'nothing saved yet',
+    undo: 'undo',
+    redo: 'redo',
+    tile: 'tile',
+    cascade: 'cascade',
+    center: 'center',
   },
   bench: {
     lead: 'Open a burst of windows in one batch and measure the commit.',
     run: 'open 50 windows',
     opened: 'windows opened in',
     frame: 'state commit',
+    windows: 'windows',
     note: 'One batch, one re-render, one layout pass. Close them from Window → Close all.',
   },
   paint: {
     lead: 'The canvas keeps its pixels through drag, resize and minimize — content is never re-parented. Aspect ratio is locked to 4:3.',
     clear: 'clear',
+    colour: 'colour',
   },
   settings: {
     theme: 'theme',
@@ -227,7 +298,7 @@ const en: Dict = {
     off: 'off',
   },
   devtools: {
-    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.6 kB entry point you can drop into your own app. It follows the manager, not this page.',
+    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.8 kB entry point you can drop into your own app. It follows the manager, not this page.',
   },
   skins: {
     lead: 'Sixteen shipped themes dress every window. A variant dresses one: the desktop mirrors it to data-wm-variant and your CSS overrides the tokens from there.',
@@ -346,7 +417,7 @@ const en: Dict = {
       cells: [
         { text: 'yes', tone: 'good' },
         { text: 'react only', tone: 'bad' },
-        { text: 'react only', tone: 'bad' },
+        { text: 'core + React·Vue·Angular', tone: 'good' },
         { text: 'yes', tone: 'good' },
       ],
     },
@@ -365,7 +436,7 @@ const en: Dict = {
         { text: 'halves, quarters, thirds', tone: 'good' },
         { text: 'none', tone: 'bad' },
         { text: 'dock grid', tone: 'plain' },
-        { text: 'halves', tone: 'plain' },
+        { text: 'none', tone: 'bad' },
       ],
     },
     {
@@ -401,7 +472,7 @@ const en: Dict = {
         { text: 'core + plugin', tone: 'good' },
         { text: 'roll your own', tone: 'bad' },
         { text: 'yes', tone: 'good' },
-        { text: 'partial', tone: 'plain' },
+        { text: 'none', tone: 'bad' },
       ],
     },
     {
@@ -434,8 +505,8 @@ const en: Dict = {
     {
       label: 'Bundle (brotli)',
       cells: [
-        { text: '~14 kB', tone: 'plain' },
-        { text: '~14 kB', tone: 'plain' },
+        { text: '~15 kB', tone: 'plain' },
+        { text: '~15 kB', tone: 'plain' },
         { text: '~60 kB', tone: 'bad' },
         { text: '~10 kB', tone: 'good' },
       ],
@@ -443,12 +514,27 @@ const en: Dict = {
   ],
 }
 
+const ZONES_RU: Record<string, string> = {
+  left: 'левая половина',
+  right: 'правая половина',
+  top: 'верхняя половина',
+  bottom: 'нижняя половина',
+  'top-left': 'левая верхняя четверть',
+  'top-right': 'правая верхняя четверть',
+  'bottom-left': 'левая нижняя четверть',
+  'bottom-right': 'правая нижняя четверть',
+  'left-third': 'левая треть',
+  'center-third': 'средняя треть',
+  'right-third': 'правая треть',
+}
+
 const ru: Dict = {
   lang: 'ru',
   meta: {
     title: 'wmkit — headless-оконный менеджер для веба',
     description:
-      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 15 кБ, адаптеры для React, Vue, Svelte, Solid и Angular, рабочие столы, undo/redo, доступность и 60fps.',
+      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 16 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
+    og: 'Целый рабочий стол внутри страницы: окна, док, рабочие столы, прилипание, отмена. Эта страница и есть демо — она работает на самой библиотеке.',
   },
   ui: {
     skip: 'Перейти к документации',
@@ -481,8 +567,26 @@ const ru: Dict = {
     'cmp.note': 'Проверено 26 июля 2026: последние коммиты, загрузки npm, открытые запросы фич.',
     'outro.title': 'Дайте приложению окна',
     'footer.made': 'Эта страница работает на самом wmkit.',
+    'cta.docs': 'Документация',
+    'link.docs': 'docs/ru/',
     'footer.back': '↑ Вернуться к демо',
     'copy.aria': 'Скопировать команду установки',
+    'aria.menus': 'Меню приложения',
+    'aria.workspaces': 'Рабочие столы',
+    'aria.demo': 'Живой рабочий стол wmkit',
+    'aria.launcher': 'Запуск приложений',
+    'aria.dock': 'Панель задач',
+    'ws.tab': 'рабочий стол',
+  },
+  announce: {
+    opened: (title) => `Окно «${title}» открыто`,
+    closed: (title) => `Окно «${title}» закрыто`,
+    minimized: (title) => `Окно «${title}» свёрнуто`,
+    restored: (title) => `Окно «${title}» восстановлено`,
+    maximized: (title) => `Окно «${title}» развёрнуто`,
+    snapped: (title, zone) => `Окно «${title}» прилеплено: ${ZONES_RU[zone] ?? zone}`,
+    focused: (title) => `Окно «${title}» в фокусе`,
+    workspace: (index) => `Рабочий стол ${index + 1}`,
   },
   menus: [
     {
@@ -535,10 +639,10 @@ const ru: Dict = {
   },
   readme: {
     lead: 'Оконный менеджер без единого мнения о вашем интерфейсе.',
-    body: 'Ядро это чистая машина состояний: границы, порядок, стадии и фокус — и ни одного обращения к DOM. DOM-слой превращает события указателя в переходы состояний на 60fps, а адаптеры для React, Vue, Svelte, Solid и Angular — тонкие обёртки над тем же объектом.',
+    body: 'Ядро это чистая машина состояний: границы, порядок, стадии и фокус — и ни одного обращения к DOM. DOM-слой превращает события указателя в переходы состояний на 60fps, а адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik и веб-компоненты — тонкие обёртки над тем же объектом.',
     badges: [
       ['0', 'зависимостей'],
-      ['<15 кБ', 'ядро в brotli'],
+      ['<16 кБ', 'ядро в brotli'],
       ['100%', 'покрытие ядра'],
       ['MIT', 'лицензия'],
     ],
@@ -548,8 +652,28 @@ const ru: Dict = {
     help: 'open [заголовок] · close <id> · focus <id> · snap <зона> · tile · cascade · undo · redo · workspace <n> · theme <name> · state · clear',
     unknown: 'неизвестная команда:',
     gone: 'нет такого окна:',
+    input: 'ввод терминала',
+    window: 'окно',
+    closed: 'закрыто:',
+    focused: 'в фокусе:',
+    noFocus: 'нет активного окна',
+    arranged: 'расставлено:',
+    undone: 'отменено',
+    noUndo: 'нечего отменять',
+    redone: 'повторено',
+    noRedo: 'нечего повторять',
+    workspace: 'рабочий стол',
+    noWorkspace: 'нет такого рабочего стола:',
+    theme: 'тема:',
+    windows: 'окон',
   },
-  inspector: { events: 'журнал событий', empty: 'пока пусто — подвигайте окно' },
+  inspector: {
+    events: 'журнал событий',
+    empty: 'пока пусто — подвигайте окно',
+    workspace: 'стол',
+    windows: 'окон',
+    more: 'ещё',
+  },
   layouts: {
     zones: 'прилепить активное окно',
     arrange: 'расставить',
@@ -557,17 +681,24 @@ const ru: Dict = {
     saved: 'сохранённые раскладки',
     save: 'сохранить текущую',
     none: 'пока ничего не сохранено',
+    undo: 'отменить',
+    redo: 'повторить',
+    tile: 'плиткой',
+    cascade: 'каскадом',
+    center: 'по центру',
   },
   bench: {
     lead: 'Открыть пачку окон одной транзакцией и замерить коммит.',
     run: 'открыть 50 окон',
     opened: 'окон открыто за',
     frame: 'коммит состояния',
+    windows: 'окон',
     note: 'Одна транзакция, одна перерисовка, один проход layout. Закрыть — Окно → Закрыть все.',
   },
   paint: {
     lead: 'Холст сохраняет пиксели при перетаскивании, растягивании и сворачивании — содержимое никогда не перевешивается в другой узел. Пропорции зафиксированы 4:3.',
     clear: 'очистить',
+    colour: 'цвет',
   },
   settings: {
     theme: 'тема',
@@ -578,7 +709,7 @@ const ru: Dict = {
     off: 'выкл',
   },
   devtools: {
-    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.6 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
+    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.8 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
   },
   skins: {
     lead: 'Шестнадцать готовых тем одевают все окна сразу. Вариант одевает одно: десктоп зеркалит его в data-wm-variant, а дальше ваш CSS переопределяет токены.',
@@ -697,7 +828,7 @@ const ru: Dict = {
       cells: [
         { text: 'да', tone: 'good' },
         { text: 'только react', tone: 'bad' },
-        { text: 'только react', tone: 'bad' },
+        { text: 'ядро + React·Vue·Angular', tone: 'good' },
         { text: 'да', tone: 'good' },
       ],
     },
@@ -716,7 +847,7 @@ const ru: Dict = {
         { text: 'половины, четверти, трети', tone: 'good' },
         { text: 'нет', tone: 'bad' },
         { text: 'док-сетка', tone: 'plain' },
-        { text: 'половины', tone: 'plain' },
+        { text: 'нет', tone: 'bad' },
       ],
     },
     {
@@ -752,7 +883,7 @@ const ru: Dict = {
         { text: 'ядро + плагин', tone: 'good' },
         { text: 'своими руками', tone: 'bad' },
         { text: 'да', tone: 'good' },
-        { text: 'частично', tone: 'plain' },
+        { text: 'нет', tone: 'bad' },
       ],
     },
     {
@@ -785,8 +916,8 @@ const ru: Dict = {
     {
       label: 'Размер (brotli)',
       cells: [
-        { text: '~14 кБ', tone: 'plain' },
-        { text: '~14 кБ', tone: 'plain' },
+        { text: '~15 кБ', tone: 'plain' },
+        { text: '~15 кБ', tone: 'plain' },
         { text: '~60 кБ', tone: 'bad' },
         { text: '~10 кБ', tone: 'good' },
       ],

@@ -1,4 +1,5 @@
 import {
+  type AnnouncerMessages,
   attachDesktop,
   createWindowManager,
   type DesktopController,
@@ -84,16 +85,30 @@ const bootLog = must(document.querySelector<HTMLElement>('#boot-log'), '#boot-lo
 const statWin = must(document.querySelector<HTMLElement>('#stat-win'), '#stat-win')
 const statFps = must(document.querySelector<HTMLElement>('#stat-fps'), '#stat-fps')
 
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {}
+}
+
 function resolveLang(): Lang {
   const fromQuery = new URLSearchParams(location.search).get('lang')
   if (fromQuery === 'ru' || fromQuery === 'en') return fromQuery
-  const stored = localStorage.getItem('wmkit-lang')
+  const stored = readStored('wmkit-lang')
   if (stored === 'ru' || stored === 'en') return stored
   return navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en'
 }
 
 function resolveTheme(): ThemeName {
-  const stored = localStorage.getItem('wmkit-theme')
+  const stored = readStored('wmkit-theme')
   return stored !== null && isThemeName(stored) ? stored : 'glass'
 }
 
@@ -131,13 +146,15 @@ function applyTheme(): void {
   document.head.append(next)
   desktopEl.dataset.theme = theme
   builder.syncTheme(theme)
-  localStorage.setItem('wmkit-theme', theme)
+  writeStored('wmkit-theme', theme)
 }
 
 export const SKIN_LAYOUTS: readonly SkinLayout[] = ['left', 'right', 'bare']
 
 let customTemplate: string | null = null
 let customShadow = false
+let customStyles: string | undefined
+let customSkin: WindowSkin | null = null
 
 function controlLines(): string[] {
   const labels = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
@@ -191,35 +208,54 @@ export function skinOf(): SkinLayout {
   return skinLayout
 }
 
-export function setSkinLayout(layout: SkinLayout): void {
-  skinLayout = layout
-  customTemplate = null
-  for (const id of mounted.keys()) {
-    if (wm.get(id)) wm.update(id, { meta: { skin: layout } })
+function dressAll(chosen: WindowSkin | string): void {
+  for (const [id, entry] of mounted) {
+    if (wm.get(id)) entry.window = desktop.mountWindow(id, chosen, { removeOnClose: true })
   }
 }
 
+export function setSkinLayout(layout: SkinLayout): void {
+  skinLayout = layout
+  customTemplate = null
+  customShadow = false
+  customStyles = undefined
+  customSkin = null
+  dressAll(layout)
+}
+
 export function applyCustomSkin(template: string, shadow: boolean, styles?: string): void {
-  customTemplate = template
-  customShadow = shadow
-  const chosen = styles ?? (shadow ? themeStyle(theme, { shadow: true }) : undefined)
-  document.head.querySelector('style[data-wm-skin-styles="custom"]')?.remove()
+  const own = styles?.trim() ? styles : undefined
+  const chosen = own ?? (shadow ? themeStyle(theme, { shadow: true }) : undefined)
   const built = skin({
     name: 'custom',
     template,
     shadow,
-    ...(chosen === undefined || chosen.trim() === '' ? {} : { styles: chosen }),
+    ...(chosen === undefined ? {} : { styles: chosen }),
   })
-  for (const id of mounted.keys()) {
-    if (wm.get(id)) desktop.mountWindow(id, built, { removeOnClose: true })
-  }
+  document.head.querySelector('style[data-wm-skin-styles="custom"]')?.remove()
+  customTemplate = template
+  customShadow = shadow
+  customStyles = own
+  customSkin = built
+  dressAll(built)
+}
+
+const narration: AnnouncerMessages = {
+  opened: (title) => dict().announce.opened(title),
+  closed: (title) => dict().announce.closed(title),
+  minimized: (title) => dict().announce.minimized(title),
+  restored: (title) => dict().announce.restored(title),
+  maximized: (title) => dict().announce.maximized(title),
+  snapped: (title, zone) => dict().announce.snapped(title, zone),
+  focused: (title) => dict().announce.focused(title),
+  workspace: (index) => dict().announce.workspace(index),
 }
 
 function desktopOptions(): DesktopOptions {
   return {
     magnetism: options.magnetism,
     snap: options.snap,
-    announce: options.announce,
+    announce: options.announce && narration,
     gestures: [touchGestures({ swipe: { workspaces: WORKSPACES } })],
     skins: demoSkins,
     minimizeTarget: (win) => dockEl.querySelector(`[data-task="${win.id}"]`) ?? dockEl,
@@ -240,6 +276,9 @@ const ctx: AppContext = {
   setTheme(next) {
     theme = next
     applyTheme()
+    if (customTemplate !== null && customShadow && customStyles === undefined) {
+      applyCustomSkin(customTemplate, true)
+    }
     relabelAll()
   },
   option: (name) => options[name],
@@ -251,6 +290,7 @@ const ctx: AppContext = {
   },
   size: () => ({ width: desktopEl.clientWidth, height: desktopEl.clientHeight }),
   safeArea,
+  workspaces: WORKSPACES,
   skinLayouts: SKIN_LAYOUTS,
   skinLayout: skinOf,
   setSkinLayout,
@@ -279,14 +319,18 @@ function safeArea(): { x: number; y: number; width: number; height: number } {
 }
 
 function remountDesktop(): void {
-  for (const entry of mounted.values()) entry.window = null
+  const contents = new Map<string, ChildNode[]>()
+  for (const [id, entry] of mounted) {
+    contents.set(id, entry.window ? [...entry.window.content.childNodes] : [])
+    entry.window = null
+  }
   desktop.destroy()
   for (const node of [...desktopEl.children]) {
     if (!node.classList.contains('wallpaper')) node.remove()
   }
   desktop = attachDesktop(wm, desktopEl, desktopOptions())
   for (const [id, entry] of mounted) {
-    if (wm.get(id)) activate(id, entry)
+    if (wm.get(id)) activate(id, entry, contents.get(id))
   }
 }
 
@@ -296,15 +340,10 @@ function mount(id: string, spec: AppSpec | null): Mounted {
   return entry
 }
 
-function activate(id: string, entry: Mounted): void {
-  const named = customTemplate === null
-  entry.window = desktop.mountWindow(
-    id,
-    named ? skinLayout : skin({ template: customTemplate as string, shadow: customShadow }),
-    { removeOnClose: true },
-  )
-  if (named) wm.update(id, { meta: { ...wm.get(id)?.meta, skin: skinLayout } })
-  if (entry.spec) entry.instance = entry.spec.render(entry.window.content, ctx) ?? null
+function activate(id: string, entry: Mounted, content?: ChildNode[]): void {
+  entry.window = desktop.mountWindow(id, customSkin ?? skinLayout, { removeOnClose: true })
+  if (content) entry.window.content.replaceChildren(...content)
+  else if (entry.spec) entry.instance = entry.spec.render(entry.window.content, ctx) ?? null
 }
 
 function openApp(id: AppId): void {
@@ -465,11 +504,15 @@ function startTabDrag(event: PointerEvent, id: string): void {
   tab.addEventListener('pointercancel', onCancel)
 }
 
+function part<T extends Element>(entry: Mounted | undefined, selector: string): T | null {
+  const host = entry?.window?.element
+  return host?.querySelector<T>(selector) ?? host?.shadowRoot?.querySelector<T>(selector) ?? null
+}
+
 function focusTab(id: string): void {
   const active = wm.getState().groups[wm.get(id)?.groupId ?? '']?.activeId
   if (!active) return
-  const host = mounted.get(active)?.window?.element
-  host?.querySelector<HTMLElement>(`.win-tab[data-tab="${id}"]`)?.focus()
+  part<HTMLElement>(mounted.get(active), `.win-tab[data-tab="${id}"]`)?.focus()
 }
 
 function onTabKeydown(event: KeyboardEvent, id: string): void {
@@ -502,8 +545,8 @@ function onTabKeydown(event: KeyboardEvent, id: string): void {
 function syncTabs(): void {
   const state = wm.getState()
   for (const [id, entry] of mounted) {
-    const strip = entry.window?.element.querySelector<HTMLElement>('.win-tabs')
-    const titleEl = entry.window?.element.querySelector<HTMLElement>('[data-wm-title]')
+    const strip = part<HTMLElement>(entry, '.win-tabs')
+    const titleEl = part<HTMLElement>(entry, '[data-wm-title]')
     const win = state.windows[id]
     const group = win?.groupId ? state.groups[win.groupId] : undefined
     if (!strip || !titleEl) continue
@@ -656,7 +699,7 @@ function renderWorkspaces(): void {
       node.role = 'tab'
       node.dataset.workspace = String(index)
       node.textContent = String(index + 1)
-      node.setAttribute('aria-label', `workspace ${index + 1}`)
+      node.setAttribute('aria-label', `${dict().ui['ws.tab']} ${index + 1}`)
       node.addEventListener('click', () => wm.setWorkspace(index))
       return node
     }),
@@ -843,6 +886,8 @@ function applyStaticI18n(): void {
   document.documentElement.lang = lang
   document.title = data.meta.title
   document.querySelector('meta[name="description"]')?.setAttribute('content', data.meta.description)
+  document.querySelector('meta[property="og:title"]')?.setAttribute('content', data.meta.title)
+  document.querySelector('meta[property="og:description"]')?.setAttribute('content', data.meta.og)
   for (const node of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
     const key = node.dataset.i18n
     if (key && data.ui[key]) node.textContent = data.ui[key]
@@ -851,22 +896,30 @@ function applyStaticI18n(): void {
     const key = node.dataset.i18nAria
     if (key && data.ui[key]) node.setAttribute('aria-label', data.ui[key])
   }
+  for (const node of document.querySelectorAll<HTMLElement>('[data-i18n-href]')) {
+    const key = node.dataset.i18nHref
+    if (key && data.ui[key]) node.setAttribute('href', data.ui[key])
+  }
   for (const node of document.querySelectorAll<HTMLButtonElement>('#lang button')) {
     node.setAttribute('aria-pressed', String(node.dataset.lang === lang))
   }
 }
 
 function relabelAll(): void {
+  wm.batch(relabelEach)
+}
+
+function relabelEach(): void {
   for (const [id, entry] of mounted) {
     const spec = entry.spec
     if (!spec) continue
     const title = dict().apps[spec.id].title
     if (wm.get(id)?.title !== title) wm.update(id, { title })
-    const titleEl = entry.window?.element.querySelector('[data-wm-title]')
+    const titleEl = part(entry, '[data-wm-title]')
     if (titleEl) titleEl.textContent = title
     const aria = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
     for (const [selector, label] of aria) {
-      entry.window?.element.querySelector(selector)?.setAttribute('aria-label', `${label} ${title}`)
+      part(entry, selector)?.setAttribute('aria-label', `${label} ${title}`)
     }
     if (entry.instance?.relabel) {
       entry.instance.relabel()
@@ -880,10 +933,11 @@ function relabelAll(): void {
 function setLang(next: Lang): void {
   if (next === lang) return
   lang = next
-  localStorage.setItem('wmkit-lang', lang)
+  writeStored('wmkit-lang', lang)
   applyStaticI18n()
   renderMenus()
   renderLauncher()
+  renderWorkspaces()
   renderFeatures()
   renderFrameworks()
   renderCompare()
@@ -974,7 +1028,7 @@ const BOOT_LINES = [
   'core .............. state machine ok',
   'dom ............... pointer + rAF ok',
   'a11y .............. live region ok',
-  'themes ............ glass light retro',
+  `themes ............ ${Object.keys(THEME_URLS).length} ok`,
   'ready.',
 ]
 
@@ -1001,24 +1055,30 @@ function boot(): void {
 }
 
 function whenSized(run: () => void): void {
-  const ready = () => desktopEl.clientWidth >= 320 && desktopEl.clientHeight >= 260
+  const styled = () =>
+    getComputedStyle(document.documentElement).getPropertyValue('--menubar-h') !== ''
+  const ready = () => styled() && desktopEl.clientWidth >= 320 && desktopEl.clientHeight >= 260
   if (ready()) {
     run()
     return
   }
   let done = false
+  let waited = false
   const finish = () => {
-    if (done) return
+    if (done || !styled()) return
     done = true
     observer.disconnect()
     clearTimeout(timer)
     run()
   }
   const observer = new ResizeObserver(() => {
-    if (ready()) finish()
+    if (waited || ready()) finish()
   })
   observer.observe(desktopEl)
-  const timer = setTimeout(finish, 1000)
+  const timer = setTimeout(() => {
+    waited = true
+    finish()
+  }, 1000)
 }
 
 function start(): void {
