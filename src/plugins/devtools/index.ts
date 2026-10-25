@@ -79,18 +79,23 @@ export function createDevtools(
   })
 
   view.onGlobalAction((action) => {
-    if (action === 'undo') {
-      wm.undo()
-      return
-    }
-    if (action === 'redo') {
-      wm.redo()
+    if (action === 'undo' || action === 'redo') {
+      const active = doc.activeElement as HTMLElement | null
+      if (action === 'undo') wm.undo()
+      else wm.redo()
+      active?.focus()
       return
     }
     const json = JSON.stringify(wm.serialize())
     const clipboard = doc.defaultView?.navigator.clipboard
-    if (clipboard) void clipboard.writeText(json)
-    view.flash(clipboard ? messages.copied : json)
+    if (!clipboard) {
+      view.flash(json)
+      return
+    }
+    clipboard.writeText(json).then(
+      () => view.flash(messages.copied),
+      () => view.flash(json),
+    )
   })
 
   container.append(view.root)

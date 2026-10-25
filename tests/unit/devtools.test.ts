@@ -192,7 +192,29 @@ describe('devtools panel', () => {
     panel.destroy()
   })
 
-  it('copies the serialized state through the clipboard when there is one', () => {
+  it('keeps keyboard focus on the undo button while undo moves the window focus', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const panel = createDevtools(wm)
+    document.body.append(panel.element)
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    const undo = globalButton(panel.element, 'undo')
+    const elsewhere = document.createElement('button')
+    document.body.append(elsewhere)
+    wm.on('focus', () => elsewhere.focus())
+    undo.focus()
+    undo.click()
+    expect(document.activeElement).toBe(undo)
+    undo.click()
+    const redo = globalButton(panel.element, 'redo')
+    redo.focus()
+    redo.click()
+    expect(document.activeElement).toBe(redo)
+    elsewhere.remove()
+    panel.destroy()
+  })
+
+  it('copies the serialized state through the clipboard when there is one', async () => {
     const writeText = vi.fn(async (_text: string) => {})
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     const wm = createWindowManager(VIEWPORT)
@@ -200,11 +222,34 @@ describe('devtools panel', () => {
     wm.open({ id: 'a' })
 
     globalButton(panel.element, 'copy').click()
+    await Promise.resolve()
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(String(writeText.mock.calls[0]?.[0])).toContain('"id":"a"')
     expect(panel.element.querySelector('[role="status"]')?.textContent).toBe(
       devtoolsMessages.copied,
     )
+    panel.destroy()
+  })
+
+  it('shows the json instead of "copied" when the clipboard write is refused', async () => {
+    const rejections: unknown[] = []
+    const onRejection = (reason: unknown) => rejections.push(reason)
+    process.on('unhandledRejection', onRejection)
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: () => Promise.reject(new Error('NotAllowedError')) },
+    })
+    const wm = createWindowManager(VIEWPORT)
+    const panel = createDevtools(wm)
+    wm.open({ id: 'a' })
+
+    globalButton(panel.element, 'copy').click()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    process.off('unhandledRejection', onRejection)
+
+    expect(rejections).toEqual([])
+    const status = panel.element.querySelector('[role="status"]')?.textContent
+    expect(status).not.toBe(devtoolsMessages.copied)
+    expect(status).toContain('"id":"a"')
     panel.destroy()
   })
 
@@ -291,6 +336,41 @@ describe('devtools panel', () => {
 
     second.destroy()
     expect(document.head.querySelectorAll('#wm-devtools-style')).toHaveLength(0)
+  })
+
+  it('gives every panel a heading id of its own, even in the same millisecond', () => {
+    vi.spyOn(performance, 'now').mockReturnValue(1234.4)
+    const first = createDevtools(createWindowManager(VIEWPORT))
+    const second = createDevtools(createWindowManager(VIEWPORT))
+    const idFirst = first.element.getAttribute('aria-labelledby')
+    const idSecond = second.element.getAttribute('aria-labelledby')
+    expect(idFirst).not.toBe(idSecond)
+    expect(document.querySelectorAll(`[id="${idFirst}"]`)).toHaveLength(1)
+    first.destroy()
+    second.destroy()
+    vi.restoreAllMocks()
+  })
+
+  it('draws a different glyph for every row action', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const panel = createDevtools(wm, { messages: { minimize: 'min', maximize: 'max' } })
+    wm.open({ id: 'a' })
+    const glyphs = ['focus', 'minimize', 'maximize', 'close'].map(
+      (action) => actionButton(panel.element, action, 'a').textContent,
+    )
+    expect(new Set(glyphs).size).toBe(4)
+    expect(actionButton(panel.element, 'maximize', 'a').getAttribute('aria-label')).toBe('max a')
+    panel.destroy()
+  })
+
+  it('survives a second destroy without stripping a live panel of its css', () => {
+    const first = createDevtools(createWindowManager(VIEWPORT))
+    const second = createDevtools(createWindowManager(VIEWPORT))
+    first.destroy()
+    first.destroy()
+    expect(document.getElementById('wm-devtools-style')).not.toBeNull()
+    second.destroy()
+    expect(document.getElementById('wm-devtools-style')).toBeNull()
   })
 
   it('leaves nothing behind on destroy', () => {

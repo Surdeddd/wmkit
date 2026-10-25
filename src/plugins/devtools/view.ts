@@ -63,6 +63,8 @@ function acquireStyle(doc: Document): HTMLStyleElement {
   return style
 }
 
+let panelCount = 0
+
 function releaseStyle(style: HTMLStyleElement): void {
   const left = Number(style.dataset.owners) - 1
   if (left > 0) style.dataset.owners = String(left)
@@ -76,13 +78,15 @@ function box(win: WindowState): string {
 
 export function createDevtoolsView(doc: Document, messages: DevtoolsMessages): DevtoolsView {
   const style = acquireStyle(doc)
+  let destroyed = false
 
   const root = doc.createElement('aside')
   root.dataset.wmDevtools = ''
   root.setAttribute('role', 'complementary')
 
   const heading = doc.createElement('h2')
-  heading.id = `wm-devtools-title-${Math.round(performance.now())}`
+  panelCount += 1
+  heading.id = `wm-devtools-title-${panelCount}`
   heading.textContent = messages.title
   root.setAttribute('aria-labelledby', heading.id)
 
@@ -163,18 +167,18 @@ export function createDevtoolsView(doc: Document, messages: DevtoolsMessages): D
 
     const acts = doc.createElement('span')
     acts.className = 'wm-dt-acts'
-    const buttons: Array<[DevtoolsAction, string]> = [
-      ['focus', messages.focus],
-      ['minimize', messages.minimize],
-      ['maximize', messages.maximize],
-      ['close', messages.close],
+    const buttons: Array<[DevtoolsAction, string, string]> = [
+      ['focus', messages.focus, '•'],
+      ['minimize', messages.minimize, '–'],
+      ['maximize', messages.maximize, '□'],
+      ['close', messages.close, '×'],
     ]
-    for (const [action, label] of buttons) {
+    for (const [action, label, glyph] of buttons) {
       const button = doc.createElement('button')
       button.type = 'button'
       button.dataset.wmDevtoolsAction = action
       button.dataset.wmDevtoolsId = win.id
-      button.textContent = label.slice(0, 1)
+      button.textContent = glyph
       button.setAttribute('aria-label', `${label} ${win.id}`)
       acts.append(button)
     }
@@ -251,6 +255,8 @@ export function createDevtoolsView(doc: Document, messages: DevtoolsMessages): D
       status.textContent = message
     },
     destroy() {
+      if (destroyed) return
+      destroyed = true
       root.removeEventListener('click', onClick)
       root.remove()
       releaseStyle(style)
