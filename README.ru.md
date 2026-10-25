@@ -2,7 +2,7 @@
 
 **Headless оконный менеджер для веба.** Перетаскиваемые окна с ресайзом, снэпом, таскбаром, клавиатурной доступностью и персистом состояния — для vanilla JS и всех основных фреймворков.
 
-[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [Документация](./docs/README.md) · [GitHub](https://github.com/Surdeddd/wmkit)
+[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [Документация](https://wmkit.vercel.app/docs/ru/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
 
@@ -11,7 +11,7 @@
 - 🪟 **Полный жизненный цикл окна** — открытие, закрытие, фокус, сворачивание, разворачивание, восстановление, drag, ресайз в 8 направлениях
 - 🧠 **Headless-ядро** — сериализуемая стейт-машина плюс DOM-контроллер; своя разметка или готовая стеклянная тема
 - 🧱 **Своё окно, своя разметка** — соберите весь корпус из строки-шаблона, повесьте кнопки атрибутами и меняйте скин на живом окне, не теряя того, что оно показывало
-- ⚛️ **Родные адаптеры** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, тонкий сахар над одним ядром
+- ⚛️ **Родные адаптеры** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, `/preact`, `/lit`, `/qwik`, тонкий сахар над одним ядром, а для всего остального — веб-компоненты `<wm-desktop>` и `<wm-window>`
 - 🗃️ **Вкладочные группы** — бросьте заголовок на заголовок, и окна начнут делить одну рамку; порядок вкладок можно менять
 - ⊞ **Snap-зоны** — половины, четверти, трети и максимизация от верхнего края с живым превью
 - 🧲 **Магнетизм** — края окна прилипают к соседям и вьюпорту при перетаскивании
@@ -22,8 +22,10 @@
 - ⚡ **Производительность** — позиционирование только через `transform`, rAF-батчинг ввода, structural sharing; 50 окон таскаются на 60fps
 - 💾 **Персист** — один вызов сериализует рабочий стол, один — восстанавливает, с версионированием и миграциями
 - 🎨 **Шестнадцать тем** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — либо полностью свой CSS
-- 🖼️ **Popout** *(experimental)* — вынос окна в Document Picture-in-Picture
-- 📦 **Ноль зависимостей**, строгий TypeScript, ESM + CJS, ядро меньше 15 кБ в brotli
+- 🖼️ **Popout** — вынос окна в Picture-in-Picture или во всплывающее окно на другом мониторе
+- 🧩 **Докинг** — окна раскладываются по панелям со вкладками и перетаскиваемыми разделителями, как в dockview, а остальные продолжают плавать; отменяется и сохраняется
+- 📦 **Совместим с WinBox** — `@surdeddd/wmkit/winbox` говорит на API WinBox.js; [переезд одним импортом](docs/winbox-migration.ru.md)
+- 📦 **Ноль зависимостей**, строгий TypeScript, ESM + CJS, ядро меньше 16 кБ в brotli
 
 ## Установка
 
@@ -69,13 +71,13 @@ desktop.attachWindow(win.id, el, { removeOnClose: true })
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | кнопки управления, работают через делегирование |
 | `data-wm-content` | скроллируемая область контента |
 
-`removeOnClose` сам отвязывает контроллер и удаляет элемент при закрытии окна. На тач-устройствах хит-зоны ресайза и порог снэпа автоматически крупнее (`pointer: coarse`); настраиваются через `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
+`removeOnClose` сам отвязывает контроллер и удаляет элемент при закрытии окна; через биндер (адаптеры) вернувшееся окно снова добавляется в рабочий стол. На тач-устройствах хит-зоны ресайза и порог снэпа автоматически крупнее (`pointer: coarse`); настраиваются через `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
 
 Контроллер добавляет ресайз-хендлы (`[data-wm-resize]`), превью снэпа (`[data-wm-snap-preview]`) и скрытый live-регион для скринридеров.
 
 ## Адаптеры
 
-Каждый адаптер — тонкая обёртка над тем же ядром и тем же DOM-контроллером, около 60 строк. Они нужны только чтобы привязаться и отвязаться в нужный момент жизненного цикла компонента. Контент окна всегда живёт в дереве вашего фреймворка: никакого innerHTML, порталов и переноса узлов.
+Каждый адаптер — тонкая обёртка над тем же ядром и тем же DOM-контроллером. Они нужны только чтобы привязаться и отвязаться в нужный момент жизненного цикла компонента. Контент окна всегда живёт в дереве вашего фреймворка: никакого innerHTML, порталов и переноса узлов.
 
 ### React
 
@@ -90,15 +92,15 @@ function Desktop() {
   return (
     <div ref={ref} style={{ position: 'relative', height: '100vh' }}>
       <button type="button" onClick={() => wm.open({ title: 'Окно' })}>открыть</button>
-      {state.order.map((id) => (
-        <Win key={id} binder={binder} win={state.windows[id]} />
+      {Object.values(state.windows).map((win) => (
+        <Win key={win.id} binder={binder} win={win} />
       ))}
     </div>
   )
 }
 
 function Win({ binder, win }) {
-  const ref = useWmWindowRef(binder, win.id, { removeOnClose: true })
+  const ref = useWmWindowRef(binder, win.id)
   return (
     <section ref={ref}>
       <header data-wm-drag><span data-wm-title>{win.title}</span></header>
@@ -208,7 +210,7 @@ export class DesktopComponent {
 }
 ```
 
-Полные примеры с таскбаром, модалками и сигнатурами всех хуков — в [docs/adapters.md](./docs/adapters.md).
+Полные примеры с таскбаром, модалками и сигнатурами всех хуков — в [docs/adapters.ru.md](./docs/adapters.ru.md).
 
 ## API ядра — кратко
 
@@ -236,9 +238,9 @@ wm.open({ id: 'video', aspectRatio: 16 / 9 })      // ресайз держит 
 wm.center('video'); wm.sendToBack('docs')
 ```
 
-Слои: `normal` < `floating` (always-on-top) < `modal`. Модалка блокирует фокус нижних окон (попытка — событие `modalblocked` и flash-анимация), Tab заперт внутри.
+Слои: `normal` < `floating` (always-on-top) < `modal`. Модалка блокирует фокус нижних окон и любое указательное взаимодействие с ними: drag, ресайз, двойной клик, action-атрибуты, меню тайтлбара и нажатия, которые сдвинули бы фокус. Заблокированный `focus()` — это событие `modalblocked`, заблокированное нажатие — flash-анимация модалки, Tab заперт внутри.
 
-Клавиатура по умолчанию: стрелки двигают сфокусированное окно (16 px), `Alt` — шаг 1 px, `Shift+стрелки` — ресайз, `Ctrl/⌘+Alt+←/→` — прилипание к половине, `Ctrl/⌘+Alt+↑/↓` — развернуть/свернуть, `Ctrl/⌘+Z` и `Ctrl/⌘+Shift+Z` — отмена и повтор, `F6`/`Shift+F6` — цикл по окнам, `Escape` отменяет активный drag/resize (и убирает его из истории).
+Клавиатура по умолчанию: стрелки двигают сфокусированное окно (16 px), пока фокус клавиатуры на самом окне или в его тайтлбаре (виджеты в контенте сохраняют свои стрелки), `Alt` — шаг 1 px, `Shift+стрелки` — ресайз, `Ctrl/⌘+Alt+←/→` — прилипание к половине, `Ctrl/⌘+Alt+↑/↓` — развернуть/свернуть, `Ctrl/⌘+Z` и `Ctrl/⌘+Shift+Z` — отмена и повтор (в том числе на нелатинской раскладке), `F6`/`Shift+F6` — цикл по окнам, и из поля ввода тоже, `Escape` отменяет активный drag/resize (и убирает его из истории).
 
 Магнетизм включён из коробки (порог 8 px, на тач-устройствах 12 px): `attachDesktop(wm, el, { magnetism: { threshold: 16 } })` или `magnetism: false`. Свой контекст-меню тайтлбара — через `onTitlebarContextMenu(win, event)` (правый клик и long-press на таче).
 
@@ -254,18 +256,29 @@ persist(wm, {                       // версия контракта + миг�
 })
 ```
 
-### Popout (experimental)
+### Popout
 
 ```js
-import { popout, isPopoutSupported } from '@surdeddd/wmkit/popout'
-if (isPopoutSupported()) await popout(wm, 'docs', contentElement)
+import { popout } from '@surdeddd/wmkit/popout'
+button.onclick = () => popout(wm, 'docs', contentElement, { target: 'window', screen: 'other' })
 ```
 
-Окно уезжает в настоящее always-on-top окно ОС (Document Picture-in-Picture) с тем же JS-контекстом и состоянием.
+Окно уезжает в отдельное окно ОС с тем же JS-контекстом и состоянием: в always-on-top Document Picture-in-Picture, где браузер его умеет (Chrome, Edge, Firefox), и во всплывающее окно везде остальном. `screen: 'other'` ставит всплывающее окно на второй монитор через Window Management API. Вызывать из обработчика жеста пользователя.
+
+### `createDock(desktop, options?)` — `@surdeddd/wmkit/dock`
+
+```js
+import { createDock } from '@surdeddd/wmkit/dock'
+const dock = createDock(desktop)
+dock.dock('editor')
+dock.dock('files', { side: 'left' })
+```
+
+Раскладывает окна по панелям. Бросьте окно к краю панели — она разделится, в центр — окно станет вкладкой, к краю рабочего стола — встанет рядом со всеми. Разделители двигаются мышью и стрелками. Закреплённое окно, оторванное за заголовок, снова плавает. Каждая операция — один шаг отмены, а `persist` сохраняет раскладку между перезагрузками.
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.46 кБ в brotli.
+Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.61 кБ в brotli.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -274,11 +287,11 @@ import { touchGestures } from '@surdeddd/wmkit/gestures'
 attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })] })
 ```
 
-Жест — это просто функция: принимает `GestureContext`, возвращает свою отписку. Свои жесты уживаются со встроенными драгом и ресайзом через ту же пару `claim`/`busy` — подробности в [docs/api.md](docs/api.md).
+Жест — это просто функция: принимает `GestureContext`, возвращает свою отписку. Свои жесты уживаются со встроенными драгом и ресайзом через ту же пару `claim`/`busy` — подробности в [docs/api.ru.md](docs/api.ru.md).
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Собирает само окно из строки разметки: можно принести свою обвязку и свои кнопки, не написав ни одного обработчика. 1.02 кБ в brotli.
+Собирает само окно из строки разметки: можно принести свою обвязку и свои кнопки, не написав ни одного обработчика. 1.9 кБ в brotli.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -288,7 +301,7 @@ const mine = skin({
   name: 'mine',
   template:
     '<section><header data-wm-drag><span data-wm-title>{{title}}</span>' +
-    '<button data-wm-close aria-label="Закрыть {{title}}"></button></header>' +
+    '<button data-wm-close aria-label="Закрыть"></button></header>' +
     '<div data-wm-content></div></section>',
 })
 
@@ -296,7 +309,7 @@ const desktop = attachDesktop(wm, root, { skins: { mine } })
 desktop.mountWindow('notes', 'mine').content.append(myApp)
 ```
 
-`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` и `data-wm-to-workspace="2"` читаются прямо из вашей разметки. Каждая подстановка `{{...}}` экранируется. `shadow: true` запечатывает обвязку в открытом теневом корне, не теряя ни группировку, ни ловушку фокуса, ни доступное имя — подробности в [docs/recipes.md](docs/recipes.md).
+`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` и `data-wm-to-workspace="2"` читаются прямо из вашей разметки. Каждая подстановка `{{...}}` экранируется и может стоять только в тексте или в атрибуте `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` или `label` в кавычках; в любом другом месте `skin()` бросает ошибку. За дальнейшими изменениями следует только `{{title}}` внутри `[data-wm-title]`. `shadow: true` запечатывает обвязку в открытом теневом корне, не теряя ни группировку, ни ловушку фокуса, ни доступное имя — подробности в [docs/recipes.ru.md](docs/recipes.ru.md).
 
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
@@ -334,17 +347,48 @@ panel.destroy()
 | вариант | одного окна | токены, через `data-wm-variant` |
 | скин | одного окна | саму разметку |
 
-Тема и вариант перекрашивают то, что есть; скин это заменяет. Для первых двух — `meta.variant`, для третьего — `meta.skin`, подробности в [docs/theming.md](docs/theming.md).
+Тема и вариант перекрашивают то, что есть; скин это заменяет. Для первых двух — `meta.variant`, для третьего — `meta.skin`, подробности в [docs/theming.ru.md](docs/theming.ru.md).
 
 ## SSR
 
 Ядро не трогает `window`/`document`: менеджер можно создавать и гидрейтить на сервере, `attachDesktop` вызывается после маунта. `persist` тихо выключается без доступного storage.
 
+## Документация
+
+Справочник лежит в [`docs/`](./docs/README.ru.md) и опубликован сайтом с поиском на русском и английском: [wmkit.vercel.app/docs/ru](https://wmkit.vercel.app/docs/ru/). Там же — [API](./docs/api.ru.md), [адаптеры](./docs/adapters.ru.md), [темы](./docs/theming.ru.md), [рецепты](./docs/recipes.ru.md), [поддержка браузеров](./docs/browser-support.ru.md) и [переезд с WinBox](./docs/winbox-migration.ru.md).
+
+## Шаблоны
+
+[`templates/dashboard`](./templates/dashboard/README.ru.md) — операционный дашборд на `<wm-desktop>` и плагине докинга: плитки с цифрами, живой график на SVG, таблица и журнал, разложенные по панелям, которые можно переставлять, отпускать плавать и сбрасывать; раскладка переживает перезагрузку, интерфейс на русском и английском.
+
+```bash
+npx degit Surdeddd/wmkit/templates/dashboard my-dashboard
+```
+
+[![Открыть в StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Surdeddd/wmkit/tree/main/templates/dashboard)
+
+## Сравнение
+
+| | wmkit | WinBox | jsPanel4 | Dockview | Zag floating-panel |
+| --- | --- | --- | --- | --- | --- |
+| Поддерживается | ✓ 2026 | ✗ с 2023 | ✗ с 2022 | ✓ | ✓ |
+| Headless-ядро | ✓ | ✗ | ✗ | ~ свой UI | ✓ |
+| Родные адаптеры | React·Vue·Svelte·Solid·Angular·Preact·Lit·Qwik + веб-компоненты | от сообщества | ✗ | React·Vue·Angular | через Ark UI |
+| Много окон (z-порядок, таскбар, модалки) | ✓ | частично | частично | группы дока | ✗ одна панель |
+| Зоны снэпа с превью | ✓ | ✗ | ✗ | — | ✗ |
+| Докинг (панели, вкладки) | ✓ | ✗ | ✗ | ✓ | ✗ |
+| Клавиатура и скринридер | ✓ | ✗ | ✗ | частично | частично |
+| Сохранение из коробки | ✓ | ✗ | ✗ | ✓ | ✗ |
+| Вынос окна (PiP, popup, другой монитор) | ✓ | ✗ | ✗ | window.open | ✗ |
+| TypeScript | строгий | @types | ✗ | ✓ | ✓ |
+
+*(проверено в июле 2026: история коммитов, загрузки npm, открытые запросы фич)*
+
 ## Качество
 
-- 565 юнит-тестов: **100%** покрытие стейт-машины, chrome-плагина и persist по строкам/веткам/функциям, плюс обязательные пороги на DOM-слой и адаптеры
-- 550+ Playwright-сценариев на Chromium, Firefox, WebKit и мобильной эмуляции: drag, ресайз во все стороны, снэп, магнетизм, рабочие столы, undo после drag, клавиатура, touch, персист через перезагрузку, стресс на 50 окон, модальные ловушки, axe-аудиты доступности, визуальная регрессия по скриншотам
-- перф-бенчмарки в CI на каждый push (`vitest bench`): 1 000 окон открываются за ~150 мс, move среди 50 окон ~1.2 мкс, полный undo/redo-проход на 100 шагов ~52 мкс
+- 867 юнит-тестов: **100%** покрытие стейт-машины, persist и модели раскладки дока по строкам/веткам/функциям, фаззеры менеджера, DOM-слоя и раскладки дока, плюс обязательные пороги на DOM-слой, плагины и адаптеры
+- 750+ Playwright-сценариев на Chromium, Firefox, WebKit и мобильной эмуляции: drag, ресайз во все стороны, снэп, магнетизм, докинг, рабочие столы, undo после drag, клавиатура, touch, iframe, popout, персист через перезагрузку, стресс на 50 окон, модальные ловушки, все адаптеры, сайт документации и шаблон, axe-аудиты доступности, визуальная регрессия по скриншотам
+- перф-бенчмарки в CI на каждый push (`vitest bench`): 1 000 окон открываются за ~57 мс, move среди 50 окон без DOM ~3 мкс, кадр перетаскивания среди 800 привязанных окон ~0.09 мс, полный undo/redo-проход на 100 шагов ~80 мкс
 - `publint` + `@arethetypeswrong/cli` проверяют валидность пакета, `size-limit` следит за бюджетами
 
 ## Лицензия

@@ -54,7 +54,7 @@ The controller runs `flipToTarget` on minimize and `flipFromTarget` on restore, 
 
 ## Modal dialogs
 
-Open with `layer: 'modal'`. The manager blocks focus on everything below it and emits `modalblocked`; the DOM layer flashes the modal and traps Tab inside it.
+Open with `layer: 'modal'`. The manager blocks focus on everything below it and emits `modalblocked`; the DOM layer refuses pointer input (drag, resize, clicks, action attributes) on the windows below, flashes the modal and traps Tab inside it.
 
 ```js
 const confirm = wm.open({
@@ -76,6 +76,8 @@ Notes:
 - `floating` is the softer variant: always on top, but not blocking.
 - The trap needs something focusable inside the window; give the dialog a button.
 - Programmatic calls are never blocked — `wm.close('confirm')` always works, which is how you dismiss it.
+- `maximize`, `snap`, `restore` and the other stage calls that focus a window bring its workspace forward but skip the focus silently while a modal blocks it; `modalblocked` means a blocked `focus()` call.
+- A window that becomes the top modal through `update(…, { layer })` or `moveToWorkspace` takes focus; demoting the focused modal hands focus to the next visible modal.
 
 ## Persistence and migrations
 
@@ -85,13 +87,14 @@ import { persist } from '@surdeddd/wmkit/persist'
 const store = persist(wm, {
   key: 'my-app-desktop',
   version: 2,
+  autoRestore: false,
   migrate: (state, from) => (from === 1 ? upgradeV1(state) : null),
 })
 ```
 
-The plugin auto-restores on creation, then debounce-saves on every change. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
+By default the plugin auto-restores on creation (`autoRestore: false` above leaves that to you, for a reason given below), then debounce-saves on every change; a pending save is flushed on `pagehide` and on `destroy()`, and `clear()` also cancels a pending save. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
 
-Restoring what you rendered is the other half — `hydrate` emits `open` for every window that appeared, so mounting can be driven entirely by events:
+Restoring what you rendered is the other half — `hydrate` emits `open` for every window that appeared, so mounting can be driven entirely by events. Register the listener before the restore happens: with the default `autoRestore`, `persist` hydrates on creation before your listener exists, and a second `restore()` of identical data emits nothing:
 
 ```js
 wm.on('open', ({ window: win }) => {
@@ -235,7 +238,7 @@ for (const id of selection) wm.moveBy(id, dx, dy)
 wm.endInteraction()          // one undo step for the whole group
 ```
 
-If the user cancels, `abortInteraction()` ends the interaction *and* drops the entry it created, so Escape leaves no trace in the history. `batch(fn)` is the non-gesture equivalent: one `change` notification and one history entry for a burst of calls.
+If the user cancels, `abortInteraction()` ends the interaction *and* drops the entry it created, so Escape leaves no trace in the history. `clearHistory()` inside a `batch` restarts history at that call, and later changes in the same batch undo back to it; inside a gesture the rest of the gesture is not recorded, and `abortInteraction()` brings back what was cleared. `batch(fn)` is the non-gesture equivalent: one `change` notification and one history entry for a burst of calls.
 
 ## A context menu on the titlebar
 
@@ -270,6 +273,28 @@ const stop = wm.subscribe(() => {
 
 That is exactly what `useWmWindow` and `wmWindowStore` do, and it is why a fifty-window desktop re-renders one component when one window moves.
 
+## Popping a React window out to another monitor
+
+A node React rendered loses its handlers when it moves into another document, because React listens on its own root. Leave the content where it is and render a copy into the popout through a portal:
+
+```tsx
+import { createPortal } from 'react-dom'
+import { popout, type PopoutHandle } from '@surdeddd/wmkit/popout'
+
+function PopoutButton({ wm, id, children }: { wm: WindowManager; id: string; children: ReactNode }) {
+  const [handle, setHandle] = useState<PopoutHandle | null>(null)
+  const open = async (event: MouseEvent<HTMLButtonElement>) => {
+    const root = event.currentTarget.closest<HTMLElement>('[data-wm-content]') as HTMLElement
+    const next = await popout(wm, id, root, { mode: 'container', target: 'window', screen: 'other' })
+    setHandle(next)
+    void next.closed.then(() => setHandle(null))
+  }
+  return handle ? createPortal(children, handle.container) : <button onClick={open}>pop out</button>
+}
+```
+
+`mode: 'container'` keeps the original node in place and hands back an empty `container` in the popout; the portal renders there with React's own event system intact. `closed` settles when the user closes the popout or the window closes in the manager.
+
 ## Server-side rendering
 
 `src/core` never touches `window` or `document`. Create the manager on the server, hydrate a saved layout, serialize it into the payload, and only attach the DOM layer after mount.
@@ -286,7 +311,7 @@ wm.hydrate(payload)
 attachDesktop(wm, desktopEl)   // ResizeObserver sets the real viewport, bounds re-derive
 ```
 
-Leaving the viewport at `0 × 0` on the server keeps clamping switched off, so nothing is squeezed into a viewport you do not know yet. `persist` probes storage in a `try`/`catch` and becomes a no-op when there is none.
+Leaving the viewport at `0 × 0` on the server keeps clamping switched off, so nothing is squeezed into a viewport you do not know yet. `persist` reads storage inside a `try`/`catch` and becomes a no-op when there is none.
 
 ## Testing
 
@@ -300,6 +325,8 @@ const win = wm.open({ title: 'Test' })
 wm.snap(win.id, 'left')
 expect(wm.get(win.id).bounds).toEqual({ x: 0, y: 0, width: 500, height: 800 })
 ```
+
+jsdom reports `clientWidth` and `clientHeight` as 0, so with `autoViewport` on the viewport set at mount is ignored and the constructor one stays: pass `viewport` to `createWindowManager` in jsdom tests.
 
 For DOM behaviour, drive real pointer events — the library uses pointer capture, so synthetic mouse events will not do. In Playwright:
 
@@ -327,7 +354,7 @@ What still matters on your side:
 
 ## Build a window from scratch
 
-`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it.
+`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it. A placeholder may sit only in text or in a quoted value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`; anywhere else `skin()` throws. Only `{{title}}` inside `[data-wm-title]` follows later state changes, every other placeholder is rendered at mount or rebuild, so the `aria-label="Close {{title}}"` below keeps the title the window had when it was mounted.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -354,13 +381,13 @@ const notes = desktop.mountWindow('notes', 'brutal')
 notes.content.append(myApp)
 ```
 
-The buttons need no handlers: `data-wm-close` and its siblings are read by the controller. `styles` are injected once per skin and never rewritten — the window carries `data-wm-skin="brutal"` so your rules have something to hold on to.
+The buttons need no handlers: `data-wm-close` and its siblings are read by the controller. Each `skin()` owns one `<style data-wm-skin-styles="brutal">` per document, removed when the last window wearing it goes away — the window carries `data-wm-skin="brutal"` so your rules have something to hold on to.
 
-The template must contain exactly one `[data-wm-content]`; anything else throws while you are writing the skin rather than silently dropping your app.
+The template must contain exactly one `[data-wm-content]` attribute and a single root element; anything else throws while you are writing the skin (or at mount, for extra roots) rather than silently dropping your app.
 
 ### Sealing it off
 
-`shadow: true` builds the chrome inside an open shadow root and projects your content through a `<slot>`. Page CSS cannot reach in, the window's own CSS cannot leak out, and the styles become one constructable stylesheet shared by every window of that skin.
+`shadow: true` builds the chrome inside an open shadow root. Your content is the template's own `[data-wm-content]` element, moved into the light DOM and projected through a `<slot>` placed where it stood, so shadow CSS reaches it as `::slotted([data-wm-content])`. Page CSS cannot reach in, the window's own CSS cannot leak out, and the styles become one constructable stylesheet shared by every window of that skin.
 
 ```js
 import { themeStyle } from '@surdeddd/wmkit/themes'
@@ -377,7 +404,7 @@ Pass `{ shadow: true }` or the theme arrives with its tokens and none of its rul
 
 ## Touch gestures
 
-Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.46 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
+Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.61 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
 
 - **Pinch a window to resize it.** Two fingers on the same window scale it around the point between them. The window's own `minSize`, `maxSize` and `aspectRatio` still rule, and the anchor is derived from the clamped size, so the point under your fingers stays put even at the limit. The whole pinch is one undo step; `Escape` or a cancelled pointer puts the start bounds back. While it runs the element carries `data-wm-pinching`.
 - **Swipe two fingers sideways to change workspace.** It works over a window as well as over bare desktop, which matters on a phone where windows cover everything. A gesture commits once the fingers travel `threshold` pixels horizontally and the travel is more than twice the vertical drift.
@@ -394,4 +421,4 @@ attachDesktop(wm, root, {
 
 Import `pinch()` or `swipe()` on their own when you only want one of them.
 
-One caveat worth knowing. A browser will hand you two-finger pointer events only if the element does not give the gesture to the page first, so the pinch gesture sets `touch-action: pan-x pan-y` on the desktop — content still scrolls, but the browser's own pinch-zoom no longer steals the gesture. If your windows never scroll, `lockTouchAction: true` upgrades that to `touch-action: none`.
+One caveat worth knowing. A browser will hand you two-finger pointer events only if the element does not give the gesture to the page first, so any two-finger gesture (pinch or swipe) sets `touch-action: pan-x pan-y` on the desktop, and the original value comes back on destroy — content still scrolls, but the browser's own pinch-zoom no longer steals the gesture. If your windows never scroll, `lockTouchAction: true` upgrades that to `touch-action: none`.

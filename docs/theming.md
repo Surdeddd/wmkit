@@ -86,7 +86,7 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-resizing` | window | the direction: `n`, `se`, … |
 | `data-wm-pinching` | window | present while two fingers are resizing it |
 | `data-wm-variant` | window | the variant name, when the window has one |
-| `data-wm-flash` | window | present for one animation after a blocked modal interaction |
+| `data-wm-flash` | window | set when a modal blocks an interaction; stays until the next blocked interaction or until the window detaches. The animation runs once per set and the attribute is not removed afterwards, since removing it would hand the element back to the theme's entry animation and replay it. Style the flash with an animation, not a static rule |
 | `data-wm-resize` | injected handles | the direction |
 | `data-wm-snap-preview` | injected preview | present |
 | `data-wm-announcer` | injected live region | present |
@@ -207,7 +207,9 @@ const dressed = skin({
 
 `{ shadow: true }` is not optional here, and the reason is worth knowing. Custom properties inherit through a shadow boundary, so the tokens reach in on their own — but the rules that use them are written as `[data-wm-window] [data-wm-drag]`, and inside a shadow root there is no ancestor carrying `data-wm-window`: that attribute lives on the host, outside. Adopt the plain text and you get the colours defined and nothing painted with them.
 
-The shadow flavour is the same stylesheet re-anchored: the window selector becomes `:host`, its qualifiers become `:host([data-wm-focused])`, descendants lose the prefix they can no longer match, and the desktop block is reduced to the tokens it defines. It is generated, never rewritten at runtime — `themeCss` stays byte-for-byte identical to the `.css` files, and `themeShadowCss` sits beside it.
+The shadow flavour is the same stylesheet re-anchored: the window selector becomes `:host`, its qualifiers become `:host([data-wm-focused])`, descendants lose the prefix they can no longer match, and the desktop block is reduced to the tokens it defines. Content rules become `::slotted([data-wm-content])`, `>` combinators are kept as `:host > x`, pseudo-classes go inside `:host(...)`, and rules that cannot match inside a shadow root are dropped. It is generated, never rewritten at runtime — `themeCss` stays byte-for-byte identical to the `.css` files, and `themeShadowCss` sits beside it.
+
+A shadow skin wears the theme in its own `styles`, whatever theme the desktop wears, so overrides on `[data-wm-desktop]` do not reach it. To retune one shadow window, set the tokens on the window host — `[data-wm-window]` or `[data-wm-skin="<name>"]`; a page rule on the host beats the shadow root's `:host` tokens.
 
 `themeNames` is the full list, in the same order the folder holds them. Both flavours come out of `pnpm themes`; a test regenerates them and fails if anyone edits a stylesheet without rerunning the generator.
 

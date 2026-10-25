@@ -2,7 +2,7 @@
 
 **Headless window manager for the web.** Draggable, resizable, snappable windows with a taskbar model, keyboard accessibility and state persistence — for vanilla JS and every major framework.
 
-[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [Docs](./docs/README.md) · [GitHub](https://github.com/Surdeddd/wmkit)
+[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [Docs](https://wmkit.vercel.app/docs/) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![CI](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
@@ -15,7 +15,7 @@
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
 - 🧱 **Your window, your markup** — build the whole frame from a template string, wire its buttons by attribute, and swap the skin on a live window without losing what it was showing
-- ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, all thin sugar over one core
+- ⚛️ **Official adapters** — `@surdeddd/wmkit/react`, `/vue`, `/svelte`, `/solid`, `/angular`, `/preact`, `/lit`, `/qwik`, all thin sugar over one core, plus `<wm-desktop>` and `<wm-window>` web components for everything else
 - 🗃️ **Tab groups** — drop one titlebar onto another and the windows share a frame, dockview style; the tab order is yours to reorder
 - ⊞ **Snap zones** — halves, quarters, thirds and drag-to-top maximize with a live preview
 - 🧲 **Magnetism** — window edges align to neighbours and the viewport while dragging
@@ -26,8 +26,10 @@
 - ⚡ **Fast** — `transform`-only positioning, rAF-batched pointer input, structural sharing; 50 windows drag at 60fps
 - 💾 **Persistence** — one call to serialize the desktop, one call to restore it, with versioned migrations
 - 🎨 **Sixteen themes** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — or bring your own CSS
-- 🖼️ **Popout** *(experimental)* — send a window into Document Picture-in-Picture
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 15 kB brotli core
+- 🖼️ **Popout** — send a window into Picture-in-Picture or a popup on another monitor
+- 🧩 **Docking** — tile windows into split panels with tabs and draggable separators, dockview style, while the rest keep floating; undoable and persisted
+- 📦 **WinBox compatible** — `@surdeddd/wmkit/winbox` speaks the WinBox.js API; [migrate in one import](docs/winbox-migration.md)
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 16 kB brotli core
 
 ## Install
 
@@ -73,7 +75,7 @@ The desktop element becomes the coordinate space. Your markup stays yours — wm
 | `data-wm-close` / `data-wm-minimize` / `data-wm-maximize` | control buttons, wired by delegation |
 | `data-wm-content` | scrollable content area (styled by themes) |
 
-`removeOnClose` detaches the controller and removes the element when the window closes. Touch devices get larger resize hit areas and snap thresholds automatically (`pointer: coarse`); tune via `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
+`removeOnClose` detaches the controller and removes the element when the window closes; through a binder (the adapters), a window that comes back is appended to the desktop again. Touch devices get larger resize hit areas and snap thresholds automatically (`pointer: coarse`); tune via `attachDesktop(wm, el, { hitAreas: { edge, corner } })`.
 
 The controller adds resize handles (`[data-wm-resize]`), a snap preview (`[data-wm-snap-preview]`) and a visually hidden live region for screen readers.
 
@@ -91,10 +93,9 @@ function Desktop() {
   return (
     <div ref={ref} style={{ position: 'relative', height: '100vh' }}>
       <button onClick={() => wm.open({ title: 'New window' })}>open</button>
-      {state.order.map((id) => {
-        const win = state.windows[id]
-        return win ? <Win key={id} binder={binder} win={win} /> : null
-      })}
+      {Object.values(state.windows).map((win) => (
+        <Win key={win.id} binder={binder} win={win} />
+      ))}
     </div>
   )
 }
@@ -182,7 +183,7 @@ function Desktop() {
 
   return (
     <div ref={dk.desktop} style={{ position: 'relative', height: '100vh' }}>
-      <For each={state().order}>
+      <For each={Object.keys(state().windows)}>
         {(id) => (
           <section ref={dk.window(id)}>
             <header data-wm-drag>
@@ -270,8 +271,8 @@ Manager methods:
 | `move(id, x, y)` / `moveBy(id, dx, dy)` / `resize(id, patch)` | resizing a snapped window unsnaps it; `aspectRatio` is preserved |
 | `center(id)` / `sendToBack(id)` | centre in the viewport, or drop to the bottom of the window's layer |
 | `restoreTo(id, bounds)` | used for drag-off-snap; stage → `normal` at explicit bounds |
-| `update(id, patch)` | title, layer, min/max size, `aspectRatio`, per-window flags, `meta` |
-| `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest; never recorded in history |
+| `update(id, patch)` | title, layer, min/max size, `aspectRatio`, per-window flags, `meta`; a patch that changes nothing is a no-op |
+| `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest; never recorded in history; a zero or negative size (a hidden desktop) is ignored |
 | `workspace()` / `setWorkspace(n)` / `moveToWorkspace(id, n)` | virtual desktops; focusing a window switches to its workspace |
 | `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop, re-derived against the current viewport |
 | `undo()` / `redo()` / `canUndo()` / `canRedo()` / `clearHistory()` | every mutation is one step; a whole drag or resize collapses into a single entry |
@@ -279,10 +280,10 @@ Manager methods:
 | `saveLayout(name)` / `loadLayout(name)` / `deleteLayout(name)` / `layoutNames()` | named desktop snapshots; `getLayout`/`setLayout` for external storage |
 | `arrange('cascade' \| 'tile')` | cascade staggers restored sizes, tile fills the viewport in a grid |
 | `minimizeAll()` / `restoreAll()` | bulk stage switches in one history step |
-| `subscribe(fn)` / `on(event, fn)` | granular events: `open, close, focus, move, resize, stage, update, order, modalblocked` |
+| `subscribe(fn)` / `on(event, fn)` | granular events: `open, close, focus, move, resize, stage, update, order, workspace, group, modalblocked` |
 | `batch(fn)` | coalesce many operations into one `change` notification |
 
-Windows carry `layer: 'normal' | 'floating' | 'modal'` — floating stays on top, modals trap focus and block interaction below (blocked attempts emit `modalblocked` and flash the modal).
+Windows carry `layer: 'normal' | 'floating' | 'modal'` — floating stays on top, modals trap focus and block pointer interaction below: drag, resize, double click, action attributes, the titlebar menu and presses that would move focus (a blocked `focus()` call emits `modalblocked`, and a blocked press flashes the modal).
 
 ### `attachDesktop(wm, element, options?)`
 
@@ -301,7 +302,7 @@ interface DesktopOptions {
 }
 ```
 
-Keyboard defaults: arrows move the focused window (16 px), `Alt` for 1 px steps, `Shift+arrows` resize, `Ctrl/⌘+Alt+←/→` snap to a half, `Ctrl/⌘+Alt+↑/↓` maximize or minimize, `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` undo and redo, `F6` / `Shift+F6` cycle windows, `Escape` cancels an in-flight drag or resize (and drops it from the history).
+Keyboard defaults: arrows move the focused window (16 px) while keyboard focus is on the window or its titlebar (content widgets keep their arrows), `Alt` for 1 px steps, `Shift+arrows` resize, `Ctrl/⌘+Alt+←/→` snap to a half, `Ctrl/⌘+Alt+↑/↓` maximize or minimize, `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` undo and redo (also on non-Latin layouts), `F6` / `Shift+F6` cycle windows, from inside a field too, `Escape` cancels an in-flight drag or resize (and drops it from the history).
 
 ### `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 
@@ -312,7 +313,7 @@ const store = persist(wm, { key: 'my-desktop' })  // auto-restores, then debounc
 store.clear()
 ```
 
-Storage defaults to `localStorage` (probed safely — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation.
+Storage defaults to `localStorage` (a missing or throwing one turns the plugin into a no-op — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation.
 
 Payloads are wrapped in a `{ version, state }` envelope. Bump `version` when your window contract changes and pass `migrate` to upgrade older data — anything you cannot migrate is discarded instead of restored broken:
 
@@ -323,13 +324,29 @@ persist(wm, {
 })
 ```
 
-### `popout(wm, id, contentEl, options?)` — `@surdeddd/wmkit/popout` *(experimental)*
+### `popout(wm, id, contentEl, options?)` — `@surdeddd/wmkit/popout`
 
-Moves a window's content into a [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) always-on-top OS window, keeping the same JS context and state. Feature-detect with `isPopoutSupported()`.
+Moves a window's content into a separate OS window, keeping the same JS context and state: an always-on-top [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) window where the browser has one (Chrome, Edge, Firefox), a popup everywhere else. `screen: 'other'` puts the popup on a second monitor through the Window Management API. Call it from a user gesture.
+
+```js
+import { popout } from '@surdeddd/wmkit/popout'
+button.onclick = () => popout(wm, 'docs', contentElement, { target: 'window', screen: 'other' })
+```
+
+### `createDock(desktop, options?)` — `@surdeddd/wmkit/dock`
+
+Docks windows into a layout of split panels. Drag a window onto a panel edge to split it, onto its centre to add a tab, or onto an edge of the desktop to dock beside everything. Separators resize with the pointer or the arrow keys. A docked window torn out by its titlebar floats again. Every dock operation is one undo step, and `persist` keeps the layout across reloads.
+
+```js
+import { createDock } from '@surdeddd/wmkit/dock'
+const dock = createDock(desktop)
+dock.dock('editor')
+dock.dock('files', { side: 'left' })
+```
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.47 kB brotlied.
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.61 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -342,7 +359,7 @@ A gesture is just a function that takes a `GestureContext` and returns its teard
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 1.02 kB brotlied.
+Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 1.9 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -352,7 +369,7 @@ const mine = skin({
   name: 'mine',
   template:
     '<section><header data-wm-drag><span data-wm-title>{{title}}</span>' +
-    '<button data-wm-close aria-label="Close {{title}}"></button></header>' +
+    '<button data-wm-close aria-label="Close"></button></header>' +
     '<div data-wm-content></div></section>',
 })
 
@@ -360,7 +377,7 @@ const desktop = attachDesktop(wm, root, { skins: { mine } })
 desktop.mountWindow('notes', 'mine').content.append(myApp)
 ```
 
-`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` and `data-wm-to-workspace="2"` are read straight off your markup. Every `{{placeholder}}` is HTML-escaped. `shadow: true` seals the chrome inside an open shadow root without losing grouping, focus trapping or the accessible name — see [docs/recipes.md](docs/recipes.md).
+`data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` and `data-wm-to-workspace="2"` are read straight off your markup. Every `{{placeholder}}` is HTML-escaped and may sit only in text or in a quoted `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label` attribute; anywhere else `skin()` throws. Only `{{title}}` inside `[data-wm-title]` follows later changes. `shadow: true` seals the chrome inside an open shadow root without losing grouping, focus trapping or the accessible name — see [docs/recipes.md](docs/recipes.md).
 
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
@@ -415,15 +432,26 @@ The core never touches `window`/`document` — create managers and even `hydrate
 
 ## Documentation
 
-This README is the tour. The reference lives in [`docs/`](./docs/README.md):
+This README is the tour. The reference lives in [`docs/`](./docs/README.md), also published as a site with search and a Russian version at [wmkit.vercel.app/docs](https://wmkit.vercel.app/docs/):
 
 | Page | What is in it |
 | --- | --- |
 | [API reference](./docs/api.md) | every export, option, method, event and type |
-| [Adapters](./docs/adapters.md) | complete React, Vue, Svelte, Solid and Angular integrations |
+| [Adapters](./docs/adapters.md) | complete React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik integrations, plus `<wm-desktop>` web components |
 | [Theming](./docs/theming.md) | `data-wm-*` contract, CSS variables, writing a theme from scratch |
 | [Recipes](./docs/recipes.md) | building a window from scratch, taskbar, modals, persistence, workspaces, SSR, testing, performance |
 | [Browser support](./docs/browser-support.md) | baselines per entry point and what degrades where |
+| [Migrating from WinBox](./docs/winbox-migration.md) | every WinBox option, method and callback mapped |
+
+## Templates
+
+[`templates/dashboard`](./templates/dashboard/README.md) is an operations dashboard on `<wm-desktop>` and the dock plugin: KPI tiles, a live SVG chart, a table and a log, tiled into panels you can rearrange, float and reset, saved across reloads, in English and Russian.
+
+```bash
+npx degit Surdeddd/wmkit/templates/dashboard my-dashboard
+```
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Surdeddd/wmkit/tree/main/templates/dashboard)
 
 ## Comparison
 
@@ -431,21 +459,22 @@ This README is the tour. The reference lives in [`docs/`](./docs/README.md):
 | --- | --- | --- | --- | --- | --- |
 | Maintained | ✓ 2026 | ✗ since 2023 | ✗ since 2022 | ✓ | ✓ |
 | Headless core | ✓ | ✗ | ✗ | ~ own UI | ✓ |
-| Official adapters | React·Vue·Svelte·Solid·Angular | community | ✗ | React·Vue·Angular | via Ark UI |
+| Official adapters | React·Vue·Svelte·Solid·Angular·Preact·Lit·Qwik + web components | community | ✗ | React·Vue·Angular | via Ark UI |
 | Multi-window (z-order, taskbar, modals) | ✓ | partial | partial | dock groups | ✗ single panel |
 | Snap zones + preview | ✓ | ✗ | ✗ | — | ✗ |
+| Docking (split panels, tabs) | ✓ | ✗ | ✗ | ✓ | ✗ |
 | Keyboard + screen reader | ✓ | ✗ | ✗ | partial | partial |
 | Persistence built in | ✓ | ✗ | ✗ | ✓ | ✗ |
-| Document PiP popout | ✓ | ✗ | ✗ | window.open | ✗ |
+| Popout (PiP, popup, other monitor) | ✓ | ✗ | ✗ | window.open | ✗ |
 | TypeScript | strict | @types | ✗ | ✓ | ✓ |
 
 *(checked July 2026: commit history, npm downloads, open feature requests)*
 
 ## Quality
 
-- 565 unit tests: **100%** line/branch/function/statement coverage on the core state machine, the chrome plugin and persistence, with enforced floors on the DOM layer and the adapters
-- 550+ Playwright scenarios on Chromium, Firefox, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, workspaces, undo after drag, keyboard, touch, persistence across reloads, 50-window stress, modal traps, axe accessibility scans, visual regression screenshots
-- performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~150 ms, a move among 50 windows costs ~1.2 µs, a full 100-step undo/redo sweep ~52 µs
+- 867 unit tests: **100%** line/branch/function/statement coverage on the core state machine, persistence and the dock layout model, fuzzers for the manager, the DOM layer and the dock layout, with enforced floors on the DOM layer, the plugins and the adapters
+- 750+ Playwright scenarios on Chromium, Firefox, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, docking, workspaces, undo after drag, keyboard, touch, iframes, popout, persistence across reloads, 50-window stress, modal traps, every adapter, the docs site and the template, axe accessibility scans, visual regression screenshots
+- performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~57 ms, a headless move among 50 windows costs ~3 µs, a drag frame among 800 attached windows ~0.09 ms, a full 100-step undo/redo sweep ~80 µs
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
 
 ## Development

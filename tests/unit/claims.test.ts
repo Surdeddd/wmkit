@@ -26,8 +26,6 @@ function ownClaims(): Array<{ where: string; size: number }> {
   for (const match of html.matchAll(/core under\s*(\d+(?:\.\d+)?)\s*kB/g)) {
     found.push({ where: 'index.html description', size: Number(match[1]) })
   }
-  // matched by the shape of the cell, not by its label: a renamed row must not
-  // slip out of this guard the way the Russian one did
   for (const match of i18n.matchAll(/cells: \[\s*\{ text: '~(\d+(?:\.\d+)?)\s*(?:kB|кБ)'/g)) {
     found.push({ where: 'comparison row', size: Number(match[1]) })
   }
@@ -66,6 +64,18 @@ describe('the numbers the project advertises', () => {
     )
     expect(shortcuts).toHaveLength(2)
     expect(shortcuts[0]).toBe(shortcuts[1])
+  })
+
+  it('quotes the same sizes in both READMEs and the recipes', () => {
+    const sizes = (file: string, unit: string) =>
+      [...read(file).matchAll(new RegExp(`(\\d+(?:\\.\\d+)?) ${unit}`, 'g'))].map(
+        (match) => match[1] as string,
+      )
+    const english = sizes('README.md', 'kB')
+    expect(english.length).toBeGreaterThanOrEqual(3)
+    expect(sizes('README.ru.md', 'кБ')).toEqual(english)
+    const gestures = /gestures`\s+costs (\d+(?:\.\d+)?) kB/.exec(read('docs/recipes.md'))?.[1]
+    expect(english).toContain(gestures)
   })
 
   it('ships every theme the demo lets you pick', () => {

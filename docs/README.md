@@ -5,7 +5,7 @@ Headless window manager for the web. The [root README](../README.md) is the tour
 | Page | What is in it |
 | --- | --- |
 | [API reference](./api.md) | every export, option, method, event and type |
-| [Adapters](./adapters.md) | complete React, Vue, Svelte, Solid and Angular integrations |
+| [Adapters](./adapters.md) | complete React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik integrations, plus `<wm-desktop>` web components |
 | [Theming](./theming.md) | `data-wm-*` contract, CSS variables, writing a theme from scratch |
 | [Recipes](./recipes.md) | building a window from scratch, taskbar, modals, persistence, workspaces, SSR, testing |
 | [Browser support](./browser-support.md) | baselines per entry point and what degrades where |
@@ -17,7 +17,7 @@ Three layers, each usable on its own:
 ```text
 createWindowManager()   state machine — bounds, stacking, stages, focus, history. No DOM.
 attachDesktop()         DOM controller — pointer, keyboard, ARIA, snap preview, animations.
-adapters                ~60 lines each — wire the two above into a framework lifecycle.
+adapters                thin wrappers — wire the two above into a framework lifecycle.
 ```
 
 The manager never reads or writes the DOM, so it runs in Node and during SSR. The controller never renders content — it moves and labels elements you already own. Window content therefore stays in your component tree: no `innerHTML`, no portals, no re-parenting.
@@ -40,4 +40,4 @@ The manager never reads or writes the DOM, so it runs in Node and during SSR. Th
 pnpm add @surdeddd/wmkit
 ```
 
-Entry points: `.` (core + DOM), `./react`, `./vue`, `./svelte`, `./solid`, `./angular`, `./persist`, `./popout`, `./gestures`, `./devtools`, `./chrome`, `./themes` (the stylesheets as text) and `./themes/*.css`. ESM and CJS, types per condition, zero dependencies.
+Entry points: `.` (core + DOM), `./react`, `./vue`, `./svelte`, `./solid`, `./angular`, `./preact`, `./lit`, `./qwik`, `./elements` and `./elements/define` (web components), `./persist`, `./popout`, `./gestures`, `./devtools`, `./chrome`, `./dock`, `./winbox`, `./themes` (the stylesheets as text) and `./themes/*.css`. ESM and CJS, types per condition, zero dependencies.

@@ -11,8 +11,9 @@ wmkit ships ES2022 (`target: es2022` in tsup), ESM + CJS, no polyfills and no ru
 | `attachDesktop` (drag, resize, snap, keyboard, a11y) | 98 | 15.4 | 94 | ES2022 and `structuredClone` still dominate |
 | `themes/glass.css`, `themes/light.css` | 111 | 16.2 | 113 | `color-mix()` in the snap preview |
 | `themes/retro.css` | 98 | 15.4 | 94 | plain borders and gradients only |
-| `@surdeddd/wmkit/persist` | 98 | 15.4 | 94 | same as core; `localStorage` is probed safely |
-| `@surdeddd/wmkit/popout` | 116 | not supported | not supported | Document Picture-in-Picture |
+| `@surdeddd/wmkit/persist` | 98 | 15.4 | 94 | same as core; a missing or throwing `localStorage` makes it a no-op |
+| `@surdeddd/wmkit/popout` | 98 | 15.4 | 94 | a `window.open` popup everywhere; picture-in-picture needs Chrome/Edge 116+ or Firefox 151+ |
+| `@surdeddd/wmkit/dock` | 98 | 15.4 | 94 | same as `attachDesktop`; `MutationObserver` marks late windows |
 
 The adapters add whatever their framework requires and nothing else: React >= 18, Vue >= 3.3, Svelte >= 4, Solid >= 1.8, Angular >= 16.
 
@@ -24,15 +25,18 @@ The DOM APIs the controller needs — pointer capture, `ResizeObserver`, `reques
 
 | API | Used by | Missing behaviour |
 | --- | --- | --- |
-| Pointer Events + `setPointerCapture` | `src/dom/drag.ts`, `src/dom/resize.ts` | no drag or resize; keyboard control and the core still work |
+| Pointer Events + `setPointerCapture` | `src/dom/drag.ts`, `src/dom/resize.ts`, dock separators | no drag or resize; keyboard control and the core still work |
 | `ResizeObserver` | `attachDesktop` viewport tracking | throws on attach — pass `autoViewport: false` and drive `wm.setViewport()` yourself |
 | `requestAnimationFrame` | pointer batching in drag and resize | required |
 | `structuredClone` | named layouts in `src/core/manager.ts` | `saveLayout`/`getLayout`/`setLayout` throw; every other core method is unaffected |
 | `Element.animate` | FLIP minimize and restore ghosts | feature-detected — the animation is skipped, state still changes |
+| `Element.moveBefore` | skin rebuilds in `src/dom/controller.ts` | feature-detected — content moves with `append`, so an `iframe` inside a rebuilt window reloads (Chromium 133+ keeps it running) |
 | `matchMedia` | coarse-pointer and reduced-motion detection | feature-detected — falls back to fine-pointer defaults |
-| `localStorage` | `persist` default storage | probed in a `try`/`catch`; the plugin becomes a no-op, or pass your own storage |
+| `localStorage` | `persist` default storage | read inside a `try`/`catch`; the plugin becomes a no-op, or pass your own storage |
 | `document.adoptedStyleSheets` | `popout` style copying | guarded — only `document.styleSheets` are copied |
-| `documentPictureInPicture` | `popout` | `isPopoutSupported()` returns `false`; `popout()` rejects with a clear error |
+| `documentPictureInPicture` | `popout` (`target: 'pip'`, and `'auto'` when present) | `'auto'` falls back to a popup; `isPopoutSupported('pip')` returns `false` |
+| `window.open` | `popout` (`target: 'window'`) | `isPopoutSupported()` returns `false` when neither kind exists; `popout()` rejects with a clear error |
+| `getScreenDetails` (Window Management API) | `popout` `screen` option, `listScreens()` | feature-detected — the popup opens at the browser's default position and `listScreens()` resolves `null`; the same happens when the permission is denied |
 
 Nothing in `src/core` touches `window` or `document`, so the manager can be created, mutated, serialized and hydrated during SSR. Only `attachDesktop` and the adapters' bind helpers need a document — call them after mount.
 
@@ -53,10 +57,11 @@ All themes are pure custom properties over `data-wm-*` attributes, so replacing 
 CI runs the full end-to-end suite on every push against:
 
 - Chromium (Playwright `Desktop Chrome`)
+- Firefox (Playwright `Desktop Firefox`)
 - WebKit (Playwright `Desktop Safari`)
 - Mobile Chromium (Playwright `Pixel 7`, touch and coarse pointer)
 
-Unit tests run in Node, with jsdom for the adapter and DOM smoke tests. Firefox is not in the matrix yet — the library uses no Gecko-specific paths, but it is not verified on every push.
+Unit tests run in Node, with jsdom for the adapter and DOM smoke tests.
 
 ## Touch and pointer
 
@@ -66,6 +71,6 @@ Titlebar context menus fire on right click and on long press, so `onTitlebarCont
 
 ## Known gaps
 
-- `popout` is Chromium-only and desktop-only, by the spec — treat it as progressive enhancement and always check `isPopoutSupported()`.
+- `popout` opens a popup in every engine; picture-in-picture exists in Chrome and Edge 116+ and Firefox 151+, on desktop only. Check `isPopoutSupported()` before showing the control, since a browser can disable both.
 - Named layouts need `structuredClone`. If you must support older engines, ship a polyfill or avoid the layout API and store `serialize()` output yourself.
 - Visual regression baselines are generated on macOS and skipped in CI, so rendering differences are caught by hand, not by the pipeline.

@@ -1,15 +1,22 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = new URL('../../', import.meta.url).pathname
 
-function markdownFiles(): string[] {
-  const found = ['README.md', 'README.ru.md']
-  for (const name of readdirSync(join(root, 'docs'))) {
-    if (name.endsWith('.md')) found.push(join('docs', name))
+function docsPages(dir = 'docs'): string[] {
+  const found: string[] = []
+  for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+    if (entry.name.startsWith('.') || entry.name === 'superpowers') continue
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...docsPages(path))
+    else if (entry.name.endsWith('.md')) found.push(path)
   }
   return found
+}
+
+function markdownFiles(): string[] {
+  return ['README.md', 'README.ru.md', ...docsPages()]
 }
 
 interface Line {
@@ -40,6 +47,16 @@ function scan(source: string): { lines: Line[]; open: string | null } {
   return { lines, open: fence }
 }
 
+function fieldsOf(text: string, name: string): Map<string, string> {
+  const block = new RegExp(`interface ${name}\\b[^{\\n]*\\{\\n([\\s\\S]*?)\\n\\}`).exec(text)
+  const fields = new Map<string, string>()
+  for (const line of (block?.[1] ?? '').split('\n')) {
+    const field = /^ {2}(\w+\??): (.*)$/.exec(line)
+    if (field) fields.set(field[1] as string, (field[2] as string).replace(/\s*\/\/.*$/, '').trim())
+  }
+  return fields
+}
+
 describe('the markdown we ship', () => {
   it('closes every code fence it opens', () => {
     const unbalanced: string[] = []
@@ -62,5 +79,62 @@ describe('the markdown we ship', () => {
       }
     }
     expect(swallowed, swallowed.join('\n')).toEqual([])
+  })
+
+  it('gives every English docs page a Russian twin', () => {
+    const missing = docsPages()
+      .filter((page) => !page.endsWith('.ru.md'))
+      .map((page) => page.replace(/\.md$/, '.ru.md'))
+      .filter((twin) => !existsSync(join(root, twin)))
+    expect(missing, `missing twins: ${missing.join(', ')}`).toEqual([])
+  })
+
+  it('links only to files that exist', () => {
+    const dead: string[] = []
+    for (const file of markdownFiles()) {
+      const { lines } = scan(readFileSync(join(root, file), 'utf8'))
+      for (const line of lines) {
+        if (line.fenced) continue
+        for (const [, href] of line.text.matchAll(/\]\(([^)\s]+)\)/g)) {
+          if (!href || /^[a-z]+:|^#|^\//i.test(href)) continue
+          const target = resolve(dirname(join(root, file)), href.split('#')[0] as string)
+          if (!existsSync(target)) dead.push(`${file}:${line.number} ${href}`)
+        }
+      }
+    }
+    expect(dead, dead.join('\n')).toEqual([])
+  })
+
+  it('declares the public state types exactly as the source does', () => {
+    const source = readFileSync(join(root, 'src/core/types.ts'), 'utf8')
+    const api = readFileSync(join(root, 'docs/api.md'), 'utf8')
+    const names = [
+      'WindowFlags',
+      'WindowState',
+      'WindowInit',
+      'WindowGroup',
+      'ManagerState',
+      'SerializedState',
+      'ManagerEvents',
+      'ManagerOptions',
+    ]
+    const drifted: string[] = []
+    for (const name of names) {
+      const documented = fieldsOf(api, name)
+      const declared = fieldsOf(source, name)
+      expect(declared.size, `${name} was not found in src/core/types.ts`).toBeGreaterThan(0)
+      expect(documented.size, `${name} was not found in docs/api.md`).toBeGreaterThan(0)
+      for (const [field, type] of declared) {
+        if (documented.get(field) !== type) {
+          drifted.push(
+            `${name}.${field}: source ${type}, docs ${documented.get(field) ?? 'missing'}`,
+          )
+        }
+      }
+      for (const field of documented.keys()) {
+        if (!declared.has(field)) drifted.push(`${name}.${field}: documented, not in the source`)
+      }
+    }
+    expect(drifted, drifted.join('\n')).toEqual([])
   })
 })
