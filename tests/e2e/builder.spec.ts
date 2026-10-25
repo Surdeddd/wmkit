@@ -59,6 +59,29 @@ test.describe('the window designer', () => {
     await expect.poll(() => previewBg(page), { timeout: 10_000 }).toBe('rgb(9, 99, 199)')
   })
 
+  test('a size below the minimum snaps back to what the window really is', async ({ page }) => {
+    await openBuilder(page)
+    const height = page.locator('.builder-axis input').nth(3)
+    await expect(height).toHaveAttribute('min', '100')
+    await expect(page.locator('.builder-axis input').nth(2)).toHaveAttribute('min', '160')
+    await height.fill('-20')
+    await height.press('Enter')
+    await expect(height).toHaveValue('100')
+    await height.fill('60')
+    await height.blur()
+    await expect(height).toHaveValue('100')
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const box = document
+            .querySelector('.builder-stage [data-wm-window="preview"]')
+            ?.getBoundingClientRect()
+          return box ? Math.round(box.height) : 0
+        }),
+      )
+      .toBe(100)
+  })
+
   test('placement runs both ways', async ({ page, isMobile }) => {
     await openBuilder(page)
     const width = page.locator('.builder-axis input').nth(2)

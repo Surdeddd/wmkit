@@ -420,18 +420,25 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
       } else {
         previewWm.resize('preview', { [field]: value })
       }
+      syncFields(true)
     })
   }
 
-  previewWm.subscribe(() => {
+  function syncFields(all = false): void {
     const win = previewWm.get('preview')
     if (!win) return
     const values = [win.bounds.x, win.bounds.y, win.bounds.width, win.bounds.height]
+    const mins = [null, null, win.minSize.width, win.minSize.height]
     for (const [index, axis] of axes.entries()) {
-      if (document.activeElement === axis.input) continue
+      const min = mins[index]
+      if (min != null) axis.input.min = String(min)
+      if (!all && document.activeElement === axis.input) continue
       axis.input.value = String(Math.round(values[index] ?? 0))
     }
-  })
+  }
+
+  previewWm.subscribe(() => syncFields())
+  syncFields()
 
   toDesktopBtn.addEventListener('click', () => {
     try {
