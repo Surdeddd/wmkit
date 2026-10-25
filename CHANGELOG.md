@@ -1,3 +1,29 @@
+# [0.12.0](https://github.com/Surdeddd/wmkit/compare/v0.11.1...v0.12.0) (2026-10-25)
+
+
+### Bug Fixes
+
+* **adapters:** React owns its nodes and survives StrictMode, Vue SSR stays live, Solid binds on mount, Angular writes untracked ([fd15f3f](https://github.com/Surdeddd/wmkit/commit/fd15f3fe8125649be949eaa304ac0d4e891d4c61))
+* **chrome:** placeholders only where they cannot inject, shadow skins keep their content element ([9dfcfb3](https://github.com/Surdeddd/wmkit/commit/9dfcfb321460f2ca85404fade235fe95b3e6316e))
+* **devtools:** unique ids, distinct row glyphs, honest copy result, idempotent destroy ([8f8b51b](https://github.com/Surdeddd/wmkit/commit/8f8b51b07e421fe9a98ce5fbd35040df4d5a81c7))
+* **gestures:** pinch and swipe share one touch-action hub and a rebuilt window no longer jumps ([6441150](https://github.com/Surdeddd/wmkit/commit/6441150ca7dcb4625b74a4f55fa0483b2e237a81))
+* **persist:** cleared layouts stay cleared, a failed restore keeps saving, the last change survives tab close ([c6d2c12](https://github.com/Surdeddd/wmkit/commit/c6d2c123216158e4715307dddaa58d517c7046c9))
+* **site:** one undo step per demo action, styles before layout, Russian in Russian, and a link to the docs ([38c2035](https://github.com/Surdeddd/wmkit/commit/38c203555a1eb094b6eea4dc0429b08dbbc591d5))
+* **site:** presets keep their look when the designer builds a shadow root ([22a2da4](https://github.com/Surdeddd/wmkit/commit/22a2da4702dcc23c89bf92ecf4fbd4916ea49ebb))
+* **themes:** shadow flavours style slotted content and keep combinators ([2efab4c](https://github.com/Surdeddd/wmkit/commit/2efab4c3171edbac7b0884ad2c01a1c66942264a))
+
+
+### Features
+
+* **adapters:** Preact, Lit and Qwik adapters ([49353b9](https://github.com/Surdeddd/wmkit/commit/49353b9c138f6fcb6968a3efcc5e8ab4927d63dd))
+* **core:** snap to any rectangle and keep plugin state in history ([d6a2350](https://github.com/Surdeddd/wmkit/commit/d6a2350ea525d9bf46b20a45541216236d2334a5))
+* **dock:** dockview-style docking with split panels, tabs, separators and tear-out ([8c78ccb](https://github.com/Surdeddd/wmkit/commit/8c78ccb51c528d9a4f92e944e5b87a85ac1e0ce6))
+* **dom:** drop targets for window drags, and a click inside a frame raises its window ([2f7c290](https://github.com/Surdeddd/wmkit/commit/2f7c2900fa732e401abac0e151deebb2932ede82))
+* **elements:** <wm-desktop> and <wm-window> web components with their own chrome, events and labels in two languages ([7c1b996](https://github.com/Surdeddd/wmkit/commit/7c1b9963961cf863c7427329347ce9d963e495d0))
+* **popout:** pop a window out to picture-in-picture or a popup on any monitor ([3310d31](https://github.com/Surdeddd/wmkit/commit/3310d314dee98be8b7bf412a7ddaa74673e279d3))
+* **templates:** an operations dashboard on web components and the dock ([7ea18c4](https://github.com/Surdeddd/wmkit/commit/7ea18c4bf301fa1185feab8bfe23934588652b5e))
+* **winbox:** a WinBox.js-compatible entry, migrate with one import ([59780d6](https://github.com/Surdeddd/wmkit/commit/59780d6a7477c6ac5dc51e1a96f7689fe78d639f))
+
 ## [0.11.1](https://github.com/Surdeddd/wmkit/compare/v0.11.0...v0.11.1) (2026-08-20)
 
 
