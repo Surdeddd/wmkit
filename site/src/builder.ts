@@ -228,6 +228,24 @@ function rescope(css: string, name: string): string {
   return css.split(SKIN).join(`[data-wm-skin="${name}"]`)
 }
 
+export function shadowCss(css: string): string {
+  return css
+    .split(`${SCOPE} [data-wm-content]`)
+    .join('::slotted([data-wm-content])')
+    .split(`${SCOPE} {`)
+    .join(':host {')
+    .split(`${SCOPE} `)
+    .join('')
+    .split(SCOPE)
+    .join(':host')
+    .replace(/(:host|::slotted\([^)]*\))(\s*\{)([^}]*)\}/g, (_, selector, open, body: string) => {
+      const strong = body.replace(/([^;{}]*[^;{}\s])\s*;/g, (whole, declaration: string) =>
+        declaration.includes('!important') ? whole : `${declaration} !important;`,
+      )
+      return `${selector}${open}${strong}}`
+    })
+}
+
 function quote(source: string): string {
   return source.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
 }
@@ -332,7 +350,7 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
         name: 'preview',
         template,
         shadow,
-        ...(css.trim() === '' ? {} : { styles: rescope(css, 'preview') }),
+        ...(css.trim() === '' ? {} : { styles: shadow ? shadowCss(css) : rescope(css, 'preview') }),
       })
       document.head.querySelector('style[data-wm-skin-styles="preview"]')?.remove()
       lastMount?.content.replaceChildren()
@@ -417,7 +435,8 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
 
   toDesktopBtn.addEventListener('click', () => {
     try {
-      deps.toDesktop(editor.value, shadowBox.checked, cssBox.value)
+      const css = cssBox.value
+      deps.toDesktop(editor.value, shadowBox.checked, shadowBox.checked ? shadowCss(css) : css)
       status.textContent = ''
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : String(error)
@@ -433,7 +452,9 @@ export function initBuilder(deps: BuilderDeps): BuilderController {
       'const mine = skin({',
       "  name: 'mine',",
       ...(shadowBox.checked ? ['  shadow: true,'] : []),
-      ...(css === '' ? [] : ['  styles: `', quote(rescope(css, 'mine')), '`,']),
+      ...(css === ''
+        ? []
+        : ['  styles: `', quote(shadowBox.checked ? shadowCss(css) : rescope(css, 'mine')), '`,']),
       '  template: `',
       quote(editor.value),
       '`,',

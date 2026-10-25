@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { shadowCss } from '../../site/src/builder'
 import { dictionaries } from '../../site/src/i18n'
 
 const root = `${resolve(dirname(fileURLToPath(import.meta.url)), '../..')}/`
@@ -49,5 +50,24 @@ describe('the readme app', () => {
       const claim = /around (\d+) lines/.exec(dict.readme.body)
       if (claim) expect(longest, dict.lang).toBeLessThanOrEqual(Number(claim[1]) * 1.25)
     }
+  })
+})
+
+describe('the window designer', () => {
+  it('moves preset CSS into a shadow root that beats the page theme', () => {
+    const scope = '[data-wm-desktop] [data-wm-window][data-wm-skin="custom"]'
+    const css = [
+      `${scope} { background: #fff; color: red !important; }`,
+      `${scope} [data-wm-drag] { display: flex; }`,
+      `${scope} [data-wm-content] { padding: 14px; }`,
+      `${scope} .lights button:hover { opacity: 1; }`,
+    ].join('\n')
+    expect(shadowCss(css).split('\n')).toEqual([
+      ':host { background: #fff !important; color: red !important; }',
+      '[data-wm-drag] { display: flex; }',
+      '::slotted([data-wm-content]) { padding: 14px !important; }',
+      '.lights button:hover { opacity: 1; }',
+    ])
+    expect(shadowCss(':host { color: red; }')).toBe(':host { color: red !important; }')
   })
 })

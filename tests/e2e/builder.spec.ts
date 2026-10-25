@@ -145,6 +145,24 @@ test.describe('the designer and the desktop keep their own styles', () => {
     expect(await backgroundOf(page, '[data-wm-window="skins"]')).toBe(MAC_BG)
   })
 
+  test('a preset keeps its look inside a shadow root, in the preview and on the desktop', async ({
+    page,
+  }) => {
+    await openBuilder(page)
+    await expect.poll(() => previewBg(page)).toBe(MAC_BG)
+    await page.locator('.builder-toggle input').check()
+    await expect.poll(() => previewBg(page)).toBe(MAC_BG)
+    const titlebar = () =>
+      page.evaluate(() => {
+        const root = document.querySelector('.builder-stage [data-wm-window="preview"]')?.shadowRoot
+        const bar = root?.querySelector('[data-wm-drag]')
+        return bar ? getComputedStyle(bar).backgroundImage : ''
+      })
+    await expect.poll(titlebar).toContain('gradient')
+    await page.locator('.builder-actions .btn-primary').click()
+    await expect.poll(() => backgroundOf(page, '[data-wm-window="skins"]')).toBe(MAC_BG)
+  })
+
   test('applying a skin on the desktop leaves the designer dressed', async ({ page }) => {
     await openBuilder(page)
     await expect.poll(() => previewBg(page)).toBe(MAC_BG)
