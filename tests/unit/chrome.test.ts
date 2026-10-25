@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
-import type { WindowManager } from '../../src/core/types'
+import type { WindowManager, WindowState } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController } from '../../src/dom/shared'
 import {
@@ -49,6 +49,126 @@ describe('template compiler', () => {
 
   it('tolerates spacing inside the braces', () => {
     expect(compileTemplate('{{ title }}')({ title: 'Notes' })).toBe('Notes')
+  })
+
+  it('expands a placeholder named after an Object.prototype member to nothing', () => {
+    const render = compileTemplate('<b>{{toString}}</b><i>{{constructor}}</i>')
+    expect(render({ title: 'x' })).toBe('<b></b><i></i>')
+  })
+
+  it('refuses a placeholder where escaping cannot keep the value inert', () => {
+    for (const template of [
+      '<span title={{title}}>t</span>',
+      '<span {{title}}>t</span>',
+      '<{{title}}>',
+      '<span title = {{title}}>t</span>',
+      '<a href="{{variant}}">link</a>',
+      '<img src="{{id}}">',
+      '<button onclick="{{title}}"></button>',
+      '<p style="{{title}}"></p>',
+      '<p data-x="1" ="{{title}}"></p>',
+      '<p data-x=1 ="{{title}}"></p>',
+      '<style>.t::before { content: "{{title}}" }</style>',
+      '<!-- {{title}} -->',
+    ]) {
+      expect(() => compileTemplate(template), template).toThrow(/placeholder/)
+    }
+  })
+
+  it('accepts a placeholder in text and in the quoted values of inert attributes', () => {
+    const render = compileTemplate(
+      '<b title="a > b" data-id=\'{{id}}\' aria-label="Close {{title}}" class = "{{variant}}">' +
+        '{{title}}</b><!-- note --><style>b{}</style>{{stage}}<br/><i data-n=1 title="{{id}}"></i>',
+    )
+    expect(
+      render({ id: 'a', title: 'x onpointerenter=alert(1)', variant: 'v', stage: 'normal' }),
+    ).toBe(
+      '<b title="a > b" data-id=\'a\' aria-label="Close x onpointerenter=alert(1)" class = "v">' +
+        'x onpointerenter=alert(1)</b><!-- note --><style>b{}</style>normal<br/><i data-n=1 title="a"></i>',
+    )
+  })
+
+  it('keeps a placeholder out of raw-text elements and CDATA, whatever their quotes pretend', () => {
+    for (const template of [
+      '<textarea><p title="</textarea><img src=x title={{title}}>"></textarea>',
+      '<div><title><p title="</title><b id={{title}}>"></title></div>',
+      '<xmp><p title="</xmp><b id={{title}}>"></xmp>',
+      '<noscript><p title="</noscript><b id={{title}}>"></noscript>',
+      '<svg><style><![CDATA[</style><b title="]]><img src=x id={{title}}>">]]></style></svg>',
+      '<script>{{title}}</script>',
+      '<iframe>{{title}}</iframe>',
+      '<noembed>{{title}}</noembed>',
+      '<noframes>{{title}}</noframes>',
+      '<plaintext></plaintext>{{title}}',
+      '<style></stylex>{{title}}</style>',
+      '<STYLE>{{title}}</STYLE>',
+      '<noscript></noscript><b>{{title}}</b>',
+      '<svg><style>{{title}}</style></svg>',
+      '<svg><script></script></svg><b>{{title}}</b>',
+      '<svg/><style>{{title}}</style>',
+      '<math></math><style>{{title}}</style>',
+      '<![CDATA[ > <b x="]]>" y={{title}}>',
+    ]) {
+      expect(() => compileTemplate(template), template).toThrow(/placeholder/)
+    }
+    const render = compileTemplate(
+      '<textarea></textarea>{{title}}<style-x>{{title}}</style-x></svg><b>{{id}}</b>' +
+        '<svg aria-label="{{title}}"><title>{{title}}</title><g title="{{id}}"></g>' +
+        '<![CDATA[ > <b x="]]>{{id}}</svg><![CDATA[ x ]]>{{id}}',
+    )
+    expect(render({ title: 't', id: 'i' })).toBe(
+      '<textarea></textarea>t<style-x>t</style-x></svg><b>i</b>' +
+        '<svg aria-label="t"><title>t</title><g title="i"></g>' +
+        '<![CDATA[ > <b x="]]>i</svg><![CDATA[ x ]]>i',
+    )
+  })
+
+  it('reads a less-than that opens no tag as text, the way the parser does', () => {
+    const render = compileTemplate(
+      '<span>a < b: {{title}}</span><span>{{title}} <3</span><!x title="> {{id}}' +
+        '<?x?>{{id}}<!-->{{id}}<!--->{{id}}</ >{{id}}',
+    )
+    expect(render({ title: 't', id: 'i' })).toBe(
+      '<span>a < b: t</span><span>t <3</span><!x title="> i<?x?>i<!-->i<!--->i</ >i',
+    )
+    for (const template of ['</{{title}}>', '<!x title="> <b y={{title}}>', '<!x {{title}}>']) {
+      expect(() => compileTemplate(template), template).toThrow(/placeholder/)
+    }
+  })
+
+  it('names the refused placeholder and the markup just before it', () => {
+    expect(() => compileTemplate('<section><a href="{{id}}">')).toThrow(
+      `({{id}} after '<section><a href="')`,
+    )
+    expect(() =>
+      compileTemplate('<div data-a="{{id}}" data-b="0123456789"><a href="{{title}}">'),
+    ).toThrow(`({{title}} after '123456789"><a href="')`)
+  })
+
+  it('admits for, value, placeholder and label, and nothing else that could carry a meaning', () => {
+    const render = compileTemplate(
+      '<label for="f-{{id}}">x</label><input value="{{title}}" placeholder="{{title}}">' +
+        '<option label="{{title}}"></option>',
+    )
+    expect(render({ id: 'a', title: 't' })).toBe(
+      '<label for="f-a">x</label><input value="t" placeholder="t"><option label="t"></option>',
+    )
+    for (const name of [
+      'name',
+      'tabindex',
+      'width',
+      'height',
+      'form',
+      'popovertarget',
+      'commandfor',
+      'command',
+      'is',
+      'target',
+      'type',
+      'content',
+    ]) {
+      expect(() => compileTemplate(`<i ${name}="{{id}}"></i>`), name).toThrow(/placeholder/)
+    }
   })
 })
 
@@ -109,15 +229,36 @@ describe('skin()', () => {
     ).toThrow(/exactly one/)
   })
 
-  it('refuses a template whose root or content slot is not a real element', () => {
+  it('counts the content slot as an attribute, not as a word in the markup', () => {
+    for (const template of [
+      'data-wm-content',
+      '<div>data-wm-content</div>',
+      '<div title="[data-wm-content]"></div>',
+      '<data-wm-content></data-wm-content>',
+    ]) {
+      expect(() => skin({ template }), template).toThrow(/exactly one/)
+    }
+    for (const template of [
+      '<section data-wm-content-wrapper><header data-wm-drag></header><div data-wm-content></div></section>',
+      '<section><!-- the data-wm-content slot --><div data-wm-content></div></section>',
+      '<section><DIV DATA-WM-CONTENT></DIV></section>',
+    ]) {
+      expect(() => skin({ template }), template).not.toThrow()
+    }
+  })
+
+  it('refuses a template whose content slot does not end up inside its single root', () => {
     const harness = makeHarness()
     harness.wm.open({ id: 'a' })
-    expect(() => harness.desktop.mountWindow('a', skin({ template: 'data-wm-content' }))).toThrow(
-      /single root element/,
-    )
-    expect(() =>
-      harness.desktop.mountWindow('a', skin({ template: '<div>data-wm-content</div>' })),
-    ).toThrow(/single root element/)
+    for (const template of [
+      '<section><template><div data-wm-content></div></template></section>',
+      '<div></div><div data-wm-content></div>',
+      '<section><header data-wm-drag></header><div data-wm-content></div></section><footer>ok</footer>',
+    ]) {
+      expect(() => harness.desktop.mountWindow('a', skin({ template })), template).toThrow(
+        /single root element/,
+      )
+    }
   })
 
   it('accepts a template whose root is itself the content slot', () => {
@@ -148,6 +289,88 @@ describe('skin()', () => {
     const sheets = document.head.querySelectorAll('style[data-wm-skin-styles="tinted"]')
     expect(sheets).toHaveLength(1)
     expect(sheets[0]?.textContent).toBe('[data-wm-skin="tinted"] { --wm-bg: red; }')
+  })
+
+  it('gives a same-named skin its own styles and clears them with the last window wearing them', () => {
+    const harness = makeHarness()
+    const template = '<section><header data-wm-drag></header><div data-wm-content></div></section>'
+    const first = skin({ name: 'custom', styles: '.v1{}', template })
+    const second = skin({ name: 'custom', styles: '.v2{}', template })
+    const styles = () =>
+      [...document.head.querySelectorAll('style[data-wm-skin-styles="custom"]')].map(
+        (tag) => tag.textContent,
+      )
+    harness.wm.open({ id: 'a' })
+    harness.wm.open({ id: 'b' })
+    harness.wm.open({ id: 'c' })
+    const a = harness.desktop.mountWindow('a', first)
+    harness.desktop.mountWindow('b', first)
+    harness.desktop.mountWindow('c', second)
+    expect(styles()).toEqual(['.v1{}', '.v2{}'])
+
+    a.detach()
+    expect(styles()).toEqual(['.v1{}', '.v2{}'])
+    harness.desktop.destroy()
+    expect(styles()).toEqual([])
+
+    const again = makeHarness()
+    again.wm.open({ id: 'a' })
+    again.desktop.mountWindow('a', first)
+    expect(styles()).toEqual(['.v1{}'])
+  })
+
+  it('releases the styles of a light skin when the last window wearing it closes', () => {
+    const harness = makeHarness()
+    const tinted = skin({
+      name: 'tinted',
+      styles: '.t{}',
+      template: '<section><header data-wm-drag></header><div data-wm-content></div></section>',
+    })
+    const tag = () => document.head.querySelector('style[data-wm-skin-styles="tinted"]')
+    harness.wm.open({ id: 'a' })
+    harness.wm.open({ id: 'b' })
+    harness.desktop.mountWindow('a', tinted)
+    harness.desktop.mountWindow('b', tinted)
+
+    harness.wm.close('a')
+    expect(tag()).not.toBeNull()
+    harness.wm.close('b')
+    expect(tag()).toBeNull()
+  })
+
+  it('releases its styles once however many times a mount is destroyed', () => {
+    const harness = makeHarness()
+    const tinted = skin({
+      name: 'tinted',
+      styles: '.t{}',
+      template: '<section><div data-wm-content></div></section>',
+    })
+    harness.wm.open({ id: 'a' })
+    harness.wm.open({ id: 'b' })
+    const context = (id: string) => ({
+      doc: document,
+      id,
+      window: harness.wm.get(id) as WindowState,
+      actions: harness.desktop.actions(id),
+    })
+    const first = tinted(context('a'))
+    tinted(context('b'))
+    first.destroy?.()
+    first.destroy?.()
+    expect(document.head.querySelector('style[data-wm-skin-styles="tinted"]')).not.toBeNull()
+  })
+
+  it('takes any skin name, quotes included', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a' })
+    const quoted = skin({
+      name: 'my "pro" \\ skin',
+      styles: '.x{}',
+      template: '<section><div data-wm-content></div></section>',
+    })
+    const mounted = harness.desktop.mountWindow('a', quoted)
+    expect(mounted.element.dataset.wmSkin).toBe('my "pro" \\ skin')
+    expect(document.head.querySelector('style')?.dataset.wmSkinStyles).toBe('my "pro" \\ skin')
   })
 
   it('leaves the head alone for a skin that brings no styles', () => {
@@ -186,6 +409,24 @@ describe('skin()', () => {
     expect(ru.element.querySelector('[data-wm-minimize]')?.getAttribute('aria-label')).toBe(
       'Свернуть',
     )
+  })
+
+  it('takes its labels as text, never as markup or placeholders', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', title: 'A' })
+    const mounted = harness.desktop.mountWindow(
+      'a',
+      windowChrome({
+        minimize: 'Hide "A" > tray',
+        maximize: "it's {{title}}",
+        close: '<b data-wm-content>',
+      }),
+    )
+    const label = (selector: string) =>
+      mounted.element.querySelector(selector)?.getAttribute('aria-label')
+    expect(label('[data-wm-minimize]')).toBe('Hide "A" > tray')
+    expect(label('[data-wm-maximize]')).toBe("it's {{title}}")
+    expect(label('[data-wm-close]')).toBe('<b data-wm-content>')
   })
 })
 
@@ -246,17 +487,35 @@ describe('shadow skins', () => {
     expect([...root.children].some((node) => node.tagName === 'SLOT')).toBe(true)
   })
 
+  it('keeps the template content element, its attributes and its default children', () => {
+    const template =
+      '<section><header data-wm-drag><span data-wm-title>{{title}}</span></header>' +
+      '<div data-wm-content class="body"><p class="lead">{{title}}</p></div></section>'
+    const harness = makeHarness()
+    harness.wm.open({ id: 'light', title: 'L' })
+    harness.wm.open({ id: 'dark', title: 'D' })
+    const light = harness.desktop.mountWindow('light', skin({ template }))
+    const shadow = harness.desktop.mountWindow('dark', skin({ template, shadow: true }))
+
+    expect(light.content.querySelector('.lead')?.textContent).toBe('L')
+    expect(shadow.content.querySelector('.lead')?.textContent).toBe('D')
+    expect(shadow.content.classList.contains('body')).toBe(true)
+    expect(shadow.content.parentElement).toBe(shadow.element)
+    expect(shadow.element.shadowRoot?.querySelector('[data-wm-content], .lead')).toBeNull()
+  })
+
   it('keeps a template that is nothing but a slot', () => {
     const harness = makeHarness()
     harness.wm.open({ id: 'a' })
     const mounted = harness.desktop.mountWindow(
       'a',
-      skin({ shadow: true, template: '<div data-wm-content></div>' }),
+      skin({ shadow: true, template: '<div data-wm-content class="only"></div>' }),
     )
     const root = mounted.element.shadowRoot as ShadowRoot
 
     expect(root.querySelector('slot')).not.toBeNull()
     expect(mounted.content.parentElement).toBe(mounted.element)
+    expect(mounted.content.className).toBe('only')
   })
 
   it('keeps the resize grips out of reach of page css', () => {
