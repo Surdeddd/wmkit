@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
-import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
 import {
   pinch as pinchGesture,
   swipe as swipeGesture,
@@ -569,5 +569,84 @@ describe('two fingers on two windows', () => {
     expect(harness.wm.get('b')?.bounds).toMatchObject({ x: 400, y: 0, width: 200, height: 200 })
     expect(left.root.dataset.wmPinching).toBeUndefined()
     expect(right.root.dataset.wmPinching).toBeUndefined()
+  })
+})
+
+describe('separate gesture factories on one desktop', () => {
+  it('restore the touch action the desktop had, whatever the order', () => {
+    const element = document.createElement('div')
+    element.style.touchAction = 'manipulation'
+    document.body.append(element)
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const desktop = attachDesktop(wm, element, {
+      autoViewport: false,
+      announce: false,
+      gestures: [pinchGesture(), swipeGesture()],
+    })
+    expect(element.style.touchAction).toBe('pan-x pan-y')
+    desktop.destroy()
+    expect(element.style.touchAction).toBe('manipulation')
+  })
+
+  it('a swipe on its own claims the touch action and gives it back', () => {
+    const element = document.createElement('div')
+    document.body.append(element)
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const initial = element.style.touchAction
+    const desktop = attachDesktop(wm, element, {
+      autoViewport: false,
+      announce: false,
+      gestures: [swipeGesture()],
+    })
+    expect(element.style.touchAction).toBe('pan-x pan-y')
+    desktop.destroy()
+    expect(element.style.touchAction).toBe(initial)
+  })
+
+  it('do not switch workspace in the middle of a pinch', () => {
+    const harness = makeHarness({ gestures: [pinchGesture(), swipeGesture()] })
+    const { root } = harness.add({ id: 'a', x: 50, y: 100, width: 500, height: 300 })
+
+    pinch(harness, root, [350, 200, 450, 200], [100, 200, 400, 200])
+
+    expect(root.dataset.wmPinching).toBe('')
+    expect(harness.wm.workspace()).toBe(0)
+  })
+
+  it('still swipe when listed before the pinch', () => {
+    const harness = makeHarness({
+      gestures: [swipeGesture({ threshold: 60 }), pinchGesture()],
+    })
+    swipe(harness, harness.element, [400, 300], [-120, 0])
+    expect(harness.wm.workspace()).toBe(1)
+  })
+
+  it('give a finished pinch a clean slate when the controller ends it', () => {
+    const skin =
+      (name: string): WindowSkin =>
+      ({ doc }) => {
+        const element = doc.createElement('section')
+        element.dataset.name = name
+        const content = doc.createElement('div')
+        content.dataset.wmContent = ''
+        element.append(content)
+        return { element, content }
+      }
+    const harness = makeHarness({
+      gestures: [touchGestures({ swipe: { threshold: 10_000 } })],
+      skins: { a: skin('a'), b: skin('b') },
+    })
+    harness.wm.open({ id: 'w', x: 100, y: 100, width: 200, height: 200, meta: { skin: 'a' } })
+    const mounted = harness.desktop.mountWindow('w', 'a')
+    pinch(harness, mounted.content, [150, 200, 250, 200], [100, 200, 300, 200])
+    expect(harness.wm.get('w')?.bounds.width).toBe(400)
+
+    harness.wm.update('w', { meta: { skin: 'b' } })
+    const live = mounted.content
+    live.dispatchEvent(touchEvent('pointermove', 1, 99, 200))
+    live.dispatchEvent(touchEvent('pointermove', 2, 301, 200))
+    harness.flushFrames()
+
+    expect(harness.wm.get('w')?.bounds.width).toBeLessThan(420)
   })
 })

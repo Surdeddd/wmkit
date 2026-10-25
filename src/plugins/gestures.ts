@@ -27,10 +27,48 @@ function spreadOf(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
-function watch(
-  ctx: GestureContext,
-  options: { pinch: Required<PinchOptions> | null; swipe: Required<SwipeOptions> | null },
-): () => void {
+interface Settings {
+  pinch: Required<PinchOptions> | null
+  swipe: Required<SwipeOptions> | null
+}
+
+interface Hub {
+  settings: Settings
+  previousTouchAction: string
+  refs: number
+  stop: () => void
+}
+
+const hubs = new WeakMap<HTMLElement, Hub>()
+
+function watch(ctx: GestureContext, part: Partial<Settings>): () => void {
+  const element = ctx.desktop
+  let hub = hubs.get(element)
+  if (!hub) {
+    const settings: Settings = { pinch: null, swipe: null }
+    hub = {
+      settings,
+      previousTouchAction: element.style.touchAction,
+      refs: 0,
+      stop: start(ctx, settings),
+    }
+    hubs.set(element, hub)
+  }
+  const shared = hub
+  shared.refs += 1
+  Object.assign(shared.settings, part)
+  element.style.touchAction = shared.settings.pinch?.lockTouchAction ? 'none' : 'pan-x pan-y'
+  return () => {
+    for (const name of Object.keys(part)) shared.settings[name as keyof Settings] = null
+    shared.refs -= 1
+    if (shared.refs > 0) return
+    hubs.delete(element)
+    element.style.touchAction = shared.previousTouchAction
+    shared.stop()
+  }
+}
+
+function start(ctx: GestureContext, options: Settings): () => void {
   const { wm, doc, view } = ctx
   const element = ctx.desktop
   const fingers = new Map<number, Finger>()
@@ -83,7 +121,10 @@ function watch(
     if (!win) return
     const claimed: PinchSession = {
       id,
-      finish: (cancelled: boolean) => endPinch(cancelled),
+      finish: (cancelled: boolean) => {
+        endPinch(cancelled)
+        disarm()
+      },
       startBounds: win.bounds,
       midX: mid.x,
       midY: mid.y,
@@ -206,10 +247,6 @@ function watch(
     disarm()
   }
 
-  const previousTouchAction = element.style.touchAction
-  if (options.pinch) {
-    element.style.touchAction = options.pinch.lockTouchAction ? 'none' : 'pan-x pan-y'
-  }
   element.addEventListener('pointerdown', onDown)
   element.addEventListener('pointermove', onMove)
   element.addEventListener('pointerup', onRelease)
@@ -220,7 +257,6 @@ function watch(
     if (session) endPinch(true)
     disarm()
     fingers.clear()
-    element.style.touchAction = previousTouchAction
     element.removeEventListener('pointerdown', onDown)
     element.removeEventListener('pointermove', onMove)
     element.removeEventListener('pointerup', onRelease)
@@ -234,7 +270,7 @@ export function pinch(options: PinchOptions = {}): DesktopGesture {
     threshold: options.threshold ?? 12,
     lockTouchAction: options.lockTouchAction === true,
   }
-  return (ctx) => watch(ctx, { pinch: settings, swipe: null })
+  return (ctx) => watch(ctx, { pinch: settings })
 }
 
 export function swipe(options: SwipeOptions = {}): DesktopGesture {
@@ -242,7 +278,7 @@ export function swipe(options: SwipeOptions = {}): DesktopGesture {
     threshold: options.threshold ?? 72,
     workspaces: options.workspaces ?? 0,
   }
-  return (ctx) => watch(ctx, { pinch: null, swipe: settings })
+  return (ctx) => watch(ctx, { swipe: settings })
 }
 
 export function touchGestures(
