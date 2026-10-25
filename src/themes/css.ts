@@ -4692,7 +4692,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -4982,7 +4982,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -5269,7 +5269,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -5553,7 +5553,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -5823,7 +5823,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -6104,7 +6104,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -6370,7 +6370,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -6635,7 +6635,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -6894,7 +6894,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: #28c840;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 14px;
@@ -7147,7 +7147,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: #28c840;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 14px;
@@ -7414,7 +7414,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 3px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 14px 16px;
@@ -7677,7 +7677,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -7933,7 +7933,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 16px 18px;
@@ -8163,7 +8163,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   font-weight: 700;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 8px;
@@ -8392,7 +8392,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -8669,7 +8669,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   outline-offset: 2px;
 }
 
-[data-wm-content] {
+::slotted([data-wm-content]) {
   flex: 1;
   overflow: auto;
   padding: 12px;

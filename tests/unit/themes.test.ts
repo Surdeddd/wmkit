@@ -7,6 +7,8 @@ import { themeCss, themeNames, themeShadowCss, themeStyle } from '../../src/them
 
 const root = new URL('../../', import.meta.url).pathname
 const read = (file: string) => readFileSync(join(root, file), 'utf8')
+const generator = new URL('../../scripts/shadow-css.mjs', import.meta.url).href
+const { toShadowCss } = (await import(generator)) as { toShadowCss: (css: string) => string }
 
 describe('the shipped themes', () => {
   it('exports every stylesheet in the folder and nothing else', () => {
@@ -82,6 +84,16 @@ describe('the shipped themes', () => {
     expect(host).not.toContain('position: relative')
   })
 
+  it('styles the projected content through ::slotted, the only way a shadow rule reaches it', () => {
+    for (const name of themeNames) {
+      const css = themeShadowCss[name]
+      expect(css, name).toMatch(/^::slotted\(\[data-wm-content\]\) \{[^}]*overflow: auto/m)
+      expect(css.replaceAll('::slotted([data-wm-content])', ''), name).not.toContain(
+        '[data-wm-content]',
+      )
+    }
+  })
+
   it('gives every theme feedback while a window is being handled', () => {
     for (const name of themeNames) {
       const css = themeCss[name]
@@ -89,5 +101,67 @@ describe('the shipped themes', () => {
         expect(css, `${name} says nothing about ${state}`).toContain(`data-wm-${state}`)
       }
     }
+  })
+})
+
+describe('the shadow generator', () => {
+  it('keeps the desktop tokens on the host so a shadow skin wears its own theme', () => {
+    const css =
+      '[data-wm-desktop] {\n  --wm-accent: #7c6cff;\n  --wm-ink: var(--wm-accent);\n  overflow: hidden;\n}\n\n' +
+      '[data-wm-window] {\n  color: var(--wm-ink);\n}\n\n' +
+      '[data-wm-window] [data-wm-drag] {\n  color: var(--wm-accent);\n}\n'
+    expect(toShadowCss(css)).toBe(
+      ':host {\n  --wm-accent: #7c6cff;\n  --wm-ink: var(--wm-accent);\n}\n\n' +
+        ':host {\n  color: var(--wm-ink);\n}\n\n' +
+        '[data-wm-drag] {\n  color: var(--wm-accent);\n}\n',
+    )
+    expect(toShadowCss('[data-wm-desktop] { overflow: hidden }')).toBe('\n')
+  })
+
+  it('re-anchors every combinator and pseudo-class onto the host', () => {
+    const cases: [string, string][] = [
+      ['[data-wm-window] > [data-wm-drag] { a: b }', ':host > [data-wm-drag] { a: b }'],
+      ['[data-wm-window]>[data-wm-drag]{a:b}', ':host > [data-wm-drag] {a:b}'],
+      [
+        '[data-wm-window][data-wm-focused]>[data-wm-drag] { a: b }',
+        ':host([data-wm-focused]) > [data-wm-drag] { a: b }',
+      ],
+      ['[data-wm-window]:hover [data-wm-drag] { a: b }', ':host(:hover) [data-wm-drag] { a: b }'],
+      [
+        '[data-wm-window][data-wm-focused]:hover::after { a: b }',
+        ':host([data-wm-focused]:hover)::after { a: b }',
+      ],
+      [
+        '[data-wm-window][data-wm-stage="a b"] [data-wm-drag] { a: b }',
+        ':host([data-wm-stage="a b"]) [data-wm-drag] { a: b }',
+      ],
+      ['[data-wm-desktop] [data-wm-window] { a: b }', ':host { a: b }'],
+      ['[data-wm-desktop] > [data-wm-window] [data-wm-title] { a: b }', '[data-wm-title] { a: b }'],
+      ['/* { note } */\n[data-wm-window] [data-wm-title] { a: b }', '[data-wm-title] { a: b }'],
+      ['[data-wm-window] [data-wm-content] { a: b }', '::slotted([data-wm-content]) { a: b }'],
+      [
+        '[data-wm-window][data-wm-focused] > [data-wm-content]:hover { a: b }',
+        ':host([data-wm-focused]) > ::slotted([data-wm-content]:hover) { a: b }',
+      ],
+    ]
+    for (const [light, shadow] of cases) expect(toShadowCss(light), light).toBe(`${shadow}\n`)
+  })
+
+  it('drops what no rule inside a shadow root could ever match', () => {
+    for (const light of [
+      '[data-wm-window] + [data-wm-window] { a: b }',
+      '[data-wm-window] ~ [data-wm-drag] { a: b }',
+      '.page [data-wm-window] [data-wm-drag] { a: b }',
+      '[data-wm-desktop][data-theme="x"] [data-wm-window] { a: b }',
+      '[data-wm-desktop] .toolbar { a: b }',
+      '[data-wm-window] [data-wm-window] { a: b }',
+      '[data-wm-window] [data-wm-content] p { a: b }',
+      '[data-wm-desktop] [data-wm-snap-preview] { a: b }',
+    ]) {
+      expect(toShadowCss(light), light).toBe('\n')
+    }
+    expect(toShadowCss('.page [data-wm-window], [data-wm-window] [data-wm-drag] { a: b }')).toBe(
+      '[data-wm-drag] { a: b }\n',
+    )
   })
 })
