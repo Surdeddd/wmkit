@@ -39,11 +39,7 @@ export interface PersistController {
 
 function defaultStorage(): PersistStorage | null {
   try {
-    const storage = globalThis.localStorage
-    const probe = '__wmkit_probe__'
-    storage.setItem(probe, '1')
-    storage.removeItem(probe)
-    return storage
+    return globalThis.localStorage
   } catch {
     return null
   }
@@ -88,13 +84,29 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     }
     if (!data) return false
     suspended = true
-    const restored = wm.hydrate(data)
-    suspended = false
+    let restored: boolean
+    try {
+      restored = wm.hydrate(data)
+    } finally {
+      suspended = false
+    }
     if (restored && stale) save()
     return restored
   }
 
+  function cancel(): void {
+    clearTimeout(timer)
+    timer = undefined
+  }
+
+  function flush(): void {
+    if (timer === undefined) return
+    cancel()
+    save()
+  }
+
   function clear(): void {
+    cancel()
     if (!storage) return
     try {
       storage.removeItem(key)
@@ -103,9 +115,15 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
 
   const unsubscribe = wm.subscribe(() => {
     if (suspended || !storage) return
-    if (timer !== undefined) clearTimeout(timer)
-    timer = setTimeout(save, debounce)
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = undefined
+      save()
+    }, debounce)
   })
+
+  const host: Partial<Pick<Window, 'addEventListener' | 'removeEventListener'>> = globalThis
+  host.addEventListener?.('pagehide', flush)
 
   if (options.autoRestore !== false) restore()
 
@@ -115,7 +133,8 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     clear,
     destroy() {
       unsubscribe()
-      if (timer !== undefined) clearTimeout(timer)
+      host.removeEventListener?.('pagehide', flush)
+      flush()
     },
   }
 }

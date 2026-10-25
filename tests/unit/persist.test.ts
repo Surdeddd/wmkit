@@ -181,17 +181,119 @@ describe('persist', () => {
     expect(storage.data.size).toBe(0)
   })
 
-  it('destroy cancels pending writes and stops listening', () => {
+  it('destroy writes the pending change once and stops listening', () => {
     const wm = makeWm()
     const storage = memoryStorage()
     const setItem = vi.spyOn(storage, 'setItem')
     const controller = persist(wm, { storage, autoRestore: false })
     wm.open()
     controller.destroy()
+    expect(setItem).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1000)
     wm.open()
     vi.advanceTimersByTime(1000)
-    expect(setItem).not.toHaveBeenCalled()
+    controller.destroy()
+    expect(setItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('writes nothing on destroy when nothing is pending', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const setItem = vi.spyOn(storage, 'setItem')
+    const controller = persist(wm, { storage, autoRestore: false })
+    wm.open()
+    vi.advanceTimersByTime(150)
+    controller.destroy()
+    expect(setItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('clear drops a save that was still pending', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const controller = persist(wm, { storage, autoRestore: false })
+    wm.open({ id: 'a' })
+    vi.advanceTimersByTime(150)
+    wm.move('a', 300, 300)
+    controller.clear()
+    expect(storage.data.has('wmkit')).toBe(false)
+    vi.advanceTimersByTime(150)
+    expect(storage.data.has('wmkit')).toBe(false)
+  })
+
+  it('keeps saving after a listener throws during restore', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a' })
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify({ version: 0, state: donor.serialize() }))
+    const wm = makeWm()
+    let fail = true
+    wm.on('open', () => {
+      if (fail) throw new Error('unknown skin')
+    })
+    const controller = persist(wm, { storage, autoRestore: false })
+    expect(() => controller.restore()).toThrow(/unknown skin/)
+    fail = false
+    storage.data.clear()
+    wm.open({ id: 'b' })
+    vi.advanceTimersByTime(150)
+    expect(storage.data.has('wmkit')).toBe(true)
+  })
+
+  it('restores from a storage whose writes are refused', () => {
+    const donor = makeWm()
+    donor.open({ id: 'a', title: 'saved' })
+    const saved = JSON.stringify({ version: 0, state: donor.serialize() })
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (key === 'wmkit' ? saved : null),
+      setItem: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+      removeItem: () => {},
+    })
+    const wm = makeWm()
+    persist(wm)
+    expect(wm.get('a')?.title).toBe('saved')
+  })
+
+  it('becomes a no-op when reading localStorage itself throws', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('denied')
+      },
+    })
+    try {
+      const wm = makeWm()
+      const controller = persist(wm)
+      expect(controller.restore()).toBe(false)
+      controller.save()
+      controller.clear()
+      wm.open()
+      expect(() => vi.advanceTimersByTime(1000)).not.toThrow()
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor)
+      else Reflect.deleteProperty(globalThis, 'localStorage')
+    }
+  })
+
+  it('flushes the pending save when the page is hidden', () => {
+    const listeners = new Map<string, () => void>()
+    vi.stubGlobal('addEventListener', (type: string, handler: () => void) => {
+      listeners.set(type, handler)
+    })
+    vi.stubGlobal('removeEventListener', (type: string) => {
+      listeners.delete(type)
+    })
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const controller = persist(wm, { storage, autoRestore: false })
+    wm.open({ id: 'a' })
+    expect(storage.data.size).toBe(0)
+    listeners.get('pagehide')?.()
+    expect(storage.data.has('wmkit')).toBe(true)
+    controller.destroy()
+    expect(listeners.has('pagehide')).toBe(false)
   })
 
   it('falls back to localStorage when it is available', () => {
