@@ -31,8 +31,14 @@
       "@surdeddd/wmkit/devtools": ["./src/plugins/devtools/index.ts"],
       "@surdeddd/wmkit/gestures": ["./src/plugins/gestures.ts"],
       "@surdeddd/wmkit/chrome": ["./src/plugins/chrome/index.ts"],
+      "@surdeddd/wmkit/winbox": ["./src/plugins/winbox/index.ts"],
+      "@surdeddd/wmkit/dock": ["./src/plugins/dock/index.ts"],
+      "@surdeddd/wmkit/elements": ["./src/plugins/elements/index.ts"],
+      "@surdeddd/wmkit/elements/define": ["./src/plugins/elements/define.ts"],
       "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
-      "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"]
+      "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"],
+      "@surdeddd/wmkit/preact": ["./src/adapters/preact.ts"],
+      "@surdeddd/wmkit/lit": ["./src/adapters/lit.ts"]
     }
   },
   "include": [
@@ -40,6 +46,7 @@
     "tests",
     "site/src",
     "site/test",
+    "templates/dashboard/src",
     "site/vite.config.ts",
     "tsup.config.ts",
     "vitest.config.ts",

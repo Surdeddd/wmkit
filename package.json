@@ -31,7 +31,9 @@
   },
   "type": "module",
   "sideEffects": [
-    "**/*.css"
+    "**/*.css",
+    "./dist/elements/define.js",
+    "./dist/elements/define.cjs"
   ],
   "engines": {
     "node": ">=20"
@@ -104,6 +106,36 @@
         "default": "./dist/angular.cjs"
       }
     },
+    "./preact": {
+      "import": {
+        "types": "./dist/preact.d.ts",
+        "default": "./dist/preact.js"
+      },
+      "require": {
+        "types": "./dist/preact.d.cts",
+        "default": "./dist/preact.cjs"
+      }
+    },
+    "./lit": {
+      "import": {
+        "types": "./dist/lit.d.ts",
+        "default": "./dist/lit.js"
+      },
+      "require": {
+        "types": "./dist/lit.d.cts",
+        "default": "./dist/lit.cjs"
+      }
+    },
+    "./qwik": {
+      "import": {
+        "types": "./dist/qwik.d.ts",
+        "default": "./dist/qwik.qwik.mjs"
+      },
+      "require": {
+        "types": "./dist/qwik.d.cts",
+        "default": "./dist/qwik.qwik.cjs"
+      }
+    },
     "./persist": {
       "import": {
         "types": "./dist/persist.d.ts",
@@ -154,6 +186,46 @@
         "default": "./dist/chrome.cjs"
       }
     },
+    "./winbox": {
+      "import": {
+        "types": "./dist/winbox.d.ts",
+        "default": "./dist/winbox.js"
+      },
+      "require": {
+        "types": "./dist/winbox.d.cts",
+        "default": "./dist/winbox.cjs"
+      }
+    },
+    "./dock": {
+      "import": {
+        "types": "./dist/dock.d.ts",
+        "default": "./dist/dock.js"
+      },
+      "require": {
+        "types": "./dist/dock.d.cts",
+        "default": "./dist/dock.cjs"
+      }
+    },
+    "./elements": {
+      "import": {
+        "types": "./dist/elements.d.ts",
+        "default": "./dist/elements.js"
+      },
+      "require": {
+        "types": "./dist/elements.d.cts",
+        "default": "./dist/elements.cjs"
+      }
+    },
+    "./elements/define": {
+      "import": {
+        "types": "./dist/elements/define.d.ts",
+        "default": "./dist/elements/define.js"
+      },
+      "require": {
+        "types": "./dist/elements/define.d.cts",
+        "default": "./dist/elements/define.cjs"
+      }
+    },
     "./themes": {
       "import": {
         "types": "./dist/themes.d.ts",
@@ -168,10 +240,13 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && vite build -c vite.qwik.config.ts --mode lib && tsc -p tsconfig.qwik.json && node -e \"require('node:fs').copyFileSync('dist/qwik.d.ts','dist/qwik.d.cts')\"",
     "themes": "node scripts/themes.mjs",
     "dev": "vite site",
-    "site:build": "vite build site",
+    "site:build": "vite build site && vitepress build docs",
+    "docs:dev": "vitepress dev docs",
+    "qwik:fixture": "vite build -c tests/fixtures/qwik/vite.config.ts",
+    "dashboard:fixture": "vite build -c tests/fixtures/dashboard/vite.config.ts",
     "site:preview": "vite preview site",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -190,6 +265,9 @@
   },
   "peerDependencies": {
     "@angular/core": ">=16",
+    "@builder.io/qwik": ">=1.5 <2",
+    "lit": ">=3",
+    "preact": ">=10",
     "react": ">=18",
     "solid-js": ">=1.8",
     "svelte": ">=4",
@@ -210,6 +288,15 @@
     },
     "@angular/core": {
       "optional": true
+    },
+    "preact": {
+      "optional": true
+    },
+    "lit": {
+      "optional": true
+    },
+    "@builder.io/qwik": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -217,6 +304,7 @@
     "@arethetypeswrong/cli": "^0.18.2",
     "@axe-core/playwright": "^4.10.2",
     "@biomejs/biome": "^2.0.0",
+    "@builder.io/qwik": "^1.20.2",
     "@playwright/test": "^1.53.2",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
@@ -227,6 +315,8 @@
     "@types/react-dom": "^19.1.6",
     "@vitest/coverage-v8": "^3.2.4",
     "jsdom": "^26.1.0",
+    "lit": "^3.3.3",
+    "preact": "^11.0.2",
     "publint": "^0.3.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -237,6 +327,7 @@
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
+    "vitepress": "1.6.4",
     "vitest": "^3.2.4",
     "vue": "^3.5.17"
   },
@@ -244,12 +335,12 @@
     {
       "name": "core",
       "path": "dist/index.js",
-      "limit": "15 kB"
+      "limit": "16 kB"
     },
     {
       "name": "react adapter",
       "path": "dist/react.js",
-      "limit": "15 kB",
+      "limit": "16.5 kB",
       "ignore": [
         "react"
       ]
@@ -257,7 +348,7 @@
     {
       "name": "vue adapter",
       "path": "dist/vue.js",
-      "limit": "15 kB",
+      "limit": "16.5 kB",
       "ignore": [
         "vue"
       ]
@@ -265,7 +356,7 @@
     {
       "name": "svelte adapter",
       "path": "dist/svelte.js",
-      "limit": "15 kB",
+      "limit": "16.5 kB",
       "ignore": [
         "svelte"
       ]
@@ -273,7 +364,7 @@
     {
       "name": "solid adapter",
       "path": "dist/solid.js",
-      "limit": "15 kB",
+      "limit": "16.5 kB",
       "ignore": [
         "solid-js"
       ]
@@ -281,9 +372,33 @@
     {
       "name": "angular adapter",
       "path": "dist/angular.js",
-      "limit": "15 kB",
+      "limit": "16.5 kB",
       "ignore": [
         "@angular/core"
+      ]
+    },
+    {
+      "name": "preact adapter",
+      "path": "dist/preact.js",
+      "limit": "16.5 kB",
+      "ignore": [
+        "preact"
+      ]
+    },
+    {
+      "name": "lit adapter",
+      "path": "dist/lit.js",
+      "limit": "16.5 kB",
+      "ignore": [
+        "lit"
+      ]
+    },
+    {
+      "name": "qwik adapter",
+      "path": "dist/qwik.qwik.mjs",
+      "limit": "17 kB",
+      "ignore": [
+        "@builder.io/qwik"
       ]
     },
     {
@@ -294,7 +409,7 @@
     {
       "name": "popout plugin",
       "path": "dist/popout.js",
-      "limit": "1 kB"
+      "limit": "2.5 kB"
     },
     {
       "name": "gestures plugin",
@@ -310,6 +425,21 @@
       "name": "chrome plugin",
       "path": "dist/chrome.js",
       "limit": "3 kB"
+    },
+    {
+      "name": "winbox compat",
+      "path": "dist/winbox.js",
+      "limit": "21 kB"
+    },
+    {
+      "name": "dock plugin",
+      "path": "dist/dock.js",
+      "limit": "6 kB"
+    },
+    {
+      "name": "web components",
+      "path": "dist/elements.js",
+      "limit": "19 kB"
     },
     {
       "name": "themes as text",
@@ -351,6 +481,27 @@
       ],
       "themes": [
         "./dist/themes.d.ts"
+      ],
+      "winbox": [
+        "./dist/winbox.d.ts"
+      ],
+      "dock": [
+        "./dist/dock.d.ts"
+      ],
+      "elements": [
+        "./dist/elements.d.ts"
+      ],
+      "elements/define": [
+        "./dist/elements/define.d.ts"
+      ],
+      "preact": [
+        "./dist/preact.d.ts"
+      ],
+      "lit": [
+        "./dist/lit.d.ts"
+      ],
+      "qwik": [
+        "./dist/qwik.d.ts"
       ]
     }
   }

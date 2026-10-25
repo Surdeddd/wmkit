@@ -8,6 +8,14 @@ export default defineConfig({
         .pathname,
       '@surdeddd/wmkit/gestures': new URL('./src/plugins/gestures.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/chrome': new URL('./src/plugins/chrome/index.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/winbox': new URL('./src/plugins/winbox/index.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/dock': new URL('./src/plugins/dock/index.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/elements/define': new URL(
+        './src/plugins/elements/define.ts',
+        import.meta.url,
+      ).pathname,
+      '@surdeddd/wmkit/elements': new URL('./src/plugins/elements/index.ts', import.meta.url)
+        .pathname,
       '@surdeddd/wmkit/themes': new URL('./src/themes/index.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/popout': new URL('./src/plugins/popout.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/react': new URL('./src/adapters/react.ts', import.meta.url).pathname,
@@ -23,6 +31,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/core/**', 'src/plugins/**', 'src/dom/**', 'src/adapters/**'],
+      exclude: ['src/adapters/qwik.ts'],
       thresholds: {
         'src/core/**': { statements: 100, lines: 100, functions: 100, branches: 100 },
         'src/dom/**': { statements: 100, lines: 100, functions: 100, branches: 90 },

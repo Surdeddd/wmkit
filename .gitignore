@@ -42,3 +42,4 @@ pnpm-debug.log*
 .vercel
 .env*
 docs/superpowers/
+docs/.vitepress/cache/

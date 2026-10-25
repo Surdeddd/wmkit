@@ -14,6 +14,7 @@
       "!test-results",
       "!playwright-report",
       "!memory-bank",
+      "!docs/.vitepress/cache",
       "!CHANGELOG.md"
     ]
   },
@@ -32,6 +33,9 @@
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "qwik": "none"
+    },
     "rules": {
       "preset": "recommended",
       "suspicious": {
