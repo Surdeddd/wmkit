@@ -281,6 +281,7 @@ describe('dock layout', () => {
   it('keeps every invariant and an exact tiling through random operation sequences', () => {
     const pool = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
     const sides = ['left', 'right', 'top', 'bottom', 'center'] as const
+    const problems: string[] = []
     for (let seed = 1; seed <= 300; seed += 1) {
       const random = rng(seed)
       const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
@@ -319,15 +320,19 @@ describe('dock layout', () => {
           layout = moveInStack(layout, pick(docked), Math.floor(random() * 4))
         }
         const label = `seed ${seed} step ${step}`
-        expect(validate(layout), label).toBe(true)
-        expect(new Set(windowsOf(layout)).size, label).toBe(windowsOf(layout).length)
+        const after = windowsOf(layout)
+        if (!validate(layout)) problems.push(`${label}: invalid layout`)
+        if (new Set(after).size !== after.length) problems.push(`${label}: a window docked twice`)
         const placed = rects(layout, area, GEOMETRY)
         const boxes = [...placed.stacks, ...placed.sashes].map((rect) => rect.bounds)
         const covered = boxes.reduce((sum, box) => sum + box.width * box.height, 0)
-        expect(covered, label).toBeCloseTo(boxes.length > 0 ? area.width * area.height : 0, 6)
+        const expected = boxes.length > 0 ? area.width * area.height : 0
+        if (Math.abs(covered - expected) > 1e-6)
+          problems.push(`${label}: covers ${covered} of ${expected}`)
         for (let i = 0; i < boxes.length; i += 1) {
           for (let j = i + 1; j < boxes.length; j += 1) {
-            expect(overlap(boxes[i] as Bounds, boxes[j] as Bounds), label).toBe(0)
+            if (overlap(boxes[i] as Bounds, boxes[j] as Bounds) > 0)
+              problems.push(`${label}: overlap ${i}/${j}`)
           }
         }
         const fits =
@@ -335,11 +340,16 @@ describe('dock layout', () => {
           placed.stacks.length * (GEOMETRY.minSize.height + GEOMETRY.sash) <= area.height
         if (fits) {
           for (const stack of placed.stacks) {
-            expect(stack.bounds.width, label).toBeGreaterThanOrEqual(GEOMETRY.minSize.width - 1)
-            expect(stack.bounds.height, label).toBeGreaterThanOrEqual(GEOMETRY.minSize.height - 1)
+            if (
+              stack.bounds.width < GEOMETRY.minSize.width - 1 ||
+              stack.bounds.height < GEOMETRY.minSize.height - 1
+            ) {
+              problems.push(`${label}: ${stack.id} below its minimum`)
+            }
           }
         }
       }
     }
+    expect(problems, problems.slice(0, 10).join('\n')).toEqual([])
   })
 })
