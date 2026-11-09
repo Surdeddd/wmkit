@@ -518,6 +518,54 @@ describe('reading the page less', () => {
   })
 })
 
+describe('nothing of a destroyed desktop runs later', () => {
+  it('drops the frame check that follows a page blur', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const h = makeHarness()
+      h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+      const idle = vi.getTimerCount()
+      window.dispatchEvent(new Event('blur'))
+      const pending = vi.getTimerCount()
+      expect(pending).toBeGreaterThan(idle)
+      h.desktop.destroy()
+      expect(vi.getTimerCount()).toBe(pending - 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('starts no flight and pulls no focus once destroyed', async () => {
+    const flights: unknown[] = []
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: () => {
+        flights.push(1)
+        return {}
+      },
+    })
+    try {
+      const slot = document.createElement('div')
+      slot.getBoundingClientRect = () => ({ left: 0, top: 560, width: 40, height: 20 }) as DOMRect
+      const outside = document.createElement('input')
+      document.body.append(slot, outside)
+      const h = makeHarness({ minimizeTarget: () => slot })
+      const a = h.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+      a.getBoundingClientRect = () => ({ left: 10, top: 10, width: 200, height: 150 }) as DOMRect
+      h.wm.minimize('a')
+      h.wm.restore('a')
+      outside.focus()
+      h.desktop.destroy()
+      flushFrames()
+      await Promise.resolve()
+      expect(flights).toEqual([])
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+    }
+  })
+})
+
 describe('minimize flights', () => {
   it('measures every window before it adds any ghost when many minimize at once', async () => {
     const log: string[] = []

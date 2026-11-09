@@ -232,6 +232,7 @@ export function attachDesktop(
   let cachedRect: Frame | null = null
   let rectUsers = 0
   let titlebar: { win: WindowState; box: DOMRect } | null = null
+  let destroyed = false
 
   let announcer: Announcer | null = null
   if (options.announce !== false) {
@@ -472,7 +473,7 @@ export function attachDesktop(
       if (hide && !el.hidden) rescue(el)
       if (!hide && el.hidden && wm.getState().focusedId === win.id) {
         queueMicrotask(() => {
-          if (!el.hidden && wm.getState().focusedId === win.id) pull(attached)
+          if (!destroyed && !el.hidden && wm.getState().focusedId === win.id) pull(attached)
         })
       }
       if (el.hidden !== hide) el.hidden = hide
@@ -699,9 +700,11 @@ export function attachDesktop(
       followFrame()
     }
   }
+  let blurCheck = 0
   const onViewBlur = () => {
     letGo()
-    view.setTimeout(followFrame, 0, true)
+    view.clearTimeout(blurCheck)
+    blurCheck = view.setTimeout(followFrame, 0, true)
   }
   element.addEventListener('pointerover', onPointerOver)
   element.addEventListener('pointerout', onPointerOver)
@@ -715,6 +718,7 @@ export function attachDesktop(
     element.removeEventListener('pointerover', onPointerOver)
     element.removeEventListener('pointerout', onPointerOver)
     view.removeEventListener('blur', onViewBlur)
+    view.clearTimeout(blurCheck)
     view.cancelAnimationFrame(frameWatch)
     element.removeEventListener('keyup', onKeyUp, true)
     element.removeEventListener('focusout', letGo, true)
@@ -739,12 +743,12 @@ export function attachDesktop(
       if (win.stage === 'minimized' && previous !== 'minimized') {
         const target = options.minimizeTarget?.(win)
         const play = target && measureFlip(attached.element, target, animationOptions, false)
-        if (play) queueMicrotask(play)
+        if (play) queueMicrotask(() => destroyed || play())
       } else if (previous === 'minimized' && win.stage !== 'minimized') {
         const target = options.minimizeTarget?.(win)
         if (target) {
-          view.requestAnimationFrame(() =>
-            flipFromTarget(attached.element, target, animationOptions),
+          view.requestAnimationFrame(
+            () => destroyed || flipFromTarget(attached.element, target, animationOptions),
           )
         }
       }
@@ -796,7 +800,6 @@ export function attachDesktop(
   }
 
   let rebuilding = false
-  let destroyed = false
 
   function endDrag(cancelled: boolean): void {
     if (drag) drag.finish(cancelled)
