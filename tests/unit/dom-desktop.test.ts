@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
-import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
 import type { AnimationOptions, GroupingOptions, StackingOptions } from '../../src/index'
 
 const VIEWPORT = { width: 800, height: 600 }
@@ -424,6 +424,46 @@ describe('the frame shield under a modal', () => {
     expect(frame.style.pointerEvents).toBe('none')
     h.wm.close('modal')
     expect(frame.style.pointerEvents).toBe('auto')
+  })
+})
+
+describe('skin changes in one transaction', () => {
+  const skin =
+    (tag: string): WindowSkin =>
+    ({ doc }) => {
+      const element = doc.createElement(tag)
+      element.innerHTML = '<div data-wm-content></div>'
+      return { element, content: element.firstElementChild as HTMLElement }
+    }
+
+  function skinned() {
+    const h = makeHarness({ skins: { plain: skin('section'), fancy: skin('article') } })
+    h.wm.open({ id: 'a', meta: { skin: 'plain' } })
+    h.wm.open({ id: 'b', meta: { skin: 'plain' } })
+    return { h, a: h.desktop.mountWindow('a', 'plain'), b: h.desktop.mountWindow('b', 'plain') }
+  }
+
+  it('applies the valid changes even when another one names an unknown skin', () => {
+    const { h, b } = skinned()
+    expect(() =>
+      h.wm.batch(() => {
+        h.wm.update('a', { meta: { skin: 'missing' } })
+        h.wm.update('b', { meta: { skin: 'fancy' } })
+      }),
+    ).toThrow(/unknown skin/)
+    expect(b.element.localName).toBe('article')
+  })
+
+  it('still syncs stacking and focus in the pass that failed', () => {
+    const { h, a, b } = skinned()
+    expect(() =>
+      h.wm.batch(() => {
+        h.wm.update('b', { meta: { skin: 'missing' } })
+        h.wm.focus('a')
+      }),
+    ).toThrow(/unknown skin/)
+    expect(a.element.dataset.wmFocused).toBe('')
+    expect(Number(a.element.style.zIndex)).toBeGreaterThan(Number(b.element.style.zIndex))
   })
 })
 

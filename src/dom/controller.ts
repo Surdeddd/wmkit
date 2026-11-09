@@ -531,6 +531,7 @@ export function attachDesktop(
   let syncAgain = false
   let shielded = false
   let reshown = false
+  let failure: { error: unknown } | null = null
 
   function syncAll(): void {
     if (syncing) {
@@ -545,6 +546,11 @@ export function attachDesktop(
       } while (syncAgain)
     } finally {
       syncing = false
+    }
+    if (failure) {
+      const { error } = failure
+      failure = null
+      throw error
     }
   }
 
@@ -587,7 +593,11 @@ export function attachDesktop(
     if (restyle !== null) {
       for (const [id, wanted] of restyle) {
         const attached = registry.get(id)
-        if (attached && attached.skin !== wanted) buildSkin(id, wanted, attached.mountOptions)
+        try {
+          if (attached && attached.skin !== wanted) buildSkin(id, wanted, attached.mountOptions)
+        } catch (error) {
+          failure ??= { error }
+        }
       }
       syncAgain = true
       return
