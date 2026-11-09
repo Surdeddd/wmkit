@@ -358,14 +358,41 @@ export function attachDesktop(
   }
 
   if (options.autoViewport !== false) {
-    const applyViewport = () =>
-      wm.setViewport({ width: element.clientWidth, height: element.clientHeight })
+    let live: HTMLElement[] = []
+    let settle = 0
+    const steady = () => {
+      for (const el of live) delete el.dataset.wmLive
+      live = []
+      settle = 0
+    }
+    const applyViewport = () => {
+      const width = element.clientWidth
+      const height = element.clientHeight
+      const now = wm.getState().viewport
+      if (width === now.width && height === now.height) return
+      if (settle === 0) {
+        for (const { element: el } of registry.values()) {
+          if (el.dataset.wmLive !== undefined) continue
+          live.push(el)
+          el.dataset.wmLive = ''
+        }
+      }
+      view.cancelAnimationFrame(settle)
+      settle = view.requestAnimationFrame(() => {
+        settle = view.requestAnimationFrame(steady)
+      })
+      wm.setViewport({ width, height })
+    }
     applyViewport()
     if (view.ResizeObserver) {
       const observer = new view.ResizeObserver(applyViewport)
       observer.observe(element)
       cleanup.push(() => observer.disconnect())
     }
+    cleanup.push(() => {
+      view.cancelAnimationFrame(settle)
+      steady()
+    })
   }
 
   function rescue(el: HTMLElement): void {
