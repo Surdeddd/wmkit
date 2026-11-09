@@ -281,23 +281,16 @@ describe('tab shortcuts', () => {
     for (const id of ['a', 'b', 'c']) h.add({ id, x: 10, y: 10, width: 300, height: 200 })
     h.wm.group(['a', 'b', 'c'])
     h.wm.activateTab('a')
-    return h
+    return { ...h, cycle: vi.spyOn(h.wm, 'cycleTab').mockReturnValue(null) }
   }
 
-  const activeTab = (h: Harness) => {
-    const id = h.wm.getState().focusedId as string
-    return h.wm.getState().groups[h.wm.get(id)?.groupId as string]?.activeId
-  }
-
-  it('moves to the next and previous tab with Ctrl or Cmd, Alt and PageDown or PageUp', () => {
+  it('cycles the tabs of the focused group with Ctrl or Cmd, Alt and PageDown or PageUp', () => {
     const h = grouped()
     const next = press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
     expect(next.defaultPrevented).toBe(true)
-    expect(activeTab(h)).toBe('b')
     press(h.element, 'PageDown', { metaKey: true, altKey: true })
-    expect(activeTab(h)).toBe('c')
     press(h.element, 'PageUp', { ctrlKey: true, altKey: true })
-    expect(activeTab(h)).toBe('b')
+    expect(h.cycle.mock.calls).toEqual([[1], [1], [-1]])
   })
 
   it('keeps out of the way without the modifiers, in fields or when switched off', () => {
@@ -307,21 +300,21 @@ describe('tab shortcuts', () => {
     const field = document.createElement('input')
     h.element.append(field)
     press(field, 'PageDown', { ctrlKey: true, altKey: true })
-    expect(activeTab(h)).toBe('a')
+    expect(h.cycle).not.toHaveBeenCalled()
 
     const off = grouped({ keyboard: { tabShortcuts: false } })
     expect(press(off.element, 'PageDown', { ctrlKey: true, altKey: true }).defaultPrevented).toBe(
       false,
     )
-    expect(activeTab(off)).toBe('a')
+    expect(off.cycle).not.toHaveBeenCalled()
   })
 
-  it('still snaps with the arrows when only the tab shortcuts are on', () => {
+  it('still cycles tabs when only the snap shortcuts are off', () => {
     const h = grouped({ keyboard: { snapShortcuts: false } })
     press(h.element, 'ArrowLeft', { ctrlKey: true, altKey: true })
     expect(h.wm.get('a')?.stage).toBe('normal')
     press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
-    expect(activeTab(h)).toBe('b')
+    expect(h.cycle).toHaveBeenCalledWith(1)
   })
 })
 
