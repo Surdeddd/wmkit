@@ -92,6 +92,12 @@ function probes(raw: string): string[] {
     '<title>{{title}}</title>',
     '<title/>{{title}}<a title="</title><img src=x onerror={{title}}>">',
     '<svg><title>{{title}}</title></svg>',
+    '<script><!--<script></script>{{title}}</script></script>',
+    '<script><!--<script>x</script>--></script>{{title}}',
+    '<script><!--</script>{{title}}',
+    '<script>a<!--b<SCRIPT>c</script>d</script>{{title}}',
+    '<script>x = 1 < 2 && "</scrip"</script>{{title}}',
+    '<script></script>{{title}}<script></script>',
   ]
 }
 
@@ -175,6 +181,8 @@ describe('template compiler against the HTML parser', () => {
       '<a><svg><foreignObject><a></a></foreignObject><![CDATA[><img src=x onerror="//]]>{{title}}">',
       '<select></select><svg><title><b>{{title}}</b></title></svg>',
       '<select></select><title/><a title="</title><img src=x onerror={{title}}>">',
+      '<script><!--<script></script>{{title}}</script></script>',
+      '<script>/*<!--*/</script>{{title}}',
     ]) {
       expect(compiled(template), template).toBeNull()
     }
@@ -190,6 +198,7 @@ describe('template compiler against the HTML parser', () => {
       '<select><option>{{title}}</option></select><svg><title>{{title}}</title></svg>',
       '<svg><foreignObject><div><b>x</div></foreignObject></svg><svg><title>{{title}}</title></svg>',
       '<math><mi>{{title}}</mi></math><svg><title>{{title}}</title></svg>{{title}}',
+      '<script>window.ready = 1 < 2</script><b title="{{title}}">{{title}}</b>',
     ]) {
       expect(compiled(template), template).not.toBeNull()
       expect(differs(template), template).toBeNull()

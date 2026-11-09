@@ -49,6 +49,7 @@ export function compile(template: string): Compiled {
   const frames: string[] = []
   let doubt = false
   let strict = false
+  let escapes = false
   let tainted = false
   let seen = ''
 
@@ -88,6 +89,7 @@ export function compile(template: string): Compiled {
       if (top && !VOID.test(name)) frames.push(`/${name}`)
       if (RAW.test(name)) {
         if (doubt || name === 'noscript') tainted = true
+        escapes = name === 'script'
         state = RAWTEXT
         close = name === 'plaintext' ? NEVER : new RegExp(`</${name}(?=[\\t\\n\\f\\r />])`, 'i')
       }
@@ -116,6 +118,9 @@ export function compile(template: string): Compiled {
       if (state === SKIP || state === RAWTEXT) {
         const found = close.exec(part.slice(i))
         if (found === null) break
+        if (state === RAWTEXT && escapes && part.slice(i, i + found.index).includes('<!--')) {
+          tainted = true
+        }
         i += found.index + (state === SKIP ? found[0].length : 0) - 1
         state = TEXT
       } else if (state === TEXT) {
