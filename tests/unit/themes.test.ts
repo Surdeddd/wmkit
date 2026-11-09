@@ -3,6 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import * as themes from '../../src/themes/index'
 import { themeCss, themeNames, themeShadowCss, themeStyle } from '../../src/themes/index'
 
 const root = new URL('../../', import.meta.url).pathname
@@ -280,6 +281,66 @@ describe('windows deep in the stack', () => {
         }
       }
     }
+  })
+})
+
+describe('one theme at a time', () => {
+  const exported = themes as unknown as Record<string, unknown>
+
+  it('exports every theme on its own, in both flavours', () => {
+    for (const name of themeNames) {
+      expect(exported[`${name}Theme`], name).toBe(themeCss[name])
+      expect(exported[`${name}ShadowTheme`], name).toBe(themeShadowCss[name])
+    }
+  })
+
+  it('types them as strings, so the declarations do not repeat every stylesheet', () => {
+    const source = read('src/themes/css.ts')
+    const declared = [...source.matchAll(/^export const (\w+)(: string)? = `/gm)]
+    expect(declared).toHaveLength(themeNames.length * 2)
+    for (const [, name, typed] of declared) expect(typed, name).toBe(': string')
+  })
+
+  it('names them so no theme can shadow another export', () => {
+    const generated = themeNames.flatMap((name) => [`${name}Theme`, `${name}ShadowTheme`])
+    const others = Object.keys(exported).filter((key) => !generated.includes(key))
+    expect(new Set(generated).size).toBe(generated.length)
+    expect(others.sort()).toEqual(['themeCss', 'themeNames', 'themeShadowCss', 'themeStyle'])
+    for (const name of themeNames) expect(name).toMatch(/^[a-z][a-z0-9]*$/)
+  })
+
+  it('bundles a single theme into an app that imports one', async () => {
+    const { build } = await import('vite')
+    const entry = '\0one-theme'
+    const result = await build({
+      configFile: false,
+      logLevel: 'silent',
+      root,
+      plugins: [
+        {
+          name: 'one-theme',
+          resolveId: (id) => (id.endsWith('one-theme') ? entry : null),
+          load: (id) =>
+            id === entry
+              ? `import { retroShadowTheme } from ${JSON.stringify(join(root, 'src/themes/index.ts'))}\nexport default retroShadowTheme\n`
+              : null,
+        },
+      ],
+      build: {
+        write: false,
+        minify: false,
+        lib: { entry: 'one-theme', formats: ['es'], fileName: 'one' },
+      },
+    })
+    const outputs = (Array.isArray(result) ? result : [result]) as Array<{
+      output: Array<{ type: string; code?: string }>
+    }>
+    const code = outputs
+      .flatMap((bundle) => bundle.output)
+      .map((chunk) => chunk.code ?? '')
+      .join('')
+    expect(code).toContain('--wm-face-dark')
+    expect(code.length).toBeLessThan(themeShadowCss.retro.length * 1.25)
   })
 })
 

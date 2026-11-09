@@ -18,6 +18,12 @@ const names = readdirSync(source)
 
 if (names.length === 0) throw new Error('wmkit: no theme stylesheets found')
 
+for (const name of names) {
+  if (!/^[a-z][a-z0-9]*$/.test(name)) {
+    throw new Error(`wmkit: theme "${name}" needs a lowercase name of letters and digits`)
+  }
+}
+
 const quote = (css) => css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
 
 const read = (name) => readFileSync(join(source, `${name}.css`), 'utf8')
@@ -25,12 +31,18 @@ const read = (name) => readFileSync(join(source, `${name}.css`), 'utf8')
 const css = [
   "import type { ThemeName } from './index'",
   '',
+  ...names.flatMap((name) => [
+    `export const ${name}Theme: string = \`${quote(read(name))}\``,
+    '',
+    `export const ${name}ShadowTheme: string = \`${quote(toShadowCss(read(name)))}\``,
+    '',
+  ]),
   'export const themeCss: Record<ThemeName, string> = {',
-  ...names.map((name) => `  ${name}: \`${quote(read(name))}\`,`),
+  ...names.map((name) => `  ${name}: ${name}Theme,`),
   '}',
   '',
   'export const themeShadowCss: Record<ThemeName, string> = {',
-  ...names.map((name) => `  ${name}: \`${quote(toShadowCss(read(name)))}\`,`),
+  ...names.map((name) => `  ${name}: ${name}ShadowTheme,`),
   '}',
   '',
 ].join('\n')
@@ -38,13 +50,13 @@ const css = [
 const index = [
   "import { themeCss, themeShadowCss } from './css'",
   '',
+  "export * from './css'",
+  '',
   'export const themeNames = [',
   ...names.map((name) => `  '${name}',`),
   '] as const',
   '',
   'export type ThemeName = (typeof themeNames)[number]',
-  '',
-  'export { themeCss, themeShadowCss }',
   '',
   'export interface ThemeStyleOptions {',
   '  shadow?: boolean',

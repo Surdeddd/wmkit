@@ -1,5 +1,7 @@
 import { themeCss, themeShadowCss } from './css'
 
+export * from './css'
+
 export const themeNames = [
   'amber',
   'aqua',
@@ -20,8 +22,6 @@ export const themeNames = [
 ] as const
 
 export type ThemeName = (typeof themeNames)[number]
-
-export { themeCss, themeShadowCss }
 
 export interface ThemeStyleOptions {
   shadow?: boolean
