@@ -186,6 +186,45 @@ describe('calls that change nothing', () => {
   })
 })
 
+describe('update with a meta or size limit object', () => {
+  it('counts as a change whatever the value, so an in-place change can be announced', () => {
+    const wm = makeWm()
+    const data = { n: 1 }
+    wm.open({ id: 'a', meta: { data } })
+    wm.clearHistory()
+    const before = wm.get('a')
+    const change = vi.fn()
+    wm.subscribe(change)
+    const events = record(wm, ['update'])
+    data.n = 2
+    expect(wm.update('a', { meta: { data } })).toBe(true)
+    expect(wm.get('a')).not.toBe(before)
+    expect(events).toEqual(['update:a'])
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(wm.canUndo()).toBe(true)
+    wm.update('a', { minSize: { ...(before?.minSize as { width: number; height: number }) } })
+    wm.update('a', { maxSize: { width: 900, height: 700 } })
+    wm.update('a', { maxSize: { width: 900, height: 700 } })
+    expect(events).toHaveLength(4)
+    events.length = 0
+    expect(wm.undo()).toBe(true)
+    expect(events).toEqual(['update:a'])
+    wm.undo()
+    wm.undo()
+    wm.undo()
+    expect(wm.get('a')).toBe(before)
+  })
+
+  it('compares primitives and the stored objects by value', () => {
+    const wm = makeWm()
+    const a = wm.open({ id: 'a', title: 'T' })
+    wm.clearHistory()
+    expect(wm.update('a', { title: 'T', minSize: a.minSize, maxSize: null })).toBe(true)
+    expect(wm.get('a')).toBe(a)
+    expect(wm.canUndo()).toBe(false)
+  })
+})
+
 describe('undo, redo and hydrate keep what did not change', () => {
   it('keeps maximized and snapped windows when an unrelated move is undone', () => {
     const wm = makeWm()

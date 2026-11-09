@@ -41,6 +41,7 @@ const ZONES: readonly SnapZone[] = [
 const INFINITE = Number.POSITIVE_INFINITY
 const TINY = Number.MIN_VALUE
 const PLACEMENT = /^(bounds|restore|stage|snap[RZ]|group|opened)/
+const OWNED = /^m(eta|inSize|axSize)$/
 
 function normalizeWorkspace(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback
@@ -71,14 +72,15 @@ function capped(width: unknown, height: unknown): Size | null {
   return size.width < INFINITE || size.height < INFINITE ? size : null
 }
 
-function equal(a: unknown, b: unknown, depth: number): boolean {
+function equal(a: unknown, b: unknown, depth: number, strict?: boolean): boolean {
   if (a === b) return true
   if (depth < 1 || !a || !b || typeof a !== 'object' || typeof b !== 'object') return false
   const x = a as Record<string, unknown>
   const y = b as Record<string, unknown>
   let size = 0
   for (const key in x) {
-    if (!(key in y) || !equal(x[key], y[key], depth - 1)) return false
+    const next = strict && depth === 2 && OWNED.test(key) ? 0 : depth - 1
+    if (!(key in y) || !equal(x[key], y[key], next, strict)) return false
     size += 1
   }
   return size === Object.keys(y).length
@@ -439,7 +441,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     queueEvent(() => emitter.emit('focus', { window: win, previous }))
   }
 
-  function emitDiff(old: WindowState, win: WindowState): void {
+  function emitDiff(old: WindowState, win: WindowState, loose?: boolean): void {
     const emit = (type: 'move' | 'resize' | 'update') =>
       queueEvent(() => emitter.emit(type, { window: win }))
     if (old.stage !== win.stage) {
@@ -451,7 +453,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
     if (
       (Object.keys(win) as (keyof WindowState)[]).some(
-        (key) => old[key] !== win[key] && !PLACEMENT.test(key) && !equal(old[key], win[key], 1),
+        (key) =>
+          old[key] !== win[key] &&
+          !PLACEMENT.test(key) &&
+          !equal(old[key], win[key], loose || !OWNED.test(key) ? 1 : 0),
       )
     ) {
       emit('update')
@@ -877,9 +882,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function update(id: string, patch: WindowUpdate): boolean {
     const win = windows[id]
     if (!win) return false
-    const minSize = patch.minSize ? { ...patch.minSize } : win.minSize
-    const maxSize =
-      patch.maxSize === undefined ? win.maxSize : patch.maxSize && { ...patch.maxSize }
+    const own = <T>(given: T | undefined, current: T): T =>
+      given === undefined || given === current ? current : given && { ...given }
+    const minSize = own(patch.minSize || undefined, win.minSize)
+    const maxSize = own(patch.maxSize, win.maxSize)
     if (
       num(minSize.width, 0) === undefined ||
       num(minSize.height, 0) === undefined ||
@@ -908,7 +914,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       patch.minSize || patch.maxSize !== undefined || patch.aspectRatio !== undefined
         ? refit(next)
         : next
-    if (equal(finalWin, win, 2)) return true
+    if (equal(finalWin, win, 1)) return true
     const resized = !boundsEqual(finalWin.bounds, win.bounds)
     setWindow(finalWin)
     syncGroup(finalWin)
@@ -1176,7 +1182,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function focusOnly(a: HistoryEntry, b: HistoryEntry): boolean {
     return (
-      equal({ ...a, order: 0, focusedId: 0 }, { ...b, order: 0, focusedId: 0 }, 4) &&
+      equal({ ...a, order: 0, focusedId: 0 }, { ...b, order: 0, focusedId: 0 }, 4, true) &&
       equal(tabsOf(a), tabsOf(b), 2)
     )
   }
@@ -1184,7 +1190,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function recordHistory(): void {
     if (!historyDirty || !pendingHistory) return
     const now = current()
-    if (equal(pendingHistory, now, 4)) return
+    if (equal(pendingHistory, now, 4, true)) return
     const top = past.at(-1)
     if (interactionDepth > 0) interactionRecorded = true
     else if (top && focusOnly(top, pendingHistory) && focusOnly(pendingHistory, now)) {
@@ -1248,7 +1254,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
   }
 
-  function track(): () => void {
+  function track(loose?: boolean): () => void {
     const before = current()
     const groups = buildGroups()
     return () => {
@@ -1257,9 +1263,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         const old = before.windows[id] as WindowState
         const win = windows[id]
         if (!win) queueEvent(() => emitter.emit('close', { window: old }))
-        else if (equal(old, win, 2)) {
+        else if (equal(old, win, 2, !loose)) {
           if (old !== win) setWindow(old)
-        } else emitDiff(old, win)
+        } else emitDiff(old, win, loose)
       }
       for (const id of order) {
         const win = windows[id] as WindowState
@@ -1324,7 +1330,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function endInteraction(): void {
-    if (interactionDepth === 1 && interactionRecorded && equal(past.at(-1), current(), 4)) {
+    if (interactionDepth === 1 && interactionRecorded && equal(past.at(-1), current(), 4, true)) {
       restoreMark()
     }
     if (interactionDepth > 0) interactionDepth -= 1
@@ -1497,7 +1503,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function hydrate(data: SerializedState): boolean {
     if (!isValidSerialized(data)) return false
 
-    const done = track()
+    const done = track(true)
     const nextWindows: Record<string, WindowState> = Object.create(null)
     const built: WindowState[] = []
     let maxSeq = 0

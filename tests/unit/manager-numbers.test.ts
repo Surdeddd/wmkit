@@ -165,7 +165,7 @@ describe('non-finite numbers never enter the state', () => {
     minSize.width = 5
     expect(wm.get('a')?.minSize).toEqual({ width: 180, height: 120 })
     const before = wm.get('a')
-    expect(wm.update('a', { minSize: { width: 180, height: 120 } })).toBe(true)
+    expect(wm.update('a', { minSize: before?.minSize })).toBe(true)
     expect(wm.get('a')).toBe(before)
   })
 

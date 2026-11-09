@@ -3170,9 +3170,7 @@ describe('history, events and serialization', () => {
     expect(change).not.toHaveBeenCalled()
     expect(updated).not.toHaveBeenCalled()
     expect(wm.canUndo()).toBe(false)
-    wm.update('a', { meta: { n: 1 }, minSize: { ...a.minSize } })
-    expect(updated).not.toHaveBeenCalled()
-    wm.update('a', { meta: { n: 2 } })
+    wm.update('a', { meta: { n: 1 } })
     expect(updated).toHaveBeenCalledTimes(1)
   })
 
