@@ -2352,8 +2352,10 @@ describe('tab group regressions', () => {
     wm.on('resize', onResize)
 
     wm.resize('a', { width: 200 })
+    expect(onResize).not.toHaveBeenCalled()
+    wm.resize('a', { width: 200, height: 500 })
     expect(onResize).toHaveBeenCalledTimes(1)
-    expect(onResize.mock.calls[0]?.[0].window.bounds.width).toBe(520)
+    expect(onResize.mock.calls[0]?.[0].window.bounds).toMatchObject({ width: 520, height: 500 })
   })
 
   it('does not leave focus on a hidden tab when a modal refuses the new host', () => {

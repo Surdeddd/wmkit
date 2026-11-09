@@ -19,6 +19,8 @@ import type {
   WindowUpdate,
 } from './types'
 
+type Limits = Pick<WindowState, 'minSize' | 'maxSize' | 'aspectRatio'>
+
 const LAYER_RANK: Record<WindowLayer, number> = { normal: 0, floating: 1, modal: 2 }
 const STAGES: readonly WindowStage[] = ['normal', 'minimized', 'maximized', 'snapped']
 const LAYERS: readonly WindowLayer[] = ['normal', 'floating', 'modal']
@@ -35,6 +37,7 @@ const ZONES: readonly SnapZone[] = [
   'center-third',
   'right-third',
 ]
+const INFINITE = Number.POSITIVE_INFINITY
 
 function normalizeWorkspace(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback
@@ -237,73 +240,89 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return result
   }
 
-  function sharedSize(ids: readonly string[], size: Size): Size {
-    let shared = size
+  function limits(win: WindowState, ids?: readonly string[]): Limits {
+    if (!ids) {
+      if (win.groupId === null) return win
+      ids = membersOf(win.groupId)
+    }
+    const minSize = { width: 0, height: 0 }
+    const maxSize = { width: INFINITE, height: INFINITE }
+    let aspectRatio: number | null = null
     for (const id of ids) {
-      const fit = normalizeSize(shared, windows[id] as WindowState)
-      shared = {
-        width: Math.max(shared.width, fit.width),
-        height: Math.max(shared.height, fit.height),
+      const member = id === win.id ? win : (windows[id] as WindowState)
+      minSize.width = Math.max(minSize.width, member.minSize.width)
+      minSize.height = Math.max(minSize.height, member.minSize.height)
+      maxSize.width = Math.min(maxSize.width, member.maxSize?.width ?? INFINITE)
+      maxSize.height = Math.min(maxSize.height, member.maxSize?.height ?? INFINITE)
+      if (member.aspectRatio !== null) {
+        aspectRatio = Math.min(aspectRatio ?? INFINITE, member.aspectRatio)
       }
     }
-    return shared
+    return { minSize, maxSize, aspectRatio }
   }
 
-  function fitFrame(win: WindowState, ids: readonly string[]): Bounds {
-    if (win.stage === 'maximized') return win.bounds
-    const bounds = { ...win.bounds, ...sharedSize(ids, win.bounds) }
-    if (win.stage === 'snapped') {
-      bounds.x = Math.max(0, Math.min(bounds.x, viewport.width - bounds.width))
-      bounds.y = Math.max(0, Math.min(bounds.y, viewport.height - bounds.height))
+  function refit(win: WindowState, lim = limits(win)): WindowState {
+    if (win.stage === 'maximized' || win.restoreStage === 'maximized') return win
+    const target = win.stage === 'snapped' && sized(viewport) ? snapTarget(win) : null
+    let bounds = win.bounds
+    if (target) bounds = snapBounds(lim, target)
+    else {
+      const size = normalizeSize(bounds, lim)
+      if (
+        Math.abs(size.width - bounds.width) > 0.5 ||
+        Math.abs(size.height - bounds.height) > 0.5
+      ) {
+        bounds = { ...bounds, ...size }
+      }
+      if (win.stage === 'normal' && keepInViewport) {
+        bounds = clampToViewport(bounds, viewport, minVisible)
+      }
     }
-    return bounds
+    return boundsEqual(bounds, win.bounds) ? win : { ...win, bounds }
   }
 
-  function syncGroup(source: WindowState, fit = true): WindowState {
+  function syncGroup(source: WindowState): WindowState {
     if (source.groupId === null) return source
-    const members = membersOf(source.groupId)
-    const fitted = fit ? fitFrame(source, members) : source.bounds
-    let effective = source
-    if (!boundsEqual(fitted, source.bounds)) {
-      effective = { ...source, bounds: fitted }
-      setWindow(effective)
-    }
-    for (const id of members) {
-      if (id === effective.id) continue
+    for (const id of membersOf(source.groupId)) {
+      if (id === source.id) continue
       const member = windows[id] as WindowState
       if (
-        boundsEqual(member.bounds, effective.bounds) &&
-        member.stage === effective.stage &&
-        member.snapZone === effective.snapZone &&
-        member.snapRect === effective.snapRect &&
-        member.layer === effective.layer &&
-        member.workspace === effective.workspace
+        boundsEqual(member.bounds, source.bounds) &&
+        member.stage === source.stage &&
+        member.snapZone === source.snapZone &&
+        member.snapRect === source.snapRect &&
+        member.layer === source.layer &&
+        member.workspace === source.workspace
       ) {
         continue
       }
       setWindow({
         ...member,
-        bounds: effective.bounds,
-        stage: effective.stage,
-        snapZone: effective.snapZone,
-        snapRect: effective.snapRect,
-        restoreBounds: effective.restoreBounds,
-        restoreStage: effective.restoreStage,
-        layer: effective.layer,
-        workspace: effective.workspace,
+        bounds: source.bounds,
+        stage: source.stage,
+        snapZone: source.snapZone,
+        snapRect: source.snapRect,
+        restoreBounds: source.restoreBounds,
+        restoreStage: source.restoreStage,
+        layer: source.layer,
+        workspace: source.workspace,
       })
     }
-    return effective
+    return source
   }
 
-  function dissolveIfOrphaned(groupId: string): void {
+  function settleGroup(groupId: string): void {
     const members = membersOf(groupId)
-    if (members.length >= 2) return
-    for (const id of members) {
-      setWindow({ ...(windows[id] as WindowState), groupId: null })
+    if (members.length < 2) {
+      for (const id of members) setWindow(refit({ ...(windows[id] as WindowState), groupId: null }))
+      const { [groupId]: _dropped, ...rest } = activeTabs
+      activeTabs = rest
+      return
     }
-    const { [groupId]: _dropped, ...rest } = activeTabs
-    activeTabs = rest
+    const host = windows[activeTabs[groupId] as string] as WindowState
+    const next = refit(host)
+    if (next !== host) setWindow(next)
+    syncGroup(next)
   }
 
   function topModalId(): string | null {
@@ -355,11 +374,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     queueEvent(() => emitter.emit('focus', { window: win, previous }))
   }
 
-  function normalizeSize(
-    size: Size,
-    win: Pick<WindowState, 'minSize' | 'maxSize' | 'aspectRatio'>,
-    drive: 'width' | 'height' = 'width',
-  ): Size {
+  function normalizeSize(size: Size, win: Limits, drive: 'width' | 'height' = 'width'): Size {
     if (win.aspectRatio === null) return clampSize(size, win.minSize, win.maxSize)
     return applyAspect(size, win.aspectRatio, win.minSize, win.maxSize, drive)
   }
@@ -469,7 +484,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       if (wasActive && remaining[0]) {
         activeTabs = { ...activeTabs, [win.groupId]: remaining[0] }
       }
-      dissolveIfOrphaned(win.groupId)
+      settleGroup(win.groupId)
       emitGroup(win.groupId, wasActive && remaining.length > 1 ? id : null)
     }
     queueEvent(() => emitter.emit('close', { window: win }))
@@ -552,9 +567,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
   }
 
-  function snapBounds(win: WindowState, rect: Bounds): Bounds {
-    const byWidth = normalizeSize(rect, win)
-    const size = byWidth.height > rect.height ? normalizeSize(rect, win, 'height') : byWidth
+  function snapBounds(lim: Limits, rect: Bounds): Bounds {
+    const byWidth = normalizeSize(rect, lim)
+    const size = byWidth.height > rect.height ? normalizeSize(rect, lim, 'height') : byWidth
     return {
       x: Math.max(0, Math.min(rect.x, viewport.width - size.width)),
       y: Math.max(0, Math.min(rect.y, viewport.height - size.height)),
@@ -640,7 +655,12 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         }
         const rect = target === 'snapped' ? snapTarget(win) : null
         if (rect) {
-          return { ...win, stage: 'snapped', restoreStage: null, bounds: snapBounds(win, rect) }
+          return {
+            ...win,
+            stage: 'snapped',
+            restoreStage: null,
+            bounds: snapBounds(limits(win), rect),
+          }
         }
         return {
           ...win,
@@ -651,9 +671,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       }
       if (win.stage === 'normal') return null
       const docked = win.stage === 'maximized' ? snapTarget(win) : null
-      if (docked) return { ...win, stage: 'snapped', bounds: snapBounds(win, docked) }
+      if (docked) return { ...win, stage: 'snapped', bounds: snapBounds(limits(win), docked) }
       const target = win.restoreBounds ?? win.bounds
-      const bounds: Bounds = { x: target.x, y: target.y, ...normalizeSize(target, win) }
+      const bounds: Bounds = { x: target.x, y: target.y, ...normalizeSize(target, limits(win)) }
       return {
         ...win,
         stage: 'normal',
@@ -670,7 +690,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function restoreTo(id: string, bounds: Bounds): boolean {
     const result = applyStage(id, (win) => {
-      const size = normalizeSize(bounds, win)
+      const size = normalizeSize(bounds, limits(win))
       const next: Bounds = { x: bounds.x, y: bounds.y, ...size }
       return {
         ...win,
@@ -697,7 +717,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         restoreBounds,
         restoreStage: null,
       }
-      return { ...next, bounds: snapBounds(next, snapTarget(next) as Bounds) }
+      return { ...next, bounds: snapBounds(limits(next), snapTarget(next) as Bounds) }
     })
     if (result && snapZone) focus(id, true)
     return result
@@ -731,7 +751,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       Math.abs(merged.height - win.bounds.height) > Math.abs(merged.width - win.bounds.width)
         ? 'height'
         : 'width'
-    const size = normalizeSize(merged, win, drive)
+    const size = normalizeSize(merged, limits(win), drive)
     let bounds: Bounds = { x: merged.x, y: merged.y, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
     const becameNormal = win.stage === 'snapped'
@@ -774,15 +794,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       snappable: patch.snappable ?? win.snappable,
       meta: patch.meta ? { ...win.meta, ...patch.meta } : win.meta,
     }
-    const bounds =
-      next.stage === 'maximized' ||
-      !(patch.minSize || patch.maxSize !== undefined || patch.aspectRatio !== undefined)
-        ? next.bounds
-        : next.stage === 'snapped' && snapTarget(next)
-          ? snapBounds(next, snapTarget(next) as Bounds)
-          : { ...next.bounds, ...normalizeSize(next.bounds, next) }
-    const resized = !boundsEqual(bounds, next.bounds)
-    const finalWin = resized ? { ...next, bounds } : next
+    const finalWin =
+      patch.minSize || patch.maxSize !== undefined || patch.aspectRatio !== undefined
+        ? refit(next)
+        : next
+    const resized = !boundsEqual(finalWin.bounds, next.bounds)
     if ((Object.keys(win) as (keyof WindowState)[]).every((key) => finalWin[key] === win[key])) {
       return true
     }
@@ -868,7 +884,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
     let groupId = `${idPrefix}-group-${++groupCounter}`
     while (activeTabs[groupId]) groupId = `${idPrefix}-group-${++groupCounter}`
-    const bounds = fitFrame(host, expanded)
+    const { bounds } = refit(host, limits(host, expanded))
     const retired = new Set<string>()
     for (const id of expanded) {
       const win = windows[id] as WindowState
@@ -905,7 +921,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (!win?.groupId) return false
     const groupId = win.groupId
     const wasActive = activeTabs[groupId] === id
-    setWindow({ ...win, groupId: null })
+    setWindow(refit({ ...win, groupId: null }))
     const remaining = membersOf(groupId)
     if (wasActive) activeTabs = { ...activeTabs, [groupId]: remaining[0] as string }
     const without = order.filter((entry) => entry !== id)
@@ -915,7 +931,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       order = next
       queueEvent(() => emitter.emit('order', { order }))
     }
-    dissolveIfOrphaned(groupId)
+    settleGroup(groupId)
     emitGroup(groupId, wasActive && remaining.length > 1 ? id : null)
     commit()
     if (onActiveWorkspace(win) && win.stage !== 'minimized') focus(id, true)
@@ -1066,7 +1082,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         const synced = syncGroup(updated)
         if (known[id]) queueEvent(() => emitter.emit('resize', { window: synced }))
       } else if (win.stage === 'snapped' && snapTarget(win)) {
-        const updated = { ...win, bounds: snapBounds(win, snapTarget(win) as Bounds) }
+        const updated = { ...win, bounds: snapBounds(limits(win), snapTarget(win) as Bounds) }
         setWindow(updated)
         const synced = syncGroup(updated)
         if (known[id]) queueEvent(() => emitter.emit('resize', { window: synced }))
@@ -1397,8 +1413,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     activeTabs = restoredTabs
     const raw = data.extensions
     extensions = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
-    for (const groupId of Object.keys(restoredTabs)) dissolveIfOrphaned(groupId)
-    for (const host of Object.values(activeTabs)) syncGroup(windows[host] as WindowState, false)
+    for (const groupId of Object.keys(restoredTabs)) settleGroup(groupId)
     order = sortByLayer(order)
 
     const candidate = typeof data.focusedId === 'string' ? windows[data.focusedId] : undefined
