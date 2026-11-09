@@ -3034,11 +3034,10 @@ describe('history, events and serialization', () => {
     for (const type of ['open', 'move', 'resize'] as const) {
       wm.on(type, ({ window: win }) => events.push([type, win.id, win.bounds]))
     }
+    const a = wm.get('a')
     wm.undo()
-    expect(events).toEqual([
-      ['resize', 'a', { x: 300, y: 0, width: 300, height: 400 }],
-      ['open', 'm', { x: 0, y: 0, width: 600, height: 400 }],
-    ])
+    expect(wm.get('a')).toBe(a)
+    expect(events).toEqual([['open', 'm', { x: 0, y: 0, width: 600, height: 400 }]])
     events.length = 0
     wm.undo()
     wm.undo()
@@ -3159,7 +3158,9 @@ describe('history, events and serialization', () => {
     expect(change).not.toHaveBeenCalled()
     expect(updated).not.toHaveBeenCalled()
     expect(wm.canUndo()).toBe(false)
-    wm.update('a', { meta: { n: 1 } })
+    wm.update('a', { meta: { n: 1 }, minSize: { ...a.minSize } })
+    expect(updated).not.toHaveBeenCalled()
+    wm.update('a', { meta: { n: 2 } })
     expect(updated).toHaveBeenCalledTimes(1)
   })
 
