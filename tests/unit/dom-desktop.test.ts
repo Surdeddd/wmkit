@@ -319,6 +319,50 @@ describe('tab shortcuts', () => {
   })
 })
 
+describe('a desktop that lives in another document', () => {
+  function framed() {
+    const frame = document.createElement('iframe')
+    document.body.append(frame)
+    const doc = frame.contentDocument as Document
+    const view = frame.contentWindow as Window & typeof globalThis
+    view.requestAnimationFrame = (() => 0) as typeof view.requestAnimationFrame
+    const host = doc.createElement('div')
+    doc.body.append(host)
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const desktop = attachDesktop(wm, host, { autoViewport: false, announce: false })
+    wm.open({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    const root = doc.createElement('section')
+    root.innerHTML =
+      '<header data-wm-drag><button data-wm-close></button></header><input class="field">'
+    host.append(root)
+    desktop.attachWindow('a', root)
+    expect(root instanceof Element).toBe(false)
+    return { wm, view, root }
+  }
+
+  it('answers the action buttons of its windows', () => {
+    const { wm, view, root } = framed()
+    const button = root.querySelector('[data-wm-close]') as HTMLElement
+    button.dispatchEvent(new view.MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(wm.get('a')).toBeUndefined()
+  })
+
+  it('moves a window with the arrows and keeps Ctrl+Z out of its fields', () => {
+    const { wm, view, root } = framed()
+    root.dispatchEvent(new view.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(wm.get('a')?.bounds.x).toBe(116)
+    const undo = new view.KeyboardEvent('keydown', {
+      key: 'z',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    ;(root.querySelector('.field') as HTMLElement).dispatchEvent(undo)
+    expect(undo.defaultPrevented).toBe(false)
+    expect(wm.get('a')?.bounds.x).toBe(116)
+  })
+})
+
 describe('shortcuts inside editing surfaces', () => {
   const FIELDS =
     '<header data-wm-drag><input class="title-field"></header>' +

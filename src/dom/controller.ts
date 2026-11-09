@@ -114,9 +114,8 @@ function retire(slot: MountSlot): void {
 }
 
 function firedOn(event: Event): Element | null {
-  const path = event.composedPath()
-  const first = path.length > 0 ? path[0] : event.target
-  return first instanceof Element ? first : null
+  const first = (event.composedPath()[0] ?? event.target) as Element | null
+  return first?.nodeType === 1 ? first : null
 }
 
 function findInWindow(el: HTMLElement, selector: string): HTMLElement | null {
@@ -132,11 +131,11 @@ function focusablesOf(el: HTMLElement): HTMLElement[] {
   if (!root) return [...el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
   const found: HTMLElement[] = []
   for (const node of root.querySelectorAll<HTMLElement>(`${FOCUSABLE_SELECTOR}, slot`)) {
-    if (!(node instanceof HTMLSlotElement)) {
+    if (node.localName !== 'slot') {
       found.push(node)
       continue
     }
-    for (const assigned of node.assignedElements()) {
+    for (const assigned of (node as HTMLSlotElement).assignedElements()) {
       if (assigned.matches(FOCUSABLE_SELECTOR)) found.push(assigned as HTMLElement)
       found.push(...assigned.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
     }
