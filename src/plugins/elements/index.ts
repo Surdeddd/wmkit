@@ -211,7 +211,8 @@ export class WmWindowElement extends Base {
     else if (name === 'x' || name === 'y') {
       wm.move(id, numberAt(this, 'x') ?? win.bounds.x, numberAt(this, 'y') ?? win.bounds.y)
     } else if (name === 'width' || name === 'height') {
-      wm.resize(id, { width: numberAt(this, 'width'), height: numberAt(this, 'height') })
+      const size = numberAt(this, name)
+      if (size !== undefined) wm.resize(id, { [name]: size })
     } else if (name === 'aspect-ratio') wm.update(id, { aspectRatio: numberAt(this, name) ?? null })
     else if (name.startsWith('min-')) {
       wm.update(id, {
