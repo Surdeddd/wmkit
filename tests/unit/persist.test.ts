@@ -424,6 +424,85 @@ describe('persist errors', () => {
     expect(reported).toEqual([broken])
   })
 
+  it('reports only the first failure of a phase to reportError until that phase works again', () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (error: unknown) => reported.push(error))
+    let full = true
+    const data = new Map<string, string>()
+    const storage: PersistStorage = {
+      getItem: () => {
+        throw new Error('read refused')
+      },
+      setItem: (key, value) => {
+        if (full) throw new Error('quota')
+        data.set(key, value)
+      },
+      removeItem: () => {
+        if (full) throw new Error('quota')
+      },
+    }
+    const wm = makeWm()
+    const controller = persist(wm, { storage, debounce: 10 })
+    controller.restore()
+    for (let i = 0; i < 3; i += 1) {
+      wm.open()
+      vi.advanceTimersByTime(10)
+    }
+    controller.clear()
+    expect(reported.map((error) => (error as Error).message)).toEqual(['read refused', 'quota'])
+
+    full = false
+    controller.save()
+    expect(data.has('wmkit')).toBe(true)
+    full = true
+    controller.save()
+    controller.save()
+    expect(reported.map((error) => (error as Error).message)).toEqual([
+      'read refused',
+      'quota',
+      'quota',
+    ])
+  })
+
+  it('hands every failure to onError when one is given', () => {
+    const phases: string[] = []
+    const storage: PersistStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('quota')
+      },
+      removeItem: () => {},
+    }
+    const controller = persist(makeWm(), { storage, onError: (_, phase) => phases.push(phase) })
+    controller.save()
+    controller.save()
+    controller.save()
+    expect(phases).toEqual(['save', 'save', 'save'])
+  })
+
+  it('reports a failing migration again after one that worked', () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (error: unknown) => reported.push(error))
+    let broken = true
+    const storage = seeded(1)
+    const controller = persist(makeWm(), {
+      storage,
+      version: 2,
+      migrate: (state) => {
+        if (broken) throw new Error('bad migration')
+        return state as SerializedState
+      },
+    })
+    controller.restore()
+    broken = false
+    storage.setItem('wmkit', JSON.stringify({ version: 1, state: makeWm().serialize() }))
+    controller.restore()
+    broken = true
+    storage.setItem('wmkit', JSON.stringify({ version: 1, state: makeWm().serialize() }))
+    controller.restore()
+    expect(reported).toHaveLength(2)
+  })
+
   it('stays out of the way where there is no reportError', () => {
     vi.stubGlobal('reportError', undefined)
     expect(() =>
@@ -473,6 +552,35 @@ describe('persist maxWait', () => {
     expect(setItem).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1)
     expect(setItem).toHaveBeenCalledTimes(2)
+  })
+
+  it('never cuts a longer debounce short by default', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const setItem = vi.spyOn(storage, 'setItem')
+    persist(wm, { storage, autoRestore: false, debounce: 5000 })
+    wm.open({ id: 'a' })
+    vi.advanceTimersByTime(4999)
+    expect(setItem).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(setItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to the default bound for a maxWait that is not a usable number', () => {
+    for (const maxWait of [Number.NaN, -1, '500' as unknown as number]) {
+      const wm = makeWm()
+      const storage = memoryStorage()
+      const setItem = vi.spyOn(storage, 'setItem')
+      persist(wm, { storage, autoRestore: false, debounce: 150, maxWait })
+      wm.open({ id: 'a' })
+      for (let i = 1; i <= 19; i += 1) {
+        vi.advanceTimersByTime(100)
+        wm.move('a', i, i)
+      }
+      expect(setItem, String(maxWait)).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(100)
+      expect(setItem, String(maxWait)).toHaveBeenCalledTimes(1)
+    }
   })
 
   it('treats an infinite bound as no bound at all', () => {

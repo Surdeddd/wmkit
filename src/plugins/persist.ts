@@ -17,6 +17,8 @@ export interface PersistOptions {
   maxWait?: number
 }
 
+type Phase = 'load' | 'migrate' | 'save'
+
 interface PersistEnvelope {
   version: number
   state: SerializedState
@@ -52,8 +54,19 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   const storage = options.storage ?? defaultStorage()
   const debounce = options.debounce ?? 150
   const version = options.version ?? 0
-  const maxWait = Math.min(options.maxWait ?? 2000, 2 ** 31 - 1)
-  const report = options.onError ?? ((error: unknown) => globalThis.reportError?.(error))
+  const wait = options.maxWait
+  const maxWait = Math.min(
+    typeof wait === 'number' && wait >= 0 ? wait : Math.max(2000, debounce),
+    2 ** 31 - 1,
+  )
+  const reported = new Set<Phase>()
+  const report = (error: unknown, phase: Phase) => {
+    if (options.onError) options.onError(error, phase)
+    else if (!reported.has(phase)) {
+      reported.add(phase)
+      globalThis.reportError?.(error)
+    }
+  }
   let timer: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
   let suspended = false
@@ -62,6 +75,7 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     if (!storage) return
     try {
       storage.setItem(key, JSON.stringify({ version, state: wm.serialize() }))
+      reported.delete('save')
     } catch (error) {
       report(error, 'save')
     }
@@ -69,19 +83,20 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
 
   function restore(): boolean {
     if (!storage) return false
-    let phase: 'load' | 'migrate' = 'load'
+    let phase: Phase = 'load'
     let data: SerializedState | null
     let stale: boolean
     try {
       const raw = storage.getItem(key)
-      if (!raw) return false
-      const envelope = unwrap(JSON.parse(raw))
+      const envelope = raw ? unwrap(JSON.parse(raw)) : null
+      reported.delete(phase)
       if (!envelope) return false
       data = envelope.state
       stale = envelope.version !== version
       if (stale) {
         phase = 'migrate'
         data = options.migrate ? options.migrate(envelope.state, envelope.version) : null
+        reported.delete(phase)
       }
     } catch (error) {
       report(error, phase)
@@ -116,6 +131,7 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     if (!storage) return
     try {
       storage.removeItem(key)
+      reported.delete('save')
     } catch (error) {
       report(error, 'save')
     }
