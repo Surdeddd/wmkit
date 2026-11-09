@@ -45,6 +45,7 @@ interface AttachedWindow {
   lastTab: boolean
   hidden: boolean
   deep: boolean
+  shield: Map<HTMLElement, string> | null
   cleanup: Array<() => void>
 }
 
@@ -460,6 +461,7 @@ export function attachDesktop(
       for (const handle of attached.handles) {
         if (handle.style.display !== display) handle.style.display = display
       }
+      if (shielded || attached.shield) shield(attached, shielded && win.layer !== 'modal')
       attached.lastState = win
       attached.lastWorkspace = activeWorkspace
       attached.lastTab = activeTab
@@ -467,6 +469,21 @@ export function attachDesktop(
     if (transition !== null) {
       void el.offsetWidth
       el.style.transition = transition
+    }
+  }
+
+  function shield(attached: AttachedWindow, on: boolean): void {
+    let kept = attached.shield
+    if (on) {
+      for (const frame of attached.element.querySelectorAll<HTMLElement>(FRAMES)) {
+        kept ??= attached.shield = new Map()
+        if (kept.has(frame)) continue
+        kept.set(frame, frame.style.pointerEvents)
+        frame.style.pointerEvents = 'none'
+      }
+    } else if (kept) {
+      for (const [frame, value] of kept) frame.style.pointerEvents = value
+      attached.shield = null
     }
   }
 
@@ -575,11 +592,8 @@ export function attachDesktop(
     reshown = false
     if (modal !== shielded) {
       shielded = modal
-      for (const { element: el } of registry.values()) {
-        if (el.dataset.wmLayer === 'modal') continue
-        for (const frame of el.querySelectorAll<HTMLElement>(FRAMES)) {
-          frame.style.pointerEvents = modal ? 'none' : ''
-        }
+      for (const attached of registry.values()) {
+        shield(attached, modal && attached.lastState?.layer !== 'modal')
       }
     }
     const wanted = state.focusedId ? (registry.get(state.focusedId)?.element ?? null) : null
@@ -775,6 +789,7 @@ export function attachDesktop(
       lastTab: true,
       hidden: false,
       deep: false,
+      shield: null,
       cleanup: [],
     }
 
@@ -990,6 +1005,7 @@ export function attachDesktop(
       // a rebuild is not a cancellation: keep where the pointer left the window
       if (drag?.id === id) endDrag(!rebuilding && !!wm.get(id))
       letGo()
+      shield(attached, false)
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)

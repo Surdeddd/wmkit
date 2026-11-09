@@ -382,6 +382,51 @@ describe('frames inside windows', () => {
   })
 })
 
+describe('the frame shield under a modal', () => {
+  const FRAMED = '<header data-wm-drag><span data-wm-title>t</span></header><iframe></iframe>'
+  const MODAL = { id: 'modal', layer: 'modal' as const, x: 50, y: 50, width: 200, height: 150 }
+  const frameIn = (root: HTMLElement) => root.querySelector('iframe') as HTMLIFrameElement
+
+  it('covers a window attached while the modal is up and a frame added later', () => {
+    const h = makeHarness()
+    const lower = h.add({ id: 'lower', x: 0, y: 0, width: 200, height: 150 })
+    h.add(MODAL)
+    const late = h.add({ id: 'late', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    expect(frameIn(late).style.pointerEvents).toBe('none')
+
+    const frame = document.createElement('iframe')
+    lower.append(frame)
+    h.wm.update('lower', { title: 'still under the modal' })
+    expect(frame.style.pointerEvents).toBe('none')
+  })
+
+  it('gives the frames back on detach, on destroy and when their window turns modal', () => {
+    const h = makeHarness()
+    const one = h.add({ id: 'one', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    const two = h.add({ id: 'two', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    const three = h.add({ id: 'three', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    h.add(MODAL)
+    h.detach('one')
+    expect(frameIn(one).style.pointerEvents).toBe('')
+
+    h.wm.update('two', { layer: 'modal' })
+    expect(frameIn(two).style.pointerEvents).toBe('')
+
+    h.desktop.destroy()
+    expect(frameIn(three).style.pointerEvents).toBe('')
+  })
+
+  it('puts back the pointer-events value the app had set', () => {
+    const h = makeHarness()
+    const frame = frameIn(h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 }, FRAMED))
+    frame.style.pointerEvents = 'auto'
+    h.add(MODAL)
+    expect(frame.style.pointerEvents).toBe('none')
+    h.wm.close('modal')
+    expect(frame.style.pointerEvents).toBe('auto')
+  })
+})
+
 describe('a desktop that lives in another document', () => {
   function framed() {
     const frame = document.createElement('iframe')
