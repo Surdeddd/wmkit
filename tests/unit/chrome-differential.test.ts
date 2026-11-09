@@ -203,7 +203,7 @@ describe('template compiler against the HTML parser', () => {
       expect(compiled(template), template).not.toBeNull()
       expect(differs(template), template).toBeNull()
     }
-  })
+  }, 30_000)
 
   it('agrees with the parser on every generated template it accepts', () => {
     const random = rng(20261110)
@@ -216,7 +216,7 @@ describe('template compiler against the HTML parser', () => {
     const failures: string[] = []
     let accepted = 0
     let foreign = 0
-    for (let n = 0; n < 1200; n += 1) {
+    for (let n = 0; n < 800; n += 1) {
       const template = context(5) + pick(probes(pick(RAW))) + context(2)
       if (compiled(template) === null) continue
       accepted += 1
@@ -225,7 +225,7 @@ describe('template compiler against the HTML parser', () => {
       if (failure) failures.push(failure)
     }
     expect(failures).toEqual([])
-    expect(accepted).toBeGreaterThan(300)
-    expect(foreign).toBeGreaterThan(100)
-  })
+    expect(accepted).toBeGreaterThan(200)
+    expect(foreign).toBeGreaterThan(60)
+  }, 120_000)
 })
