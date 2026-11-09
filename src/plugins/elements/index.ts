@@ -117,14 +117,25 @@ function closedIn(state: ManagerState): unknown[] {
 export class WmDesktopElement extends Base {
   manager: WindowManager | null = null
   controller: DesktopController | null = null
-  options: WmDesktopOptions = {}
-  messages: ElementsMessages | null = null
+  declare options: WmDesktopOptions
+  declare messages: ElementsMessages | null
   readonly windows = new Map<string, WmWindowElement>()
   readonly [MEMBERS] = new Set<WmWindowElement>();
   [SHEETS]: CSSStyleSheet[] = []
   private css: WmDesktopStyles | null = null
   private store: PersistController | null = null
   private stops: Array<() => void> = []
+
+  constructor() {
+    super()
+    this.options ??= {}
+    this.messages ??= null
+    if (Object.hasOwn(this, 'styles')) {
+      const styles = this.styles
+      Reflect.deleteProperty(this, 'styles')
+      this.styles = styles
+    }
+  }
 
   get styles(): WmDesktopStyles | null {
     return this.css
@@ -222,7 +233,7 @@ export class WmWindowElement extends Base {
     ...FLAGS,
   ]
 
-  windowId: string | null = null
+  declare windowId: string | null
   private host: WmDesktopElement | null = null
   private detach: (() => void) | null = null
   private quiet = false
@@ -230,6 +241,11 @@ export class WmWindowElement extends Base {
   private tabs = ''
   private adopted: CSSStyleSheet[] = []
   private controls: Array<[keyof WindowFlags, HTMLElement]> = []
+
+  constructor() {
+    super()
+    this.windowId ??= null
+  }
 
   get manager(): WindowManager | null {
     return this.host?.manager ?? null

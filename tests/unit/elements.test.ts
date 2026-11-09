@@ -63,6 +63,33 @@ describe('defining the elements', () => {
     vi.stubGlobal('customElements', undefined)
     expect(() => defineWmElements({ prefix: 'never' })).not.toThrow()
   })
+
+  it('keeps properties a framework set before the elements were defined', () => {
+    const holder = document.createElement('div')
+    holder.innerHTML = '<early-desktop><early-window label="Early"></early-window></early-desktop>'
+    document.body.append(holder)
+    const desktop = holder.querySelector('early-desktop') as WmDesktopElement
+    const element = holder.querySelector('early-window') as WmWindowElement
+    const sheet = new CSSStyleSheet()
+    desktop.options = { viewport: { width: 900, height: 600 } }
+    desktop.messages = { ...elementsMessagesRu, close: 'Fermer' }
+    desktop.styles = [sheet]
+    element.windowId = 'early'
+    defineWmElements({ prefix: 'early' })
+    expect(desktop).toBeInstanceOf(WmDesktopElement)
+    expect(desktop.manager?.getState().viewport).toEqual({ width: 900, height: 600 })
+    expect(desktop.manager?.get('early')?.title).toBe('Early')
+    expect(element.windowId).toBe('early')
+    const root = element.shadowRoot as ShadowRoot
+    expect(root.querySelector('[part~=close]')?.getAttribute('aria-label')).toBe('Fermer')
+    expect(Object.hasOwn(desktop, 'styles')).toBe(false)
+    expect(desktop.styles).toEqual([sheet])
+    expect(root.adoptedStyleSheets).toEqual([sheet])
+
+    const later = document.createElement('early-desktop') as WmDesktopElement
+    expect([later.options, later.messages, later.styles]).toEqual([{}, null, null])
+    expect((document.createElement('early-window') as WmWindowElement).windowId).toBeNull()
+  })
 })
 
 describe('a desktop', () => {
