@@ -195,17 +195,23 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
 
   const hiddenBox = (id: string | null) => id !== null && boxes.get(id)?.hidden === true
   let replaying = false
-  for (const name of ['undo', 'redo'] as const) {
-    const run = wm[name]
-    wm[name] = () => {
+  const methods = wm as unknown as Record<string, (...args: unknown[]) => boolean>
+  for (const name of ['undo', 'redo', 'hydrate', 'loadLayout']) {
+    const run = methods[name] as (...args: unknown[]) => boolean
+    methods[name] = (...args) => {
       replaying = true
       try {
-        return run()
+        return run(...args)
       } finally {
         replaying = false
       }
     }
   }
+  const gone = new Set<string>()
+  let sweeping = false
+  wm.on('open', ({ window: win }) => {
+    if (!replaying) gone.delete(win.id)
+  })
   const cycle = wm.cycleFocus
   wm.cycleFocus = (direction) => {
     let id: string | null = null
@@ -255,6 +261,15 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     held: false,
     sync() {
       const state = wm.getState()
+      const ghosts = state.order.filter((id) => gone.has(id))
+      if (ghosts.length > 0 && !sweeping) {
+        sweeping = true
+        wm.beginInteraction()
+        for (const id of ghosts) wm.close(id)
+        wm.abortInteraction()
+        sweeping = false
+        return
+      }
       if (!replaying && hiddenBox(state.focusedId)) {
         wm.cycleFocus(-1)
         return
@@ -312,6 +327,7 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     box.unmount()
     boxes.delete(win.id)
     seen.delete(win.id)
+    gone.add(win.id)
     const index = history.indexOf(box)
     if (index !== -1) history.splice(index, 1)
     runtime.boxes -= 1

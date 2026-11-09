@@ -540,6 +540,113 @@ describe('tearing down', () => {
   })
 })
 
+describe('windows of closed boxes', () => {
+  const managerOf = (made: WinBox) =>
+    (made as unknown as { runtime: { wm: WindowManager } }).runtime.wm
+  const ids = (wm: WindowManager) => [...wm.getState().order].sort()
+
+  it('never come back with undo, and undo leaves no step of its own', () => {
+    const wm = WinBox.manager(root)
+    const a = box('A', { id: 'ga' })
+    box('B', { id: 'gb' })
+    a.close()
+    expect(ids(wm)).toEqual(['gb'])
+
+    expect(wm.undo()).toBe(true)
+    expect(ids(wm)).toEqual(['gb'])
+    expect(wm.canRedo()).toBe(true)
+    expect(wm.redo()).toBe(true)
+    expect(ids(wm)).toEqual(['gb'])
+    expect(wm.canRedo()).toBe(false)
+    expect(root.querySelectorAll('.winbox')).toHaveLength(1)
+  })
+
+  it('stay closed through every undo and redo around the close', () => {
+    const wm = WinBox.manager(root)
+    const a = box('A', { id: 'ra' })
+    const b = box('B', { id: 'rb' })
+    a.move(30, 40)
+    b.move(60, 70)
+    a.close()
+    const seen: string[][] = []
+    for (let step = 0; step < 3; step += 1) {
+      expect(wm.undo()).toBe(true)
+      seen.push(ids(wm))
+    }
+    expect(wm.get('rb')?.bounds.x).not.toBe(60)
+    for (let step = 0; step < 3; step += 1) {
+      expect(wm.redo()).toBe(true)
+      seen.push(ids(wm))
+    }
+    expect(seen).toEqual(Array.from({ length: 6 }, () => ['rb']))
+    expect(wm.canRedo()).toBe(false)
+    expect(wm.get('rb')?.bounds).toMatchObject({ x: 60, y: 70 })
+    expect(b.window.isConnected).toBe(true)
+
+    while (wm.undo()) expect(wm.get('ra')).toBeUndefined()
+    while (wm.redo()) expect(wm.get('ra')).toBeUndefined()
+  })
+
+  it('stay closed after the last box closed on a desktop the app holds', () => {
+    const wm = WinBox.manager(root)
+    const only = box('Only', { id: 'lo' })
+    only.close()
+    expect(wm.undo()).toBe(true)
+    expect(ids(wm)).toEqual([])
+    expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
+    const next = box('Next')
+    expect(managerOf(next)).toBe(wm)
+    expect(next.window.isConnected).toBe(true)
+  })
+
+  it('cannot be reached once the last box took its desktop down', () => {
+    const only = box('Only', { id: 'td' })
+    const old = managerOf(only)
+    only.close()
+    const next = box('Next', { id: 'tn' })
+    const wm = managerOf(next)
+    expect(wm).not.toBe(old)
+    while (wm.undo()) expect(wm.get('td')).toBeUndefined()
+    expect(ids(wm)).toEqual([])
+    expect(next.window.isConnected).toBe(false)
+  })
+
+  it('stay closed when a saved state or layout brings them back', () => {
+    const wm = WinBox.manager(root)
+    const a = box('A', { id: 'ha' })
+    box('B', { id: 'hb' })
+    const saved = wm.serialize()
+    wm.saveLayout('both')
+    a.close()
+    expect(wm.hydrate(saved)).toBe(true)
+    expect(ids(wm)).toEqual(['hb'])
+    expect(wm.loadLayout('both')).toBe(true)
+    expect(ids(wm)).toEqual(['hb'])
+  })
+
+  it('leave windows the app opened on the manager alone, even under a closed box id', () => {
+    const wm = WinBox.manager(root)
+    const a = box('A', { id: 'oa' })
+    box('B', { id: 'ob' })
+    a.close()
+    wm.open({ id: 'oa' })
+    wm.open({ id: 'raw' })
+    wm.close('raw')
+    expect(wm.undo()).toBe(true)
+    expect(ids(wm)).toEqual(['oa', 'ob', 'raw'])
+    expect(wm.undo()).toBe(true)
+    expect(ids(wm)).toEqual(['oa', 'ob'])
+  })
+
+  it('let a new box take the id of a closed one', () => {
+    const wm = WinBox.manager(root)
+    box('Old', { id: 'same' }).close()
+    const again = box('New', { id: 'same' })
+    expect(ids(wm)).toEqual(['same'])
+    expect(again.window.isConnected).toBe(true)
+  })
+})
+
 describe('methods and properties', () => {
   it('moves, resizes and renames through properties and chained calls', () => {
     const made = box('Props')
