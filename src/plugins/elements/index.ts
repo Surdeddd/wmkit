@@ -2,6 +2,7 @@ import { createWindowManager } from '../../core/manager'
 import type {
   ManagerOptions,
   ManagerState,
+  WindowFlags,
   WindowInit,
   WindowManager,
   WindowState,
@@ -33,6 +34,7 @@ export type WmDesktopOptions = DesktopOptions & ManagerOptions
 
 const CHROME_CSS = `:host{position:absolute;left:0;top:0;display:flex;flex-direction:column;box-sizing:border-box;color:var(--wm-text,#1d1d1f);background:var(--wm-bg,#fff);border:1px solid var(--wm-border,rgba(0,0,0,.14));border-radius:var(--wm-radius,10px);box-shadow:var(--wm-shadow,0 8px 28px rgba(0,0,0,.2))}
 :host([hidden]),:host([closed]){display:none!important}
+[hidden]{display:none!important}
 [part=titlebar]{border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0;display:flex;align-items:center;gap:6px;flex:none;height:36px;padding:0 6px 0 12px;background:var(--wm-titlebar-bg,transparent);user-select:none;-webkit-user-select:none;touch-action:none}
 [part=title]{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:600 13px/1 system-ui,sans-serif}
 [part~=control]{width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:inherit;font:16px/1 system-ui,sans-serif;cursor:pointer;opacity:.7}
@@ -185,6 +187,7 @@ export class WmWindowElement extends Base {
   private detach: (() => void) | null = null
   private quiet = false
   private last: WindowState | null = null
+  private controls: Array<[keyof WindowFlags, HTMLElement]> = []
 
   get manager(): WindowManager | null {
     return this.host?.manager ?? null
@@ -266,10 +269,14 @@ export class WmWindowElement extends Base {
       this.detach = (host.controller as DesktopController).attachWindow(id, this)
       host.windows.set(id, this)
     }
-    if (win !== this.last) {
+    const last = this.last
+    if (win !== last) {
       this.last = win
       if ((this.getAttribute('stage') ?? 'normal') !== win.stage) {
         this.reflect(() => this.setAttribute('stage', win.stage))
+      }
+      for (const [flag, button] of this.controls) {
+        if (last?.[flag] !== win[flag]) button.hidden = !win[flag]
       }
     }
     if (opened) emit(this, 'wm-open', { window: win })
@@ -340,10 +347,10 @@ export class WmWindowElement extends Base {
     const actions = doc.createElement('slot')
     actions.name = 'actions'
     bar.append(title, actions)
-    for (const [action, glyph, label] of [
-      ['wmMinimize', '–', messages.minimize],
-      ['wmMaximize', '□', messages.maximize],
-      ['wmClose', '×', messages.close],
+    for (const [action, glyph, label, flag] of [
+      ['wmMinimize', '–', messages.minimize, 'minimizable'],
+      ['wmMaximize', '□', messages.maximize, 'maximizable'],
+      ['wmClose', '×', messages.close, 'closable'],
     ] as const) {
       const button = part('button', `control ${action.slice(2).toLowerCase()}`)
       button.setAttribute('type', 'button')
@@ -351,6 +358,7 @@ export class WmWindowElement extends Base {
       button.dataset[action] = ''
       button.textContent = glyph
       bar.append(button)
+      this.controls.push([flag, button])
     }
     const content = part('div', 'content')
     content.append(doc.createElement('slot'))
