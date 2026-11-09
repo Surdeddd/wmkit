@@ -653,6 +653,49 @@ describe('fingers lifted where the desktop cannot hear them', () => {
   })
 })
 
+describe('measuring the desktop', () => {
+  it('happens once per gesture, not once per move', () => {
+    const harness = makeHarness({ gestures: [swipeGesture()] })
+    const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 400, height: 300 })
+    let reads = 0
+    const real = harness.element.getBoundingClientRect.bind(harness.element)
+    harness.element.getBoundingClientRect = () => {
+      reads += 1
+      return real()
+    }
+
+    root.dispatchEvent(touchEvent('pointerdown', 5, 100, 100))
+    root.dispatchEvent(touchEvent('pointerdown', 6, 160, 100))
+    for (let i = 0; i < 200; i += 1) {
+      root.dispatchEvent(touchEvent('pointermove', 5, 100 + i, 100 + (i % 3)))
+    }
+    expect(reads).toBe(1)
+
+    root.dispatchEvent(touchEvent('pointerup', 5, 300, 100))
+    root.dispatchEvent(touchEvent('pointerup', 6, 160, 100))
+    root.dispatchEvent(touchEvent('pointerdown', 7, 100, 100))
+    root.dispatchEvent(touchEvent('pointermove', 7, 120, 100))
+    expect(reads).toBe(2)
+  })
+
+  it('follows a scroll in the middle of a gesture', () => {
+    const harness = makeHarness({ gestures: [pinchGesture()] })
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
+    let top = 0
+    harness.element.getBoundingClientRect = () => ({ left: 0, top }) as DOMRect
+
+    root.dispatchEvent(touchEvent('pointerdown', 1, 100, 100))
+    root.dispatchEvent(touchEvent('pointerdown', 2, 300, 300))
+    top = -100
+    window.dispatchEvent(new Event('scroll'))
+    root.dispatchEvent(touchEvent('pointermove', 1, 50, -50))
+    root.dispatchEvent(touchEvent('pointermove', 2, 350, 250))
+    harness.flushFrames()
+
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 50, y: 50, width: 300, height: 300 })
+  })
+})
+
 describe('two fingers on two windows', () => {
   it('never resizes either of them', () => {
     const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 600 } })] })

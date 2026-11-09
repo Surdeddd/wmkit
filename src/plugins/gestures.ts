@@ -108,8 +108,6 @@ function start(ctx: GestureContext, options: Settings): () => void {
     session = null
     if (cancelled) wm.resize(active.id, active.startBounds)
     ctx.release(active)
-    releaseRect?.()
-    releaseRect = null
     const host = ctx.windowElement(active.id)
     if (host) delete host.dataset.wmPinching
     if (cancelled) wm.abortInteraction()
@@ -132,7 +130,6 @@ function start(ctx: GestureContext, options: Settings): () => void {
     session = claimed
     ctx.claim(claimed)
     wm.beginInteraction()
-    releaseRect = ctx.trackRect()
     const host = ctx.windowElement(id)
     if (host) host.dataset.wmPinching = ''
   }
@@ -187,10 +184,19 @@ function start(ctx: GestureContext, options: Settings): () => void {
     wm.setWorkspace(next)
   }
 
+  function forget(id: number): boolean {
+    if (!fingers.delete(id)) return false
+    if (fingers.size === 0) {
+      releaseRect?.()
+      releaseRect = null
+    }
+    return true
+  }
+
   function reset(cancelled: boolean): void {
     if (session) endPinch(cancelled)
     disarm()
-    fingers.clear()
+    for (const id of [...fingers.keys()]) forget(id)
   }
 
   function onDown(event: PointerEvent): void {
@@ -200,6 +206,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
       disarm()
       return
     }
+    releaseRect ??= ctx.trackRect()
     fingers.set(event.pointerId, { point: ctx.toLocal(event), windowId: windowIdAt(event) })
     const both = pair()
     if (!both) return
@@ -229,7 +236,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
   }
 
   function onRelease(event: PointerEvent): void {
-    if (!fingers.delete(event.pointerId)) return
+    if (!forget(event.pointerId)) return
     if (pending) {
       if (raf !== 0) {
         view.cancelAnimationFrame(raf)
@@ -242,7 +249,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
   }
 
   function onCancel(event: PointerEvent): void {
-    if (!fingers.delete(event.pointerId)) return
+    if (!forget(event.pointerId)) return
     if (session) endPinch(true)
     disarm()
   }
