@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { rawInlineCode } from '../../docs/.vitepress/markdown'
 import {
   alternates,
   HOST,
@@ -81,6 +82,33 @@ function fieldsOf(text: string, name: string): Map<string, string> {
 }
 
 describe('the markdown we ship', () => {
+  it('keeps double braces in inline code out of the page compiler', () => {
+    const marked: Array<[string, string]> = []
+    const token = { attrSet: (name: string, value: string) => void marked.push([name, value]) }
+    const md: Parameters<typeof rawInlineCode>[0] = {
+      renderer: { rules: { code_inline: () => '<code>{{title}}</code>' } },
+    }
+    rawInlineCode(md)
+    expect(md.renderer.rules.code_inline?.([token], 0, {}, {}, {})).toBe('<code>{{title}}</code>')
+    expect(marked).toEqual([['v-pre', '']])
+
+    const bare: Parameters<typeof rawInlineCode>[0] = { renderer: { rules: {} } }
+    expect(() => rawInlineCode(bare)).not.toThrow()
+    expect(bare.renderer.rules).toEqual({})
+  })
+
+  it('writes double braces only where the page compiler cannot see them', () => {
+    const exposed: string[] = []
+    for (const file of docsPages()) {
+      const prose = readFileSync(join(root, file), 'utf8')
+        .replace(/^(`{3,}|~{3,})[\s\S]*?^\1[ \t]*$/gm, '')
+        .replace(/<span v-pre>[\s\S]*?<\/span>/g, '')
+        .replace(/`[^`\n]*`/g, '')
+      if (prose.includes('{{')) exposed.push(file)
+    }
+    expect(exposed, `${exposed.join(', ')} show {{ outside code`).toEqual([])
+  })
+
   it('closes every code fence it opens', () => {
     const unbalanced: string[] = []
     for (const file of markdownFiles()) {

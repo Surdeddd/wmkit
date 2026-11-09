@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type DefaultTheme, defineConfig, type MarkdownOptions, type SiteConfig } from 'vitepress'
+import { rawInlineCode } from './markdown'
 import { alternates, HOST, LANDING, landingSitemap, pageUrl, robots } from './seo'
 
 const base = process.env.VERCEL ? '/docs/' : '/wmkit/docs/'
@@ -164,7 +165,13 @@ export default defineConfig({
     )
   },
   buildEnd: writeLlms,
-  markdown: { config: twinLinks, anchor: { slugify } },
+  markdown: {
+    config(md) {
+      twinLinks(md)
+      rawInlineCode(md as unknown as Parameters<typeof rawInlineCode>[0])
+    },
+    anchor: { slugify },
+  },
   locales: {
     root: {
       label: 'English',
