@@ -88,13 +88,21 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-focused` | window | present on the focused window |
 | `data-wm-dragging` | window | present during a drag |
 | `data-wm-resizing` | window | the direction: `n`, `se`, … |
-| `data-wm-pinching` | window | present while two fingers are resizing it |
+| `data-wm-pinching` | window | present while two fingers are resizing it (gestures plugin) |
 | `data-wm-variant` | window | the variant name, when the window has one |
+| `data-wm-group` | window | the id of its tab group, on grouped windows |
+| `data-wm-tab` | window | `active` or `inactive`, on grouped windows |
+| `data-wm-tab-target` | window | present on the window a drag would group with, once the gesture is armed |
+| `data-wm-live` | window | present while the desktop is being resized; see [below](#large-desktops-and-live-resizing) |
+| `data-wm-deep` | window | present on visible windows far down the stack; see [below](#large-desktops-and-live-resizing) |
+| `data-wm-docked` | window | present while the window is docked (dock plugin) |
+| `data-wm-skin` | window | the skin name, on windows built by a named skin (chrome plugin) |
 | `data-wm-flash` | window | set when a modal blocks an interaction; stays until the next blocked interaction or until the window detaches. The animation runs once per set and the attribute is not removed afterwards, since removing it would hand the element back to the theme's entry animation and replay it. Style the flash with an animation, not a static rule |
 | `data-wm-resize` | injected handles | the direction |
 | `data-wm-snap-preview` | injected preview | present |
+| `data-wm-drop` | injected preview | present while the preview shows where a drop target would put the window |
 | `data-wm-announcer` | injected live region | present |
-| `hidden` | window | minimized, or on another workspace |
+| `hidden` | window | minimized, on another workspace, or an inactive tab |
 
 Geometry is inline `transform: translate3d()`, `width`, `height` and `z-index`. Never fight it with `left`/`top` in CSS — position through the manager instead.
 
@@ -106,6 +114,7 @@ Geometry is inline `transform: translate3d()`, `width`, `height` and `z-index`. 
 | --- | --- |
 | `--wm-radius` | window and titlebar corner radius |
 | `--wm-bg`, `--wm-bg-focused` | window background |
+| `--wm-bg-solid` | opaque background for windows that lose their blur, see [below](#large-desktops-and-live-resizing) |
 | `--wm-border`, `--wm-border-focused` | window border |
 | `--wm-shadow`, `--wm-shadow-focused` | window shadow |
 | `--wm-titlebar-bg` | titlebar fill |
@@ -134,7 +143,7 @@ A theme with a see-through window composites against whatever is behind it. `fro
 
 If you write your own translucent theme, check it against a dark backdrop before shipping it. `tests/e2e/theme-contrast.spec.ts` measures the rendered pixels of the demo under all sixteen shipped themes and fails below 4.5:1.
 
-`retro.css` is a different visual system and exposes `--wm-face`, `--wm-face-light`, `--wm-face-dark`, `--wm-face-darker`, `--wm-title-active-a`, `--wm-title-active-b`, `--wm-title-inactive`, `--wm-title-text`, plus the shared `--wm-text`, `--wm-text-dim` and `--wm-accent`.
+`retro.css` is a different visual system and exposes `--wm-face`, `--wm-face-light`, `--wm-face-dark`, `--wm-face-darker`, `--wm-title-active-a`, `--wm-title-active-b`, `--wm-title-inactive`, `--wm-title-text`, plus the shared `--wm-text`, `--wm-text-dim`, `--wm-accent` and `--wm-radius` (`0`, so chrome that reads the token keeps square corners).
 
 Retuning a shipped theme is a scoped override:
 
@@ -146,6 +155,20 @@ Retuning a shipped theme is a scoped override:
   --wm-blur: 18px;
 }
 ```
+
+## Large desktops and live resizing
+
+Two attributes keep a theme cheap when the desktop is busy.
+
+`data-wm-live` is on the windows while the desktop element is being resized, and an application may set it during its own live edits. Every shipped theme with a geometry transition stops easing `transform`, `width` and `height` for such a window (`[data-wm-window][data-wm-live]`, or `:host([data-wm-live])` in the shadow flavour), so the windows follow the resize instead of easing after it. A custom theme or skin with its own geometry transition should do the same:
+
+```css
+[data-wm-window][data-wm-live] {
+  transition: none;
+}
+```
+
+`data-wm-deep` is on the visible windows that sit more than `stacking.deep` places below the top of the stack, 12 by default. The six themes with `backdrop-filter` — `glass`, `light`, `neon`, `aqua`, `frost` and `synth` — drop the blur on those windows and paint them with `--wm-bg-solid`, an opaque version of `--wm-bg`. A window that deep is mostly covered by others, and a blur behind each of dozens of windows is work the GPU repeats on every frame. When you retune `--wm-bg`, retune `--wm-bg-solid` with it. `stacking: { deep: false }` in `attachDesktop` turns the attribute off.
 
 ## Switching themes at runtime
 
@@ -196,29 +219,30 @@ wm.update('notes', { meta: { skin: 'compact' } })  // rebuilt in place
 
 ## Themes as text
 
-A stylesheet loaded into `document.head` cannot reach inside a shadow root, so a skin built with `shadow: true` never sees it. For that case the same sixteen themes ship as strings:
+A stylesheet loaded into `document.head` cannot reach inside a shadow root, so a skin built with `shadow: true` never sees it, and neither does the chrome of a `<wm-window>` web component. For that case the same sixteen themes ship as strings, each in two flavours: `carbonTheme` for a document and `carbonShadowTheme` for a shadow root.
 
 ```js
-import { themeNames, themeStyle } from '@surdeddd/wmkit/themes'
+import { carbonShadowTheme } from '@surdeddd/wmkit/themes'
 
 const dressed = skin({
   name: 'dressed',
   shadow: true,
-  styles: themeStyle('carbon', { shadow: true }),
+  styles: carbonShadowTheme,
   template: '<section><header data-wm-drag><span data-wm-title>{{title}}</span></header><div data-wm-content></div></section>',
 })
 ```
 
-`{ shadow: true }` is not optional here, and the reason is worth knowing. Custom properties inherit through a shadow boundary, so the tokens reach in on their own — but the rules that use them are written as `[data-wm-window] [data-wm-drag]`, and inside a shadow root there is no ancestor carrying `data-wm-window`: that attribute lives on the host, outside. Adopt the plain text and you get the colours defined and nothing painted with them.
+When the theme is picked at runtime, `themeStyle(name, { shadow: true })` returns the same text by name. For `<wm-window>`, assign the theme once to the desktop element, `desktop.styles = carbonShadowTheme`, and every window of that desktop wears it; see [Web Components](adapters.md#web-components).
 
-The shadow flavour is the same stylesheet re-anchored: the window selector becomes `:host`, its qualifiers become `:host([data-wm-focused])`, descendants lose the prefix they can no longer match, and the desktop block is reduced to the tokens it defines. Content rules become `::slotted([data-wm-content])`, `>` combinators are kept as `:host > x`, pseudo-classes go inside `:host(...)`, and rules that cannot match inside a shadow root are dropped. It is generated, never rewritten at runtime — `themeCss` stays byte-for-byte identical to the `.css` files, and `themeShadowCss` sits beside it.
+The shadow flavour is not optional here, and the reason is worth knowing. Custom properties inherit through a shadow boundary, so the tokens reach in on their own — but the rules that use them are written as `[data-wm-window] [data-wm-drag]`, and inside a shadow root there is no ancestor carrying `data-wm-window`: that attribute lives on the host, outside. Adopt the plain text and you get the colours defined and nothing painted with them.
+
+The shadow flavour is the same stylesheet re-anchored: the window selector becomes `:host`, its qualifiers become `:host([data-wm-focused])`, descendants lose the prefix they can no longer match, and the desktop block is reduced to the tokens it defines. Content rules are written twice: as `::slotted([data-wm-content])` for a skin that projects its content through a slot, and as a plain `[data-wm-content]` for a content box that lives inside the shadow root, like the one in `<wm-window>`. `>` combinators are kept as `:host > x`, pseudo-classes go inside `:host(...)`, and rules that cannot match inside a shadow root are dropped. It is generated, never rewritten at runtime — `themeCss` stays byte-for-byte identical to the `.css` files, and `themeShadowCss` sits beside it.
 
 A shadow skin wears the theme in its own `styles`, whatever theme the desktop wears, so overrides on `[data-wm-desktop]` do not reach it. To retune one shadow window, set the tokens on the window host — `[data-wm-window]` or `[data-wm-skin="<name>"]`; a page rule on the host beats the shadow root's `:host` tokens.
 
 `themeNames` is the full list, in the same order the folder holds them. Both flavours come out of `pnpm themes`; a test regenerates them and fails if anyone edits a stylesheet without rerunning the generator.
 
-Importing this entry costs the weight of all sixteen stylesheets twice over, so reach for it only when you need the text. Loading a theme the ordinary way, as a `.css` import, stays the cheaper path.
-
+Each theme is a separate export, so a bundler keeps only the ones you import. `themeStyle`, `themeCss` and `themeShadowCss` reach every theme by name and bring all thirty-two strings into the bundle, so use them only when the choice happens at runtime. Loading a theme the ordinary way, as a `.css` import, keeps it out of your JavaScript altogether.
 
 ## Writing a theme from scratch
 
@@ -257,6 +281,10 @@ A minimal but complete theme is about thirty lines. The only structural requirem
   user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition: none;              /* keep up while the desktop resizes */
+}
+
 [data-wm-window] [data-wm-drag] {
   flex-shrink: 0;
   cursor: default;
@@ -285,7 +313,7 @@ A minimal but complete theme is about thirty lines. The only structural requirem
 Four rules are easy to get wrong:
 
 1. **`[hidden]` needs `display: none` restated.** `display: flex` beats the UA `[hidden]` rule, so a minimized window would stay visible.
-2. **Kill transitions while dragging.** A transition on `transform` during a drag makes the window lag behind the cursor.
+2. **Kill transitions while dragging.** A transition on `transform` during a drag makes the window lag behind the cursor, and during a desktop resize behind the edge it follows: drop it under `data-wm-dragging`, `data-wm-resizing` and `data-wm-live`.
 3. **Do not put `overflow: hidden` on the window itself** unless you also want to clip the resize handles, which sit slightly outside the border box.
 4. **Never write a bare `section { }` rule** in the surrounding page. If your windows are `<section>` elements it will hit them; this exact bug shipped once already.
 
