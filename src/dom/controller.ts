@@ -79,6 +79,8 @@ const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditabl
 
 let titleSeq = 0
 
+const claimed = new WeakSet<Event>()
+
 function setData(el: HTMLElement, key: string, value: string | null): void {
   if (value === null) {
     if (key in el.dataset) delete el.dataset[key]
@@ -850,7 +852,7 @@ export function attachDesktop(
         event.stopPropagation()
       }
     }
-    for (const type of ['mousedown', 'click', 'dblclick', 'contextmenu']) {
+    for (const type of ['mousedown', 'click', 'dblclick', 'auxclick', 'contextmenu']) {
       windowElement.addEventListener(type, onBlockedInput, true)
       attached.cleanup.push(() => windowElement.removeEventListener(type, onBlockedInput, true))
     }
@@ -865,7 +867,8 @@ export function attachDesktop(
 
     const onClick = (event: MouseEvent) => {
       const target = firedOn(event)
-      if (!target) return
+      if (!target || claimed.has(event) || windowElementOf(target) !== windowElement) return
+      claimed.add(event)
       const current = wm.get(id)
       if (!current) return
       if (target.closest('[data-wm-close]')) {

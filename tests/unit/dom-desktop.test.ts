@@ -427,6 +427,44 @@ describe('the frame shield under a modal', () => {
   })
 })
 
+describe('input routed to the right window', () => {
+  it('lets the close button of a nested desktop close only its own window', () => {
+    const h = makeHarness()
+    const outer = h.add({ id: 'outer', x: 0, y: 0, width: 600, height: 400 })
+    const nested = document.createElement('div')
+    outer.append(nested)
+    const innerWm = createWindowManager({ viewport: { width: 500, height: 300 } })
+    const inner = attachDesktop(innerWm, nested, { autoViewport: false, announce: false })
+    innerWm.open({ id: 'inner', x: 0, y: 0, width: 200, height: 150 })
+    const innerRoot = document.createElement('section')
+    innerRoot.innerHTML = '<header data-wm-drag><button data-wm-close></button></header>'
+    nested.append(innerRoot)
+    inner.attachWindow('inner', innerRoot)
+
+    ;(innerRoot.querySelector('[data-wm-close]') as HTMLElement).click()
+    expect(innerWm.get('inner')).toBeUndefined()
+    expect(h.wm.get('outer')).toBeDefined()
+  })
+
+  it('refuses a middle click on a window under a modal', () => {
+    const h = makeHarness()
+    const lower = h.add(
+      { id: 'lower', x: 0, y: 0, width: 200, height: 150 },
+      '<header data-wm-drag></header><a href="#x" class="link">link</a>',
+    )
+    h.add({ id: 'modal', layer: 'modal', x: 300, y: 300, width: 200, height: 150 })
+    const link = lower.querySelector('.link') as HTMLElement
+    let reached = 0
+    link.addEventListener('auxclick', () => {
+      reached += 1
+    })
+    const click = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1 })
+    link.dispatchEvent(click)
+    expect(reached).toBe(0)
+    expect(click.defaultPrevented).toBe(true)
+  })
+})
+
 describe('skin changes in one transaction', () => {
   const skin =
     (tag: string): WindowSkin =>
