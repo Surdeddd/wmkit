@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { constants, Script } from 'node:vm'
 import { build } from 'vite'
@@ -19,6 +20,7 @@ async function installDom(): Promise<() => Promise<void>> {
 
 beforeAll(async () => {
   const configFile = `${fixture}vite.config.ts`
+  mkdirSync(`${fixture}dist`, { recursive: true })
   vi.stubEnv('NODE_ENV', 'production')
   vi.stubEnv('TMPDIR', `${fixture}dist`)
   try {
