@@ -29,7 +29,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,8 +38,28 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit firefox
-        timeout-minutes: 12
+      - id: playwright
+        run: |
+          version="$(pnpm exec playwright --version | awk '{ print $2 }')"
+          test -n "$version"
+          . /etc/os-release
+          echo "key=playwright-${ID}-${VERSION_ID}-${RUNNER_ARCH}-${version}" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright.outputs.key }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium webkit firefox
+        timeout-minutes: 15
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright.outputs.key }}
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium webkit firefox
+        timeout-minutes: 10
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
