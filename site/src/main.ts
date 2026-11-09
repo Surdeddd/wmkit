@@ -1,3 +1,4 @@
+import shadowThemes from 'virtual:wmkit-shadow-themes'
 import {
   type AnnouncerMessages,
   attachDesktop,
@@ -12,7 +13,6 @@ import {
 } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
-import { themeStyle } from '@surdeddd/wmkit/themes'
 import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
 import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
 import blueprintUrl from '@surdeddd/wmkit/themes/blueprint.css?url'
@@ -156,6 +156,21 @@ let customTemplate: string | null = null
 let customShadow = false
 let customStyles: string | undefined
 let customSkin: WindowSkin | null = null
+let skinRequest = 0
+let themeRequest: ThemeName | null = null
+
+const shadowThemeCss = new Map<ThemeName, string>()
+
+function loadShadowTheme(name: ThemeName): Promise<string> {
+  const ready = shadowThemeCss.get(name)
+  if (ready !== undefined) return Promise.resolve(ready)
+  const load = shadowThemes[name]
+  if (!load) return Promise.reject(new Error(`wmkit demo: no shadow flavour of ${name}`))
+  return load().then((css) => {
+    shadowThemeCss.set(name, css)
+    return css
+  })
+}
 
 function controlLines(): string[] {
   const labels = lang === 'ru' ? RU_CONTROLS : EN_CONTROLS
@@ -216,6 +231,7 @@ function dressAll(chosen: WindowSkin | string): void {
 }
 
 export function setSkinLayout(layout: SkinLayout): void {
+  skinRequest += 1
   skinLayout = layout
   customTemplate = null
   customShadow = false
@@ -225,8 +241,21 @@ export function setSkinLayout(layout: SkinLayout): void {
 }
 
 export function applyCustomSkin(template: string, shadow: boolean, styles?: string): void {
+  skinRequest += 1
   const own = styles?.trim() ? styles : undefined
-  const chosen = own ?? (shadow ? themeStyle(theme, { shadow: true }) : undefined)
+  const themed = own === undefined && shadow ? shadowThemeCss.get(theme) : undefined
+  if (own === undefined && shadow && themed === undefined) {
+    const request = skinRequest
+    const wanted = theme
+    loadShadowTheme(wanted).then(
+      () => {
+        if (request === skinRequest && wanted === theme) applyCustomSkin(template, shadow, styles)
+      },
+      () => {},
+    )
+    return
+  }
+  const chosen = own ?? themed
   const built = skin({
     name: 'custom',
     template,
@@ -275,12 +304,24 @@ const ctx: AppContext = {
   reset: () => resetDesktop(),
   theme: () => theme,
   setTheme(next) {
+    themeRequest = next
+    const redress = customTemplate !== null && customShadow && customStyles === undefined
+    if (redress && !shadowThemeCss.has(next)) {
+      loadShadowTheme(next).then(
+        () => {
+          if (themeRequest === next) ctx.setTheme(next)
+        },
+        () => {},
+      )
+      return
+    }
     theme = next
     applyTheme()
     if (customTemplate !== null && customShadow && customStyles === undefined) {
       applyCustomSkin(customTemplate, true)
     }
     relabelAll()
+    loadShadowTheme(next).catch(() => {})
   },
   option: (name) => options[name],
   setOption(name, value) {
@@ -1085,6 +1126,7 @@ function whenSized(run: () => void): void {
 function start(): void {
   whenSized(openDefaults)
   startFpsMeter()
+  loadShadowTheme(theme).catch(() => {})
 }
 
 must(document.querySelector<HTMLElement>('#brand-ver'), '#brand-ver').textContent =
