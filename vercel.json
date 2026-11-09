@@ -5,8 +5,8 @@
   "outputDirectory": "site/dist",
   "framework": null,
   "rewrites": [
-    { "source": "/docs/:page", "destination": "/docs/:page.html" },
-    { "source": "/docs/:dir/:page", "destination": "/docs/:dir/:page.html" },
-    { "source": "/docs/ru/:dir/:page", "destination": "/docs/ru/:dir/:page.html" }
+    { "source": "/docs/:page((?!ru$)[^/.]+)", "destination": "/docs/:page.html" },
+    { "source": "/docs/:dir/:page([^/.]+)", "destination": "/docs/:dir/:page.html" },
+    { "source": "/docs/ru/:dir/:page([^/.]+)", "destination": "/docs/ru/:dir/:page.html" }
   ]
 }

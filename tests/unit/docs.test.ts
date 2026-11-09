@@ -215,10 +215,13 @@ describe('what the docs tell search engines', () => {
     const rewrite = (path: string): string | null => {
       for (const { source, destination } of config.rewrites ?? []) {
         const names: string[] = []
-        const pattern = source.replace(/:(\w+)/g, (_whole, name: string) => {
-          names.push(name)
-          return '([^/]+)'
-        })
+        const pattern = source.replace(
+          /:(\w+)(?:\(((?:[^()]|\([^()]*\))*)\))?/g,
+          (_whole, name: string, custom?: string) => {
+            names.push(name)
+            return `(${custom ?? '[^/]+'})`
+          },
+        )
         const match = new RegExp(`^${pattern}$`).exec(path)
         if (!match) continue
         return names.reduce(
@@ -232,6 +235,14 @@ describe('what the docs tell search engines', () => {
       if (page.endsWith('index.md')) continue
       const address = new URL(pageUrl(page)).pathname
       expect(rewrite(address.replace(/\.html$/, '')), page).toBe(address)
+    }
+    for (const kept of [
+      '/docs/ru',
+      '/docs/sitemap.xml',
+      '/docs/assets/app.js',
+      '/docs/ru/assets/app.js',
+    ]) {
+      expect(rewrite(kept), kept).toBeNull()
     }
   })
 })
