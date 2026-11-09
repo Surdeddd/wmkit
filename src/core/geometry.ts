@@ -131,8 +131,22 @@ export interface MagnetResult {
   snappedY: boolean
 }
 
-function nearestEdge(low: number, high: number, targetLow: number, targetHigh: number): number[] {
-  return [targetLow - low, targetHigh - low, targetLow - high, targetHigh - high]
+function closer(best: number, delta: number, threshold: number): number {
+  return Math.abs(delta) <= threshold && Math.abs(delta) < Math.abs(best) ? delta : best
+}
+
+function nearestEdge(
+  best: number,
+  low: number,
+  high: number,
+  targetLow: number,
+  targetHigh: number,
+  threshold: number,
+): number {
+  best = closer(best, targetLow - low, threshold)
+  best = closer(best, targetHigh - low, threshold)
+  best = closer(best, targetLow - high, threshold)
+  return closer(best, targetHigh - high, threshold)
 }
 
 export function magnetize(
@@ -145,22 +159,22 @@ export function magnetize(
   let bestX = threshold + 1
   let bestY = threshold + 1
   for (const target of targets) {
-    for (const delta of nearestEdge(
+    bestX = nearestEdge(
+      bestX,
       bounds.x,
       bounds.x + bounds.width,
       target.x,
       target.x + target.width,
-    )) {
-      if (Math.abs(delta) <= threshold && Math.abs(delta) < Math.abs(bestX)) bestX = delta
-    }
-    for (const delta of nearestEdge(
+      threshold,
+    )
+    bestY = nearestEdge(
+      bestY,
       bounds.y,
       bounds.y + bounds.height,
       target.y,
       target.y + target.height,
-    )) {
-      if (Math.abs(delta) <= threshold && Math.abs(delta) < Math.abs(bestY)) bestY = delta
-    }
+      threshold,
+    )
   }
   if (Math.abs(bestX) <= threshold) {
     result.x = bounds.x + bestX
