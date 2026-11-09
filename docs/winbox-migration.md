@@ -21,6 +21,8 @@ description: Move an app from WinBox.js to wmkit by changing one import — what
 
 Every way of opening a window keeps working: `new WinBox(title, options)`, `new WinBox(options)`, `WinBox.new(...)` and `WinBox(...)` without `new`.
 
+In CommonJS, `require('@surdeddd/wmkit/winbox')` returns the constructor itself, as WinBox's own bundle does; `.default`, `.WinBox`, `.winboxMessages` and `.winboxMessagesRu` hang off it. The CommonJS types use `export =`, so `import WinBox = require('@surdeddd/wmkit/winbox')` type-checks in TypeScript.
+
 ## What maps to what
 
 | WinBox | wmkit |
@@ -41,9 +43,14 @@ Every way of opening a window keeps working: `new WinBox(title, options)`, `new 
 
 The markup keeps WinBox's class names — `.winbox` with the `focus`, `min`, `max`, `full`, `hide` and `modal` state classes, `.wb-header`, `.wb-control` (`.wb-min`, `.wb-max`, `.wb-full`, `.wb-close`), `.wb-drag`, `.wb-icon`, `.wb-title`, `.wb-body` — so CSS written for WinBox keeps applying.
 
+The state classes and the callbacks follow the manager rather than the call that caused a change, so they stay right after undo, redo, a restored layout and a viewport change. `onresize` and `onmove` also fire when maximizing, restoring or snapping changes the geometry, in the order WinBox uses: resize, then move, then the stage callback.
+
 ## What is different
 
 - **Snapping and keyboard control are on.** Drag a window to an edge to snap it, use the arrow keys on a focused window. Turn either off with `WinBox.configure({ snap: false, keyboard: false })`. Grouping windows into tabs is off by default and comes back with `grouping: true`.
+- **The control buttons work from the keyboard.** They take focus and answer Enter and Space, those added with `addControl` too. A hidden window drops out of the focus cycle, so F6 skips it.
+- **Closing is final.** A closed window never comes back through undo, redo or a restored layout; open a new one instead.
+- **The last window takes its desktop along.** When the last window of a desktop closes, the desktop, its controller and their listeners on the page are removed, and the next `new WinBox()` builds a fresh one. A desktop whose manager you took with `WinBox.manager()` stays, so `persist(WinBox.manager(), …)` keeps working.
 - **Minimized windows** wait in a strip of title buttons along the bottom edge; a click restores them.
 - **`top`/`right`/`bottom`/`left` belong to a desktop, not a window.** Windows created with the same set share one desktop; another set gets its own. Positions are measured inside that area.
 - **`index`** is ignored: stacking is the manager's job.
