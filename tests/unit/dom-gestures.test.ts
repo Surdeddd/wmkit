@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
-import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
+import type {
+  DesktopController,
+  DesktopOptions,
+  GestureContext,
+  WindowSkin,
+} from '../../src/dom/shared'
 import { createDock, dockLayout } from '../../src/plugins/dock'
 
 const VIEWPORT = { width: 800, height: 600 }
@@ -416,6 +421,31 @@ describe('escape from a drag', () => {
     wm.restore('b')
     expect(wm.get('b')).toMatchObject({ stage: 'snapped', bounds: { x: 503 } })
     expect(dockLayout.windowsOf(dock.layout())).toEqual(['a', 'b'])
+  })
+})
+
+describe('one gesture at a time', () => {
+  it('cancels a pointer drag instead of orphaning it when a gesture plugin claims the desktop', () => {
+    let gestures: GestureContext | null = null
+    const h = makeHarness({
+      gestures: [
+        (ctx) => {
+          gestures = ctx
+          return () => {}
+        },
+      ],
+    })
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const b = h.add({ id: 'b', x: 400, y: 100, width: 200, height: 150 })
+    dragTo(h, a.handle, [150, 110], [250, 210])
+    const pinch = { id: 'b', finish: vi.fn() }
+    ;(gestures as unknown as GestureContext).claim(pinch)
+
+    expect(a.root.dataset.wmDragging).toBeUndefined()
+    expect(h.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+    ;(gestures as unknown as GestureContext).release(pinch)
+    dragTo(h, b.handle, [450, 110], [460, 120])
+    expect(h.wm.get('b')?.bounds).toMatchObject({ x: 410, y: 110 })
   })
 })
 

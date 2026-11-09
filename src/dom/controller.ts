@@ -341,6 +341,7 @@ export function attachDesktop(
     },
     currentDrag: () => drag,
     claimDrag(session) {
+      if (drag !== session) drag?.finish(true)
       drag = session
       titlebar = null
     },
