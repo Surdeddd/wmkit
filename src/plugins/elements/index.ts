@@ -82,6 +82,7 @@ const OPEN = Symbol('wmkit-open')
 const SYNC = Symbol('wmkit-sync')
 const ADOPT = Symbol('wmkit-adopt')
 const MEMBERS = Symbol('wmkit-members')
+const OWNERS = Symbol('wmkit-owners')
 const SHEETS = Symbol('wmkit-sheets')
 
 const Base = (typeof HTMLElement === 'undefined' ? Object : HTMLElement) as typeof HTMLElement
@@ -114,13 +115,20 @@ function closedIn(state: ManagerState): unknown[] {
   return Array.isArray(closed) ? closed : []
 }
 
+function writeClosed(wm: WindowManager, closed: unknown[]): void {
+  wm.beginInteraction()
+  wm.setExtension(KEY, closed.length > 0 ? { closed } : undefined)
+  wm.abortInteraction()
+}
+
 export class WmDesktopElement extends Base {
   manager: WindowManager | null = null
   controller: DesktopController | null = null
   declare options: WmDesktopOptions
   declare messages: ElementsMessages | null
   readonly windows = new Map<string, WmWindowElement>()
-  readonly [MEMBERS] = new Set<WmWindowElement>();
+  readonly [MEMBERS] = new Set<WmWindowElement>()
+  readonly [OWNERS] = new Map<string, WmWindowElement>();
   [SHEETS]: CSSStyleSheet[] = []
   private css: WmDesktopStyles | null = null
   private store: PersistController | null = null
@@ -159,6 +167,7 @@ export class WmDesktopElement extends Base {
     const on = (name: string) => this.getAttribute(name) !== 'false'
     const wm = createWindowManager(this.options)
     this.manager = wm
+    this[OWNERS].clear()
     this.controller = attachDesktop(wm, this, {
       snap: on('snap'),
       keyboard: on('keyboard'),
@@ -212,14 +221,11 @@ export class WmDesktopElement extends Base {
       const id = element.windowId
       if (id !== null && !state.windows[id] && !closed.includes(id)) {
         closed.push(id)
+        this[OWNERS].set(id, element)
         changed = true
       }
     }
-    if (!changed) return
-    const wm = this.manager as WindowManager
-    wm.beginInteraction()
-    wm.setExtension(KEY, closed.length > 0 ? { closed } : undefined)
-    wm.abortInteraction()
+    if (changed) writeClosed(this.manager as WindowManager, closed)
   }
 }
 
@@ -260,6 +266,17 @@ export class WmWindowElement extends Base {
     queueMicrotask(() => {
       if (this.isConnected) return
       this.release(true)
+      const host = this.host
+      const id = this.windowId as string
+      if (!host?.isConnected || host[OWNERS].get(id) !== this) return
+      host[OWNERS].delete(id)
+      const wm = host.manager as WindowManager
+      const closed = closedIn(wm.getState())
+      if (closed.includes(id))
+        writeClosed(
+          wm,
+          closed.filter((entry) => entry !== id),
+        )
     })
   }
 
@@ -388,7 +405,11 @@ export class WmWindowElement extends Base {
     const id = this.getAttribute('window-id') ?? this.windowId
     this.windowId = id
     if (id === null || !wm.get(id)) {
-      if (!reopen && (this.hasAttribute('closed') || closedIn(wm.getState()).includes(id))) {
+      const owners = host[OWNERS]
+      const claim = (owners.get(id as string) ?? this) === this
+      const listed = claim && closedIn(wm.getState()).includes(id)
+      if (!reopen && (this.hasAttribute('closed') || listed)) {
+        if (id !== null) owners.set(id, this)
         this.reflect(() => this.toggleAttribute('closed', true))
         return
       }

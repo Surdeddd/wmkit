@@ -269,4 +269,69 @@ describe('closed panels', () => {
     wm?.close('b')
     expect(closedList(desktop)).toEqual(['b'])
   })
+
+  it('open again when the page drops the closed element and later renders a new one', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="mail" label="Mail"></wm-window></wm-desktop>',
+    )
+    const wm = desktop.manager
+    wm?.close('mail')
+    expect(closedList(desktop)).toEqual(['mail'])
+    windowOf(desktop, 'mail').remove()
+    await flush()
+    expect(closedList(desktop)).toBeUndefined()
+    expect(wm?.canUndo()).toBe(true)
+    const fresh = document.createElement('wm-window')
+    fresh.setAttribute('window-id', 'mail')
+    desktop.append(fresh)
+    expect(wm?.get('mail')).toBeDefined()
+    expect(fresh.hasAttribute('closed')).toBe(false)
+    expect(fresh.dataset.wmWindow).toBe('mail')
+  })
+
+  it('open again when a keyed re-render swaps the closed element in one task', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="mail" label="Mail"></wm-window></wm-desktop>',
+    )
+    const wm = desktop.manager
+    wm?.close('mail')
+    const fresh = document.createElement('wm-window')
+    fresh.setAttribute('window-id', 'mail')
+    windowOf(desktop, 'mail').replaceWith(fresh)
+    expect(wm?.get('mail')).toBeDefined()
+    expect(fresh.dataset.wmWindow).toBe('mail')
+    await flush()
+    expect(wm?.get('mail')).toBeDefined()
+    expect(closedList(desktop)).toBeUndefined()
+  })
+
+  it('stay closed when the closed element only moves within the page', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="a"></wm-window><section><wm-window window-id="b"></wm-window></section></wm-desktop>',
+    )
+    const wm = desktop.manager
+    wm?.close('b')
+    const b = windowOf(desktop, 'b')
+    desktop.append(b)
+    await flush()
+    expect(wm?.get('b')).toBeUndefined()
+    expect(b.hasAttribute('closed')).toBe(true)
+    expect(closedList(desktop)).toEqual(['b'])
+  })
+
+  it('stay closed when the whole desktop leaves the page and comes back', async () => {
+    const desktop = mount(
+      '<wm-desktop persist="k"><wm-window window-id="a"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
+    )
+    desktop.manager?.close('b')
+    const holder = desktop.parentElement as HTMLElement
+    desktop.remove()
+    await flush()
+    expect(desktop.manager).toBeNull()
+    holder.append(desktop)
+    expect(desktop.manager?.get('a')).toBeDefined()
+    expect(desktop.manager?.get('b')).toBeUndefined()
+    expect(windowOf(desktop, 'b').hasAttribute('closed')).toBe(true)
+    expect(closedList(desktop)).toEqual(['b'])
+  })
 })
