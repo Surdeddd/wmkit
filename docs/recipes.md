@@ -10,15 +10,19 @@ Working patterns for the things people build with a window manager. Every snippe
 - [Minimize animation into the taskbar](#minimize-animation-into-the-taskbar)
 - [Modal dialogs](#modal-dialogs)
 - [Persistence and migrations](#persistence-and-migrations)
+- [A tab strip for grouped windows](#a-tab-strip-for-grouped-windows)
 - [Workspaces](#workspaces)
 - [Aspect-ratio windows](#aspect-ratio-windows)
 - [Custom snap layouts](#custom-snap-layouts)
 - [Grouping a gesture into one undo](#grouping-a-gesture-into-one-undo)
 - [A context menu on the titlebar](#a-context-menu-on-the-titlebar)
 - [Reacting to one window only](#reacting-to-one-window-only)
+- [Popping a React window out to another monitor](#popping-a-react-window-out-to-another-monitor)
 - [Server-side rendering](#server-side-rendering)
 - [Testing](#testing)
 - [Performance](#performance)
+- [Build a window from scratch](#build-a-window-from-scratch)
+- [Touch gestures](#touch-gestures)
 
 ## Taskbar
 
@@ -96,7 +100,7 @@ const store = persist(wm, {
 })
 ```
 
-By default the plugin auto-restores on creation (`autoRestore: false` above leaves that to you, for a reason given below), then debounce-saves on every change; a pending save is flushed on `pagehide` and on `destroy()`, and `clear()` also cancels a pending save. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
+By default the plugin auto-restores on creation (`autoRestore: false` above leaves that to you, for a reason given below), then debounce-saves on every change, and under a steady stream of changes it still saves at least every `maxWait` ms (2000 by default); a pending save is flushed on `pagehide` and on `destroy()`, and `clear()` also cancels a pending save. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
 
 Restoring what you rendered is the other half — `hydrate` emits `open` for every window that appeared, so mounting can be driven entirely by events. Register the listener before the restore happens: with the default `autoRestore`, `persist` hydrates on creation before your listener exists, and a second `restore()` of identical data emits nothing:
 
@@ -107,7 +111,16 @@ wm.on('open', ({ window: win }) => {
 store.restore()
 ```
 
-Bounds are re-derived against the current viewport during `hydrate`, so a desktop saved on a 27-inch monitor and restored on a laptop comes back on-screen: maximized windows refill, snapped windows re-snap, and normal windows are clamped so their titlebars stay reachable.
+Bounds are re-derived against the current viewport during `hydrate`, so a desktop saved on a 27-inch monitor and restored on a laptop comes back on-screen: maximized windows refill, snapped windows re-snap, and normal windows are clamped so their titlebars stay reachable. A window damaged in storage is repaired rather than costing you the whole layout ([what gets repaired](api.md#serializedstate)).
+
+Nothing in the plugin throws: a storage that fails to read or write, a payload that is not JSON and a `migrate` that throws are reported instead. Send them to your own logging with `onError`; without it they go to `reportError`, which shows them in the console like an uncaught error:
+
+```js
+persist(wm, {
+  key: 'my-app-desktop',
+  onError: (error, phase) => logger.warn(`desktop ${phase} failed`, error),
+})
+```
 
 ## A tab strip for grouped windows
 
@@ -163,7 +176,10 @@ tab.addEventListener('keydown', (event) => {
 ```
 
 Give the strip `role="tablist"`, each button `role="tab"`, and keep a roving `tabindex` — `0` on the
-shown tab, `-1` on the rest — so the whole group costs one stop in the page's tab sequence.
+shown tab, `-1` on the rest — so the whole group costs one stop in the page's tab sequence. The
+desktop already switches tabs from the keyboard: `Ctrl`/`⌘` + `Alt` + `PageDown` / `PageUp` calls
+`cycleTab`, and `keyboard: { tabShortcuts: false }` turns that off. A `<wm-window>` web component
+draws a strip like this one itself ([Web Components](adapters.md#web-components)).
 
 The DOM layer hides inactive members for you and marks the elements: `data-wm-group` carries the
 group id and `data-wm-tab` is `active` or `inactive`, so a theme can style the frame without any
@@ -171,8 +187,9 @@ JavaScript.
 
 Holding one titlebar over another for a moment groups the two windows. The pause matters: without
 it, every drag that happens to end over a neighbour's titlebar would swallow the window. The
-default dwell is 420 ms, tunable with `grouping: { dwell: 250 }`. While the gesture is armed the
-target carries `data-wm-tab-target`:
+default dwell is 420 ms, tunable with `grouping: { dwell: 250 }`. Modal windows never group, neither
+as the dragged window nor as the target. While the gesture is armed the target carries
+`data-wm-tab-target`:
 
 ```css
 [data-wm-tab-target] {
@@ -237,12 +254,21 @@ To change what a drag to the edge does, use `snap` options: `threshold` and `cor
 Drag and resize already collapse into a single history entry. Do the same for your own gestures:
 
 ```js
+const start = selection.map((id) => [id, wm.get(id).bounds])
 wm.beginInteraction()
 for (const id of selection) wm.moveBy(id, dx, dy)
-wm.endInteraction()          // one undo step for the whole group
+
+function commit() {
+  wm.endInteraction()        // one undo step for the whole group
+}
+
+function cancel() {          // on Escape
+  for (const [id, { x, y }] of start) wm.move(id, x, y)
+  wm.abortInteraction()      // and no step at all
+}
 ```
 
-If the user cancels, `abortInteraction()` ends the interaction *and* drops the entry it created, so Escape leaves no trace in the history. `clearHistory()` inside a `batch` restarts history at that call, and later changes in the same batch undo back to it; inside a gesture the rest of the gesture is not recorded, and `abortInteraction()` brings back what was cleared. `batch(fn)` is the non-gesture equivalent: one `change` notification and one history entry for a burst of calls.
+If the user cancels, put the windows back and call `abortInteraction()`: it ends the interaction *and* drops the entry it created, so Escape leaves no trace in the history. It does not roll anything back by itself — changes left in place would be undone together with the step before. An interaction that ends where it started leaves no entry at all, and inside a nested interaction `abortInteraction()` only leaves the inner level. `clearHistory()` inside a `batch` restarts history at that call, and later changes in the same batch undo back to it; inside a gesture the rest of the gesture is not recorded, and `abortInteraction()` brings back what was cleared. `batch(fn)` is the non-gesture equivalent: one `change` notification and one history entry for a burst of calls.
 
 ## A context menu on the titlebar
 
@@ -297,7 +323,7 @@ function PopoutButton({ wm, id, children }: { wm: WindowManager; id: string; chi
 }
 ```
 
-`mode: 'container'` keeps the original node in place and hands back an empty `container` in the popout; the portal renders there with React's own event system intact. `closed` settles when the user closes the popout or the window closes in the manager.
+`mode: 'container'` keeps the original node in place and hands back an empty `container` in the popout; the portal renders there with React's own event system intact. `closed` settles when the user closes the popout or the window closes in the manager. A second click while the window is out is harmless: `popout` focuses the popout that is already open and resolves to the same handle.
 
 ## Server-side rendering
 
@@ -330,7 +356,7 @@ wm.snap(win.id, 'left')
 expect(wm.get(win.id).bounds).toEqual({ x: 0, y: 0, width: 500, height: 800 })
 ```
 
-jsdom reports `clientWidth` and `clientHeight` as 0, so with `autoViewport` on the viewport set at mount is ignored and the constructor one stays: pass `viewport` to `createWindowManager` in jsdom tests.
+jsdom reports `clientWidth` and `clientHeight` as 0, so with `autoViewport` on the viewport set at mount is ignored and the constructor one stays: pass `viewport` to `createWindowManager` in jsdom tests. Plain jsdom has no `ResizeObserver` either; the controller then measures the desktop once and carries on.
 
 For DOM behaviour, drive real pointer events — the library uses pointer capture, so synthetic mouse events will not do. In Playwright:
 
@@ -353,12 +379,13 @@ What still matters on your side:
 - **Batch bulk work.** `wm.batch(() => { for (…) wm.open(…) })` turns fifty opens into one notification, one re-render and one layout pass.
 - **Subscribe narrowly.** Per-window subscriptions beat re-rendering the list.
 - **Keep content cheap while dragging.** `[data-wm-dragging]` is on the element — use it to pause expensive effects.
-- **Do not animate `transform` in your theme during a gesture.** The shipped themes already switch the transition off; a custom theme must do the same.
+- **Do not animate `transform` in your theme during a gesture or a desktop resize.** The shipped themes already switch the transition off under `data-wm-dragging`, `data-wm-resizing` and `data-wm-live`; a custom theme must do the same.
+- **Let buried windows go flat.** A blur behind every window is costly on a big desktop, so the translucent themes drop it on windows marked `data-wm-deep`, those more than `stacking.deep` places below the top (12 by default). Lower it if your desktop holds many windows, or pass `false` to keep the blur everywhere — see [Theming](theming.md#large-desktops-and-live-resizing).
 
 
 ## Build a window from scratch
 
-`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it. A placeholder may sit only in text or in a quoted value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`; anywhere else `skin()` throws. Only `{{title}}` inside `[data-wm-title]` follows later state changes, every other placeholder is rendered at mount or rebuild, so the `aria-label="Close {{title}}"` below keeps the title the window had when it was mounted.
+<span v-pre>`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it. A placeholder may sit only in text or in a quoted value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`; anywhere else `skin()` throws, and so it does for SVG or MathML markup a browser could parse differently ([the full rules](api.md#skinspec--surdedddwmkitchrome)). Only `{{title}}` inside `[data-wm-title]` follows later state changes, every other placeholder is rendered at mount or rebuild, so the `aria-label="Close {{title}}"` below keeps the title the window had when it was mounted.</span>
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
