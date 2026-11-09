@@ -305,3 +305,70 @@ describe('escape from a drag', () => {
     expect(dockLayout.windowsOf(dock.layout())).toEqual(['a', 'b'])
   })
 })
+
+describe('a held arrow key', () => {
+  function key(target: EventTarget, type: string, name: string, init: KeyboardEventInit = {}) {
+    target.dispatchEvent(new KeyboardEvent(type, { key: name, bubbles: true, ...init }))
+  }
+
+  function hold(target: EventTarget, name: string, repeats: number, init: KeyboardEventInit = {}) {
+    for (let i = 0; i <= repeats; i += 1) key(target, 'keydown', name, { ...init, repeat: i > 0 })
+  }
+
+  function steps(wm: WindowManager): number {
+    let count = 0
+    while (wm.undo()) count += 1
+    return count
+  }
+
+  it('moves the window in one undo step however long it is held', () => {
+    const h = makeHarness()
+    const { root } = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.clearHistory()
+    hold(root, 'ArrowRight', 29)
+    expect(h.wm.get('a')?.bounds.x).toBe(100 + 30 * 16)
+    key(root, 'keyup', 'ArrowRight')
+    expect(steps(h.wm)).toBe(1)
+    expect(h.wm.get('a')?.bounds.x).toBe(100)
+  })
+
+  it('starts a new step on a new press, another key, a resize press or a lost focus', () => {
+    const h = makeHarness()
+    const { root } = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.clearHistory()
+    hold(root, 'ArrowRight', 3)
+    key(root, 'keyup', 'ArrowRight')
+    hold(root, 'ArrowRight', 3)
+    hold(root, 'ArrowDown', 3)
+    key(root, 'keydown', 'Shift', { shiftKey: true })
+    hold(root, 'ArrowDown', 3, { shiftKey: true })
+    root.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    hold(root, 'ArrowLeft', 2)
+    window.dispatchEvent(new Event('blur'))
+    hold(root, 'ArrowUp', 2)
+    key(root, 'keyup', 'ArrowUp')
+    expect(steps(h.wm)).toBe(6)
+  })
+
+  it('lets go when the desktop is destroyed or the window detached mid hold', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.add({ id: 'b', x: 400, y: 100, width: 200, height: 150 })
+    h.wm.clearHistory()
+    hold(a.root, 'ArrowRight', 2)
+    a.detach()
+    h.wm.move('b', 10, 10)
+    h.wm.move('b', 20, 20)
+    h.wm.undo()
+    expect(h.wm.get('b')?.bounds).toMatchObject({ x: 10, y: 10 })
+
+    const other = makeHarness()
+    const c = other.add({ id: 'c', x: 100, y: 100, width: 200, height: 150 })
+    hold(c.root, 'ArrowRight', 2)
+    other.desktop.destroy()
+    other.wm.move('c', 10, 10)
+    other.wm.move('c', 20, 20)
+    other.wm.undo()
+    expect(other.wm.get('c')?.bounds).toMatchObject({ x: 10, y: 10 })
+  })
+})

@@ -603,6 +603,18 @@ export function attachDesktop(
     }),
   )
 
+  let heldKey: string | null = null
+  function hold(key: string): void {
+    if (heldKey !== null) return
+    heldKey = key
+    wm.beginInteraction()
+  }
+  function letGo(): void {
+    if (heldKey === null) return
+    heldKey = null
+    wm.endInteraction()
+  }
+
   function followFrame(): void {
     const active = doc.activeElement
     const host = active?.matches(FRAMES) ? windowElementOf(active) : null
@@ -625,13 +637,24 @@ export function attachDesktop(
       followFrame()
     }
   }
-  const onViewBlur = () => view.setTimeout(followFrame)
+  const onViewBlur = () => {
+    letGo()
+    view.setTimeout(followFrame)
+  }
   element.addEventListener('pointerover', onPointerOver)
   view.addEventListener('blur', onViewBlur)
+  const onKeyUp = (event: KeyboardEvent) => {
+    if (event.key === heldKey) letGo()
+  }
+  element.addEventListener('keyup', onKeyUp, true)
+  element.addEventListener('focusout', letGo, true)
   cleanup.push(() => {
     element.removeEventListener('pointerover', onPointerOver)
     view.removeEventListener('blur', onViewBlur)
     view.cancelAnimationFrame(frameWatch)
+    element.removeEventListener('keyup', onKeyUp, true)
+    element.removeEventListener('focusout', letGo, true)
+    letGo()
   })
 
   cleanup.push(
@@ -887,6 +910,7 @@ export function attachDesktop(
     }
 
     const onWindowKeydown = (event: KeyboardEvent) => {
+      if (!event.repeat || event.key !== heldKey) letGo()
       const target = firedOn(event)
       if (drag || target?.closest(interactiveSelector)) return
       if (target !== windowElement && !handle?.contains(target)) return
@@ -906,12 +930,14 @@ export function attachDesktop(
       if (event.shiftKey) {
         if (!current.resizable) return
         event.preventDefault()
+        hold(event.key)
         wm.resize(id, {
           width: current.bounds.width + dx * step,
           height: current.bounds.height + dy * step,
         })
       } else if (current.draggable && current.stage === 'normal') {
         event.preventDefault()
+        hold(event.key)
         wm.moveBy(id, dx * step, dy * step)
       }
     }
@@ -954,6 +980,7 @@ export function attachDesktop(
       detached = true
       // a rebuild is not a cancellation: keep where the pointer left the window
       if (drag?.id === id) endDrag(!rebuilding && !!wm.get(id))
+      letGo()
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)
