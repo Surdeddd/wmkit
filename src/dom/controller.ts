@@ -92,17 +92,20 @@ function setAttr(el: HTMLElement, name: string, value: string | null): void {
   else if (el.getAttribute(name) !== value) el.setAttribute(name, value)
 }
 
-function setText(el: HTMLElement, text: string): void {
+function setText(el: HTMLElement, text: string, previous: string): void {
   if (el.textContent === text) return
-  if (el.firstElementChild) {
-    el.textContent = text
-    return
-  }
+  const walker = el.ownerDocument.createTreeWalker(el, 4)
   let first: Text | null = null
-  for (const node of el.childNodes) {
-    if (node.nodeType !== Node.TEXT_NODE) continue
-    if (first) (node as Text).data = ''
-    else first = node as Text
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text
+    const at = previous ? node.data.indexOf(previous) : -1
+    if (at >= 0) {
+      if (text !== previous) {
+        node.data = node.data.slice(0, at) + text + node.data.slice(at + previous.length)
+      }
+      return
+    }
+    first ??= node
   }
   if (first) first.data = text
   else el.append(text)
@@ -454,7 +457,9 @@ export function attachDesktop(
         reshown = true
       }
       setAttr(el, 'aria-label', win.title)
-      if (attached.title) setText(attached.title, win.title)
+      if (attached.title && prev?.title !== win.title) {
+        setText(attached.title, win.title, prev?.title ?? win.title)
+      }
       setAttr(el, 'aria-modal', win.layer === 'modal' ? 'true' : null)
       const display =
         win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'

@@ -1252,14 +1252,14 @@ describe('desktop controller', () => {
     expect(text.isConnected).toBe(true)
     expect(text.data).toBe('Second')
 
-    title.append('tail')
+    title.append(' tail')
     harness.wm.update('a', { title: 'Third' })
-    expect(title.textContent).toBe('Third')
+    expect(title.textContent).toBe('Third tail')
     expect(title.childNodes).toHaveLength(3)
 
     title.innerHTML = '<b>bold</b>'
     harness.wm.update('a', { title: 'Fourth' })
-    expect(title.innerHTML).toBe('Fourth')
+    expect(title.innerHTML).toBe('<b>Fourth</b>')
   })
 
   it('never touches the title node when the title has not changed', () => {

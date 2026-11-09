@@ -427,6 +427,49 @@ describe('the frame shield under a modal', () => {
   })
 })
 
+describe('the title node', () => {
+  function titled(markup: string, title = 'Notes') {
+    const h = makeHarness()
+    const root = h.add(
+      { id: 'a', title, x: 0, y: 0, width: 200, height: 150 },
+      `<header data-wm-drag><span data-wm-title>${markup}</span></header>`,
+    )
+    return { h, title: root.querySelector('[data-wm-title]') as HTMLElement }
+  }
+
+  it('keeps an icon and static text around the title, on attach and on rename', () => {
+    const icon = titled('<i class="icon"></i> Notes')
+    expect(icon.title.innerHTML).toBe('<i class="icon"></i> Notes')
+    icon.h.wm.update('a', { title: 'Plans' })
+    expect(icon.title.innerHTML).toBe('<i class="icon"></i> Plans')
+
+    const prefix = titled('File: Notes — draft')
+    prefix.h.wm.update('a', { title: 'Plans' })
+    expect(prefix.title.textContent).toBe('File: Plans — draft')
+
+    const image = titled('<img alt="" src="data:,"> Notes')
+    image.h.wm.update('a', { title: 'Plans' })
+    expect(image.title.querySelector('img')).not.toBeNull()
+    expect(image.title.textContent).toBe(' Plans')
+  })
+
+  it('finds the title inside a nested element', () => {
+    const { h, title } = titled('<b>Notes</b>')
+    h.wm.update('a', { title: 'Plans' })
+    expect(title.innerHTML).toBe('<b>Plans</b>')
+  })
+
+  it('writes a title it cannot find into the first text and keeps the elements', () => {
+    const { h, title } = titled('<i class="icon"></i>placeholder')
+    expect(title.innerHTML).toBe('<i class="icon"></i>Notes')
+    const empty = titled('<i class="icon"></i>', '')
+    empty.h.wm.update('a', { title: 'Plans' })
+    expect(empty.title.innerHTML).toBe('<i class="icon"></i>Plans')
+    h.wm.update('a', { title: 'Plans' })
+    expect(title.innerHTML).toBe('<i class="icon"></i>Plans')
+  })
+})
+
 describe('DOM focus after a restore', () => {
   it('follows the window the manager focused last in the same task', async () => {
     const h = makeHarness()
