@@ -96,16 +96,30 @@ describe('non-finite numbers never enter the state', () => {
     expect(wm.get('a')).toBe(before)
   })
 
-  it('clamps a snapTo rectangle into the viewport and refuses one without area', () => {
+  it('clamps a snapTo rectangle into the viewport and refuses one that starts outside it', () => {
     const wm = makeWm()
     expect(wm.snapTo('a', { x: 2, y: 2, width: 3, height: 3 })).toBe(false)
+    expect(wm.snapTo('a', { x: -1, y: 0.5, width: 3, height: 3 })).toBe(false)
     expect(wm.snapTo('a', { x: 0.5, y: 0, width: -0.25, height: 1 })).toBe(false)
     expect(wm.get('a')?.stage).toBe('normal')
-    expect(wm.snapTo('a', { x: -1, y: 0.5, width: 3, height: 3 })).toBe(true)
+    expect(wm.snapTo('a', { x: 0, y: 0.5, width: 3, height: 3 })).toBe(true)
     expect(wm.get('a')).toMatchObject({
       snapRect: { x: 0, y: 0.5, width: 1, height: 0.5 },
       bounds: { x: 0, y: 300, width: 800, height: 300 },
     })
+  })
+
+  it('accepts an empty snapTo rectangle inside the viewport at the minimum size', () => {
+    const wm = makeWm()
+    expect(wm.snapTo('a', { x: 0.5, y: 1, width: 0, height: 0 })).toBe(true)
+    expect(wm.get('a')).toMatchObject({
+      stage: 'snapped',
+      snapRect: { x: 0.5, y: 1, width: 0, height: 0 },
+      bounds: { x: 400, y: 500, width: 160, height: 100 },
+    })
+    const copy = createWindowManager({ viewport: VIEWPORT })
+    copy.hydrate(JSON.parse(JSON.stringify(wm.serialize())))
+    expect(copy.get('a')).toEqual(wm.get('a'))
   })
 
   it('refuses an unknown snap zone', () => {

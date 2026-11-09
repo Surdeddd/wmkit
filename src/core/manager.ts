@@ -1,5 +1,5 @@
 import { createEmitter } from './emitter'
-import { applyAspect, boundsEqual, clamp, clampSize, clampToViewport, zoneBounds } from './geometry'
+import { applyAspect, boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
 import type {
   ArrangeMode,
   Bounds,
@@ -84,16 +84,12 @@ function equal(a: unknown, b: unknown, depth: number): boolean {
   return size === Object.keys(y).length
 }
 
-function span(start: number, size: number): [number, number] {
-  const from = clamp(start, 0, 1)
-  return [from, from === start && start + size <= 1 ? size : clamp(start + size, 0, 1) - from]
-}
-
 function unitRect(rect: Bounds): Bounds | null {
-  if (!finite(rect.x, rect.y, rect.width, rect.height)) return null
-  const [x, width] = span(rect.x, rect.width)
-  const [y, height] = span(rect.y, rect.height)
-  return width > 0 && height > 0 ? { x, y, width, height } : null
+  const { x, y, width, height } = rect
+  if (!finite(x, y, width, height) || Math.min(x, y, width, height) < 0 || Math.max(x, y) > 1) {
+    return null
+  }
+  return { x, y, width: x + width <= 1 ? width : 1 - x, height: y + height <= 1 ? height : 1 - y }
 }
 
 export function createWindowManager(options: ManagerOptions = {}): WindowManager {
