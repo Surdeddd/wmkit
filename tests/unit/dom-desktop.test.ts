@@ -427,6 +427,28 @@ describe('the frame shield under a modal', () => {
   })
 })
 
+describe('attaching windows', () => {
+  it('refuses a desktop that was destroyed', () => {
+    const h = makeHarness()
+    h.wm.open({ id: 'late', x: 10, y: 10, width: 200, height: 150 })
+    h.desktop.destroy()
+    const root = document.createElement('section')
+    h.element.append(root)
+    expect(() => h.desktop.attachWindow('late', root)).toThrow(/destroyed/)
+    expect(root.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('refuses an element that already drives another window', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+    h.wm.open({ id: 'b', x: 300, y: 300, width: 200, height: 150 })
+    expect(() => h.desktop.attachWindow('b', a)).toThrow(/"a" is already attached/)
+    expect(a.dataset.wmWindow).toBe('a')
+    h.wm.move('a', 40, 40)
+    expect(a.style.transform).toBe('translate3d(40px, 40px, 0)')
+  })
+})
+
 describe('input routed to the right window', () => {
   it('lets the close button of a nested desktop close only its own window', () => {
     const h = makeHarness()

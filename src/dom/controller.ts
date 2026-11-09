@@ -776,6 +776,7 @@ export function attachDesktop(
   }
 
   let rebuilding = false
+  let destroyed = false
 
   function endDrag(cancelled: boolean): void {
     if (drag) drag.finish(cancelled)
@@ -787,8 +788,13 @@ export function attachDesktop(
     windowOptions: WindowAttachOptions = {},
   ): () => void {
     const win = wm.get(id)
+    if (destroyed) throw new Error('wmkit: the desktop is destroyed')
     if (!win) throw new Error(`wmkit: cannot attach unknown window "${id}"`)
-    if (registry.has(id)) throw new Error(`wmkit: window "${id}" is already attached`)
+    const owner = windowElement.dataset.wmWindow
+    const taken = registry.has(id)
+      ? id
+      : owner && registry.get(owner)?.element === windowElement && owner
+    if (taken) throw new Error(`wmkit: window "${taken}" is already attached`)
 
     const attached: AttachedWindow = {
       element: windowElement,
@@ -1148,6 +1154,7 @@ export function attachDesktop(
       }
     },
     destroy() {
+      destroyed = true
       endDrag(true)
       for (const [, attached] of registry) {
         attached.release?.()
