@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { computed as ngComputed } from '@angular/core'
+import {
+  createEnvironmentInjector,
+  DestroyRef,
+  Injector,
+  computed as ngComputed,
+  runInInjectionContext,
+} from '@angular/core'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { createElement, StrictMode, useEffect, useState } from 'react'
 import { createEffect, createRoot, createSignal } from 'solid-js'
@@ -348,6 +354,114 @@ describe('angular adapter smoke', () => {
 
     wm.update('ng', { title: 'Angular 2' })
     expect(state().windows.ng?.title).toBe('Angular 2')
+  })
+})
+
+describe('angular element bindings', () => {
+  function ngDesktop() {
+    const wm = createWindowManager(VIEWPORT)
+    const dk = createNgDesktop(wm, DESKTOP_OPTIONS)
+    const host = document.createElement('div')
+    document.body.append(host)
+    return { wm, dk, host }
+  }
+
+  function panel(host: HTMLElement) {
+    const element = document.createElement('section')
+    host.append(element)
+    return element
+  }
+
+  it('hands back a release function for every binding made after render', () => {
+    const { wm, dk, host } = ngDesktop()
+    const releaseDesktop = dk.desktop(host)
+    wm.open({ id: 'notes', title: 'Notes' })
+    const first = panel(host)
+    const release = dk.window('notes')(first)
+    expect(typeof release, 'nothing to dispose the window binding with').toBe('function')
+    expect(typeof releaseDesktop).toBe('function')
+
+    release()
+    release()
+    expect(first.dataset.wmWindow).toBeUndefined()
+
+    const second = panel(host)
+    expect(() => dk.window('notes')(second), 'the released element still owns the id').not.toThrow()
+    expect(second.dataset.wmWindow).toBe('notes')
+
+    releaseDesktop()
+    expect(host.dataset.wmDesktop).toBeUndefined()
+    expect(second.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('a window component rendered again binds its new element once the old one is gone', () => {
+    const { wm, dk, host } = ngDesktop()
+    dk.desktop(host)
+    wm.open({ id: 'notes', title: 'Notes' })
+    const first = panel(host)
+    dk.window('notes')(first)
+
+    const twin = panel(host)
+    expect(() => dk.window('notes')(twin), 'two live elements shared one id').toThrow(
+      /already attached/,
+    )
+    twin.remove()
+
+    first.remove()
+    const second = panel(host)
+    expect(() => dk.window('notes')(second)).not.toThrow()
+    expect(second.dataset.wmWindow).toBe('notes')
+    expect(first.dataset.wmWindow, 'the dead element kept its binding').toBeUndefined()
+  })
+
+  it('releases bindings with an explicit DestroyRef, so a reopened id leaves the dead element alone', () => {
+    const { wm, dk, host } = ngDesktop()
+    const scope = createEnvironmentInjector([], Injector.create({ providers: [] }) as never)
+    dk.desktop(host, scope.get(DestroyRef))
+    wm.open({ id: 'notes', title: 'Notes' })
+    const first = panel(host)
+    dk.window('notes', undefined, scope.get(DestroyRef))(first)
+
+    wm.close('notes')
+    first.remove()
+    scope.destroy()
+    wm.open({ id: 'notes', title: 'Notes' })
+    expect(first.isConnected, 'reopening resurrected the destroyed component').toBe(false)
+    expect(host.dataset.wmDesktop).toBeUndefined()
+  })
+
+  it('takes an injector as the lifetime', () => {
+    const { wm, dk, host } = ngDesktop()
+    dk.desktop(host)
+    wm.open({ id: 'notes', title: 'Notes' })
+    const scope = createEnvironmentInjector([], Injector.create({ providers: [] }) as never)
+    const nodeInjector = { get: () => scope.get(DestroyRef) } as unknown as Injector
+    const first = panel(host)
+    const release = dk.window('notes', undefined, nodeInjector)(first)
+
+    scope.destroy()
+    expect(first.dataset.wmWindow).toBeUndefined()
+    expect(() => release()).not.toThrow()
+  })
+
+  it('a binding factory created in an injection context releases with it', () => {
+    const { wm, dk, host } = ngDesktop()
+    const scope = createEnvironmentInjector([], Injector.create({ providers: [] }) as never)
+    const bind = runInInjectionContext(scope, () => {
+      dk.desktop(host)
+      return dk.window('notes')
+    })
+    wm.open({ id: 'notes', title: 'Notes' })
+    const first = panel(host)
+    const release = bind(first)
+    expect(first.dataset.wmWindow).toBe('notes')
+
+    release()
+    const second = panel(host)
+    bind(second)
+    scope.destroy()
+    expect(second.dataset.wmWindow).toBeUndefined()
+    expect(host.dataset.wmDesktop).toBeUndefined()
   })
 })
 

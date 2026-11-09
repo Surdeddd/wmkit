@@ -1,17 +1,41 @@
-import { computed, DestroyRef, inject, type Signal, signal, untracked } from '@angular/core'
+import {
+  computed,
+  DestroyRef,
+  type Injector,
+  inject,
+  type Signal,
+  signal,
+  untracked,
+} from '@angular/core'
 import { createWindowManager } from '../core/manager'
 import type { ManagerOptions, ManagerState, WindowManager, WindowState } from '../core/types'
 import { createDesktopBinder, type DesktopBinder } from '../dom/binder'
 import type { DesktopOptions, WindowAttachOptions } from '../dom/shared'
 
-function onDestroy(dispose: () => void): void {
-  let destroyRef: DestroyRef | null = null
+export type WmLifetime = DestroyRef | Injector
+
+function destroyRefOf(lifetime?: WmLifetime): DestroyRef | null {
+  if (lifetime) return 'onDestroy' in lifetime ? lifetime : lifetime.get(DestroyRef)
   try {
-    destroyRef = inject(DestroyRef)
+    return inject(DestroyRef)
   } catch {
-    destroyRef = null
+    return null
   }
-  destroyRef?.onDestroy(dispose)
+}
+
+function onDestroy(dispose: () => void, owner = destroyRefOf()): () => void {
+  let live = true
+  const release = () => {
+    if (live) {
+      live = false
+      dispose()
+    }
+  }
+  const off = owner?.onDestroy(release)
+  return () => {
+    off?.()
+    release()
+  }
 }
 
 export function useWindowManager(options?: ManagerOptions): WindowManager {
@@ -34,23 +58,46 @@ export function useWmWindow(wm: WindowManager, id: string): Signal<WindowState |
 
 export interface AngularDesktop {
   binder: DesktopBinder
-  desktop(element: HTMLElement): void
-  window(id: string, options?: WindowAttachOptions): (element: HTMLElement) => void
+  desktop(element: HTMLElement, lifetime?: WmLifetime): () => void
+  window(
+    id: string,
+    options?: WindowAttachOptions,
+    lifetime?: WmLifetime,
+  ): (element: HTMLElement) => () => void
+}
+
+interface WindowBinding {
+  id: string
+  element: HTMLElement
+  release(): void
 }
 
 export function createDesktop(wm: WindowManager, options?: DesktopOptions): AngularDesktop {
   const binder = createDesktopBinder(wm, options)
+  const bindings = new Set<WindowBinding>()
   onDestroy(() => binder.destroy())
   return {
     binder,
-    desktop(element) {
-      const unbind = binder.bindDesktop(element)
-      onDestroy(unbind)
+    desktop(element, lifetime) {
+      return onDestroy(binder.bindDesktop(element), destroyRefOf(lifetime))
     },
-    window(id, windowOptions) {
+    window(id, windowOptions, lifetime) {
+      const owner = destroyRefOf(lifetime)
       return (element) => {
+        for (const binding of bindings) {
+          if (binding.id === id && !binding.element.isConnected) binding.release()
+        }
         const unbind = binder.bindWindow(id, element, windowOptions)
-        onDestroy(unbind)
+        const binding: WindowBinding = {
+          id,
+          element,
+          release: onDestroy(() => {
+            bindings.delete(binding)
+            unbind()
+          }, owner),
+        }
+        bindings.add(binding)
+        return binding.release
       }
     },
   }
