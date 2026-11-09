@@ -317,6 +317,11 @@ describe('desktop styles', () => {
     for (const button of root.querySelectorAll('[part~=control]')) {
       expect(button.matches(buttons.selectorText)).toBe(true)
     }
+    const content = ruleFor('[data-wm-content]') as CSSStyleRule
+    expect(
+      (root.querySelector('[part=content]') as HTMLElement).matches(content.selectorText),
+    ).toBe(true)
+    expect(content.cssText).toContain('var(--wm-face-dark)')
   })
 
   it('skips strings where constructable sheets are missing and still adopts given sheets', () => {

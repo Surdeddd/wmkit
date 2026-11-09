@@ -520,6 +520,16 @@ export const amberShadowTheme: string = `:host {
   text-shadow: 0 0 8px rgba(255, 176, 46, 0.28);
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+  text-shadow: 0 0 8px rgba(255, 176, 46, 0.28);
+}
+
 :host::after {
   content: "";
   position: absolute;
@@ -1116,6 +1126,15 @@ export const aquaShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -1722,6 +1741,15 @@ export const blueprintShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -2337,6 +2365,15 @@ export const brutalistShadowTheme: string = `:host {
   line-height: 1.6;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 [data-wm-close],
 [data-wm-minimize],
 [data-wm-maximize] {
@@ -2892,6 +2929,15 @@ export const candyShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -3494,6 +3540,15 @@ export const carbonShadowTheme: string = `:host {
   line-height: 1.6;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 :host([data-wm-focused]) {
   border-left-width: 3px;
 }
@@ -4046,6 +4101,15 @@ export const forestShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -4628,6 +4692,15 @@ export const frostShadowTheme: string = `:host {
   line-height: 1.6;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
@@ -5185,6 +5258,14 @@ export const glassShadowTheme: string = `:host {
   line-height: 1.55;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
@@ -5730,6 +5811,14 @@ export const lightShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: 14px;
@@ -6323,6 +6412,14 @@ export const neonShadowTheme: string = `:host {
   line-height: 1.6;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
@@ -6885,6 +6982,15 @@ export const noirShadowTheme: string = `:host {
   line-height: 1.6;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
@@ -7414,6 +7520,14 @@ export const paperShadowTheme: string = `:host {
   line-height: 1.65;
 }
 
+[data-wm-content] {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 18px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 @keyframes wm-window-in {
   from {
     opacity: 0;
@@ -7512,6 +7626,7 @@ export const retroTheme: string = `[data-wm-desktop] {
   --wm-accent-ink: #000080;
   --wm-title-text: #ffffff;
   --wm-title-text-inactive: #1a1a1a;
+  --wm-radius: 0;
   position: relative;
   overflow: hidden;
   background: #008080;
@@ -7552,6 +7667,7 @@ export const retroTheme: string = `[data-wm-desktop] {
   display: flex;
   align-items: center;
   gap: 6px;
+  height: auto;
   padding: 3px 4px;
   margin: 2px;
   background: linear-gradient(90deg, var(--wm-title-inactive), #b5b5b5);
@@ -7727,6 +7843,7 @@ export const retroShadowTheme: string = `:host {
   --wm-accent-ink: #000080;
   --wm-title-text: #ffffff;
   --wm-title-text-inactive: #1a1a1a;
+  --wm-radius: 0;
 }
 
 :host {
@@ -7764,6 +7881,7 @@ export const retroShadowTheme: string = `:host {
   display: flex;
   align-items: center;
   gap: 6px;
+  height: auto;
   padding: 3px 4px;
   margin: 2px;
   background: linear-gradient(90deg, var(--wm-title-inactive), #b5b5b5);
@@ -7853,6 +7971,18 @@ export const retroShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  margin: 0 2px 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--wm-face);
+  border: 1px solid;
+  border-color: var(--wm-face-dark) var(--wm-face-light) var(--wm-face-light) var(--wm-face-dark);
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: 8px;
@@ -8395,6 +8525,15 @@ export const synthShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: var(--wm-content-padding, 14px 16px);
+  font-family: var(--wm-content-font, inherit);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: var(--wm-content-padding, 14px 16px);
@@ -8961,6 +9100,15 @@ export const terminalShadowTheme: string = `:host {
 }
 
 ::slotted([data-wm-content]) {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  font-family: var(--wm-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+[data-wm-content] {
   flex: 1;
   overflow: auto;
   padding: 12px;

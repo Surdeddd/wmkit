@@ -72,7 +72,7 @@ function rewriteCompound(compound) {
   return qualifiers === '' ? `:host${element}` : `:host(${qualifiers})${element}`
 }
 
-function rewriteSelector(selector) {
+function rewriteSelector(selector, slotted = true) {
   if (selector.includes(DESKTOP_ONLY)) return null
   let list = compounds(selector)
   if (list[0]?.compound === DESKTOP && list[1]?.compound.startsWith(WINDOW)) {
@@ -90,8 +90,10 @@ function rewriteSelector(selector) {
   const content = list.findIndex(({ compound }) => compound.includes(CONTENT))
   if (content !== -1) {
     if (content !== list.length - 1) return null
-    const [inner, element] = pseudoElement(list[content].compound)
-    list[content] = { ...list[content], compound: `::slotted(${inner})${element}` }
+    if (slotted) {
+      const [inner, element] = pseudoElement(list[content].compound)
+      list[content] = { ...list[content], compound: `::slotted(${inner})${element}` }
+    }
   }
   const result = joinCompounds(list)
   return result.includes(WINDOW) || result.includes(DESKTOP) ? null : result
@@ -156,11 +158,19 @@ function transform(css) {
       if (kept !== null) out.push(`:host {\n  ${kept}\n}`)
       continue
     }
-    const selectors = splitTop(head, ',')
-      .map(rewriteSelector)
-      .filter((selector) => selector !== null && selector !== '')
+    const heads = splitTop(head, ',')
+    const rewrite = (list, slotted) =>
+      list
+        .map((selector) => rewriteSelector(selector, slotted))
+        .filter((selector) => selector !== null && selector !== '')
+    const selectors = rewrite(heads, true)
     if (selectors.length === 0) continue
     out.push(`${selectors.join(',\n')} {${body}}`)
+    const boxed = rewrite(
+      heads.filter((selector) => selector.includes(CONTENT)),
+      false,
+    )
+    if (boxed.length > 0) out.push(`${boxed.join(',\n')} {${body}}`)
   }
   return `${out.join('\n\n')}\n`
 }

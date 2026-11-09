@@ -181,12 +181,14 @@ describe('the shipped themes', () => {
     expect(host).not.toContain('position: relative')
   })
 
-  it('styles the projected content through ::slotted, the only way a shadow rule reaches it', () => {
+  it('styles the content twice: slotted where a skin projects it, plain where the box sits inside the root', () => {
     for (const name of themeNames) {
       const css = themeShadowCss[name]
+      const count = (pattern: RegExp) => [...css.matchAll(pattern)].length
       expect(css, name).toMatch(/^::slotted\(\[data-wm-content\]\) \{[^}]*overflow: auto/m)
-      expect(css.replaceAll('::slotted([data-wm-content])', ''), name).not.toContain(
-        '[data-wm-content]',
+      expect(css, name).toMatch(/^\[data-wm-content\] \{[^}]*overflow: auto/m)
+      expect(count(/(?<!\()\[data-wm-content\]/g), name).toBe(
+        count(/::slotted\(\[data-wm-content\]/g),
       )
     }
   })
@@ -378,10 +380,17 @@ describe('the shadow generator', () => {
       ['[data-wm-desktop] [data-wm-window] { a: b }', ':host { a: b }'],
       ['[data-wm-desktop] > [data-wm-window] [data-wm-title] { a: b }', '[data-wm-title] { a: b }'],
       ['/* { note } */\n[data-wm-window] [data-wm-title] { a: b }', '[data-wm-title] { a: b }'],
-      ['[data-wm-window] [data-wm-content] { a: b }', '::slotted([data-wm-content]) { a: b }'],
+      [
+        '[data-wm-window] [data-wm-content] { a: b }',
+        '::slotted([data-wm-content]) { a: b }\n\n[data-wm-content] { a: b }',
+      ],
       [
         '[data-wm-window][data-wm-focused] > [data-wm-content]:hover { a: b }',
-        ':host([data-wm-focused]) > ::slotted([data-wm-content]:hover) { a: b }',
+        ':host([data-wm-focused]) > ::slotted([data-wm-content]:hover) { a: b }\n\n:host([data-wm-focused]) > [data-wm-content]:hover { a: b }',
+      ],
+      [
+        '[data-wm-window] [data-wm-title], [data-wm-window] [data-wm-content] { a: b }',
+        '[data-wm-title],\n::slotted([data-wm-content]) { a: b }\n\n[data-wm-content] { a: b }',
       ],
     ]
     for (const [light, shadow] of cases) expect(toShadowCss(light), light).toBe(`${shadow}\n`)
