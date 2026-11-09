@@ -133,3 +133,120 @@ describe('the frame of a snapped tab group is stable', () => {
     expect(wm.get('small')?.bounds).toEqual(before)
   })
 })
+
+describe('bulk commands', () => {
+  it('arrange leaves windows snapped to a rectangle where they are', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'docked' })
+    wm.open({ id: 'max' })
+    wm.open({ id: 'f', x: 900, y: 500 })
+    wm.open({ id: 'g', x: 700, y: 300 })
+    wm.snapTo('docked', { x: 0, y: 0, width: 0.5, height: 1 })
+    wm.snapTo('max', { x: 0.5, y: 0, width: 0.5, height: 1 })
+    wm.maximize('max')
+    const docked = wm.get('docked')
+    const max = wm.get('max')
+    wm.arrange('tile')
+    expect(wm.get('docked')).toBe(docked)
+    expect(wm.get('max')).toBe(max)
+    expect(wm.get('f')?.bounds).toEqual({ x: 0, y: 0, width: 640, height: 800 })
+    expect(wm.get('g')?.bounds).toEqual({ x: 640, y: 0, width: 640, height: 800 })
+    wm.arrange('cascade')
+    expect(wm.get('docked')).toBe(docked)
+  })
+
+  it('arrange raises the arranged windows and focuses the last one', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'm' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'f', layer: 'floating' })
+    wm.minimize('m')
+    wm.focus('a')
+    wm.arrange('cascade')
+    expect(wm.getState().order).toEqual(['m', 'b', 'a', 'f'])
+    expect(wm.getState().focusedId).toBe('f')
+  })
+
+  it('minimizeAll leaves windows that may not be minimized', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'pinned', minimizable: false })
+    wm.minimizeAll()
+    expect(wm.get('a')?.stage).toBe('minimized')
+    expect(wm.get('pinned')?.stage).toBe('normal')
+    expect(wm.getState().focusedId).toBe('pinned')
+  })
+
+  it('restoreAll restores in opening order and focuses the last one', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    wm.focus('a')
+    wm.minimizeAll()
+    wm.restoreAll()
+    expect(wm.getState().order).toEqual(['a', 'b', 'c'])
+    expect(wm.getState().focusedId).toBe('c')
+    expect(wm.minimized()).toEqual([])
+  })
+
+  it('closeAll reports every window once and leaves an empty desktop', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    const group = wm.group(['a', 'b'])
+    const seen: string[] = []
+    wm.on('close', ({ window: win }) => seen.push(win.id))
+    wm.on('group', ({ groupId, members }) => seen.push(`${groupId}:${members.length}`))
+    wm.on('order', ({ order }) => seen.push(`order:${order.length}`))
+    let changes = 0
+    wm.subscribe(() => {
+      changes += 1
+    })
+    wm.closeAll()
+    expect(seen).toEqual(['a', 'b', 'c', 'order:0', `${group}:0`])
+    expect(changes).toBe(1)
+    expect(wm.getState()).toMatchObject({ windows: {}, order: [], focusedId: null, groups: {} })
+    wm.undo()
+    expect(wm.getState().order).toHaveLength(3)
+    wm.redo()
+    wm.closeAll()
+    expect(changes).toBe(3)
+  })
+
+  it('costs linear time in the number of windows', () => {
+    const make = (n: number) => {
+      const wm = createWindowManager({ viewport: { width: 4000, height: 3000 }, historyLimit: 0 })
+      wm.batch(() => {
+        for (let i = 0; i < n; i += 1) wm.open({ id: `w${i}`, x: i % 500, y: i % 300 })
+      })
+      return wm
+    }
+    const time = (n: number, run: (wm: ReturnType<typeof make>) => void) => {
+      let best = Number.POSITIVE_INFINITY
+      for (let i = 0; i < 3; i += 1) {
+        const wm = make(n)
+        const start = performance.now()
+        run(wm)
+        best = Math.min(best, performance.now() - start)
+      }
+      return best
+    }
+    const runs: Record<string, (wm: ReturnType<typeof make>) => void> = {
+      closeAll: (wm) => wm.closeAll(),
+      arrange: (wm) => wm.arrange('cascade'),
+      minimizeAll: (wm) => wm.minimizeAll(),
+      restoreAll: (wm) => {
+        wm.minimizeAll()
+        wm.restoreAll()
+      },
+    }
+    for (const [name, run] of Object.entries(runs)) {
+      time(250, run)
+      const ratio = time(2000, run) / Math.max(0.5, time(500, run))
+      expect(ratio, name).toBeLessThan(8)
+    }
+  }, 30_000)
+})

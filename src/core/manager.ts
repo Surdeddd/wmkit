@@ -1,6 +1,7 @@
 import { createEmitter } from './emitter'
 import { applyAspect, boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
 import type {
+  ArrangeMode,
   Bounds,
   HistoryEntry,
   ManagerEvents,
@@ -224,6 +225,26 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const changed = next.length !== order.length || next.some((entry, i) => entry !== order[i])
     if (changed) order = next
     return changed
+  }
+
+  function lift(ids: string[]): void {
+    const last = ids.at(-1)
+    if (last === undefined) return
+    const rank = new Map<string, number>()
+    const keyOf = (id: string) => (windows[id] as WindowState).groupId ?? id
+    ids.forEach((id, index) => {
+      rank.set(keyOf(id), index)
+    })
+    const position = (id: string) => rank.get(keyOf(id)) ?? -1
+    const next = [...order].sort(
+      (a, b) => layerRankOf(a) - layerRankOf(b) || position(a) - position(b),
+    )
+    if (!equal(next, order, 1)) {
+      order = next
+      queueEvent(() => emitter.emit('order', { order }))
+      commit()
+    }
+    focus(topModalId() ?? last, true)
   }
 
   function onActiveWorkspace(win: WindowState): boolean {
@@ -530,7 +551,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function closeAll(): void {
-    for (const id of [...order]) close(id)
+    if (order.length === 0) return
+    const done = track()
+    windows = Object.create(null)
+    order = []
+    activeTabs = {}
+    modalCount = 0
+    focusedId = null
+    groupsDirty = true
+    done()
+    commit()
   }
 
   function focus(id: string, quiet?: boolean): boolean {
@@ -679,8 +709,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return win.stage === 'maximized' ? restore(id) : maximize(id)
   }
 
-  function restore(id: string): boolean {
-    const result = applyStage(id, (win) => {
+  function unminimize(id: string): boolean {
+    return applyStage(id, (win) => {
       if (win.stage === 'minimized') {
         const target = win.restoreStage ?? 'normal'
         if (target === 'maximized') {
@@ -722,6 +752,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         bounds: keepInViewport ? clampToViewport(bounds, viewport, minVisible) : bounds,
       }
     })
+  }
+
+  function restore(id: string): boolean {
+    const result = unminimize(id)
     if (result) focus(id, true)
     return result
   }
@@ -1303,49 +1337,55 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     return [...layouts.keys()]
   }
 
-  function arrange(mode: 'cascade' | 'tile'): void {
+  function arrange(mode: ArrangeMode): void {
     const ids = order.filter((id) => {
       const win = windows[id] as WindowState
-      return win.stage !== 'minimized' && onActiveWorkspace(win) && isVisibleTab(win)
+      return (
+        win.stage !== 'minimized' && !win.snapRect && onActiveWorkspace(win) && isVisibleTab(win)
+      )
     })
-    if (ids.length === 0) return
-    if (mode === 'cascade') {
-      ids.forEach((id, index) => {
-        const win = windows[id] as WindowState
-        const size = win.restoreBounds ?? win.bounds
-        restoreTo(id, {
-          x: cascadeOrigin.x + (index % 10) * cascadeOffset,
-          y: cascadeOrigin.y + (index % 10) * cascadeOffset,
-          width: size.width,
-          height: size.height,
-        })
-      })
-      return
-    }
-    if (!sized(viewport)) return
+    if (ids.length === 0 || (mode === 'tile' && !sized(viewport))) return
     const cols = Math.ceil(Math.sqrt(ids.length))
     const rows = Math.ceil(ids.length / cols)
     const cellWidth = Math.floor(viewport.width / cols)
     const cellHeight = Math.floor(viewport.height / rows)
     ids.forEach((id, index) => {
-      restoreTo(id, {
-        x: (index % cols) * cellWidth,
-        y: Math.floor(index / cols) * cellHeight,
-        width: cellWidth,
-        height: cellHeight,
-      })
+      const win = windows[id] as WindowState
+      const size = win.restoreBounds ?? win.bounds
+      const offset = (index % 10) * cascadeOffset
+      place(
+        id,
+        mode === 'cascade'
+          ? {
+              x: cascadeOrigin.x + offset,
+              y: cascadeOrigin.y + offset,
+              width: size.width,
+              height: size.height,
+            }
+          : {
+              x: (index % cols) * cellWidth,
+              y: Math.floor(index / cols) * cellHeight,
+              width: cellWidth,
+              height: cellHeight,
+            },
+      )
     })
+    lift(ids)
   }
 
   function minimizeAll(): void {
     for (const id of [...order]) {
       const win = windows[id] as WindowState
-      if (onActiveWorkspace(win) && isVisibleTab(win)) minimize(id)
+      if (win.minimizable && onActiveWorkspace(win) && isVisibleTab(win)) minimize(id)
     }
   }
 
   function restoreAll(): void {
-    for (const win of minimized()) restore(win.id)
+    lift(
+      minimized()
+        .map((win) => win.id)
+        .filter(unminimize),
+    )
   }
 
   function serialize(): SerializedState {

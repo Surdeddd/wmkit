@@ -148,6 +148,17 @@ describe('calls that change nothing', () => {
     )
   })
 
+  it('arrange into the arrangement the windows already have', () => {
+    expectNoop(
+      (wm) => wm.arrange('cascade'),
+      (wm) => wm.arrange('cascade'),
+    )
+    expectNoop(
+      (wm) => wm.arrange('tile'),
+      (wm) => wm.arrange('tile'),
+    )
+  })
+
   it('keeps the order array and the groups of the state on a focus of the top window', () => {
     const wm = makeWm()
     wm.open({ id: 'a' })
@@ -260,7 +271,7 @@ describe('undo, redo and hydrate keep what did not change', () => {
   })
 })
 
-describe('restoreTo emits what changed', () => {
+describe('restoreTo and arrange emit what changed', () => {
   it('emits move and resize but no stage event for a normal window', () => {
     const wm = makeWm()
     wm.open({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
@@ -276,6 +287,16 @@ describe('restoreTo emits what changed', () => {
     const events = record(wm, ['stage', 'move', 'resize'])
     wm.restoreTo('a', { x: 300, y: 200, width: 400, height: 300 })
     expect(events).toEqual(['stage:a:maximized->normal', 'move:a', 'resize:a'])
+  })
+
+  it('emits the geometry events of a cascade', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 500, y: 300, width: 200, height: 150 })
+    wm.open({ id: 'b', x: 400, y: 100, width: 200, height: 150 })
+    const events = record(wm, ['move', 'resize', 'focus', 'order'])
+    wm.arrange('cascade')
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 32, y: 32 })
+    expect(events).toEqual(['move:a', 'move:b'])
   })
 })
 
