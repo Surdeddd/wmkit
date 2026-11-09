@@ -93,7 +93,11 @@ export function createDragStarter(ctx: SessionContext) {
     }
 
     function flush(): void {
-      if (!session.hasPending || ctx.currentDrag() !== session) return
+      if (ctx.currentDrag() === session) step()
+    }
+
+    function step(): void {
+      if (!session.hasPending) return
       session.hasPending = false
       session.raf = 0
       const current = wm.get(id)
@@ -231,9 +235,10 @@ export function createDragStarter(ctx: SessionContext) {
 
     function finish(cancelled: boolean): void {
       if (ctx.currentDrag() !== session) return
+      ctx.releaseDrag(session)
       try {
         if (session.raf !== 0) view.cancelAnimationFrame(session.raf)
-        if (session.hasPending && !cancelled) flush()
+        if (!cancelled) step()
         if (cancelled) {
           if (session.moved && session.restored) {
             if (session.startStage === 'maximized') {
@@ -250,16 +255,14 @@ export function createDragStarter(ctx: SessionContext) {
               wm.move(id, session.startBounds.x, session.startBounds.y)
             }
           }
-        } else if (session.moved && session.drop) {
-          session.drop.commit()
-        } else if (session.moved && session.groupTarget) {
-          if (wm.group([session.groupTarget, id])) wm.activateTab(id)
-        } else if (session.moved && session.zone) {
-          if (session.zone === 'maximize') wm.maximize(id)
-          else wm.snap(id, session.zone)
+        } else if (session.moved && wm.get(id)) {
+          if (session.drop) session.drop.commit()
+          else if (session.groupTarget) {
+            if (wm.group([session.groupTarget, id])) wm.activateTab(id)
+          } else if (session.zone === 'maximize') wm.maximize(id)
+          else if (session.zone) wm.snap(id, session.zone)
         }
       } finally {
-        ctx.releaseDrag(session)
         releaseRect()
         handle.removeEventListener('pointermove', onMove)
         handle.removeEventListener('pointerup', onUp)

@@ -953,7 +953,7 @@ export function attachDesktop(
       if (detached) return
       detached = true
       // a rebuild is not a cancellation: keep where the pointer left the window
-      if (drag?.id === id) endDrag(!rebuilding)
+      if (drag?.id === id) endDrag(!rebuilding && !!wm.get(id))
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)

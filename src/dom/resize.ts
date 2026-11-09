@@ -101,6 +101,7 @@ export function createResizeStarter(ctx: SessionContext) {
 
     function finish(cancelled: boolean): void {
       if (ctx.currentDrag() !== session) return
+      ctx.releaseDrag(session)
       try {
         if (raf !== 0) view.cancelAnimationFrame(raf)
         if (hasPending && !cancelled) flush()
@@ -114,7 +115,6 @@ export function createResizeStarter(ctx: SessionContext) {
           }
         }
       } finally {
-        ctx.releaseDrag(session)
         releaseRect()
         handleEl.removeEventListener('pointermove', onMove)
         handleEl.removeEventListener('pointerup', onUp)
