@@ -157,6 +157,7 @@ export function createDevtoolsView(doc: Document, messages: DevtoolsMessages): D
 
   const rows = new Map<string, Row>()
   let listOrder = ''
+  let shown = 0
 
   function buildRow(win: WindowState): Row {
     const node = doc.createElement('li')
@@ -237,17 +238,22 @@ export function createDevtoolsView(doc: Document, messages: DevtoolsMessages): D
         windowList.replaceChildren(...ordered)
       }
       logEmpty.hidden = log.length > 0
-      logList.replaceChildren(
-        ...[...log].reverse().map((entry) => {
-          const item = doc.createElement('li')
-          const type = doc.createElement('b')
-          type.textContent = entry.type
-          const detail = doc.createElement('span')
-          detail.textContent = entry.detail
-          item.append(type, detail)
-          return item
-        }),
-      )
+      const fresh: HTMLElement[] = []
+      for (const entry of log) {
+        if (entry.seq <= shown) continue
+        shown = entry.seq
+        const item = doc.createElement('li')
+        const type = doc.createElement('b')
+        type.textContent = entry.type
+        const detail = doc.createElement('span')
+        detail.textContent = entry.detail
+        item.append(type, detail)
+        fresh.unshift(item)
+      }
+      logList.prepend(...fresh)
+      while (logList.childElementCount > log.length) {
+        ;(logList.lastElementChild as Element).remove()
+      }
       undo.disabled = !history.canUndo
       redo.disabled = !history.canRedo
     },

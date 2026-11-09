@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import {
   createDevtools,
@@ -8,6 +8,24 @@ import {
 } from '../../src/plugins/devtools/index'
 
 const VIEWPORT = { viewport: { width: 800, height: 600 } }
+
+const frames = new Map<number, FrameRequestCallback>()
+let nextFrame = 0
+
+function flush(): void {
+  const due = [...frames.values()]
+  frames.clear()
+  for (const callback of due) callback(0)
+}
+
+beforeEach(() => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    nextFrame += 1
+    frames.set(nextFrame, callback)
+    return nextFrame
+  })
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id))
+})
 
 function rowsOf(panel: HTMLElement): string[] {
   return [...panel.querySelectorAll<HTMLElement>('[data-wm-devtools-row]')].map(
@@ -32,6 +50,7 @@ function logLines(panel: HTMLElement): string[] {
 }
 
 afterEach(() => {
+  frames.clear()
   document.body.replaceChildren()
   document.head.querySelector('#wm-devtools-style')?.remove()
   vi.unstubAllGlobals()
@@ -56,9 +75,11 @@ describe('devtools panel', () => {
 
     wm.open({ id: 'a', title: 'First' })
     wm.open({ id: 'b', title: 'Second' })
+    flush()
     expect(rowsOf(panel.element)).toEqual(['b', 'a'])
 
     wm.close('a')
+    flush()
     expect(rowsOf(panel.element)).toEqual(['b'])
     panel.destroy()
   })
@@ -67,6 +88,7 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm)
     wm.open({ id: 'a', title: 'First', x: 12, y: 34, width: 200, height: 150, layer: 'modal' })
+    flush()
 
     const meta = panel.element.querySelector('.wm-dt-meta')?.textContent ?? ''
     expect(meta).toContain('normal')
@@ -81,6 +103,7 @@ describe('devtools panel', () => {
     const panel = createDevtools(wm)
     wm.open({ id: 'a' })
     wm.open({ id: 'b' })
+    flush()
 
     const focused = panel.element.querySelector('[data-wm-devtools-row][data-focused]')
     expect(focused?.getAttribute('data-wm-devtools-row')).toBe('b')
@@ -92,6 +115,7 @@ describe('devtools panel', () => {
     const panel = createDevtools(wm)
     wm.open({ id: 'a' })
     wm.open({ id: 'b' })
+    flush()
 
     actionButton(panel.element, 'focus', 'a').click()
     expect(wm.getState().focusedId).toBe('a')
@@ -133,6 +157,7 @@ describe('devtools panel', () => {
     expect(panel.element.textContent).toContain(devtoolsMessages.quiet)
 
     for (const id of ['a', 'b', 'c', 'd']) wm.open({ id })
+    flush()
     const lines = logLines(panel.element)
     expect(lines).toHaveLength(3)
     expect(lines[0]).toContain('d')
@@ -145,9 +170,11 @@ describe('devtools panel', () => {
     const panel = createDevtools(wm)
     wm.open({ id: 'a' })
     wm.maximize('a')
+    flush()
     expect(logLines(panel.element)[0]).toContain('a → maximized')
 
     wm.setWorkspace(2)
+    flush()
     expect(logLines(panel.element)[0]).toContain('3')
     panel.destroy()
   })
@@ -158,6 +185,7 @@ describe('devtools panel', () => {
     wm.open({ id: 'a' })
     wm.open({ id: 'b' })
     const groupId = wm.group(['a', 'b'])
+    flush()
 
     expect(logLines(panel.element)[0]).toContain(groupId ?? 'missing')
     panel.destroy()
@@ -167,6 +195,7 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm, { events: ['order'] })
     wm.open({ id: 'a' })
+    flush()
 
     expect(logLines(panel.element)[0]?.trim()).toBe('order')
     panel.destroy()
@@ -181,9 +210,11 @@ describe('devtools panel', () => {
     expect(redo.disabled).toBe(true)
 
     wm.open({ id: 'a' })
+    flush()
     expect(undo.disabled).toBe(false)
 
     undo.click()
+    flush()
     expect(wm.get('a')).toBeUndefined()
     expect(redo.disabled).toBe(false)
 
@@ -202,10 +233,12 @@ describe('devtools panel', () => {
     const elsewhere = document.createElement('button')
     document.body.append(elsewhere)
     wm.on('focus', () => elsewhere.focus())
+    flush()
     undo.focus()
     undo.click()
     expect(document.activeElement).toBe(undo)
     undo.click()
+    flush()
     const redo = globalButton(panel.element, 'redo')
     redo.focus()
     redo.click()
@@ -269,6 +302,7 @@ describe('devtools panel', () => {
     const panel = createDevtools(wm, { messages: devtoolsMessagesRu })
     wm.open({ id: 'a' })
     wm.minimize('a')
+    flush()
 
     expect(panel.element.textContent).toContain('окна')
     expect(panel.element.querySelector('.wm-dt-meta')?.textContent).toContain('свёрнуто')
@@ -280,12 +314,14 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm)
     wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    flush()
 
     const close = actionButton(panel.element, 'close', 'a')
     close.focus()
     expect(document.activeElement).toBe(close)
 
     wm.move('a', 120, 90)
+    flush()
     expect(panel.element.querySelector('.wm-dt-meta')?.textContent).toContain('120,90')
     expect(actionButton(panel.element, 'close', 'a')).toBe(close)
     expect(document.activeElement).toBe(close)
@@ -297,9 +333,11 @@ describe('devtools panel', () => {
     const panel = createDevtools(wm)
     wm.open({ id: 'a' })
     wm.open({ id: 'b' })
+    flush()
     const rowB = panel.element.querySelector("[data-wm-devtools-row='b']")
 
     wm.close('b')
+    flush()
     expect(rowsOf(panel.element)).toEqual(['a'])
     expect(rowB?.isConnected).toBe(false)
     panel.destroy()
@@ -309,6 +347,7 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm)
     wm.open({ id: 'a', title: '' })
+    flush()
 
     expect(panel.element.querySelector('.wm-dt-id')?.textContent).toBe('a')
     panel.destroy()
@@ -355,6 +394,7 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm, { messages: { minimize: 'min', maximize: 'max' } })
     wm.open({ id: 'a' })
+    flush()
     const glyphs = ['focus', 'minimize', 'maximize', 'close'].map(
       (action) => actionButton(panel.element, action, 'a').textContent,
     )
@@ -377,12 +417,85 @@ describe('devtools panel', () => {
     const wm = createWindowManager(VIEWPORT)
     const panel = createDevtools(wm)
     wm.open({ id: 'a' })
+    flush()
     const before = logLines(panel.element).length
-
-    panel.destroy()
-    expect(panel.element.isConnected).toBe(false)
+    expect(before).toBeGreaterThan(0)
 
     wm.open({ id: 'b' })
+    panel.destroy()
+    expect(panel.element.isConnected).toBe(false)
+    expect(frames.size).toBe(0)
+
+    wm.open({ id: 'c' })
+    flush()
+    expect(frames.size).toBe(0)
     expect(logLines(panel.element)).toHaveLength(before)
+  })
+})
+
+describe('devtools painting', () => {
+  it('paints at most once per frame, however many events a transaction logs', () => {
+    const wm = createWindowManager(VIEWPORT)
+    for (let i = 0; i < 10; i += 1) wm.open({ id: `w${i}` })
+    const panel = createDevtools(wm)
+    const requested = vi.fn()
+    const real = globalThis.requestAnimationFrame
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      requested()
+      return real(callback)
+    })
+
+    wm.closeAll()
+    expect(requested).toHaveBeenCalledTimes(1)
+    expect(logLines(panel.element)).toHaveLength(0)
+    flush()
+    expect(logLines(panel.element).filter((line) => line.startsWith('close'))).toHaveLength(10)
+    expect(rowsOf(panel.element)).toEqual([])
+
+    for (let i = 0; i < 30; i += 1) wm.open({ id: `n${i}` })
+    expect(requested).toHaveBeenCalledTimes(2)
+    panel.destroy()
+  })
+
+  it('adds new log lines without rebuilding the ones it already shows', () => {
+    const wm = createWindowManager(VIEWPORT)
+    for (let i = 0; i < 20; i += 1) wm.open({ id: `w${i}`, x: 0, y: 0, width: 200, height: 150 })
+    const panel = createDevtools(wm, { logLimit: 5 })
+    for (let i = 0; i < 20; i += 1) wm.focus(`w${i}`)
+    flush()
+    const list = panel.element.querySelector('.wm-dt-log') as HTMLElement
+    const shown = [...list.children]
+    expect(shown).toHaveLength(5)
+
+    const created = vi.spyOn(document, 'createElement')
+    for (let i = 0; i < 60; i += 1) {
+      wm.move('w0', i + 1, i + 1)
+      flush()
+    }
+    expect(created).not.toHaveBeenCalled()
+    expect([...list.children]).toEqual(shown)
+
+    wm.focus('w3')
+    wm.focus('w4')
+    flush()
+    expect(created).toHaveBeenCalledTimes(6)
+    expect([...list.children].slice(2)).toEqual(shown.slice(0, 3))
+    expect(logLines(panel.element).slice(0, 2)).toEqual(['focusw4', 'focusw3'])
+    created.mockRestore()
+    panel.destroy()
+  })
+
+  it('shows only the newest lines when one frame logs more than the limit', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const panel = createDevtools(wm, { logLimit: 3, events: ['open'] })
+    wm.open({ id: 'a' })
+    flush()
+    for (const id of ['b', 'c', 'd', 'e', 'f']) wm.open({ id })
+    flush()
+    expect(logLines(panel.element)).toEqual(['openf', 'opene', 'opend'])
+    wm.open({ id: 'g' })
+    flush()
+    expect(logLines(panel.element)).toEqual(['openg', 'openf', 'opene'])
+    panel.destroy()
   })
 })

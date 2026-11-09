@@ -52,16 +52,22 @@ export function createDevtools(
   const view = createDevtoolsView(doc, messages)
   const log: DevtoolsLogEntry[] = []
   let seq = 0
+  let frame = 0
 
   function draw(): void {
+    frame = 0
     view.render(wm.getState(), log, { canUndo: wm.canUndo(), canRedo: wm.canRedo() })
+  }
+
+  function schedule(): void {
+    if (frame === 0) frame = requestAnimationFrame(draw)
   }
 
   function record(type: DevtoolsEvent, payload: unknown): void {
     seq += 1
     log.push({ seq, type, detail: detailOf(type, payload) })
     if (log.length > limit) log.shift()
-    draw()
+    schedule()
   }
 
   const stops = watched.map((type) =>
@@ -69,7 +75,7 @@ export function createDevtools(
       record(type, payload)
     }),
   )
-  stops.push(wm.subscribe(() => draw()))
+  stops.push(wm.subscribe(schedule))
 
   view.onWindowAction((action, id) => {
     if (action === 'focus') wm.focus(id)
@@ -104,6 +110,7 @@ export function createDevtools(
   return {
     element: view.root,
     destroy() {
+      cancelAnimationFrame(frame)
       for (const stop of stops) stop()
       view.destroy()
     },
