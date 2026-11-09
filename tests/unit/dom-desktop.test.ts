@@ -514,6 +514,40 @@ describe('reading the page less', () => {
   })
 })
 
+describe('minimize flights', () => {
+  it('measures every window before it adds any ghost when many minimize at once', async () => {
+    const log: string[] = []
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: () => ({}),
+    })
+    try {
+      const slot = document.createElement('div')
+      slot.getBoundingClientRect = () => ({ left: 0, top: 560, width: 40, height: 20 }) as DOMRect
+      document.body.append(slot)
+      const h = makeHarness({ minimizeTarget: () => slot })
+      for (const id of ['a', 'b', 'c']) {
+        const root = h.add({ id, x: 10, y: 10, width: 200, height: 150 })
+        root.getBoundingClientRect = () => {
+          log.push('read')
+          return { left: 10, top: 10, width: 200, height: 150 } as DOMRect
+        }
+      }
+      const append = document.body.append.bind(document.body)
+      document.body.append = (...nodes: Array<Node | string>) => {
+        log.push('write')
+        append(...nodes)
+      }
+      h.wm.minimizeAll()
+      await Promise.resolve()
+      expect(log).toEqual(['read', 'read', 'read', 'write', 'write', 'write'])
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+      Reflect.deleteProperty(document.body, 'append')
+    }
+  })
+})
+
 describe('closing through actions', () => {
   it('asks beforeClose for the actions a desktop or a skin hands out', () => {
     let skinActions: WindowActions | null = null

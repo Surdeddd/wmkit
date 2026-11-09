@@ -294,6 +294,17 @@ describe('flip animations', () => {
     expect(ghost.isConnected).toBe(false)
   })
 
+  it('leaves no ghost behind when the animation cannot start', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target, animate } = setup()
+    animate.mockImplementation(() => {
+      throw new TypeError('bad easing')
+    })
+    expect(() => flipToTarget(source, target, { easing: 'bogus' })).toThrow(TypeError)
+    expect(() => flipFromTarget(source, target, { easing: 'bogus' })).toThrow(TypeError)
+    expect(document.body.children).toHaveLength(2)
+  })
+
   it('clears the outbound ghost when its animation is interrupted', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
     const { source, target, anim } = setup()

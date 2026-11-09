@@ -652,7 +652,7 @@ describe('configuration surface', () => {
     expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 200, y: 200 })
   })
 
-  it('passes the configured duration to the minimize animation', () => {
+  it('passes the configured duration to the minimize animation', async () => {
     const calls: Array<{ duration?: unknown; easing?: unknown }> = []
     const original = Element.prototype.animate
     Element.prototype.animate = function animate(
@@ -675,6 +675,7 @@ describe('configuration surface', () => {
       root.getBoundingClientRect = () => new DOMRect(10, 10, 200, 150)
 
       harness.wm.minimize('a')
+      await Promise.resolve()
       expect(calls).toHaveLength(1)
       expect(calls[0]).toMatchObject({ duration: 90, easing: 'linear' })
     } finally {
@@ -2008,7 +2009,7 @@ describe('minimize flight', () => {
     Element.prototype.animate = realAnimate
   })
 
-  it('flies the window to its taskbar slot and back', () => {
+  it('flies the window to its taskbar slot and back', async () => {
     const flights: KeyframeAnimationOptions[] = []
     Element.prototype.animate = function fake(_keyframes: unknown, options: unknown) {
       flights.push(options as KeyframeAnimationOptions)
@@ -2024,6 +2025,7 @@ describe('minimize flight', () => {
     root.getBoundingClientRect = () => ({ left: 100, top: 100, width: 200, height: 150 }) as DOMRect
 
     harness.wm.minimize('a')
+    await Promise.resolve()
     expect(flights).toHaveLength(1)
     expect(flights[0]).toMatchObject({ duration: 120 })
 

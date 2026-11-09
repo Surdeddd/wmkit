@@ -1,6 +1,6 @@
 import type { Bounds, SnapZone, WindowManager, WindowState } from '../core/types'
 import { createActions } from './actions'
-import { flipFromTarget, flipToTarget } from './animate'
+import { flipFromTarget, measureFlip } from './animate'
 import { type Announcer, createAnnouncer } from './announcer'
 import { createDragStarter } from './drag'
 import { createResizeHandles, createResizeStarter } from './resize'
@@ -733,7 +733,8 @@ export function attachDesktop(
       if (!animationEnabled) return
       if (win.stage === 'minimized' && previous !== 'minimized') {
         const target = options.minimizeTarget?.(win)
-        if (target) flipToTarget(attached.element, target, animationOptions)
+        const play = target && measureFlip(attached.element, target, animationOptions, false)
+        if (play) queueMicrotask(play)
       } else if (previous === 'minimized' && win.stage !== 'minimized') {
         const target = options.minimizeTarget?.(win)
         if (target) {
