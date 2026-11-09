@@ -74,6 +74,8 @@ const FOCUSABLE_SELECTOR =
 
 const FRAMES = 'iframe, object, embed'
 
+const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditable=false])'
+
 let titleSeq = 0
 
 function setData(el: HTMLElement, key: string, value: string | null): void {
@@ -692,9 +694,7 @@ export function attachDesktop(
         return
       }
       if (!event.ctrlKey && !event.metaKey) return
-      if (drag) return
-      const target = firedOn(event)
-      if (target?.closest(interactiveSelector)) return
+      if (drag || event.defaultPrevented || firedOn(event)?.closest(EDITABLE)) return
       if (historyShortcuts && (event.key === 'z' || event.key === 'Z' || event.keyCode === 90)) {
         event.preventDefault()
         if (event.shiftKey) wm.redo()
@@ -910,7 +910,7 @@ export function attachDesktop(
     const onWindowKeydown = (event: KeyboardEvent) => {
       if (!event.repeat || event.key !== heldKey) letGo()
       const target = firedOn(event)
-      if (drag || target?.closest(interactiveSelector)) return
+      if (drag || target?.closest(interactiveSelector) || target?.closest(EDITABLE)) return
       if (target !== windowElement && !handle?.contains(target)) return
       const current = wm.get(id)
       if (!current) return

@@ -318,3 +318,52 @@ describe('tab shortcuts', () => {
     expect(activeTab(h)).toBe('b')
   })
 })
+
+describe('shortcuts inside editing surfaces', () => {
+  const FIELDS =
+    '<header data-wm-drag><input class="title-field"></header>' +
+    '<input class="field"><textarea></textarea><select></select>' +
+    '<div contenteditable><b class="inner">rich</b></div><canvas tabindex="0"></canvas>' +
+    '<button class="plain">ok</button>'
+
+  function moved(options: DesktopOptions = {}) {
+    const h = makeHarness(options)
+    const root = h.add({ id: 'a', x: 100, y: 100, width: 300, height: 200 }, FIELDS)
+    h.wm.move('a', 300, 300)
+    return { h, root, at: (selector: string) => root.querySelector(selector) as HTMLElement }
+  }
+
+  it('leaves Ctrl+Z to every editing surface whatever the drag-handle selector is', () => {
+    for (const options of [{}, { interactiveSelector: '.no-drag' }]) {
+      const { h, at } = moved(options)
+      for (const selector of ['.field', 'textarea', 'select', '.inner', '.title-field']) {
+        const event = press(at(selector), 'z', { ctrlKey: true })
+        expect(event.defaultPrevented).toBe(false)
+        press(at(selector), 'ArrowLeft', { ctrlKey: true, altKey: true })
+      }
+      expect(h.wm.get('a')?.bounds.x).toBe(300)
+      expect(h.wm.get('a')?.stage).toBe('normal')
+      h.desktop.destroy()
+    }
+  })
+
+  it('leaves Ctrl+Z alone once the app has handled it', () => {
+    const { h, at } = moved()
+    const canvas = at('canvas')
+    canvas.addEventListener('keydown', (event) => event.preventDefault())
+    press(canvas, 'z', { ctrlKey: true })
+    expect(h.wm.get('a')?.bounds.x).toBe(300)
+  })
+
+  it('still undoes from a control that does not edit text', () => {
+    const { h, at } = moved()
+    expect(press(at('.plain'), 'z', { ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(h.wm.get('a')?.bounds.x).toBe(100)
+  })
+
+  it('keeps the arrows in a field of the titlebar with a custom drag-handle selector', () => {
+    const { h, at } = moved({ interactiveSelector: '.no-drag' })
+    press(at('.title-field'), 'ArrowRight')
+    expect(h.wm.get('a')?.bounds.x).toBe(300)
+  })
+})
