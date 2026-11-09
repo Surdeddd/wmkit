@@ -35,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm site:build && pnpm qwik:fixture && pnpm dashboard:fixture && pnpm site:preview --port ${PORT} --strictPort`,
+    command: `WMKIT_E2E=1 pnpm site:build && pnpm qwik:fixture && pnpm dashboard:fixture && pnpm site:preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/wmkit/`,
     reuseExistingServer: false,
     timeout: 120_000,

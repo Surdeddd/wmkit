@@ -6,6 +6,15 @@ const pkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
 ) as { version: string }
 
+const page = (path: string) => fileURLToPath(new URL(path, import.meta.url))
+
+const TEST_PAGES = ['vanilla', 'react', 'winbox', 'elements', 'preact', 'lit', 'dock'] as const
+
+const testPages =
+  process.env.WMKIT_E2E === '1'
+    ? Object.fromEntries(TEST_PAGES.map((name) => [name, page(`./test/${name}.html`)]))
+    : {}
+
 export default defineConfig({
   base: process.env.VERCEL ? '/' : '/wmkit/',
   define: {
@@ -51,14 +60,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        vanilla: fileURLToPath(new URL('./test/vanilla.html', import.meta.url)),
-        react: fileURLToPath(new URL('./test/react.html', import.meta.url)),
-        winbox: fileURLToPath(new URL('./test/winbox.html', import.meta.url)),
-        elements: fileURLToPath(new URL('./test/elements.html', import.meta.url)),
-        preact: fileURLToPath(new URL('./test/preact.html', import.meta.url)),
-        lit: fileURLToPath(new URL('./test/lit.html', import.meta.url)),
-        dock: fileURLToPath(new URL('./test/dock.html', import.meta.url)),
+        main: page('./index.html'),
+        ...testPages,
       },
     },
   },
