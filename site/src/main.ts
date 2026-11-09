@@ -32,6 +32,7 @@ import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
 import type { AppContext, AppInstance, AppSpec, SkinLayout, ThemeName } from './apps'
 import { apps, isThemeName } from './apps'
 import { initBuilder } from './builder'
+import { startFpsMeter } from './fps'
 import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
 import './os.css'
 import './apps.css'
@@ -1050,21 +1051,6 @@ document.addEventListener('pointermove', (event) => {
   card.style.setProperty('--my', `${event.clientY - rect.top}px`)
 })
 
-function startFpsMeter(): void {
-  let frames = 0
-  let mark = performance.now()
-  const tick = (now: number) => {
-    frames += 1
-    if (now - mark >= 1000) {
-      statFps.textContent = String(Math.min(120, Math.round((frames * 1000) / (now - mark))))
-      frames = 0
-      mark = now
-    }
-    requestAnimationFrame(tick)
-  }
-  requestAnimationFrame(tick)
-}
-
 const BOOT_LINES = [
   `wmkit ${__WMKIT_VERSION__} · headless window manager`,
   'core .............. state machine ok',
@@ -1125,7 +1111,7 @@ function whenSized(run: () => void): void {
 
 function start(): void {
   whenSized(openDefaults)
-  startFpsMeter()
+  startFpsMeter(statFps, window, (listener) => wm.subscribe(listener))
   loadShadowTheme(theme).catch(() => {})
 }
 
