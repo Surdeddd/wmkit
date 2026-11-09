@@ -530,7 +530,7 @@ export function attachDesktop(
     }
     stackTarget.length = length
     restack(stackTarget, { base: zIndexBase, gap: zIndexGap })
-    stackRows.length = length
+    stackRows.length = 0
   }
 
   function markDeep(order: readonly string[]): void {
