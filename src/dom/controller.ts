@@ -294,7 +294,7 @@ export function attachDesktop(
     groupDwell,
     groupTarget(clientX, clientY, selfId, local) {
       const state = wm.getState()
-      if (!groupingEnabled) return null
+      if (!groupingEnabled || state.windows[selfId]?.layer === 'modal') return null
       const order = state.order
       for (let i = order.length; i-- > 0; ) {
         const id = order[i] as string
@@ -305,7 +305,7 @@ export function attachDesktop(
         if (local.x < b.x || local.y < b.y || local.x > b.x + b.width || local.y > b.y + b.height) {
           continue
         }
-        if (!attached.handle) return null
+        if (win.layer === 'modal' || !attached.handle) return null
         if (titlebar?.win !== win) titlebar = { win, box: attached.handle.getBoundingClientRect() }
         const box = titlebar.box
         return clientX >= box.left &&

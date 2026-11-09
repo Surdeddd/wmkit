@@ -203,6 +203,24 @@ describe('finding a tab group target', () => {
     expect(bare.root.dataset.wmTabTarget).toBeUndefined()
     expect(h.element.querySelector('[data-wm-tab-target]')).toBeNull()
   })
+
+  it('never groups a modal window, dragged or under the pointer', () => {
+    const { h, target } = scene()
+    placeTitlebar(target.handle, 400, 400)
+    const modal = h.add({ id: 'modal', layer: 'modal', x: 20, y: 300, width: 200, height: 150 })
+    dragTo(h, modal.handle, [50, 310], [450, 410])
+    modal.handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(h.wm.get('modal')).toMatchObject({ layer: 'modal', groupId: null })
+    h.wm.close('modal')
+
+    const moving = h.element.querySelector('[data-wm-window="moving"] [data-wm-drag]')
+    dragTo(h, moving as HTMLElement, [60, 20], [100, 60])
+    const late = h.add({ id: 'late', layer: 'modal', x: 400, y: 400, width: 200, height: 150 })
+    placeTitlebar(late.handle, 400, 400)
+    ;(moving as HTMLElement).dispatchEvent(pointerEvent('pointermove', 450, 410))
+    h.flush()
+    expect(h.element.querySelector('[data-wm-tab-target]')).toBeNull()
+  })
 })
 
 describe('a gesture whose window closes', () => {
