@@ -240,7 +240,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup && vite build -c vite.qwik.config.ts --mode lib && tsc -p tsconfig.qwik.json && node -e \"require('node:fs').copyFileSync('dist/qwik.d.ts','dist/qwik.d.cts')\"",
+    "build": "tsup && node scripts/winbox-cjs.mjs && vite build -c vite.qwik.config.ts --mode lib && tsc -p tsconfig.qwik.json && node -e \"require('node:fs').copyFileSync('dist/qwik.d.ts','dist/qwik.d.cts')\"",
     "themes": "node scripts/themes.mjs",
     "dev": "vite site",
     "site:build": "vite build site && vitepress build docs",
