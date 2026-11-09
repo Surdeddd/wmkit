@@ -437,3 +437,56 @@ describe('persist errors', () => {
     ).not.toThrow()
   })
 })
+
+describe('persist maxWait', () => {
+  it('saves at least every two seconds while changes keep coming', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const setItem = vi.spyOn(storage, 'setItem')
+    persist(wm, { storage, autoRestore: false, debounce: 150 })
+    wm.open({ id: 'a' })
+    for (let i = 1; i <= 50; i += 1) {
+      vi.advanceTimersByTime(100)
+      wm.move('a', i, i)
+    }
+    expect(setItem).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(setItem.mock.calls[1]?.[1] as string).state.windows[0].bounds.x).toBe(39)
+    vi.advanceTimersByTime(150)
+    expect(setItem).toHaveBeenCalledTimes(3)
+    expect(JSON.parse(storage.data.get('wmkit') as string).state.windows[0].bounds.x).toBe(50)
+  })
+
+  it('takes a custom bound and starts it afresh after each save', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const setItem = vi.spyOn(storage, 'setItem')
+    persist(wm, { storage, autoRestore: false, debounce: 100, maxWait: 250 })
+    wm.open({ id: 'a' })
+    vi.advanceTimersByTime(90)
+    wm.move('a', 1, 1)
+    vi.advanceTimersByTime(90)
+    wm.move('a', 2, 2)
+    vi.advanceTimersByTime(70)
+    expect(setItem).toHaveBeenCalledTimes(1)
+    wm.move('a', 3, 3)
+    vi.advanceTimersByTime(99)
+    expect(setItem).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(1)
+    expect(setItem).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats an infinite bound as no bound at all', () => {
+    const wm = makeWm()
+    const storage = memoryStorage()
+    const setItem = vi.spyOn(storage, 'setItem')
+    persist(wm, { storage, autoRestore: false, debounce: 100, maxWait: Number.POSITIVE_INFINITY })
+    wm.open({ id: 'a' })
+    for (let i = 1; i <= 30; i += 1) {
+      vi.advanceTimersByTime(50)
+      wm.move('a', i, i)
+    }
+    expect(setItem).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(100)
+    expect(setItem).toHaveBeenCalledTimes(1)
+  })
+})

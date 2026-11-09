@@ -14,6 +14,7 @@ export interface PersistOptions {
   version?: number
   migrate?: (state: unknown, from: number) => SerializedState | null
   onError?: (error: unknown, phase: 'load' | 'migrate' | 'save') => void
+  maxWait?: number
 }
 
 interface PersistEnvelope {
@@ -51,8 +52,10 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   const storage = options.storage ?? defaultStorage()
   const debounce = options.debounce ?? 150
   const version = options.version ?? 0
+  const maxWait = Math.min(options.maxWait ?? 2000, 2 ** 31 - 1)
   const report = options.onError ?? ((error: unknown) => globalThis.reportError?.(error))
   let timer: ReturnType<typeof setTimeout> | undefined
+  let deadline: ReturnType<typeof setTimeout> | undefined
   let suspended = false
 
   function save(): void {
@@ -98,7 +101,8 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
 
   function cancel(): void {
     clearTimeout(timer)
-    timer = undefined
+    clearTimeout(deadline)
+    timer = deadline = undefined
   }
 
   function flush(): void {
@@ -120,10 +124,8 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   const unsubscribe = wm.subscribe(() => {
     if (suspended || !storage) return
     clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = undefined
-      save()
-    }, debounce)
+    timer = setTimeout(flush, debounce)
+    deadline ??= setTimeout(flush, maxWait)
   })
 
   const host: Partial<Pick<Window, 'addEventListener' | 'removeEventListener'>> = globalThis
