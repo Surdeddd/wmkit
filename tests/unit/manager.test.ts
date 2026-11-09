@@ -770,7 +770,7 @@ describe('serialize and hydrate', () => {
     rawWindow(badLayer).layer = 'sky'
     expect(wm.hydrate(badLayer)).toBe(false)
     const badBounds = structuredClone(template)
-    rawWindow(badBounds).bounds = { x: 'a' }
+    rawWindow(badBounds).bounds = 'a'
     expect(wm.hydrate(badBounds)).toBe(false)
     const dupes = structuredClone(template)
     dupes.windows.push(structuredClone(dupes.windows[0]) as (typeof dupes.windows)[0])
@@ -1030,6 +1030,9 @@ describe('Infinity max size serialization (regression)', () => {
     const data = donor.serialize()
     rawWindow(data).maxSize = { width: 'wide', height: 3 }
     const wm = makeWm()
+    expect(wm.hydrate(data)).toBe(true)
+    expect(wm.get('w')?.maxSize).toEqual({ width: Number.POSITIVE_INFINITY, height: 3 })
+    rawWindow(data).maxSize = { width: 'wide', height: -3 }
     expect(wm.hydrate(data)).toBe(true)
     expect(wm.get('w')?.maxSize).toBeNull()
   })

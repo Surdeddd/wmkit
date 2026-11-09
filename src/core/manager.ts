@@ -1,5 +1,5 @@
 import { createEmitter } from './emitter'
-import { applyAspect, boundsEqual, clampSize, clampToViewport, zoneBounds } from './geometry'
+import { applyAspect, boundsEqual, clamp, clampSize, clampToViewport, zoneBounds } from './geometry'
 import type {
   ArrangeMode,
   Bounds,
@@ -39,7 +39,33 @@ const ZONES: readonly SnapZone[] = [
   'right-third',
 ]
 const INFINITE = Number.POSITIVE_INFINITY
+const TINY = Number.MIN_VALUE
 const PLACEMENT = /^(bounds|restore|stage|snap[RZ]|group|opened)/
+
+function normalizeWorkspace(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback
+}
+
+function sized(size: Size): boolean {
+  return size.width > 0 && size.height > 0
+}
+
+function finite(...values: unknown[]): boolean {
+  return values.every(Number.isFinite)
+}
+
+function num(value: unknown, min = Number.NEGATIVE_INFINITY): number | undefined {
+  return Number.isFinite(value) && (value as number) >= min ? (value as number) : undefined
+}
+
+function cap(value: unknown): number {
+  return typeof value === 'number' && value > 0 ? value : INFINITE
+}
+
+function capped(width: unknown, height: unknown): Size | null {
+  const size = { width: cap(width), height: cap(height) }
+  return size.width < INFINITE || size.height < INFINITE ? size : null
+}
 
 function equal(a: unknown, b: unknown, depth: number): boolean {
   if (a === b) return true
@@ -54,12 +80,16 @@ function equal(a: unknown, b: unknown, depth: number): boolean {
   return size === Object.keys(y).length
 }
 
-function normalizeWorkspace(value: number | undefined, fallback: number): number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback
+function span(start: number, size: number): [number, number] {
+  const from = clamp(start, 0, 1)
+  return [from, from === start && start + size <= 1 ? size : clamp(start + size, 0, 1) - from]
 }
 
-function sized(size: Size): boolean {
-  return size.width > 0 && size.height > 0
+function unitRect(rect: Bounds): Bounds | null {
+  if (!finite(rect.x, rect.y, rect.width, rect.height)) return null
+  const [x, width] = span(rect.x, rect.width)
+  const [y, height] = span(rect.y, rect.height)
+  return width > 0 && height > 0 ? { x, y, width, height } : null
 }
 
 export function createWindowManager(options: ManagerOptions = {}): WindowManager {
@@ -427,12 +457,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
   }
 
-  function normalizeSize(size: Size, win: Limits, drive: 'width' | 'height' = 'width'): Size {
-    if (win.aspectRatio === null) return clampSize(size, win.minSize, win.maxSize)
-    return applyAspect(size, win.aspectRatio, win.minSize, win.maxSize, drive)
+  function normalizeSize(size: Size, lim: Limits, drive: 'width' | 'height' = 'width'): Size {
+    const min = { width: Math.max(1, lim.minSize.width), height: Math.max(1, lim.minSize.height) }
+    if (lim.aspectRatio === null) return clampSize(size, min, lim.maxSize)
+    return applyAspect(size, lim.aspectRatio, min, lim.maxSize, drive)
   }
 
-  function positionForOpen(init: WindowInit): { x: number; y: number } {
+  function positionForOpen(init: { x?: number; y?: number }): { x: number; y: number } {
     if (init.x !== undefined && init.y !== undefined) return { x: init.x, y: init.y }
     const offset = (cascadeIndex % 10) * cascadeOffset
     cascadeIndex += 1
@@ -449,33 +480,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
     if (windows[id]) throw new Error(`wmkit: window id "${id}" already exists`)
 
-    const minSize = { width: init.minWidth ?? 160, height: init.minHeight ?? 100 }
-    const maxSize =
-      init.maxWidth !== undefined || init.maxHeight !== undefined
-        ? {
-            width: init.maxWidth ?? Number.POSITIVE_INFINITY,
-            height: init.maxHeight ?? Number.POSITIVE_INFINITY,
-          }
-        : null
-    const aspectRatio =
-      init.aspectRatio !== undefined && Number.isFinite(init.aspectRatio) && init.aspectRatio > 0
-        ? init.aspectRatio
-        : null
-    const requested = {
-      width: init.width ?? defaultSize.width,
-      height: init.height ?? defaultSize.height,
-    }
-    const size =
-      aspectRatio === null
-        ? clampSize(requested, minSize, maxSize)
-        : applyAspect(
-            requested,
-            aspectRatio,
-            minSize,
-            maxSize,
-            init.width === undefined && init.height !== undefined ? 'height' : 'width',
-          )
-    const position = positionForOpen(init)
+    const minSize = { width: num(init.minWidth, 0) ?? 160, height: num(init.minHeight, 0) ?? 100 }
+    const maxSize = capped(init.maxWidth, init.maxHeight)
+    const aspectRatio = num(init.aspectRatio, TINY) ?? null
+    const width = num(init.width, TINY)
+    const height = num(init.height, TINY)
+    const size = normalizeSize(
+      { width: width ?? defaultSize.width, height: height ?? defaultSize.height },
+      { minSize, maxSize, aspectRatio },
+      width === undefined && height !== undefined ? 'height' : 'width',
+    )
+    const position = positionForOpen({ x: num(init.x), y: num(init.y) })
     let bounds: Bounds = { ...position, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
 
@@ -491,7 +506,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       stage: 'normal',
       snapZone: null,
       snapRect: null,
-      layer: init.layer ?? 'normal',
+      layer: init.layer && LAYERS.includes(init.layer) ? init.layer : 'normal',
       workspace: normalizeWorkspace(init.workspace, workspace),
       groupId: null,
       minSize,
@@ -780,7 +795,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function restoreTo(id: string, bounds: Bounds): boolean {
-    const result = place(id, bounds)
+    const result = finite(bounds.x, bounds.y, bounds.width, bounds.height) && place(id, bounds)
     if (result) focus(id, true)
     return result
   }
@@ -804,7 +819,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function move(id: string, x: number, y: number): boolean {
     const win = windows[id]
-    if (win?.stage !== 'normal') return false
+    if (win?.stage !== 'normal' || !Number.isFinite(x) || !Number.isFinite(y)) return false
     let bounds: Bounds = { ...win.bounds, x, y }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
     if (boundsEqual(bounds, win.bounds)) return true
@@ -825,7 +840,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function resize(id: string, patch: Partial<Bounds>): boolean {
     const win = windows[id]
     if (!win || win.stage === 'maximized' || win.stage === 'minimized') return false
-    const merged: Bounds = { ...win.bounds, ...patch }
+    const pick = (key: keyof Bounds) => patch[key] ?? win.bounds[key]
+    const merged: Bounds = {
+      x: pick('x'),
+      y: pick('y'),
+      width: pick('width'),
+      height: pick('height'),
+    }
+    if (!finite(merged.x, merged.y, merged.width, merged.height)) return false
     const drive =
       Math.abs(merged.height - win.bounds.height) > Math.abs(merged.width - win.bounds.width)
         ? 'height'
@@ -851,20 +873,25 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function update(id: string, patch: WindowUpdate): boolean {
     const win = windows[id]
     if (!win) return false
+    const minSize = patch.minSize ? { ...patch.minSize } : win.minSize
+    const maxSize =
+      patch.maxSize === undefined ? win.maxSize : patch.maxSize && { ...patch.maxSize }
+    if (
+      num(minSize.width, 0) === undefined ||
+      num(minSize.height, 0) === undefined ||
+      (maxSize && !(maxSize.width > 0 && maxSize.height > 0)) ||
+      (patch.layer && !LAYERS.includes(patch.layer))
+    ) {
+      return false
+    }
     const next: WindowState = {
       ...win,
       title: patch.title ?? win.title,
       layer: patch.layer ?? win.layer,
-      minSize: patch.minSize ?? win.minSize,
-      maxSize: patch.maxSize === undefined ? win.maxSize : patch.maxSize,
+      minSize,
+      maxSize,
       aspectRatio:
-        patch.aspectRatio === undefined
-          ? win.aspectRatio
-          : patch.aspectRatio !== null &&
-              Number.isFinite(patch.aspectRatio) &&
-              patch.aspectRatio > 0
-            ? patch.aspectRatio
-            : null,
+        patch.aspectRatio === undefined ? win.aspectRatio : (num(patch.aspectRatio, TINY) ?? null),
       draggable: patch.draggable ?? win.draggable,
       resizable: patch.resizable ?? win.resizable,
       closable: patch.closable ?? win.closable,
@@ -893,7 +920,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function setViewport(next: Size): void {
-    if (!sized(next) || (next.width === viewport.width && next.height === viewport.height)) return
+    if (
+      !sized(next) ||
+      !finite(next.width, next.height) ||
+      (next.width === viewport.width && next.height === viewport.height)
+    ) {
+      return
+    }
     viewport = { ...next }
     reflowViewport(true)
     commitQuiet()
@@ -927,7 +960,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (target === win.workspace) return false
     const updated = { ...win, workspace: target }
     setWindow(updated)
-    const synced = syncGroup(updated)
+    syncGroup(updated)
     if (!onActiveWorkspace(updated) && focusedId === id) {
       focusTop()
       if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
@@ -936,7 +969,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     } else {
       handOff(id)
     }
-    queueEvent(() => emitter.emit('update', { window: synced }))
+    queueEvent(() => emitter.emit('update', { window: updated }))
     commit()
     return true
   }
@@ -1068,7 +1101,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const current = members.indexOf(activeTabs[win.groupId] as string)
     const index = (current + direction + members.length) % members.length
     const next = members[index] as string
-    return activateTab(next) ? next : null
+    activateTab(next)
+    return next
   }
 
   function groupMembers(groupId: string): readonly WindowState[] {
@@ -1103,7 +1137,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function center(id: string): boolean {
     const win = windows[id]
-    if (win?.stage !== 'normal') return false
+    if (win?.stage !== 'normal' || !sized(viewport)) return false
     return move(
       id,
       Math.round((viewport.width - win.bounds.width) / 2),
@@ -1306,26 +1340,30 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     historyDirty = false
   }
 
+  function clone<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value))
+  }
+
   function saveLayout(name: string): SerializedState {
-    const data = serialize()
-    layouts.set(name, structuredClone(data))
-    return data
+    const data = clone(serialize())
+    layouts.set(name, data)
+    return clone(data)
   }
 
   function loadLayout(name: string): boolean {
     const data = layouts.get(name)
     if (!data) return false
-    return hydrate(structuredClone(data))
+    return hydrate(clone(data))
   }
 
   function getLayout(name: string): SerializedState | undefined {
     const data = layouts.get(name)
-    return data ? structuredClone(data) : undefined
+    return data ? clone(data) : undefined
   }
 
   function setLayout(name: string, data: SerializedState): boolean {
     if (!isValidSerialized(data)) return false
-    layouts.set(name, structuredClone(data))
+    layouts.set(name, clone(data))
     return true
   }
 
@@ -1415,47 +1453,29 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
   }
 
-  function isBounds(value: unknown): value is Bounds {
-    if (typeof value !== 'object' || value === null) return false
-    const bounds = value as Record<string, unknown>
-    return (
-      typeof bounds.x === 'number' &&
-      typeof bounds.y === 'number' &&
-      typeof bounds.width === 'number' &&
-      typeof bounds.height === 'number'
-    )
+  function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
   }
 
-  function isSize(value: unknown): value is Size {
-    if (typeof value !== 'object' || value === null) return false
-    const size = value as Record<string, unknown>
-    return typeof size.width === 'number' && typeof size.height === 'number'
+  function fields(value: unknown): Record<string, unknown> {
+    return isObject(value) ? value : {}
   }
 
-  function isSizeAxis(value: unknown): value is number | null {
-    return value === null || typeof value === 'number'
-  }
-
-  function readMaxSize(value: unknown): Size | null {
-    if (typeof value !== 'object' || value === null) return null
-    const size = value as Record<string, unknown>
-    if (!isSizeAxis(size.width) || !isSizeAxis(size.height)) return null
-    if (size.width === null && size.height === null) return null
-    return {
-      width: size.width ?? Number.POSITIVE_INFINITY,
-      height: size.height ?? Number.POSITIVE_INFINITY,
-    }
+  function readBounds(value: unknown): Bounds | null {
+    const { x, y, width, height } = fields(value)
+    return finite(x, y) && num(width, TINY) && num(height, TINY)
+      ? ({ x, y, width, height } as Bounds)
+      : null
   }
 
   function isSerializedWindow(value: unknown): value is SerializedWindowState {
-    if (typeof value !== 'object' || value === null) return false
-    const win = value as Record<string, unknown>
     return (
-      typeof win.id === 'string' &&
-      win.id.length > 0 &&
-      isBounds(win.bounds) &&
-      STAGES.includes(win.stage as WindowStage) &&
-      LAYERS.includes(win.layer as WindowLayer)
+      isObject(value) &&
+      typeof value.id === 'string' &&
+      value.id.length > 0 &&
+      isObject(value.bounds) &&
+      STAGES.includes(value.stage as WindowStage) &&
+      LAYERS.includes(value.layer as WindowLayer)
     )
   }
 
@@ -1472,30 +1492,34 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
     const done = track()
     const nextWindows: Record<string, WindowState> = Object.create(null)
+    const built: WindowState[] = []
     let maxSeq = 0
     for (const raw of data.windows) {
-      const win: WindowState = {
+      const minSize = fields(raw.minSize)
+      const maxSize = fields(raw.maxSize)
+      const bounds = fields(raw.bounds)
+      const snapRect = isObject(raw.snapRect) ? unitRect(raw.snapRect as Bounds) : null
+      const snapZone = ZONES.includes(raw.snapZone as SnapZone) ? raw.snapZone : null
+      let win: WindowState = {
         id: raw.id,
         title: typeof raw.title === 'string' ? raw.title : 'Window',
-        bounds: { ...raw.bounds },
-        restoreBounds:
-          raw.restoreBounds && isBounds(raw.restoreBounds) ? { ...raw.restoreBounds } : null,
+        bounds: {
+          ...positionForOpen({ x: num(bounds.x), y: num(bounds.y) }),
+          width: num(bounds.width, TINY) ?? defaultSize.width,
+          height: num(bounds.height, TINY) ?? defaultSize.height,
+        },
+        restoreBounds: readBounds(raw.restoreBounds),
         restoreStage: STAGES.includes(raw.restoreStage as WindowStage) ? raw.restoreStage : null,
-        stage: raw.stage,
-        snapZone: ZONES.includes(raw.snapZone as SnapZone) ? raw.snapZone : null,
-        snapRect: isBounds(raw.snapRect) ? { ...raw.snapRect } : null,
+        stage: raw.stage === 'snapped' && !snapZone && !snapRect ? 'normal' : raw.stage,
+        snapZone,
+        snapRect,
         layer: raw.layer,
         workspace: normalizeWorkspace(raw.workspace, 0),
         groupId: typeof raw.groupId === 'string' && raw.groupId.length > 0 ? raw.groupId : null,
-        minSize: isSize(raw.minSize) ? { ...raw.minSize } : { width: 160, height: 100 },
-        maxSize: readMaxSize(raw.maxSize),
-        aspectRatio:
-          typeof raw.aspectRatio === 'number' &&
-          Number.isFinite(raw.aspectRatio) &&
-          raw.aspectRatio > 0
-            ? raw.aspectRatio
-            : null,
-        openedSeq: typeof raw.openedSeq === 'number' ? raw.openedSeq : ++maxSeq,
+        minSize: { width: num(minSize.width, 0) ?? 160, height: num(minSize.height, 0) ?? 100 },
+        maxSize: capped(maxSize.width, maxSize.height),
+        aspectRatio: num(raw.aspectRatio, TINY) ?? null,
+        openedSeq: num(raw.openedSeq) ?? ++maxSeq,
         draggable: raw.draggable !== false,
         resizable: raw.resizable !== false,
         closable: raw.closable !== false,
@@ -1504,9 +1528,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         snappable: raw.snappable !== false,
         meta: raw.meta && typeof raw.meta === 'object' ? { ...raw.meta } : {},
       }
+      if (win.groupId === null) win = refit(win)
       maxSeq = Math.max(maxSeq, win.openedSeq)
-      nextWindows[win.id] = win
+      built.push(win)
     }
+    for (const win of built.sort((a, b) => a.openedSeq - b.openedSeq)) nextWindows[win.id] = win
 
     const requestedOrder = Array.isArray(data.order) ? data.order : []
     const seen = new Set<string>()
@@ -1517,8 +1543,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         nextOrder.push(id)
       }
     }
-    for (const id of Object.keys(nextWindows)) {
-      if (!seen.has(id)) nextOrder.push(id)
+    for (const win of data.windows) {
+      if (!seen.has(win.id)) nextOrder.push(win.id)
     }
 
     windows = nextWindows
@@ -1533,10 +1559,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     for (const id of order) {
       const groupId = (windows[id] as WindowState).groupId
       if (groupId === null || restoredTabs[groupId]) continue
-      const wanted =
-        typeof rawTabs === 'object' && rawTabs !== null
-          ? (rawTabs as Record<string, unknown>)[groupId]
-          : undefined
+      const wanted = isObject(rawTabs) ? rawTabs[groupId] : undefined
       const members = membersOf(groupId)
       restoredTabs[groupId] =
         typeof wanted === 'string' && members.includes(wanted) ? wanted : (members[0] as string)
@@ -1582,8 +1605,12 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     toggleMaximize: (id) => transact(() => toggleMaximize(id)),
     restore: (id) => transact(() => restore(id)),
     restoreTo: (id, bounds) => transact(() => restoreTo(id, bounds)),
-    snap: (id, zone) => transact(() => snap(id, zone)),
-    snapTo: (id, rect) => transact(() => snap(id, null, { ...rect })),
+    snap: (id, zone) => transact(() => ZONES.includes(zone) && snap(id, zone)),
+    snapTo: (id, rect) =>
+      transact(() => {
+        const unit = unitRect(rect)
+        return !!unit && snap(id, null, unit)
+      }),
     move: (id, x, y) => transact(() => move(id, x, y)),
     moveBy: (id, dx, dy) => transact(() => moveBy(id, dx, dy)),
     center: (id) => transact(() => center(id)),
