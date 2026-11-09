@@ -59,8 +59,7 @@ export function createDesktop(wm: WindowManager, options?: DesktopOptions): Svel
   return {
     binder,
     desktop(node) {
-      binder.bindDesktop(node)
-      return { destroy: () => binder.destroy() }
+      return { destroy: binder.bindDesktop(node) }
     },
     window(node, params) {
       let bound = params.id

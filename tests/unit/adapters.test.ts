@@ -582,6 +582,28 @@ describe('svelte window action', () => {
     expect(winEl.style.transform).toBe('translate3d(70px, 80px, 0)')
     action.destroy?.()
   })
+
+  it('keeps window bindings that outlive the desktop node for the next desktop', () => {
+    const wm = createManager(VIEWPORT)
+    const dk = createSvelteDesktop(wm, DESKTOP_OPTIONS)
+    const first = document.createElement('div')
+    const panel = document.createElement('section')
+    document.body.append(first, panel)
+    wm.open({ id: 'notes', title: 'Notes' })
+
+    const desktopAction = dk.desktop(first)
+    const windowAction = dk.window(panel, { id: 'notes' })
+    desktopAction.destroy()
+    expect(panel.dataset.wmWindow, 'the window stayed attached to a dead desktop').toBeUndefined()
+
+    const second = document.createElement('div')
+    document.body.append(second)
+    dk.desktop(second)
+    expect(panel.dataset.wmWindow, 'destroying the desktop forgot the window binding').toBe('notes')
+
+    windowAction.destroy()
+    expect(panel.dataset.wmWindow).toBeUndefined()
+  })
 })
 
 describe('titlebar landmark neutralisation', () => {
