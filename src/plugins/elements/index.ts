@@ -16,18 +16,21 @@ export interface ElementsMessages {
   minimize: string
   maximize: string
   close: string
+  tabs?: string
 }
 
 export const elementsMessages: ElementsMessages = {
   minimize: 'Minimize',
   maximize: 'Maximize',
   close: 'Close',
+  tabs: 'Tabs',
 }
 
 export const elementsMessagesRu: ElementsMessages = {
   minimize: 'Свернуть',
   maximize: 'Развернуть',
   close: 'Закрыть',
+  tabs: 'Вкладки',
 }
 
 export type WmDesktopOptions = DesktopOptions & ManagerOptions
@@ -39,6 +42,11 @@ const CHROME_CSS = `:host{position:absolute;left:0;top:0;display:flex;flex-direc
 [part=title]{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:600 13px/1 system-ui,sans-serif}
 [part~=control]{width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:inherit;font:16px/1 system-ui,sans-serif;cursor:pointer;opacity:.7}
 [part~=control]:hover,[part~=control]:focus-visible{opacity:1;outline:2px solid var(--wm-accent,currentColor)}
+[part=tabs]{flex:1;display:flex;gap:2px;min-width:0;overflow:hidden}
+[part~=tab]{min-width:0;max-width:16ch;height:26px;padding:0 10px;border:0;border-radius:6px;background:none;color:inherit;font:13px/1 system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;opacity:.7}
+[part~=tab]:hover,[part~=active]{opacity:1}
+[part~=active]{font-weight:600;background:color-mix(in srgb,currentColor 12%,transparent)}
+[part~=tab]:focus-visible{opacity:1;outline:2px solid var(--wm-accent,currentColor)}
 [part=content]{position:relative;flex:1;min-height:0;overflow:auto;border-radius:inherit;border-top-left-radius:0;border-top-right-radius:0}
 :host([chrome=none]) [part=titlebar]{display:none}`
 
@@ -86,6 +94,12 @@ function emit(element: Element, type: string, detail: unknown, cancelable = fals
   return element.dispatchEvent(
     new CustomEvent(type, { detail, bubbles: true, composed: true, cancelable }),
   )
+}
+
+function part(doc: Document, tag: string, name: string): HTMLElement {
+  const node = doc.createElement(tag)
+  node.setAttribute('part', name)
+  return node
 }
 
 function closedIn(state: ManagerState): unknown[] {
@@ -187,6 +201,7 @@ export class WmWindowElement extends Base {
   private detach: (() => void) | null = null
   private quiet = false
   private last: WindowState | null = null
+  private tabs = ''
   private controls: Array<[keyof WindowFlags, HTMLElement]> = []
 
   get manager(): WindowManager | null {
@@ -279,6 +294,30 @@ export class WmWindowElement extends Base {
         if (last?.[flag] !== win[flag]) button.hidden = !win[flag]
       }
     }
+    const group = win.groupId === null ? undefined : state.groups[win.groupId]
+    const members = group?.activeId === id && group.members.length > 1 ? group.members : []
+    const tabs = members
+      .map((member) => `${member}\n${(state.windows[member] as WindowState).title}`)
+      .join('\n')
+    if (tabs !== this.tabs) {
+      this.tabs = tabs
+      const root = this.shadowRoot as ShadowRoot
+      const strip = root.querySelector('[part=tabs]') as HTMLElement
+      ;(root.querySelector('[part=title]') as HTMLElement).hidden = members.length > 0
+      strip.hidden = members.length === 0
+      strip.replaceChildren(
+        ...members.map((member) => {
+          const tab = part(this.ownerDocument, 'button', member === id ? 'tab active' : 'tab')
+          tab.setAttribute('type', 'button')
+          tab.setAttribute('role', 'tab')
+          tab.setAttribute('aria-selected', String(member === id))
+          tab.tabIndex = member === id ? 0 : -1
+          tab.dataset.windowId = member
+          tab.textContent = (state.windows[member] as WindowState).title || member
+          return tab
+        }),
+      )
+    }
     if (opened) emit(this, 'wm-open', { window: win })
   }
 
@@ -335,24 +374,45 @@ export class WmWindowElement extends Base {
     const doc = this.ownerDocument
     const style = doc.createElement('style')
     style.textContent = CHROME_CSS
-    const part = (tag: string, name: string) => {
-      const node = doc.createElement(tag)
-      node.setAttribute('part', name)
-      return node
-    }
-    const bar = part('header', 'titlebar')
+    const bar = part(doc, 'header', 'titlebar')
     bar.dataset.wmDrag = ''
-    const title = part('span', 'title')
+    const title = part(doc, 'span', 'title')
     title.dataset.wmTitle = ''
+    const strip = part(doc, 'div', 'tabs')
+    strip.setAttribute('role', 'tablist')
+    strip.setAttribute('aria-label', messages.tabs ?? (elementsMessages.tabs as string))
+    strip.hidden = true
+    strip.addEventListener('click', (event) => {
+      const id = (event.target as HTMLElement).dataset.windowId
+      if (id && this.manager?.activateTab(id)) {
+        const next = (this.host as WmDesktopElement).windows.get(id)?.shadowRoot
+        next?.querySelector<HTMLElement>('[part~=active]')?.focus()
+      }
+    })
+    strip.addEventListener('keydown', (event) => {
+      const tabs = [...strip.children] as HTMLElement[]
+      const at = tabs.indexOf(event.target as HTMLElement)
+      const to = (
+        { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: tabs.length - 1 } as Record<
+          string,
+          number
+        >
+      )[event.key]
+      if (to === undefined) return
+      event.preventDefault()
+      const next = tabs[(to + tabs.length) % tabs.length] as HTMLElement
+      for (const tab of tabs) tab.tabIndex = tab === next ? 0 : -1
+      next.focus()
+    })
     const actions = doc.createElement('slot')
     actions.name = 'actions'
-    bar.append(title, actions)
+    bar.append(title, strip, actions)
     for (const [action, glyph, label, flag] of [
       ['wmMinimize', '–', messages.minimize, 'minimizable'],
       ['wmMaximize', '□', messages.maximize, 'maximizable'],
       ['wmClose', '×', messages.close, 'closable'],
     ] as const) {
-      const button = part('button', `control ${action.slice(2).toLowerCase()}`)
+      const button = part(doc, 'button', `control ${action.slice(2).toLowerCase()}`)
       button.setAttribute('type', 'button')
       button.setAttribute('aria-label', label)
       button.dataset[action] = ''
@@ -360,7 +420,7 @@ export class WmWindowElement extends Base {
       bar.append(button)
       this.controls.push([flag, button])
     }
-    const content = part('div', 'content')
+    const content = part(doc, 'div', 'content')
     content.append(doc.createElement('slot'))
     root.append(style, bar, content)
   }
