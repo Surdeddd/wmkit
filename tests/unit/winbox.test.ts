@@ -533,6 +533,20 @@ describe('tearing down', () => {
     expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
   })
 
+  it('lets go of the old manager, so its windows cannot touch a box that took the same id', () => {
+    const first = box('First', { id: 'tx' })
+    const old = managerOf(first)
+    first.close()
+    const node = document.createElement('p')
+    const next = box('Next', { id: 'tx', mount: node })
+    old.open({ id: 'tx' })
+    old.close('tx')
+    expect(next.body.contains(node)).toBe(true)
+    expect(WinBox.stack()).toContain(next)
+    next.maximize()
+    expect(next.hasClass('max')).toBe(true)
+  })
+
   it('keeps the desktop when a new window arrives in the same batch as the last one leaves', () => {
     const only = box('Only')
     const wm = managerOf(only)

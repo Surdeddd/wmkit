@@ -209,9 +209,11 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
   }
   const gone = new Set<string>()
   let reacting = false
-  wm.on('open', ({ window: win }) => {
-    if (!replaying) gone.delete(win.id)
-  })
+  const stops = [
+    wm.on('open', ({ window: win }) => {
+      if (!replaying) gone.delete(win.id)
+    }),
+  ]
   const cycle = wm.cycleFocus
   wm.cycleFocus = (direction) => {
     let id: string | null = null
@@ -308,29 +310,33 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
   }
 
   let doomed = false
-  const stop = wm.subscribe(() => {
-    if (doomed && runtime.boxes === 0 && !runtime.held) {
-      stop()
-      desktop.destroy()
-      layer.remove()
-      forRoot.delete(key)
-      return
-    }
-    doomed = false
-    runtime.sync()
-  })
-  wm.on('close', ({ window: win }) => {
-    const box = boxes.get(win.id)
-    if (!box) return
-    box.unmount()
-    boxes.delete(win.id)
-    seen.delete(win.id)
-    gone.add(win.id)
-    const index = history.indexOf(box)
-    if (index !== -1) history.splice(index, 1)
-    runtime.boxes -= 1
-    doomed = true
-  })
+  stops.push(
+    wm.subscribe(() => {
+      if (doomed && runtime.boxes === 0 && !runtime.held) {
+        for (const stop of stops) stop()
+        desktop.destroy()
+        layer.remove()
+        forRoot.delete(key)
+        return
+      }
+      doomed = false
+      runtime.sync()
+    }),
+  )
+  stops.push(
+    wm.on('close', ({ window: win }) => {
+      const box = boxes.get(win.id)
+      if (!box) return
+      box.unmount()
+      boxes.delete(win.id)
+      seen.delete(win.id)
+      gone.add(win.id)
+      const index = history.indexOf(box)
+      if (index !== -1) history.splice(index, 1)
+      runtime.boxes -= 1
+      doomed = true
+    }),
+  )
 
   if (!watchedDocs.has(doc)) {
     watchedDocs.add(doc)
