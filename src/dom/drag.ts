@@ -144,9 +144,11 @@ export function createDragStarter(ctx: SessionContext) {
         nextX = magnet.x
         nextY = magnet.y
       }
+      const { clientX, clientY, local } = session
+      const drop = ctx.dropAt(clientX, clientY, id, local)
+      const candidate = drop ? null : ctx.groupTarget(clientX, clientY, id, local)
       wm.move(id, nextX, nextY)
 
-      const drop = ctx.dropAt(session.clientX, session.clientY, id, session.local)
       if (session.drop && !drop) ctx.hidePreview()
       session.drop = drop
       if (drop) {
@@ -157,7 +159,6 @@ export function createDragStarter(ctx: SessionContext) {
         return
       }
 
-      const candidate = ctx.groupTarget(session.clientX, session.clientY, id)
       if (candidate !== session.hoverId) {
         session.hoverId = candidate
         clearHover()

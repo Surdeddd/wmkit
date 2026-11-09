@@ -142,25 +142,6 @@ function focusablesOf(el: HTMLElement): HTMLElement[] {
   return found
 }
 
-function dragHandleAt(node: Element, clientX: number, clientY: number): Element | null {
-  const handle = node.closest?.('[data-wm-drag]')
-  if (handle) return handle
-  const root = node.shadowRoot
-  if (!root) return null
-  for (const candidate of root.querySelectorAll('[data-wm-drag]')) {
-    const box = candidate.getBoundingClientRect()
-    if (
-      clientX >= box.left &&
-      clientX <= box.right &&
-      clientY >= box.top &&
-      clientY <= box.bottom
-    ) {
-      return candidate
-    }
-  }
-  return null
-}
-
 function windowElementOf(node: Element): HTMLElement | null {
   const found = node.closest<HTMLElement>('[data-wm-window]')
   if (found) return found
@@ -230,6 +211,7 @@ export function attachDesktop(
   let groupTargetEl: HTMLElement | null = null
   let cachedRect: { left: number; top: number } | null = null
   let rectUsers = 0
+  let titlebar: { win: WindowState; box: DOMRect } | null = null
 
   let announcer: Announcer | null = null
   if (options.announce !== false) {
@@ -266,6 +248,7 @@ export function attachDesktop(
   function refreshRect(): void {
     const rect = element.getBoundingClientRect()
     cachedRect = { left: rect.left, top: rect.top }
+    titlebar = null
   }
 
   const ctx: SessionContext = {
@@ -309,14 +292,28 @@ export function attachDesktop(
     interactiveSelector,
     magnetThreshold,
     groupDwell,
-    groupTarget(clientX, clientY, selfId) {
-      if (!groupingEnabled || typeof doc.elementsFromPoint !== 'function') return null
-      for (const node of doc.elementsFromPoint(clientX, clientY)) {
-        const host = windowElementOf(node)
-        const id = host?.dataset.wmWindow
-        if (!id || id === selfId || registry.get(id)?.element !== host) continue
-        const handle = dragHandleAt(node, clientX, clientY)
-        return handle && windowElementOf(handle) === host ? id : null
+    groupTarget(clientX, clientY, selfId, local) {
+      const state = wm.getState()
+      if (!groupingEnabled) return null
+      const order = state.order
+      for (let i = order.length; i-- > 0; ) {
+        const id = order[i] as string
+        const attached = registry.get(id)
+        const win = state.windows[id] as WindowState
+        if (id === selfId || !attached || attached.hidden) continue
+        const b = win.bounds
+        if (local.x < b.x || local.y < b.y || local.x > b.x + b.width || local.y > b.y + b.height) {
+          continue
+        }
+        if (!attached.handle) return null
+        if (titlebar?.win !== win) titlebar = { win, box: attached.handle.getBoundingClientRect() }
+        const box = titlebar.box
+        return clientX >= box.left &&
+          clientX <= box.right &&
+          clientY >= box.top &&
+          clientY <= box.bottom
+          ? id
+          : null
       }
       return null
     },
@@ -337,6 +334,7 @@ export function attachDesktop(
     currentDrag: () => drag,
     claimDrag(session) {
       drag = session
+      titlebar = null
     },
     releaseDrag(session) {
       if (drag === session) drag = null

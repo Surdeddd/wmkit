@@ -98,16 +98,111 @@ function dragTo(h: Harness, handle: HTMLElement, from: [number, number], to: [nu
   h.flush()
 }
 
+function placeTitlebar(handle: HTMLElement, left: number, top: number, width = 200, height = 30) {
+  const box = {
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    width,
+    height,
+  }
+  const read = vi.fn(() => box as DOMRect)
+  handle.getBoundingClientRect = read
+  return read
+}
+
 function escape(): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
   document.dispatchEvent(event)
   return event
 }
 
+const realElementsFromPoint = document.elementsFromPoint
+
 afterEach(() => {
   frames.length = 0
   vi.unstubAllGlobals()
+  document.elementsFromPoint = realElementsFromPoint
   document.body.replaceChildren()
+})
+
+describe('finding a tab group target', () => {
+  function scene() {
+    const h = makeHarness({ grouping: { dwell: 0 } })
+    document.elementsFromPoint = () => {
+      throw new Error('the page is hit-tested')
+    }
+    const target = h.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const moving = h.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    return { h, target, moving }
+  }
+
+  it('finds the window from the manager bounds and measures only its titlebar', () => {
+    const { h, target, moving } = scene()
+    const read = placeTitlebar(target.handle, 400, 400)
+    const seen: string[] = []
+    read.mockImplementation(() => {
+      seen.push(moving.root.style.transform)
+      return { left: 400, top: 400, right: 600, bottom: 430 } as DOMRect
+    })
+
+    moving.handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
+    for (const x of [440, 450, 460]) {
+      moving.handle.dispatchEvent(pointerEvent('pointermove', x, 410))
+      h.flush()
+    }
+    expect(target.root.dataset.wmTabTarget).toBe('')
+    moving.handle.dispatchEvent(pointerEvent('pointerup', 460, 410))
+
+    expect(h.wm.get('moving')?.groupId).toBe(h.wm.get('target')?.groupId)
+    expect(h.wm.get('moving')?.groupId).not.toBeNull()
+    expect(seen).toEqual(['translate3d(10px, 10px, 0)'])
+  })
+
+  it('measures the titlebar again in a new gesture and after the page scrolls', () => {
+    const { h, target, moving } = scene()
+    const read = placeTitlebar(target.handle, 400, 400)
+    dragTo(h, moving.handle, [60, 20], [450, 410])
+    window.dispatchEvent(new Event('scroll'))
+    moving.handle.dispatchEvent(pointerEvent('pointermove', 452, 412))
+    h.flush()
+    moving.handle.dispatchEvent(pointerEvent('pointercancel', 452, 412))
+    dragTo(h, moving.handle, [60, 20], [450, 410])
+    expect(read).toHaveBeenCalledTimes(3)
+  })
+
+  it('never groups through a window that covers the titlebar, nor with a hidden one', () => {
+    const { h, target, moving } = scene()
+    placeTitlebar(target.handle, 400, 400)
+    h.add({ id: 'cover', x: 380, y: 380, width: 300, height: 300 })
+    h.wm.focus('moving')
+    dragTo(h, moving.handle, [60, 20], [450, 410])
+    expect(target.root.dataset.wmTabTarget).toBeUndefined()
+    moving.handle.dispatchEvent(pointerEvent('pointercancel', 450, 410))
+
+    h.wm.minimize('cover')
+    h.wm.open({ id: 'ghost', x: 380, y: 380, width: 300, height: 300 })
+    h.wm.focus('moving')
+    dragTo(h, moving.handle, [60, 20], [450, 410])
+    expect(target.root.dataset.wmTabTarget).toBe('')
+  })
+
+  it('leaves the target alone when the pointer misses its titlebar or it has none', () => {
+    const { h, target, moving } = scene()
+    placeTitlebar(target.handle, 400, 400)
+    dragTo(h, moving.handle, [60, 20], [450, 500])
+    expect(target.root.dataset.wmTabTarget).toBeUndefined()
+    moving.handle.dispatchEvent(pointerEvent('pointercancel', 450, 500))
+
+    const bare = h.add({ id: 'bare', x: 100, y: 300, width: 200, height: 150 }, '<div></div>')
+    h.wm.focus('moving')
+    dragTo(h, moving.handle, [60, 20], [150, 310])
+    expect(bare.root.dataset.wmTabTarget).toBeUndefined()
+    expect(h.element.querySelector('[data-wm-tab-target]')).toBeNull()
+  })
 })
 
 describe('a gesture whose window closes', () => {

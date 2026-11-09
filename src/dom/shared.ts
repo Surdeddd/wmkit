@@ -157,7 +157,7 @@ export interface SessionContext {
   interactiveSelector: string
   magnetThreshold: number
   groupDwell: number
-  groupTarget(clientX: number, clientY: number, selfId: string): string | null
+  groupTarget(clientX: number, clientY: number, selfId: string, local: Point): string | null
   dropAt(clientX: number, clientY: number, id: string, local: Point): DropHit | null
   markGroupTarget(id: string | null): void
   currentDrag(): ActiveDrag | null

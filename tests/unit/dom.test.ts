@@ -97,12 +97,23 @@ function drag(harness: Harness, handle: HTMLElement, from: [number, number], to:
   harness.flushFrames()
 }
 
-const realElementsFromPoint = document.elementsFromPoint
+function placeTitlebar(handle: Element, left: number, top: number, width = 200, height = 30) {
+  handle.getBoundingClientRect = () =>
+    ({
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+      width,
+      height,
+    }) as DOMRect
+}
 
 afterEach(() => {
   frames.length = 0
   vi.unstubAllGlobals()
-  document.elementsFromPoint = realElementsFromPoint
   document.body.replaceChildren()
 })
 
@@ -412,8 +423,7 @@ describe('tab groups in the dom', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    const targetHandle = harness.handleOf('target')
-    document.elementsFromPoint = () => [targetHandle]
+    placeTitlebar(harness.handleOf('target'), 400, 400)
 
     handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
     handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
@@ -434,7 +444,7 @@ describe('tab groups in the dom', () => {
     const harness = makeHarness({ magnetism: false, snap: false })
     harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    document.elementsFromPoint = () => [harness.handleOf('target')]
+    placeTitlebar(harness.handleOf('target'), 400, 400)
 
     drag(harness, handle, [60, 20], [450, 410])
     handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
@@ -447,13 +457,12 @@ describe('tab groups in the dom', () => {
       const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 200 } })
       harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
       const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-      document.elementsFromPoint = () => [harness.handleOf('target')]
+      placeTitlebar(harness.handleOf('target'), 400, 400)
 
       handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
       handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
       harness.flushFrames()
 
-      document.elementsFromPoint = () => []
       handle.dispatchEvent(pointerEvent('pointermove', 200, 300))
       harness.flushFrames()
       vi.advanceTimersByTime(1000)
@@ -509,7 +518,7 @@ describe('tab groups in the dom', () => {
       const harness = makeHarness({ magnetism: false, snap: false, grouping: false })
       harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
       const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-      document.elementsFromPoint = () => [harness.handleOf('target')]
+      placeTitlebar(harness.handleOf('target'), 400, 400)
 
       drag(harness, handle, [60, 20], [450, 410])
       vi.advanceTimersByTime(1000)
@@ -528,7 +537,7 @@ describe('tab groups in the dom', () => {
       const harness = makeHarness({ magnetism: false, snap: false })
       harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
       const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-      document.elementsFromPoint = () => [harness.handleOf('target')]
+      placeTitlebar(harness.handleOf('target'), 400, 400)
 
       drag(harness, handle, [60, 20], [450, 410])
       expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
@@ -549,11 +558,11 @@ describe('tab groups in the dom', () => {
     vi.useFakeTimers()
     try {
       const harness = makeHarness({ magnetism: false })
-      harness.add({ id: 'target', x: 0, y: 0, width: 200, height: 150 })
+      harness.add({ id: 'target', x: 0, y: 150, width: 200, height: 150 })
       const { handle } = harness.add({ id: 'moving', x: 300, y: 300, width: 200, height: 150 })
-      document.elementsFromPoint = () => [harness.handleOf('target')]
+      placeTitlebar(harness.handleOf('target'), 0, 150)
 
-      drag(harness, handle, [350, 310], [4, 200])
+      drag(harness, handle, [350, 310], [4, 160])
       const preview = harness.element.querySelector<HTMLElement>('[data-wm-snap-preview]')
       expect(preview?.style.display).toBe('block')
 
@@ -561,7 +570,7 @@ describe('tab groups in the dom', () => {
       expect(preview?.style.display).toBe('none')
       expect(harness.element.querySelector('[data-wm-tab-target]')).not.toBeNull()
 
-      handle.dispatchEvent(pointerEvent('pointerup', 4, 200))
+      handle.dispatchEvent(pointerEvent('pointerup', 4, 160))
       expect(harness.wm.get('moving')?.stage).toBe('normal')
       expect(harness.wm.get('moving')?.groupId).toBeTruthy()
     } finally {
@@ -569,24 +578,24 @@ describe('tab groups in the dom', () => {
     }
   })
 
-  it('ignores a hit test result that is not this desktop window element', () => {
+  it('looks past a window that is not attached to this desktop', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    const stale = harness.handleOf('target').closest('[data-wm-window]') as HTMLElement
-    const clone = stale.cloneNode(true) as HTMLElement
-    document.elementsFromPoint = () => [clone.querySelector('[data-wm-drag]') as HTMLElement]
+    placeTitlebar(harness.handleOf('target'), 400, 400)
+    harness.wm.open({ id: 'elsewhere', x: 400, y: 400, width: 200, height: 150 })
+    harness.wm.focus('moving')
 
     drag(harness, handle, [60, 20], [450, 410])
     handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
-    expect(harness.wm.get('moving')?.groupId).toBeNull()
+    expect(harness.wm.get('moving')?.groupId).toBe(harness.wm.get('target')?.groupId)
   })
 
   it('clears the target flag when the marked window detaches mid drag', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     const target = harness.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    document.elementsFromPoint = () => [harness.handleOf('target')]
+    placeTitlebar(harness.handleOf('target'), 400, 400)
 
     drag(harness, handle, [60, 20], [450, 410])
     expect(target.root.dataset.wmTabTarget).toBe('')
@@ -2512,20 +2521,7 @@ describe('windows built inside a shadow root', () => {
       '<header data-wm-drag><span data-wm-title></span></header>',
     )
     const root = host.shadowRoot as ShadowRoot
-    const inner = root.querySelector('[data-wm-drag]') as HTMLElement
-    // the handle is found by geometry inside the root, so give it one
-    inner.getBoundingClientRect = () =>
-      ({
-        left: 400,
-        top: 400,
-        right: 600,
-        bottom: 440,
-        x: 400,
-        y: 400,
-        width: 200,
-        height: 40,
-      }) as DOMRect
-    document.elementsFromPoint = () => [host]
+    placeTitlebar(root.querySelector('[data-wm-drag]') as HTMLElement, 400, 400, 200, 40)
 
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
     handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
@@ -2538,14 +2534,14 @@ describe('windows built inside a shadow root', () => {
     expect(harness.wm.get('moving')?.groupId).toBeTruthy()
   })
 
-  it('gives up on a shadow root that cannot answer where a point lands', () => {
+  it('leaves a shadow window alone when the pointer misses its titlebar', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     const host = shadowWindow(
       harness,
       { id: 'target', x: 400, y: 400, width: 200, height: 150 },
       '<header data-wm-drag></header>',
     )
-    document.elementsFromPoint = () => [host]
+    placeTitlebar(host.shadowRoot?.querySelector('[data-wm-drag]') as HTMLElement, 400, 500)
 
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
     drag(harness, handle, [60, 20], [450, 410])
@@ -2553,28 +2549,12 @@ describe('windows built inside a shadow root', () => {
     expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
   })
 
-  it('gives up on a shadow root that keeps answering with its own host', () => {
-    const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
-    const host = shadowWindow(
-      harness,
-      { id: 'target', x: 400, y: 400, width: 200, height: 150 },
-      '<header data-wm-drag></header>',
-    )
-    Object.assign(host.shadowRoot as ShadowRoot, { elementFromPoint: () => host })
-    document.elementsFromPoint = () => [host]
-
-    const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
-    drag(harness, handle, [60, 20], [450, 410])
-
-    expect(harness.element.querySelector('[data-wm-tab-target]')).toBeNull()
-  })
-
-  it('ignores a hit that belongs to no window at all', () => {
+  it('ignores a titlebar that belongs to no window at all', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     const stray = document.createElement('div')
     stray.dataset.wmDrag = ''
     document.body.append(stray)
-    document.elementsFromPoint = () => [stray]
+    placeTitlebar(stray, 400, 400)
 
     const { handle } = harness.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
     drag(harness, handle, [60, 20], [450, 410])
@@ -2713,10 +2693,9 @@ describe('drag robustness', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     const c = harness.add({ id: 'c', x: 300, y: 300, width: 200, height: 150 })
     const b = harness.add({ id: 'b', x: 250, y: 250, width: 300, height: 300 })
-    const body = document.createElement('div')
-    b.root.append(body)
+    placeTitlebar(b.handle, 250, 250)
+    placeTitlebar(c.handle, 300, 300)
     const a = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
-    document.elementsFromPoint = () => [a.handle, a.root, body, b.root, c.handle, c.root]
 
     a.handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
     a.handle.dispatchEvent(pointerEvent('pointermove', 350, 310))
@@ -2732,8 +2711,8 @@ describe('drag robustness', () => {
   it('still groups with the topmost window when its titlebar is under the pointer', () => {
     const harness = makeHarness({ magnetism: false, snap: false, grouping: { dwell: 0 } })
     const b = harness.add({ id: 'b', x: 250, y: 250, width: 300, height: 300 })
+    placeTitlebar(b.handle, 250, 250, 300)
     const a = harness.add({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
-    document.elementsFromPoint = () => [a.handle, a.root, b.handle, b.root]
 
     a.handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
     a.handle.dispatchEvent(pointerEvent('pointermove', 350, 260))
