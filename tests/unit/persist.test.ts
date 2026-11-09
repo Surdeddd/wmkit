@@ -324,3 +324,116 @@ describe('persist', () => {
     expect(() => vi.advanceTimersByTime(1000)).not.toThrow()
   })
 })
+
+describe('persist errors', () => {
+  function seeded(version: number): ReturnType<typeof memoryStorage> {
+    const donor = makeWm()
+    donor.open({ id: 'a' })
+    const storage = memoryStorage()
+    storage.setItem('wmkit', JSON.stringify({ version, state: donor.serialize() }))
+    return storage
+  }
+
+  it('hands a failing migration to onError instead of throwing out of persist()', () => {
+    const errors: Array<[unknown, string]> = []
+    const broken = new Error('bad migration')
+    const wm = makeWm()
+    const controller = persist(wm, {
+      storage: seeded(1),
+      version: 2,
+      migrate: () => {
+        throw broken
+      },
+      onError: (error, phase) => errors.push([error, phase]),
+    })
+    expect(errors).toEqual([[broken, 'migrate']])
+    expect(wm.get('a')).toBeUndefined()
+    expect(controller.restore()).toBe(false)
+    expect(errors).toHaveLength(2)
+  })
+
+  it('reports a state it cannot serialize and saves again once the value is gone', () => {
+    const errors: Array<[unknown, string]> = []
+    const wm = makeWm()
+    const storage = memoryStorage()
+    persist(wm, { storage, debounce: 10, onError: (error, phase) => errors.push([error, phase]) })
+    const loop: Record<string, unknown> = {}
+    loop.self = loop
+    wm.open({ id: 'a', meta: { loop } })
+    vi.advanceTimersByTime(10)
+    expect(storage.data.size).toBe(0)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]?.[0]).toBeInstanceOf(TypeError)
+    expect(errors[0]?.[1]).toBe('save')
+
+    wm.update('a', { meta: { loop: null } })
+    vi.advanceTimersByTime(10)
+    expect(storage.data.has('wmkit')).toBe(true)
+    expect(errors).toHaveLength(1)
+  })
+
+  it('reports storage that refuses a read, a write or a removal', () => {
+    const phases: string[] = []
+    const refused = new Error('denied')
+    const storage: PersistStorage = {
+      getItem: () => {
+        throw refused
+      },
+      setItem: () => {
+        throw refused
+      },
+      removeItem: () => {
+        throw refused
+      },
+    }
+    const controller = persist(makeWm(), { storage, onError: (_, phase) => phases.push(phase) })
+    controller.save()
+    controller.clear()
+    expect(phases).toEqual(['load', 'save', 'save'])
+  })
+
+  it('reports a payload that is not JSON', () => {
+    const storage = memoryStorage()
+    storage.setItem('wmkit', '{"version":')
+    const onError = vi.fn()
+    expect(persist(makeWm(), { storage, onError }).restore()).toBe(false)
+    expect(onError).toHaveBeenCalledTimes(2)
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(SyntaxError)
+    expect(onError.mock.calls[0]?.[1]).toBe('load')
+  })
+
+  it('stays quiet about storage that simply holds nothing', () => {
+    const onError = vi.fn()
+    expect(persist(makeWm(), { storage: memoryStorage(), onError }).restore()).toBe(false)
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('falls back to reportError so a failure is never silent', () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (error: unknown) => reported.push(error))
+    const broken = new Error('bad migration')
+    expect(() =>
+      persist(makeWm(), {
+        storage: seeded(1),
+        version: 2,
+        migrate: () => {
+          throw broken
+        },
+      }),
+    ).not.toThrow()
+    expect(reported).toEqual([broken])
+  })
+
+  it('stays out of the way where there is no reportError', () => {
+    vi.stubGlobal('reportError', undefined)
+    expect(() =>
+      persist(makeWm(), {
+        storage: seeded(1),
+        version: 2,
+        migrate: () => {
+          throw new Error('bad migration')
+        },
+      }),
+    ).not.toThrow()
+  })
+})

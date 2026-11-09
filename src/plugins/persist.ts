@@ -13,6 +13,7 @@ export interface PersistOptions {
   autoRestore?: boolean
   version?: number
   migrate?: (state: unknown, from: number) => SerializedState | null
+  onError?: (error: unknown, phase: 'load' | 'migrate' | 'save') => void
 }
 
 interface PersistEnvelope {
@@ -50,6 +51,7 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   const storage = options.storage ?? defaultStorage()
   const debounce = options.debounce ?? 150
   const version = options.version ?? 0
+  const report = options.onError ?? ((error: unknown) => globalThis.reportError?.(error))
   let timer: ReturnType<typeof setTimeout> | undefined
   let suspended = false
 
@@ -57,30 +59,30 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     if (!storage) return
     try {
       storage.setItem(key, JSON.stringify({ version, state: wm.serialize() }))
-    } catch {}
+    } catch (error) {
+      report(error, 'save')
+    }
   }
 
   function restore(): boolean {
     if (!storage) return false
-    let raw: string | null = null
+    let phase: 'load' | 'migrate' = 'load'
+    let data: SerializedState | null
+    let stale: boolean
     try {
-      raw = storage.getItem(key)
-    } catch {
+      const raw = storage.getItem(key)
+      if (!raw) return false
+      const envelope = unwrap(JSON.parse(raw))
+      if (!envelope) return false
+      data = envelope.state
+      stale = envelope.version !== version
+      if (stale) {
+        phase = 'migrate'
+        data = options.migrate ? options.migrate(envelope.state, envelope.version) : null
+      }
+    } catch (error) {
+      report(error, phase)
       return false
-    }
-    if (!raw) return false
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      return false
-    }
-    const envelope = unwrap(parsed)
-    if (!envelope) return false
-    let data: SerializedState | null = envelope.state
-    const stale = envelope.version !== version
-    if (stale) {
-      data = options.migrate ? options.migrate(envelope.state, envelope.version) : null
     }
     if (!data) return false
     suspended = true
@@ -110,7 +112,9 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     if (!storage) return
     try {
       storage.removeItem(key)
-    } catch {}
+    } catch (error) {
+      report(error, 'save')
+    }
   }
 
   const unsubscribe = wm.subscribe(() => {
