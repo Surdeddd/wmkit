@@ -208,7 +208,7 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     }
   }
   const gone = new Set<string>()
-  let sweeping = false
+  let reacting = false
   wm.on('open', ({ window: win }) => {
     if (!replaying) gone.delete(win.id)
   })
@@ -262,16 +262,14 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     sync() {
       const state = wm.getState()
       const ghosts = state.order.filter((id) => gone.has(id))
-      if (ghosts.length > 0 && !sweeping) {
-        sweeping = true
+      const handOff = hiddenBox(state.focusedId)
+      if ((ghosts.length > 0 || handOff) && !reacting) {
+        reacting = true
         wm.beginInteraction()
         for (const id of ghosts) wm.close(id)
+        if (hiddenBox(wm.getState().focusedId)) wm.cycleFocus(-1)
         wm.abortInteraction()
-        sweeping = false
-        return
-      }
-      if (!replaying && hiddenBox(state.focusedId)) {
-        wm.cycleFocus(-1)
+        reacting = false
         return
       }
       for (const win of Object.values(state.windows)) mirror(win)

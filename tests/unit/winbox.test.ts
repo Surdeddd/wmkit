@@ -448,12 +448,38 @@ describe('hidden windows', () => {
     b.hide()
     expect(wm.getState().focusedId).toBeNull()
     expect(wm.undo()).toBe(true)
-    expect(wm.getState().focusedId).toBe('ub')
+    expect(wm.getState().focusedId).toBe('ua')
+    expect(b.hasClass('focus')).toBe(false)
+    expect(wm.canRedo()).toBe(true)
     expect(wm.redo()).toBe(true)
     expect(wm.getState().focusedId).toBeNull()
     expect(wm.undo()).toBe(true)
     expect(wm.undo()).toBe(true)
     expect(wm.getState().focusedId).toBe('ua')
+  })
+
+  it('pass focus on without a step of their own, so a later resize keeps redo', () => {
+    box('A', { id: 'va' })
+    const b = box('B', { id: 'vb' })
+    const wm = WinBox.manager(root)
+    b.hide()
+    wm.undo()
+    expect(wm.canRedo()).toBe(true)
+    wm.setViewport({ width: 900, height: 700 })
+    expect(wm.canRedo()).toBe(true)
+    const steps = (() => {
+      let count = 0
+      while (wm.undo()) count += 1
+      return count
+    })()
+    while (wm.redo()) {}
+    expect(wm.getState().focusedId).toBeNull()
+    wm.focus('vb')
+    expect(wm.getState().focusedId).not.toBe('vb')
+    expect(wm.undo()).toBe(true)
+    let again = 0
+    while (wm.undo()) again += 1
+    expect(again).toBe(steps)
   })
 
   it('leave nothing focused when every window is hidden', () => {
