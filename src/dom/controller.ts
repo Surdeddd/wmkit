@@ -361,9 +361,11 @@ export function attachDesktop(
     const applyViewport = () =>
       wm.setViewport({ width: element.clientWidth, height: element.clientHeight })
     applyViewport()
-    const observer = new view.ResizeObserver(applyViewport)
-    observer.observe(element)
-    cleanup.push(() => observer.disconnect())
+    if (view.ResizeObserver) {
+      const observer = new view.ResizeObserver(applyViewport)
+      observer.observe(element)
+      cleanup.push(() => observer.disconnect())
+    }
   }
 
   function rescue(el: HTMLElement): void {
