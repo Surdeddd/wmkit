@@ -191,6 +191,35 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     },
   })
 
+  const hiddenBox = (id: string | null) => id !== null && boxes.get(id)?.hidden === true
+  let replaying = false
+  for (const name of ['undo', 'redo'] as const) {
+    const run = wm[name]
+    wm[name] = () => {
+      replaying = true
+      try {
+        return run()
+      } finally {
+        replaying = false
+      }
+    }
+  }
+  const cycle = wm.cycleFocus
+  wm.cycleFocus = (direction) => {
+    let id: string | null = null
+    wm.batch(() => {
+      id = cycle(direction)
+      for (let left = wm.getState().order.length; hiddenBox(id) && left > 0; left -= 1) {
+        id = cycle(direction)
+      }
+      if (hiddenBox(id)) {
+        wm.blur()
+        id = null
+      }
+    })
+    return id
+  }
+
   const seen = new Map<string, WindowState>()
   const mirror = (win: WindowState) => {
     const box = boxes.get(win.id)
@@ -222,6 +251,10 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     insets,
     sync() {
       const state = wm.getState()
+      if (!replaying && hiddenBox(state.focusedId)) {
+        wm.cycleFocus(-1)
+        return
+      }
       for (const win of Object.values(state.windows)) mirror(win)
       if (state.focusedId !== focused) {
         const previous = focused === null ? undefined : boxes.get(focused)
@@ -390,6 +423,14 @@ export class WinBox {
         const header = part('wb-header')
         header.dataset.wmDrag = ''
         const control = part('wb-control')
+        control.addEventListener('keydown', (event) => {
+          const target = event.target as HTMLElement
+          if (target.parentElement !== control || (event.key !== 'Enter' && event.key !== ' ')) {
+            return
+          }
+          event.preventDefault()
+          target.click()
+        })
         for (const [name, action, label] of [
           ['wb-min', 'wmMinimize', messages.minimize],
           ['wb-max', 'wmMaximize', messages.maximize],
@@ -398,6 +439,7 @@ export class WinBox {
         ] as const) {
           const button = part(name, 'span')
           button.setAttribute('role', 'button')
+          button.tabIndex = 0
           button.setAttribute('aria-label', label)
           if (action) button.dataset[action] = ''
           else button.addEventListener('click', () => this.fullscreen(!this.full))
@@ -695,6 +737,7 @@ export class WinBox {
     const button = this.window.ownerDocument.createElement('span')
     button.className = control.class
     button.setAttribute('role', 'button')
+    button.tabIndex = 0
     if (control.image) button.style.backgroundImage = `url(${JSON.stringify(control.image)})`
     const click = control.click
     if (click) button.addEventListener('click', (event) => click.call(this, event, this))

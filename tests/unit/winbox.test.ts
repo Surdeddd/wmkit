@@ -349,6 +349,125 @@ describe('following the manager', () => {
   })
 })
 
+describe('keyboard', () => {
+  function press(target: Element, key: string): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  }
+
+  it('puts every control button in the tab order and presses it with Enter or Space', () => {
+    const made = box('Keys')
+    const controls = [...(made.window.querySelector('.wb-control')?.children ?? [])]
+    expect(controls.map((node) => (node as HTMLElement).tabIndex)).toEqual([0, 0, 0, 0])
+
+    const max = made.window.querySelector('.wb-max') as HTMLElement
+    expect(press(max, 'Enter').defaultPrevented).toBe(true)
+    expect(made.max).toBe(true)
+    expect(press(max, ' ').defaultPrevented).toBe(true)
+    expect(made.max).toBe(false)
+    expect(press(max, 'a').defaultPrevented).toBe(false)
+    expect(
+      press(made.window.querySelector('.wb-control') as Element, 'Enter').defaultPrevented,
+    ).toBe(false)
+    press(made.window.querySelector('.wb-min') as Element, 'Enter')
+    expect(made.min).toBe(true)
+  })
+
+  it('does the same for a control added later', () => {
+    const made = box('Custom')
+    const click = vi.fn()
+    made.addControl({ class: 'wb-pin', click })
+    const pin = made.window.querySelector('.wb-pin') as HTMLElement
+    expect(pin.tabIndex).toBe(0)
+    press(pin, ' ')
+    expect(click).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes from the keyboard after asking onclose', () => {
+    let allow = false
+    const made = box('Close', { onclose: () => !allow })
+    const close = made.window.querySelector('.wb-close') as HTMLElement
+    press(close, 'Enter')
+    expect(WinBox.manager(root).get(made.id)).toBeDefined()
+    allow = true
+    press(close, 'Enter')
+    expect(WinBox.manager(root).get(made.id)).toBeUndefined()
+  })
+})
+
+describe('hidden windows', () => {
+  it('drop out of the focus cycle in both directions and come back when shown', () => {
+    const a = box('A', { id: 'ha' })
+    const b = box('B', { id: 'hb' })
+    const c = box('C', { id: 'hc' })
+    const wm = WinBox.manager(root)
+    b.hide()
+    const forward: Array<string | null> = []
+    const backward: Array<string | null> = []
+    for (let i = 0; i < 6; i += 1) forward.push(wm.cycleFocus(1))
+    for (let i = 0; i < 6; i += 1) backward.push(wm.cycleFocus(-1))
+    expect(forward).not.toContain('hb')
+    expect(backward).not.toContain('hb')
+    expect(new Set(forward)).toEqual(new Set(['ha', 'hc']))
+    expect(new Set(backward)).toEqual(new Set(['ha', 'hc']))
+    expect(b.hasClass('focus')).toBe(false)
+
+    b.show()
+    const again = new Set<string | null>()
+    for (let i = 0; i < 6; i += 1) again.add(wm.cycleFocus(1))
+    expect(again).toEqual(new Set(['ha', 'hb', 'hc']))
+    expect([a.hidden, c.hidden]).toEqual([false, false])
+  })
+
+  it('pass focus on to a visible window when the manager or the app picks a hidden one', () => {
+    const a = box('A', { id: 'pa' })
+    const b = box('B', { id: 'pb' })
+    const c = box('C', { id: 'pc' })
+    const wm = WinBox.manager(root)
+    b.focus()
+    a.focus()
+    b.hide()
+    c.focus()
+    expect(wm.getState().order.at(-1)).toBe('pc')
+    wm.focus('pb')
+    expect(wm.getState().focusedId).toBe('pc')
+    b.focus()
+    expect(wm.getState().focusedId).toBe('pc')
+    c.close()
+    expect(wm.getState().focusedId).toBe('pa')
+    expect(a.hasClass('focus')).toBe(true)
+    expect(b.hasClass('focus')).toBe(false)
+  })
+
+  it('let undo and redo walk through a focus that sat on a window hidden since', () => {
+    box('A', { id: 'ua' })
+    const b = box('B', { id: 'ub' })
+    const wm = WinBox.manager(root)
+    b.hide()
+    expect(wm.getState().focusedId).toBeNull()
+    expect(wm.undo()).toBe(true)
+    expect(wm.getState().focusedId).toBe('ub')
+    expect(wm.redo()).toBe(true)
+    expect(wm.getState().focusedId).toBeNull()
+    expect(wm.undo()).toBe(true)
+    expect(wm.undo()).toBe(true)
+    expect(wm.getState().focusedId).toBe('ua')
+  })
+
+  it('leave nothing focused when every window is hidden', () => {
+    const a = box('A')
+    const b = box('B')
+    const wm = WinBox.manager(root)
+    a.hide()
+    b.hide()
+    expect(wm.cycleFocus(1)).toBeNull()
+    expect(wm.getState().focusedId).toBeNull()
+    a.focus()
+    expect(wm.getState().focusedId).toBeNull()
+  })
+})
+
 describe('methods and properties', () => {
   it('moves, resizes and renames through properties and chained calls', () => {
     const made = box('Props')
