@@ -75,6 +75,9 @@ export function createDragStarter(ctx: SessionContext) {
     }
 
     const el = ctx.windowElement(id)
+    const frame: Bounds = { x: 0, y: 0, width: 0, height: 0 }
+    const probe: Bounds = { ...frame }
+    const targets: Bounds[] = [frame]
 
     function armGroup(target: string): void {
       session.groupTarget = target
@@ -126,9 +129,9 @@ export function createDragStarter(ctx: SessionContext) {
       let nextY = session.pendingY - session.grabDY
       if (ctx.magnetThreshold > 0) {
         const state = wm.getState()
-        const targets: Bounds[] = [
-          { x: 0, y: 0, width: state.viewport.width, height: state.viewport.height },
-        ]
+        frame.width = state.viewport.width
+        frame.height = state.viewport.height
+        targets.length = 1
         for (const otherId of state.order) {
           if (otherId === id) continue
           const other = state.windows[otherId]
@@ -136,11 +139,11 @@ export function createDragStarter(ctx: SessionContext) {
           if (other.groupId !== null && state.groups[other.groupId]?.activeId !== otherId) continue
           targets.push(other.bounds)
         }
-        const magnet = magnetize(
-          { x: nextX, y: nextY, width: current.bounds.width, height: current.bounds.height },
-          targets,
-          ctx.magnetThreshold,
-        )
+        probe.x = nextX
+        probe.y = nextY
+        probe.width = current.bounds.width
+        probe.height = current.bounds.height
+        const magnet = magnetize(probe, targets, ctx.magnetThreshold)
         nextX = magnet.x
         nextY = magnet.y
       }
