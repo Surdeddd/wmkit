@@ -100,7 +100,7 @@ const store = persist(wm, {
 })
 ```
 
-By default the plugin auto-restores on creation (`autoRestore: false` above leaves that to you, for a reason given below), then debounce-saves on every change, and under a steady stream of changes it still saves at least every `maxWait` ms (2000 by default); a pending save is flushed on `pagehide` and on `destroy()`, and `clear()` also cancels a pending save. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
+By default the plugin auto-restores on creation (`autoRestore: false` above leaves that to you, for a reason given below), then debounce-saves on every change, and under a steady stream of changes it still saves at least every `maxWait` ms (2000, or `debounce` when that is longer); a pending save is flushed on `pagehide` and on `destroy()`, and `clear()` also cancels a pending save. Payloads are wrapped as `{ version, state }`; a payload from another version goes through `migrate`, and returning `null` discards it instead of restoring something broken. A successful migration is written back immediately.
 
 Restoring what you rendered is the other half — `hydrate` emits `open` for every window that appeared, so mounting can be driven entirely by events. Register the listener before the restore happens: with the default `autoRestore`, `persist` hydrates on creation before your listener exists, and a second `restore()` of identical data emits nothing:
 
@@ -113,7 +113,7 @@ store.restore()
 
 Bounds are re-derived against the current viewport during `hydrate`, so a desktop saved on a 27-inch monitor and restored on a laptop comes back on-screen: maximized windows refill, snapped windows re-snap, and normal windows are clamped so their titlebars stay reachable. A window damaged in storage is repaired rather than costing you the whole layout ([what gets repaired](api.md#serializedstate)).
 
-Nothing in the plugin throws: a storage that fails to read or write, a payload that is not JSON and a `migrate` that throws are reported instead. Send them to your own logging with `onError`; without it they go to `reportError`, which shows them in the console like an uncaught error:
+Nothing in the plugin throws: a storage that fails to read or write, a payload that is not JSON and a `migrate` that throws are reported instead. Send them to your own logging with `onError`; without it the first failure goes to `reportError`, which shows it in the console like an uncaught error, and the next ones stay quiet until a save or load succeeds again:
 
 ```js
 persist(wm, {

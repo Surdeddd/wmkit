@@ -148,7 +148,7 @@ interface SerializedState {
 
 - a position that is not finite takes the cascade position; a width or height that is not finite or not above 0 takes `defaultSize`
 - the size is clamped into the window's own limits; an invalid minimum axis takes its default (160 or 100), an invalid maximum axis becomes unbounded
-- a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is clamped into the unit square, or dropped when nothing of it lies inside
+- a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is clamped into the unit square, or dropped when `snapTo` would refuse it
 - `stage: 'snapped'` with neither a known `snapZone` nor a `snapRect` becomes `'normal'`
 - an `openedSeq` that is not finite gets a new one, and any other unknown per-window field takes its default
 
@@ -210,7 +210,7 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 | `snap(id, zone)` | `boolean` | zone geometry, clamped to the window's own min/max; `false` for an unknown zone |
 | `snapTo(id, rect)` | `boolean` | snaps to any rectangle given in viewport fractions (`{ x: 0.5, y: 0, width: 0.5, height: 1 }` is the right half); it follows viewport changes like a zone does, and the first drag frame tears the window out. Unlike `snap` it neither focuses nor raises the window. The dock plugin is built on it |
 
-`snapTo` clamps its rectangle into the unit square: `{ x: -1, y: 0.5, width: 3, height: 3 }` is stored as `{ x: 0, y: 0.5, width: 1, height: 0.5 }`. It returns `false` when a value is not finite or nothing of the rectangle lies inside the square.
+`snapTo` clamps its rectangle into the unit square: `{ x: 0.5, y: 0.5, width: 3, height: 3 }` is stored as `{ x: 0.5, y: 0.5, width: 0.5, height: 0.5 }`. It returns `false` for a value that is not finite, a negative width or height, or an origin outside the unit square. An empty rectangle whose origin lies inside is accepted, and the window takes its minimum size.
 
 `maximize`, `snap`, `restore`, `restoreTo`, `group` and `ungroup` focus the window the way `focus()` does: they switch to its workspace first, even when a modal is up on the current workspace. When a modal blocks the window they skip the focus silently and do not emit `modalblocked`, which means a blocked `focus()` call.
 
@@ -222,12 +222,12 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 | `moveBy(id, dx, dy)` | `boolean` | relative `move` |
 | `center(id)` | `boolean` | centres a `normal` window in the viewport; `false` while the viewport is unknown |
 | `resize(id, patch)` | `boolean` | `Partial<Bounds>`; `false` while the window is maximized or minimized. Unsnaps a snapped window, unless its bounds do not actually change; honours `aspectRatio`, driven by the axis that changed most |
-| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). Changing the constraints of a snapped window re-derives its zone. See below for what it refuses and what counts as a change |
+| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). A patch that sets the values the window already has is a no-op: same object, no events, no history entry. Primitives compare by value; a new `meta`, `minSize` or `maxSize` object always counts as a change. Changing the constraints of a snapped window re-derives its zone |
 | `setViewport(size)` | `void` | re-derives maximized and snapped bounds, clamps the rest; never recorded in history; a size with a dimension that is not finite and above 0 (a hidden desktop, for one) is ignored and the last known viewport stays |
 
 A number that is not finite never enters the state: `move`, `moveBy`, `resize`, `restoreTo` and `snapTo` given `NaN` or `Infinity` change nothing and return `false`. A partial patch keeps what it does not name, so `wm.resize(id, { width: 400, height: undefined })` keeps the height, and so does `height: null`. Sizes never go below 1 px, whatever the minimum says.
 
-`update(id, patch)` returns `false` and changes nothing for an impossible limit — a `minSize` axis that is negative, not finite or missing, a `maxSize` axis that is not above 0 or missing (`Infinity` is fine) — or for an unknown layer. It stores copies of `minSize` and `maxSize`, so mutating the object you passed changes nothing later. A patch that leaves the window equal to what it was is a no-op: same object, no events, no history entry. Values are compared, not objects: `update(id, { meta: { n: 1 } })` on a window whose `meta` already equals `{ n: 1 }` changes nothing, while a value nested inside `meta` compares by identity.
+`update(id, patch)` returns `false` and changes nothing for an impossible limit — a `minSize` axis that is negative, not finite or missing, a `maxSize` axis that is not above 0 or missing (`Infinity` is fine) — or for an unknown layer. It stores copies of `minSize` and `maxSize`, so mutating the object you passed changes nothing later.
 
 ### Workspaces
 
@@ -308,7 +308,7 @@ The `group` event fires on creation, activation and membership changes, includin
 | `beginInteraction()` / `endInteraction()` | `void` | collapse a gesture into one entry; nestable. An interaction whose state ends equal to how it started leaves no entry, and the redo stack survives it |
 | `abortInteraction()` | `void` | at the outermost level, ends the interaction and drops the entry it created — for cancelled gestures. The changes made inside stay in the state and do not become a step of their own, so roll them back before aborting (the controller does on Escape). Inside a nested interaction it only leaves the inner level, and the outer interaction keeps its single entry |
 
-Steps that change only focus and stacking order collapse when they follow each other: three clicks on other windows after a move leave two undo steps, the move and one focus step.
+Steps that change only focus and stacking order collapse when they follow each other: three clicks on other windows after a move leave two undo steps, the move and one focus step. A collapsed step that ends where it started disappears, so an `undo()` that returns `true` always changes something.
 
 `hydrate()` and `loadLayout()` clear the history: you cannot undo across a restore. `undo()` and `redo()` called inside a `batch` or an interaction behave as if the batch or the interaction had ended just before the call and started again right after it, so the rest of a gesture becomes a new step.
 
@@ -321,10 +321,10 @@ Steps that change only focus and stacking order collapse when they follow each o
 | `getLayout(name)` | `SerializedState \| undefined` | isolated copy |
 | `setLayout(name, data)` | `boolean` | validates like `hydrate` |
 | `deleteLayout(name)` / `layoutNames()` | `boolean` / `string[]` | |
-| `arrange(mode)` | `void` | `'cascade'` staggers from `cascadeOrigin`; `'tile'` fills a `ceil(sqrt(n))` grid. Both skip minimized windows, other workspaces and windows snapped to an explicit rectangle (`snapTo`, docked panels); see below |
+| `arrange(mode)` | `void` | `'cascade'` staggers from `cascadeOrigin`; `'tile'` fills a `ceil(sqrt(n))` grid. Both skip minimized windows and other workspaces, and leave a window placed with `snapTo` where it is; see below |
 | `minimizeAll()` / `restoreAll()` | `void` | active workspace, one history entry. `minimizeAll` skips windows with `minimizable: false`; `restoreAll` emits at most one `order` |
 
-`arrange` emits `move` and `resize` for each window it places, raises the arranged windows once and focuses the last of them, or the top modal when one is up; calling it again with nothing changed is a no-op. `arrange`, `minimizeAll`, `restoreAll` and `closeAll` take time linear in the number of windows when no tab groups are involved.
+A window placed with `snapTo` stays where it is, whoever placed it — the dock plugin or your own layout code; `restore()` it first to have it arranged. `arrange` emits `move` and `resize` for each window it places, raises the arranged windows once and focuses the last of them, or the top modal when one is up; calling it again with nothing changed is a no-op. `arrange`, `minimizeAll`, `restoreAll` and `closeAll` take time linear in the number of windows when no tab groups are involved.
 
 Layout storage is in-memory. Persist it yourself with `getLayout`/`setLayout`, or use the persist plugin for the live desktop. Layouts are copied with `structuredClone`, so cyclic values, `Date`s and `Infinity` in `meta` or in an extension survive. A value that cannot be cloned, such as a function, makes the copy go through JSON instead: functions are dropped, `Date`s become strings and `Infinity` becomes `null`.
 
@@ -421,7 +421,19 @@ interface DesktopOptions {
 
 The nested option objects are exported as types: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `StackingOptions` and `AnimationOptions`.
 
-`beforeClose` is asked whenever the user closes a window: by a `data-wm-close` button, through `desktop.actions(id).close()` and through the close action a skin receives. A direct `wm.close(id)` does not ask it. Where `ResizeObserver` is missing, `autoViewport` measures the element once at attach and does not follow it afterwards.
+`beforeClose` is asked by everything that closes a window on the user's behalf: a `data-wm-close` button, the close action a skin receives and `desktop.actions(id).close()`. Return `false` to keep the window open. `wm.close(id)` never asks and always closes, so call it to finish after a confirmation of your own:
+
+```js
+attachDesktop(wm, root, {
+  beforeClose: (win) => {
+    if (!win.meta.unsaved) return true
+    askToDiscard(win.title).then((discard) => discard && wm.close(win.id))
+    return false
+  },
+})
+```
+
+Where `ResizeObserver` is missing, `autoViewport` measures the element once at attach and does not follow it afterwards.
 
 ### Gestures
 
@@ -665,7 +677,7 @@ flipFromTarget(source: HTMLElement, target: Element, options?: FlipGhostOptions)
 interface FlipGhostOptions { duration?: number; easing?: string }
 ```
 
-Both flips render a throwaway ghost element and remove it on finish or cancel. They no-op under reduced motion, without `Element.animate`, or when either rect has zero width. `attachDesktop` calls them for you when `minimizeTarget` is set.
+Both flips render a throwaway ghost element and remove it on finish or cancel. They no-op under reduced motion, without `Element.animate`, or when either rect has zero width. `attachDesktop` calls them for you when `minimizeTarget` is set, for every stage change into or out of `minimized`, including those made by undo, redo, `hydrate` and `loadLayout`.
 
 ## Announcer
 
@@ -742,7 +754,7 @@ const chromeMessagesRu: ChromeMessages  // Russian
 
 <span v-pre>Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out (`{` included), so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.</span>
 
-A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, and anything after `<noscript>`.
+A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, and anything after `<noscript>` or `<script>`.
 
 <span v-pre>Inside SVG and MathML the compiler follows the HTML parser's foreign-content rules, and it refuses a template wherever a browser could build a different tree than the compiler expects. It throws for a placeholder after a raw-text element (`textarea`, `style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`) inside SVG. Once the markup holds `<math>`, `<select>`, an HTML tag directly inside `<svg>`, a mismatched end tag, or an `<a>` inside `foreignObject`, `desc` or `title`, it also throws for a placeholder after any later raw-text element, CDATA section or `<title>` with markup in it. `<svg><title>{{title}}</title></svg>`, ordinary inline icons and HTML inside `foreignObject` keep working.</span>
 
@@ -781,7 +793,7 @@ interface PersistOptions {
   key?: string             // 'wmkit'
   storage?: PersistStorage // localStorage, when reading it does not throw
   debounce?: number        // 150 ms
-  maxWait?: number         // 2000 ms; Infinity removes the bound
+  maxWait?: number         // the larger of 2000 ms and debounce; Infinity removes the bound
   autoRestore?: boolean    // true
   version?: number         // 0
   migrate?: (state: unknown, from: number) => SerializedState | null
@@ -814,7 +826,7 @@ Nothing the plugin does throws at you. An absent storage turns it into a no-op, 
 | `'migrate'` | `migrate` threw; `restore()` returns `false` and `persist()` still returns its controller |
 | `'save'` | the state cannot be serialized (a circular value, a `BigInt`) or the storage threw, in `clear()` too |
 
-Without `onError` the error goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
+Without `onError` the first failure of a run goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything; further failures stay quiet until the next success, after which reporting resumes. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
 
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 
