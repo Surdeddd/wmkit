@@ -119,7 +119,7 @@ function placeTitlebar(handle: HTMLElement, left: number, top: number, width = 2
   return read
 }
 
-function escape(): KeyboardEvent {
+function pressEscape(): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
   document.dispatchEvent(event)
   return event
@@ -356,7 +356,7 @@ describe('escape from a drag', () => {
 
     dragTo(h, handle, [400, 10], [420, 60])
     expect(h.wm.get('a')?.stage).toBe('normal')
-    escape()
+    pressEscape()
 
     expect(shape(h)).toEqual(before)
     h.wm.restore('a')
@@ -369,14 +369,14 @@ describe('escape from a drag', () => {
     h.wm.maximize('a')
     let before = shape(h)
     dragTo(h, handle, [400, 10], [420, 60])
-    escape()
+    pressEscape()
     expect(shape(h)).toEqual(before)
 
     h.wm.restore('a')
     h.wm.snap('a', 'left')
     before = shape(h)
     dragTo(h, handle, [100, 10], [420, 260])
-    escape()
+    pressEscape()
     expect(shape(h)).toEqual(before)
   })
 
@@ -413,7 +413,7 @@ describe('escape from a drag', () => {
     handle.dispatchEvent(pointerEvent('pointerdown', 500, 10))
     handle.dispatchEvent(pointerEvent('pointermove', 400, 200))
     for (const frame of frames.splice(0)) frame()
-    escape()
+    pressEscape()
 
     expect(wm.get('b')).toMatchObject({ stage: 'maximized' })
     expect(wm.get('b')?.snapRect).not.toBeNull()
