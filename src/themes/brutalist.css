@@ -65,6 +65,12 @@
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;

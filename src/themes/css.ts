@@ -65,6 +65,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -382,6 +388,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -672,6 +684,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -978,6 +996,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -1281,6 +1305,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -1560,6 +1590,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -1860,6 +1896,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -2139,6 +2181,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -2421,6 +2469,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -2692,6 +2746,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -2961,6 +3021,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 200ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 200ms ease,
+    border-color 200ms ease;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -3254,6 +3320,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -3533,6 +3605,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -4016,6 +4094,12 @@ export const themeCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 [data-wm-window][data-wm-stage="maximized"],
 [data-wm-window][data-wm-stage="snapped"] {
   border-radius: 0;
@@ -4293,6 +4377,12 @@ export const themeCss: Record<ThemeName, string> = {
     border-color 120ms linear;
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-wm-window][data-wm-live] {
+  transition:
+    box-shadow 120ms linear,
+    border-color 120ms linear;
 }
 
 [data-wm-window][data-wm-stage="maximized"],
@@ -4573,6 +4663,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -4877,6 +4973,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -5151,6 +5253,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -5435,6 +5543,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -5724,6 +5838,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -5987,6 +6107,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -6271,6 +6397,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -6534,6 +6666,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -6800,6 +6938,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -7053,6 +7197,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -7304,6 +7454,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 200ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 200ms ease,
+    border-color 200ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -7577,6 +7733,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -7835,6 +7997,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 180ms ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 :host([data-wm-stage="maximized"]),
@@ -8292,6 +8460,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   -webkit-user-select: none;
 }
 
+:host([data-wm-live]) {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
 :host([data-wm-stage="maximized"]),
 :host([data-wm-stage="snapped"]) {
   border-radius: 0;
@@ -8553,6 +8727,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
     border-color 120ms linear;
   user-select: none;
   -webkit-user-select: none;
+}
+
+:host([data-wm-live]) {
+  transition:
+    box-shadow 120ms linear,
+    border-color 120ms linear;
 }
 
 :host([data-wm-stage="maximized"]),
