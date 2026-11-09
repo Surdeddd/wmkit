@@ -614,8 +614,11 @@ export function attachDesktop(
     wm.endInteraction()
   }
 
-  function followFrame(): void {
+  let seen: Element | null = null
+  function followFrame(force?: boolean): void {
     const active = doc.activeElement
+    if (!force && active === seen) return
+    seen = active
     const host = active?.matches(FRAMES) ? windowElementOf(active) : null
     const id = host?.dataset.wmWindow
     if (id && registry.get(id)?.element === host && wm.getState().focusedId !== id && !shielded) {
@@ -623,14 +626,21 @@ export function attachDesktop(
     }
   }
   let frameWatch = 0
+  let hovered: Element | null = null
   const watchFrame = () => {
+    frameWatch = 0
+    if (!(hovered as Element).isConnected) return
     followFrame()
     frameWatch = view.requestAnimationFrame(watchFrame)
   }
   const onPointerOver = (event: Event) => {
-    const over = !!firedOn(event)?.matches(FRAMES)
-    if (over && !frameWatch) frameWatch = view.requestAnimationFrame(watchFrame)
-    else if (!over && frameWatch) {
+    const target = firedOn(event)
+    if (event.type === 'pointerover' && target?.matches(FRAMES)) {
+      if (frameWatch) return
+      hovered = target
+      seen = doc.activeElement
+      frameWatch = view.requestAnimationFrame(watchFrame)
+    } else if (frameWatch) {
       view.cancelAnimationFrame(frameWatch)
       frameWatch = 0
       followFrame()
@@ -638,9 +648,10 @@ export function attachDesktop(
   }
   const onViewBlur = () => {
     letGo()
-    view.setTimeout(followFrame)
+    view.setTimeout(followFrame, 0, true)
   }
   element.addEventListener('pointerover', onPointerOver)
+  element.addEventListener('pointerout', onPointerOver)
   view.addEventListener('blur', onViewBlur)
   const onKeyUp = (event: KeyboardEvent) => {
     if (event.key === heldKey) letGo()
@@ -649,6 +660,7 @@ export function attachDesktop(
   element.addEventListener('focusout', letGo, true)
   cleanup.push(() => {
     element.removeEventListener('pointerover', onPointerOver)
+    element.removeEventListener('pointerout', onPointerOver)
     view.removeEventListener('blur', onViewBlur)
     view.cancelAnimationFrame(frameWatch)
     element.removeEventListener('keyup', onKeyUp, true)

@@ -11,6 +11,10 @@ const VIEWPORT = { width: 800, height: 600 }
 const frames = new Map<number, FrameRequestCallback>()
 let frameSeq = 0
 
+function pointerOn(target: EventTarget, type: string): void {
+  target.dispatchEvent(new MouseEvent(type, { bubbles: true, composed: true }))
+}
+
 function stubFrames(): void {
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     frames.set(++frameSeq, callback)
@@ -316,6 +320,65 @@ describe('tab shortcuts', () => {
     expect(h.wm.get('a')?.stage).toBe('normal')
     press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
     expect(activeTab(h)).toBe('b')
+  })
+})
+
+describe('frames inside windows', () => {
+  const FRAMED = '<header data-wm-drag><span data-wm-title>t</span></header><iframe></iframe>'
+
+  function frameOf(root: HTMLElement, focused = false): HTMLIFrameElement {
+    const frame = root.querySelector('iframe') as HTMLIFrameElement
+    if (focused) {
+      frame.tabIndex = 0
+      frame.focus()
+    }
+    return frame
+  }
+
+  it('stops watching once the pointer leaves the frame, whatever it moves to', () => {
+    const h = makeHarness()
+    const frame = frameOf(h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 }, FRAMED))
+    pointerOn(frame, 'pointerover')
+    expect(frames.size).toBe(1)
+    pointerOn(frame, 'pointerout')
+    expect(frames.size).toBe(0)
+  })
+
+  it('stops watching a frame whose window has left the page', () => {
+    const h = makeHarness()
+    const root = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    pointerOn(frameOf(root), 'pointerover')
+    h.wm.close('a')
+    root.remove()
+    flushFrames()
+    expect(frames.size).toBe(0)
+  })
+
+  it('never takes focus back for a frame that already had it', () => {
+    const h = makeHarness()
+    const frame = frameOf(h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 }, FRAMED), true)
+    pointerOn(frame, 'pointerover')
+    flushFrames()
+
+    h.wm.blur()
+    flushFrames()
+    expect(h.wm.getState().focusedId).toBe(null)
+
+    h.wm.open({ id: 'b', x: 20, y: 20, width: 200, height: 150 })
+    flushFrames()
+    expect(h.wm.getState().focusedId).toBe('b')
+    expect(h.wm.getState().order.at(-1)).toBe('b')
+  })
+
+  it('still focuses the window of a frame that takes focus under the pointer', () => {
+    const h = makeHarness()
+    const root = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 }, FRAMED)
+    h.add({ id: 'b', x: 300, y: 0, width: 200, height: 150 })
+    const frame = frameOf(root)
+    pointerOn(frame, 'pointerover')
+    frameOf(root, true)
+    flushFrames()
+    expect(h.wm.getState().focusedId).toBe('a')
   })
 })
 
