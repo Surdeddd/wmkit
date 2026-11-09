@@ -1,3 +1,7 @@
+---
+description: Every export of @surdeddd/wmkit and its subpaths — the window manager with its methods, events and types, the DOM controller, geometry and animation helpers, persist, popout and devtools.
+---
+
 # API reference
 
 Everything exported from `@surdeddd/wmkit` and its subpaths. Types are the real ones from `src/core/types.ts` and `src/dom/shared.ts`.

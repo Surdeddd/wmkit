@@ -1,3 +1,7 @@
+---
+description: Все экспорты @surdeddd/wmkit и его подпутей — менеджер окон с методами, событиями и типами, DOM-контроллер, хелперы геометрии и анимации, persist, popout и devtools.
+---
+
 # Справочник API
 
 Всё, что экспортируют `@surdeddd/wmkit` и его подпути. Типы — настоящие, из `src/core/types.ts` и `src/dom/shared.ts`.

@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type DefaultTheme, defineConfig, type MarkdownOptions, type SiteConfig } from 'vitepress'
+import { alternates, HOST, LANDING, landingSitemap, pageUrl, robots } from './seo'
 
-const HOST = 'https://wmkit.vercel.app'
 const base = process.env.VERCEL ? '/docs/' : '/wmkit/docs/'
 const docs = fileURLToPath(new URL('..', import.meta.url))
 const src = (path: string) => fileURLToPath(new URL(`../../src/${path}`, import.meta.url))
@@ -76,11 +76,6 @@ function sidebar(locale: 'en' | 'ru'): DefaultTheme.SidebarItem[] {
   }))
 }
 
-function pageUrl(relativePath: string): string {
-  const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html')
-  return `${HOST}/docs/${path}`
-}
-
 function writeLlms(config: SiteConfig): void {
   const served = (page: string) => config.rewrites.map[page] ?? page
   const english = config.pages.filter((page) => !served(page).startsWith('ru/')).sort()
@@ -110,10 +105,8 @@ function writeLlms(config: SiteConfig): void {
   const root = resolve(config.outDir, '..')
   writeFileSync(join(root, 'llms.txt'), lines.join('\n'))
   writeFileSync(join(root, 'llms-full.txt'), full.join('\n'))
-  writeFileSync(
-    join(root, 'robots.txt'),
-    `User-agent: *\nAllow: /\n\nSitemap: ${HOST}/docs/sitemap.xml\n`,
-  )
+  writeFileSync(join(root, 'robots.txt'), robots())
+  writeFileSync(join(root, 'sitemap.xml'), landingSitemap())
 }
 
 const REPO = 'https://github.com/Surdeddd/wmkit/blob/main/'
@@ -162,12 +155,13 @@ export default defineConfig({
     ':dir/:name.ru.md': 'ru/:dir/:name.md',
   },
   sitemap: { hostname: `${HOST}/docs/` },
-  transformPageData(pageData) {
+  transformPageData(pageData, { siteConfig }) {
+    const served = new Set(siteConfig.pages.map((page) => siteConfig.rewrites.map[page] ?? page))
     pageData.frontmatter.head ??= []
-    pageData.frontmatter.head.push([
-      'link',
-      { rel: 'canonical', href: pageUrl(pageData.relativePath) },
-    ])
+    pageData.frontmatter.head.push(
+      ['link', { rel: 'canonical', href: pageUrl(pageData.relativePath) }],
+      ...alternates(pageData.relativePath, served),
+    )
   },
   buildEnd: writeLlms,
   markdown: { config: twinLinks, anchor: { slugify } },
@@ -177,7 +171,7 @@ export default defineConfig({
       lang: 'en',
       themeConfig: {
         nav: [
-          { text: 'Demo', link: `${HOST}/` },
+          { text: 'Demo', link: LANDING.en },
           { text: `v${pkg.version}`, link: 'https://www.npmjs.com/package/@surdeddd/wmkit' },
         ],
         sidebar: sidebar('en'),
@@ -189,7 +183,7 @@ export default defineConfig({
       description: 'Headless-оконный менеджер для веба',
       themeConfig: {
         nav: [
-          { text: 'Демо', link: `${HOST}/` },
+          { text: 'Демо', link: LANDING.ru },
           { text: `v${pkg.version}`, link: 'https://www.npmjs.com/package/@surdeddd/wmkit' },
         ],
         sidebar: sidebar('ru'),

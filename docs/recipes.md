@@ -1,3 +1,7 @@
+---
+description: Working wmkit patterns — a taskbar, minimizing into it, modal dialogs, persistence with migrations, aspect-ratio windows, custom snap layouts, server-side rendering, testing and performance.
+---
+
 # Recipes
 
 Working patterns for the things people build with a window manager. Every snippet is framework-agnostic unless it says otherwise.

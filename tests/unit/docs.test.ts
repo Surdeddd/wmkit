@@ -1,6 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import {
+  alternates,
+  HOST,
+  LANDING,
+  landingSitemap,
+  pageUrl,
+  robots,
+} from '../../docs/.vitepress/seo'
 
 const root = new URL('../../', import.meta.url).pathname
 
@@ -17,6 +25,21 @@ function docsPages(dir = 'docs'): string[] {
 
 function markdownFiles(): string[] {
   return ['README.md', 'README.ru.md', ...docsPages()]
+}
+
+function served(page: string): string {
+  const path = page.replace(/^docs\//, '').replace(/(^|\/)README(\.ru)?\.md$/, '$1index$2.md')
+  return path.endsWith('.ru.md') ? `ru/${path.replace(/\.ru\.md$/, '.md')}` : path
+}
+
+function frontMatter(text: string): Record<string, string> {
+  const block = /^---\n([\s\S]*?)\n---\n/.exec(text)?.[1] ?? ''
+  const fields: Record<string, string> = {}
+  for (const line of block.split('\n')) {
+    const field = /^(\w+): (.*)$/.exec(line)
+    if (field) fields[field[1] as string] = (field[2] as string).trim()
+  }
+  return fields
 }
 
 interface Line {
@@ -136,5 +159,79 @@ describe('the markdown we ship', () => {
       }
     }
     expect(drifted, drifted.join('\n')).toEqual([])
+  })
+})
+
+describe('what the docs tell search engines', () => {
+  it('describes every page in words of its own, in the language of the page', () => {
+    const seen: Record<'en' | 'ru', Map<string, string>> = { en: new Map(), ru: new Map() }
+    for (const page of docsPages()) {
+      const lang = page.endsWith('.ru.md') ? 'ru' : 'en'
+      const description = frontMatter(readFileSync(join(root, page), 'utf8')).description ?? ''
+      expect(description.length, `${page} has no description`).toBeGreaterThan(60)
+      expect(description, page).not.toMatch(/: | #|^[@`'"*&!|>%{[]/)
+      expect(/[а-яё]/i.test(description), `${page} is described in the wrong language`).toBe(
+        lang === 'ru',
+      )
+      expect(seen[lang].get(description), `${page} repeats ${seen[lang].get(description)}`).toBe(
+        undefined,
+      )
+      seen[lang].set(description, page)
+    }
+  })
+
+  it('links every page to its twin in the other language', () => {
+    const pages = new Set(docsPages().map(served))
+    expect(pages.has('index.md') && pages.has('ru/index.md')).toBe(true)
+    for (const page of pages) {
+      const english = page.replace(/^ru\//, '')
+      const links = Object.fromEntries(
+        alternates(page, pages).map(([, attributes]) => [attributes.hreflang, attributes.href]),
+      )
+      expect(links, page).toEqual({
+        en: pageUrl(english),
+        ru: pageUrl(`ru/${english}`),
+        'x-default': pageUrl(english),
+      })
+    }
+    expect(alternates('orphan.md', new Set(['orphan.md']))).toEqual([])
+    expect(pageUrl('ru/guides/windows-95-desktop-react.md')).toBe(
+      `${HOST}/docs/ru/guides/windows-95-desktop-react.html`,
+    )
+  })
+
+  it('lists the landing in both languages in a sitemap that robots.txt points to', () => {
+    const sitemap = landingSitemap()
+    for (const url of [LANDING.en, LANDING.ru]) expect(sitemap).toContain(`<loc>${url}</loc>`)
+    expect(sitemap).toContain(`hreflang="ru" href="${HOST}/ru/"`)
+    expect(robots()).toContain(`Sitemap: ${HOST}/sitemap.xml`)
+    expect(robots()).toContain(`Sitemap: ${HOST}/docs/sitemap.xml`)
+  })
+
+  it('answers a docs address without .html on Vercel, as the mirror and preview already do', () => {
+    const config = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8')) as {
+      rewrites?: Array<{ source: string; destination: string }>
+    }
+    const rewrite = (path: string): string | null => {
+      for (const { source, destination } of config.rewrites ?? []) {
+        const names: string[] = []
+        const pattern = source.replace(/:(\w+)/g, (_whole, name: string) => {
+          names.push(name)
+          return '([^/]+)'
+        })
+        const match = new RegExp(`^${pattern}$`).exec(path)
+        if (!match) continue
+        return names.reduce(
+          (target, name, index) => target.replace(`:${name}`, match[index + 1] as string),
+          destination,
+        )
+      }
+      return null
+    }
+    for (const page of docsPages().map(served)) {
+      if (page.endsWith('index.md')) continue
+      const address = new URL(pageUrl(page)).pathname
+      expect(rewrite(address.replace(/\.html$/, '')), page).toBe(address)
+    }
   })
 })

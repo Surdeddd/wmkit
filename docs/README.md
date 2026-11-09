@@ -1,3 +1,7 @@
+---
+description: Reference documentation for wmkit, a headless window manager for the web — the three layers, the API, the framework adapters, theming, recipes and browser support.
+---
+
 # wmkit documentation
 
 Headless window manager for the web. The [root README](../README.md) is the tour; these pages are the reference.

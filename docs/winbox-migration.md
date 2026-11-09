@@ -1,3 +1,7 @@
+---
+description: Move an app from WinBox.js to wmkit by changing one import — what maps to what, what behaves differently and what the wmkit manager adds underneath.
+---
+
 # Migrating from WinBox
 
 `@surdeddd/wmkit/winbox` speaks the WinBox.js 0.2 API, so an app moves over by changing one import. Under it runs the wmkit manager, which brings snapping, keyboard control, screen-reader announcements, undo and persistence along.

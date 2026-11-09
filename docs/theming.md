@@ -1,3 +1,7 @@
+---
+description: How a wmkit theme works — the data-wm-* attributes it styles, the CSS custom properties, the sixteen shipped themes and writing your own theme from scratch.
+---
+
 # Theming
 
 wmkit never styles anything by class name. It writes `data-wm-*` attributes and inline geometry, and a theme is just CSS that reacts to those attributes. Sixteen themes ship with the package; replacing them with your own removes every CSS requirement the library has.

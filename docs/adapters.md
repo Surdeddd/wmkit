@@ -1,3 +1,7 @@
+---
+description: Complete wmkit integrations for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, and the wm-desktop and wm-window web components, with the contract they share.
+---
+
 # Adapters
 
 Every adapter is a thin wrapper over the same manager and the same DOM controller. They exist to attach and detach at the right moment in a component lifecycle, nothing more. Anything you can do in one, you can do in all of them, and you can always drop to the vanilla API.

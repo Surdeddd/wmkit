@@ -1,3 +1,7 @@
+---
+description: Which browsers each wmkit entry point supports — Chrome, Safari and Firefox baselines per import, the platform APIs that set them and what degrades where.
+---
+
 # Browser support
 
 wmkit ships ES2022 (`target: es2022` in tsup), ESM + CJS, no polyfills and no runtime dependencies. The floor is set by the platform APIs each layer touches, not by the syntax — so the answer differs depending on how much of the package you actually import.

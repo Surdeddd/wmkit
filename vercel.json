@@ -3,5 +3,10 @@
   "installCommand": "corepack enable && pnpm install --frozen-lockfile",
   "buildCommand": "pnpm site:build",
   "outputDirectory": "site/dist",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    { "source": "/docs/:page", "destination": "/docs/:page.html" },
+    { "source": "/docs/:dir/:page", "destination": "/docs/:dir/:page.html" },
+    { "source": "/docs/ru/:dir/:page", "destination": "/docs/ru/:dir/:page.html" }
+  ]
 }
