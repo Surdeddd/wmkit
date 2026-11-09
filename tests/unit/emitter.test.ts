@@ -53,6 +53,19 @@ describe('createEmitter', () => {
     expect(calls).toEqual(['first', 'second', 'second'])
   })
 
+  it('treats each subscription of the same function as its own', () => {
+    const emitter = createEmitter<TestEvents>()
+    const listener = vi.fn()
+    const offFirst = emitter.on('ping', listener)
+    emitter.on('ping', listener)
+    emitter.emit('ping', { value: 7 })
+    expect(listener).toHaveBeenCalledTimes(2)
+    offFirst()
+    offFirst()
+    emitter.emit('ping', { value: 8 })
+    expect(listener).toHaveBeenCalledTimes(3)
+  })
+
   it('clear removes every listener', () => {
     const emitter = createEmitter<TestEvents>()
     const listener = vi.fn()

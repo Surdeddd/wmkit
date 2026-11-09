@@ -16,9 +16,10 @@ export function createEmitter<Events extends Record<keyof Events, unknown>>(): E
         set = new Set()
         listeners.set(event, set)
       }
-      set.add(listener as Listener<never>)
+      const entry: Listener<never> = (payload) => (listener as Listener<never>)(payload)
+      set.add(entry)
       return () => {
-        set.delete(listener as Listener<never>)
+        set.delete(entry)
       }
     },
     emit(event, payload) {
