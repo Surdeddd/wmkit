@@ -81,6 +81,22 @@ function effective(
   return winner && declared(winner.body, property)
 }
 
+function token(css: string, value: string): string {
+  const first = topLevelRules(css)[0]?.body ?? ''
+  return value.replace(/var\((--wm-[a-z-]+)\)/g, (whole, name: string) => {
+    const defined = new RegExp(`(?:^|\\s)${name}:\\s*([^;]+);`).exec(first)?.[1]
+    return defined === undefined ? whole : defined.trim()
+  })
+}
+
+function alpha(colour: string): number | null {
+  if (/^#[0-9a-f]{6}$|^#[0-9a-f]{3}$/i.test(colour)) return 1
+  const match = /^rgba?\(([^)]+)\)$/.exec(colour)
+  if (!match) return null
+  const parts = (match[1] as string).split(/[\s,/]+/).filter(Boolean)
+  return parts.length === 4 ? Number.parseFloat(parts[3] as string) : 1
+}
+
 const GEOMETRY = /(^|[\s,])(transform|width|height)\s/
 const GESTURES = ['[data-wm-dragging]', '[data-wm-resizing]', '[data-wm-live]']
 const ALONGSIDE = [
@@ -216,6 +232,51 @@ describe('geometry that has to follow the pointer', () => {
         for (const extra of ALONGSIDE) {
           const value = effective(css, flavour, extra, 'transition') ?? ''
           expect(value, `${name} ${flavour} ${extra.join('')}`).toMatch(GEOMETRY)
+        }
+      }
+    }
+  })
+})
+
+describe('windows deep in the stack', () => {
+  const blurred = (name: (typeof themeNames)[number]) =>
+    (effective(themeCss[name], 'document', [], 'backdrop-filter') ?? 'none') !== 'none'
+
+  it('finds the themes that blur what lies under a window', () => {
+    expect(themeNames.filter(blurred).sort()).toEqual(
+      ['aqua', 'frost', 'glass', 'light', 'neon', 'synth'].sort(),
+    )
+  })
+
+  it('stop blurring and turn opaque, in both flavours', () => {
+    const costly: string[] = []
+    for (const name of themeNames.filter(blurred)) {
+      for (const [flavour, sheets] of Object.entries(FLAVOURS) as [Flavour, typeof themeCss][]) {
+        const css = sheets[name] as string
+        for (const extra of ALONGSIDE) {
+          const attributes = ['[data-wm-deep]', ...extra]
+          const where = `${name} ${flavour} ${attributes.join('')}`
+          for (const property of ['backdrop-filter', '-webkit-backdrop-filter']) {
+            const value = effective(css, flavour, attributes, property)
+            if (value !== 'none') costly.push(`${where} keeps ${property}: ${value}`)
+          }
+          const background = token(css, effective(css, flavour, attributes, 'background') ?? '')
+          if (alpha(background) !== 1) costly.push(`${where} sits on ${background}`)
+        }
+      }
+    }
+    expect(costly, costly.join('\n')).toEqual([])
+  })
+
+  it('leave every other window exactly as it was', () => {
+    for (const name of themeNames.filter(blurred)) {
+      for (const [flavour, sheets] of Object.entries(FLAVOURS) as [Flavour, typeof themeCss][]) {
+        const css = sheets[name] as string
+        for (const extra of ALONGSIDE) {
+          const where = `${name} ${flavour} ${extra.join('')}`
+          expect(effective(css, flavour, extra, 'backdrop-filter'), where).not.toBe('none')
+          expect(effective(css, flavour, extra, 'background'), where).toMatch(/^var\(--wm-bg/)
+          expect(effective(css, flavour, extra, 'background'), where).not.toContain('solid')
         }
       }
     }

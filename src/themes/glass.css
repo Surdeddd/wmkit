@@ -2,6 +2,7 @@
   --wm-radius: 14px;
   --wm-bg: rgba(22, 24, 34, 0.55);
   --wm-bg-focused: rgba(26, 28, 40, 0.68);
+  --wm-bg-solid: rgb(22, 24, 34);
   --wm-border: rgba(255, 255, 255, 0.09);
   --wm-border-focused: rgba(255, 255, 255, 0.22);
   --wm-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
@@ -48,6 +49,12 @@
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],

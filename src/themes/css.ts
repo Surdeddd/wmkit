@@ -329,6 +329,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 10px;
   --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
+  --wm-bg-solid: rgb(238, 241, 246);
   --wm-border: rgba(60, 80, 110, 0.28);
   --wm-border-focused: rgba(40, 70, 120, 0.45);
   --wm-shadow: 0 6px 18px rgba(20, 40, 80, 0.18);
@@ -376,6 +377,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -2124,6 +2131,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 18px;
   --wm-bg: rgba(255, 255, 255, 0.82);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
+  --wm-bg-solid: rgb(255, 255, 255);
   --wm-border: rgba(255, 255, 255, 0.6);
   --wm-border-focused: rgba(255, 255, 255, 0.92);
   --wm-shadow: 0 8px 30px rgba(80, 110, 150, 0.18);
@@ -2171,6 +2179,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -2411,6 +2425,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 14px;
   --wm-bg: rgba(22, 24, 34, 0.55);
   --wm-bg-focused: rgba(26, 28, 40, 0.68);
+  --wm-bg-solid: rgb(22, 24, 34);
   --wm-border: rgba(255, 255, 255, 0.09);
   --wm-border-focused: rgba(255, 255, 255, 0.22);
   --wm-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
@@ -2457,6 +2472,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -2688,6 +2709,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 12px;
   --wm-bg: rgba(255, 255, 255, 0.9);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
+  --wm-bg-solid: rgb(255, 255, 255);
   --wm-border: rgba(15, 23, 42, 0.1);
   --wm-border-focused: rgba(15, 23, 42, 0.22);
   --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
@@ -2734,6 +2756,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -2965,6 +2993,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 16px;
   --wm-bg: rgba(13, 8, 30, 0.72);
   --wm-bg-focused: rgba(18, 11, 40, 0.84);
+  --wm-bg-solid: rgb(13, 8, 30);
   --wm-border: rgba(124, 58, 237, 0.28);
   --wm-border-focused: rgba(236, 72, 153, 0.65);
   --wm-shadow: 0 10px 32px rgba(6, 2, 20, 0.6);
@@ -3011,6 +3040,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -4032,6 +4067,7 @@ export const themeCss: Record<ThemeName, string> = {
   --wm-radius: 8px;
   --wm-bg: rgba(24, 12, 44, 0.82);
   --wm-bg-focused: rgba(30, 15, 54, 0.92);
+  --wm-bg-solid: rgb(24, 12, 44);
   --wm-border: rgba(255, 138, 200, 0.3);
   --wm-border-focused: rgba(255, 200, 120, 0.75);
   --wm-shadow: 0 10px 28px rgba(10, 4, 24, 0.6);
@@ -4082,6 +4118,12 @@ export const themeCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+[data-wm-window][data-wm-deep] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 [data-wm-window][data-wm-dragging],
@@ -4916,6 +4958,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 10px;
   --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
+  --wm-bg-solid: rgb(238, 241, 246);
   --wm-border: rgba(60, 80, 110, 0.28);
   --wm-border-focused: rgba(40, 70, 120, 0.45);
   --wm-shadow: 0 6px 18px rgba(20, 40, 80, 0.18);
@@ -4961,6 +5004,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
@@ -6611,6 +6660,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 18px;
   --wm-bg: rgba(255, 255, 255, 0.82);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
+  --wm-bg-solid: rgb(255, 255, 255);
   --wm-border: rgba(255, 255, 255, 0.6);
   --wm-border-focused: rgba(255, 255, 255, 0.92);
   --wm-shadow: 0 8px 30px rgba(80, 110, 150, 0.18);
@@ -6656,6 +6706,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
@@ -6882,6 +6938,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 14px;
   --wm-bg: rgba(22, 24, 34, 0.55);
   --wm-bg-focused: rgba(26, 28, 40, 0.68);
+  --wm-bg-solid: rgb(22, 24, 34);
   --wm-border: rgba(255, 255, 255, 0.09);
   --wm-border-focused: rgba(255, 255, 255, 0.22);
   --wm-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
@@ -6926,6 +6983,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
@@ -7141,6 +7204,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 12px;
   --wm-bg: rgba(255, 255, 255, 0.9);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
+  --wm-bg-solid: rgb(255, 255, 255);
   --wm-border: rgba(15, 23, 42, 0.1);
   --wm-border-focused: rgba(15, 23, 42, 0.22);
   --wm-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
@@ -7185,6 +7249,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
@@ -7400,6 +7470,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 16px;
   --wm-bg: rgba(13, 8, 30, 0.72);
   --wm-bg-focused: rgba(18, 11, 40, 0.84);
+  --wm-bg-solid: rgb(13, 8, 30);
   --wm-border: rgba(124, 58, 237, 0.28);
   --wm-border-focused: rgba(236, 72, 153, 0.65);
   --wm-shadow: 0 10px 32px rgba(6, 2, 20, 0.6);
@@ -7444,6 +7515,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
@@ -8400,6 +8477,7 @@ export const themeShadowCss: Record<ThemeName, string> = {
   --wm-radius: 8px;
   --wm-bg: rgba(24, 12, 44, 0.82);
   --wm-bg-focused: rgba(30, 15, 54, 0.92);
+  --wm-bg-solid: rgb(24, 12, 44);
   --wm-border: rgba(255, 138, 200, 0.3);
   --wm-border-focused: rgba(255, 200, 120, 0.75);
   --wm-shadow: 0 10px 28px rgba(10, 4, 24, 0.6);
@@ -8448,6 +8526,12 @@ export const themeShadowCss: Record<ThemeName, string> = {
   background: var(--wm-bg-focused);
   border-color: var(--wm-border-focused);
   box-shadow: var(--wm-shadow-focused);
+}
+
+:host([data-wm-deep]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--wm-bg-solid);
 }
 
 :host([data-wm-dragging]),
