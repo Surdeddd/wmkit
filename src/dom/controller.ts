@@ -766,10 +766,7 @@ export function attachDesktop(
       const win = focused ? wm.get(focused) : undefined
       if (!win) return
       if (event.key === 'PageDown' || event.key === 'PageUp') {
-        if (tabShortcuts) {
-          event.preventDefault()
-          wm.cycleTab(event.key === 'PageUp' ? -1 : 1)
-        }
+        if (tabShortcuts && wm.cycleTab(event.key === 'PageUp' ? -1 : 1)) event.preventDefault()
         return
       }
       if (!snapShortcuts) return

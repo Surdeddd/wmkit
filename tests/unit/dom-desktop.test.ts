@@ -311,6 +311,15 @@ describe('tab shortcuts', () => {
     expect(off.active()).toBe('a')
   })
 
+  it('leaves the key to the page when the focused window has no tabs to cycle', () => {
+    const h = makeHarness()
+    h.add({ id: 'alone', x: 10, y: 10, width: 300, height: 200 })
+    expect(press(h.element, 'PageDown', { ctrlKey: true, altKey: true }).defaultPrevented).toBe(
+      false,
+    )
+    expect(press(h.element, 'PageUp', { metaKey: true, altKey: true }).defaultPrevented).toBe(false)
+  })
+
   it('still cycles tabs when only the snap shortcuts are off', () => {
     const h = grouped({ keyboard: { snapShortcuts: false } })
     press(h.element, 'ArrowLeft', { ctrlKey: true, altKey: true })
