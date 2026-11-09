@@ -540,6 +540,44 @@ describe('closing through actions', () => {
   })
 })
 
+describe('pointer to desktop coordinates', () => {
+  it('takes the border, the scroll and a scale transform of the desktop into account', () => {
+    const element = document.createElement('div')
+    const h = makeHarness({ magnetism: false, snap: false }, element)
+    const root = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    element.getBoundingClientRect = () =>
+      ({ left: 50, top: 20, width: 1620, height: 1220, right: 1670, bottom: 1240 }) as DOMRect
+    for (const [key, value] of [
+      ['offsetWidth', 810],
+      ['offsetHeight', 610],
+      ['clientLeft', 5],
+      ['clientTop', 5],
+      ['scrollLeft', 30],
+      ['scrollTop', 10],
+    ] as const) {
+      Object.defineProperty(element, key, { configurable: true, value })
+    }
+    const handle = root.querySelector('[data-wm-drag]') as HTMLElement
+    let local = { x: 0, y: 0 }
+    h.desktop.addDropTarget((_x, _y, _id, at) => {
+      local = { ...at }
+      return null
+    })
+    Element.prototype.setPointerCapture = () => {}
+    Element.prototype.hasPointerCapture = () => false
+    const pointer = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y })
+      Object.defineProperty(event, 'pointerId', { value: 1 })
+      handle.dispatchEvent(event)
+    }
+    pointer('pointerdown', 250, 240)
+    pointer('pointermove', 450, 440)
+    flushFrames()
+    expect(local).toEqual({ x: 225, y: 215 })
+    expect(h.wm.get('a')?.bounds).toMatchObject({ x: 200, y: 200 })
+  })
+})
+
 describe('input routed to the right window', () => {
   it('lets the close button of a nested desktop close only its own window', () => {
     const h = makeHarness()

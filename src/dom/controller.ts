@@ -24,6 +24,13 @@ import {
 } from './shared'
 import { restack, type StackingTarget, UNASSIGNED } from './stacking'
 
+interface Frame extends Point {
+  left: number
+  top: number
+  sx: number
+  sy: number
+}
+
 interface MountSlot {
   mount: SkinMount
   done: boolean
@@ -217,7 +224,7 @@ export function attachDesktop(
   let drag: ActiveDrag | null = null
   let groupTargetId: string | null = null
   let groupTargetEl: HTMLElement | null = null
-  let cachedRect: { left: number; top: number } | null = null
+  let cachedRect: Frame | null = null
   let rectUsers = 0
   let titlebar: { win: WindowState; box: DOMRect } | null = null
 
@@ -253,9 +260,20 @@ export function attachDesktop(
     if (preview) preview.style.display = 'none'
   }
 
-  function refreshRect(): void {
+  function measure(): Frame {
     const rect = element.getBoundingClientRect()
-    cachedRect = { left: rect.left, top: rect.top }
+    return {
+      left: rect.left,
+      top: rect.top,
+      sx: element.offsetWidth ? rect.width / element.offsetWidth : 1,
+      sy: element.offsetHeight ? rect.height / element.offsetHeight : 1,
+      x: element.scrollLeft - element.clientLeft,
+      y: element.scrollTop - element.clientTop,
+    }
+  }
+
+  function refreshRect(): void {
+    cachedRect = measure()
     titlebar = null
   }
 
@@ -264,8 +282,8 @@ export function attachDesktop(
     doc,
     view,
     toLocal(event: PointerEvent): Point {
-      const rect = cachedRect ?? element.getBoundingClientRect()
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+      const r = cachedRect ?? measure()
+      return { x: (event.clientX - r.left) / r.sx + r.x, y: (event.clientY - r.top) / r.sy + r.y }
     },
     trackRect() {
       if (rectUsers === 0) {
