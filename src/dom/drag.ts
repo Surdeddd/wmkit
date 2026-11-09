@@ -230,6 +230,7 @@ export function createDragStarter(ctx: SessionContext) {
     function onKeydown(keyEvent: KeyboardEvent): void {
       if (keyEvent.key === 'Escape') {
         keyEvent.preventDefault()
+        keyEvent.stopPropagation()
         finish(true)
       }
     }

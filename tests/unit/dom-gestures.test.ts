@@ -420,6 +420,30 @@ describe('escape from a drag', () => {
 })
 
 describe('keys in the middle of a drag', () => {
+  it('keeps Escape that cancels a gesture from reaching the page', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    let heard = 0
+    const listen = () => {
+      heard += 1
+    }
+    document.addEventListener('keydown', listen)
+    const press = () => {
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      a.root.dispatchEvent(event)
+      return event
+    }
+    dragTo(h, a.handle, [150, 110], [250, 210])
+    expect(press().defaultPrevented).toBe(true)
+    const grip = h.grip('a', 'se')
+    grip.dispatchEvent(pointerEvent('pointerdown', 300, 250))
+    expect(press().defaultPrevented).toBe(true)
+    expect(heard).toBe(0)
+    press()
+    expect(heard).toBe(1)
+    document.removeEventListener('keydown', listen)
+  })
+
   it('keeps F6 from switching windows while a pointer drag holds one', () => {
     const h = makeHarness()
     const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
