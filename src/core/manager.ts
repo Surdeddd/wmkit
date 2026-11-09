@@ -813,7 +813,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       }
       return { ...next, bounds: snapBounds(limits(next), snapTarget(next) as Bounds) }
     })
-    if (result && snapZone) focus(id, true)
+    if (result) {
+      if (snapZone) focus(id, true)
+      else handOff(id)
+    }
     return result
   }
 

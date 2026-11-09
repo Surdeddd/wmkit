@@ -2540,6 +2540,15 @@ describe('viewport changes stay out of history', () => {
 })
 
 describe('focus, modals and cycling', () => {
+  it('hands the focus to a minimized modal that snapTo brings back', () => {
+    const wm = makeWm()
+    wm.open({ id: 'm', layer: 'modal' })
+    wm.minimize('m')
+    wm.open({ id: 'a' })
+    wm.snapTo('m', { x: 0.25, y: 0.25, width: 0.5, height: 0.5 })
+    expect(wm.getState().focusedId).toBe('m')
+  })
+
   it('restores a minimized window inside a viewport that shrank meanwhile', () => {
     const wm = createWindowManager({ viewport: { width: 1600, height: 1000 } })
     wm.open({ id: 'a', x: 1200, y: 800, width: 300, height: 150 })
