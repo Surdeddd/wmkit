@@ -540,6 +540,24 @@ describe('closing through actions', () => {
   })
 })
 
+describe('the modal tab trap', () => {
+  it('counts a control with fixed position as a stop', () => {
+    const h = makeHarness()
+    const root = h.add(
+      { id: 'm', layer: 'modal', x: 0, y: 0, width: 300, height: 200 },
+      '<header data-wm-drag><button class="first">a</button></header><button class="pinned">b</button>',
+    )
+    const first = root.querySelector('.first') as HTMLElement
+    const pinned = root.querySelector('.pinned') as HTMLElement
+    Object.defineProperty(first, 'offsetParent', { configurable: true, value: root })
+    pinned.getClientRects = () => [{}] as unknown as DOMRectList
+    first.focus()
+    const tab = press(first, 'Tab', { shiftKey: true })
+    expect(tab.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(pinned)
+  })
+})
+
 describe('pointer to desktop coordinates', () => {
   it('takes the border, the scroll and a scale transform of the desktop into account', () => {
     const element = document.createElement('div')

@@ -1015,7 +1015,7 @@ export function attachDesktop(
       if (current?.layer !== 'modal') return
       const active = windowElement.shadowRoot?.activeElement ?? doc.activeElement
       const focusables = focusablesOf(windowElement).filter(
-        (node) => node.offsetParent !== null || node === active,
+        (node) => node.offsetParent !== null || node === active || node.getClientRects().length > 0,
       )
       if (focusables.length === 0) return
       const first = focusables[0]
