@@ -51,4 +51,20 @@ describe('window actions', () => {
     expect(act.sendToBack()).toBe(true)
     expect(wm.getState().order[0]).toBe('a')
   })
+
+  it('lets a close veto keep the window and passes it the window it would close', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'Draft' })
+    const asked: string[] = []
+    const veto = (win: { title: string }) => {
+      asked.push(win.title)
+      return asked.length > 1
+    }
+    const act = createActions(wm, 'a', veto)
+    expect(act.close()).toBe(false)
+    expect(wm.get('a')).toBeDefined()
+    expect(act.close()).toBe(true)
+    expect(act.close()).toBe(false)
+    expect(asked).toEqual(['Draft', 'Draft'])
+  })
 })

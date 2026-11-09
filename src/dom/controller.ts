@@ -201,6 +201,7 @@ export function attachDesktop(
   const animationOptions: AnimationOptions =
     typeof options.animation === 'object' ? options.animation : {}
   const windowVariant = options.windowVariant ?? defaultVariant
+  const actionsFor = (id: string) => createActions(wm, id, options.beforeClose)
 
   element.dataset.wmDesktop = ''
   element.tabIndex = -1
@@ -874,8 +875,9 @@ export function attachDesktop(
       claimed.add(event)
       const current = wm.get(id)
       if (!current) return
+      const act = actionsFor(id)
       if (target.closest('[data-wm-close]')) {
-        if (current.closable && options.beforeClose?.(current) !== false) wm.close(id)
+        if (current.closable) act.close()
         return
       }
       if (target.closest('[data-wm-minimize]')) {
@@ -886,7 +888,6 @@ export function attachDesktop(
         if (current.maximizable) wm.toggleMaximize(id)
         return
       }
-      const act = createActions(wm, id)
       const snapTarget = target.closest<HTMLElement>('[data-wm-snap]')
       if (snapTarget) {
         const zone = snapTarget.dataset.wmSnap ?? ''
@@ -1076,7 +1077,7 @@ export function attachDesktop(
   ): MountSlot {
     const win = wm.get(id)
     if (!win) throw new Error(`wmkit: cannot mount unknown window "${id}"`)
-    const mount = resolveSkin(skin)({ doc, id, window: win, actions: createActions(wm, id) })
+    const mount = resolveSkin(skin)({ doc, id, window: win, actions: actionsFor(id) })
     const standing = registry.get(id)
     const previous = standing?.slot?.mount ?? null
     const carried =
@@ -1144,7 +1145,7 @@ export function attachDesktop(
     wm,
     attachWindow,
     mountWindow,
-    actions: (id: string) => createActions(wm, id),
+    actions: actionsFor,
     addDropTarget(target) {
       dropTargets.add(target)
       return () => {

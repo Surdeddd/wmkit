@@ -1,4 +1,4 @@
-import type { SnapZone, WindowManager } from '../core/types'
+import type { SnapZone, WindowManager, WindowState } from '../core/types'
 
 export interface WindowActions {
   focus(): boolean
@@ -13,10 +13,18 @@ export interface WindowActions {
   moveToWorkspace(workspace: number): boolean
 }
 
-export function createActions(wm: WindowManager, id: string): WindowActions {
+export function createActions(
+  wm: WindowManager,
+  id: string,
+  // biome-ignore lint/suspicious/noConfusingVoidType: a handler may return nothing
+  beforeClose?: (window: WindowState) => boolean | void,
+): WindowActions {
   return {
     focus: () => wm.focus(id),
-    close: () => wm.close(id),
+    close: () => {
+      const win = wm.get(id)
+      return !!win && beforeClose?.(win) !== false && wm.close(id)
+    },
     minimize: () => wm.minimize(id),
     maximize: () => wm.maximize(id),
     toggleMaximize: () => wm.toggleMaximize(id),

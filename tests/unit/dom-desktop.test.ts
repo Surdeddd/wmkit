@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
+import type { WindowActions } from '../../src/dom/actions'
 import { createDesktopBinder } from '../../src/dom/binder'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
@@ -510,6 +511,32 @@ describe('reading the page less', () => {
     lower.dispatchEvent(click)
     expect(click.defaultPrevented).toBe(true)
     expect(reads).toBe(0)
+  })
+})
+
+describe('closing through actions', () => {
+  it('asks beforeClose for the actions a desktop or a skin hands out', () => {
+    let skinActions: WindowActions | null = null
+    const h = makeHarness({
+      beforeClose: (win) => win.id === 'gone',
+      skins: {
+        plain: ({ doc, actions }) => {
+          skinActions = actions
+          const element = doc.createElement('section')
+          return { element, content: element }
+        },
+      },
+    })
+    h.add({ id: 'kept', x: 0, y: 0, width: 200, height: 150 })
+    h.add({ id: 'gone', x: 0, y: 0, width: 200, height: 150 })
+    expect(h.desktop.actions('kept').close()).toBe(false)
+    expect(h.wm.get('kept')).toBeDefined()
+    h.wm.open({ id: 'skinned' })
+    h.desktop.mountWindow('skinned', 'plain')
+    expect((skinActions as unknown as WindowActions).close()).toBe(false)
+    expect(h.wm.get('skinned')).toBeDefined()
+    expect(h.desktop.actions('gone').close()).toBe(true)
+    expect(h.wm.get('gone')).toBeUndefined()
   })
 })
 
