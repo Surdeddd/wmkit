@@ -26,6 +26,50 @@ function rng(seed: number): () => number {
   }
 }
 
+function numbersOf(win: WindowState): number[] {
+  const boxes = [win.bounds, win.restoreBounds, win.snapRect].flatMap((box) =>
+    box ? [box.x, box.y, box.width, box.height] : [],
+  )
+  const caps = win.maxSize
+    ? [win.maxSize.width, win.maxSize.height].filter((value) => value !== Infinity)
+    : []
+  return [
+    ...boxes,
+    ...caps,
+    win.minSize.width,
+    win.minSize.height,
+    win.openedSeq,
+    win.workspace,
+    win.aspectRatio ?? 1,
+  ]
+}
+
+function sizeRange(
+  state: ManagerState,
+  win: WindowState,
+): { width: [number, number]; height: [number, number] } {
+  const members = win.groupId ? (state.groups[win.groupId]?.members ?? [win.id]) : [win.id]
+  let [minW, minH, maxW, maxH] = [1, 1, Infinity, Infinity]
+  let ratio: number | null = null
+  for (const id of members) {
+    const member = state.windows[id] as WindowState
+    minW = Math.max(minW, member.minSize.width)
+    minH = Math.max(minH, member.minSize.height)
+    maxW = Math.min(maxW, member.maxSize?.width ?? Infinity)
+    maxH = Math.min(maxH, member.maxSize?.height ?? Infinity)
+    if (member.aspectRatio !== null) ratio = Math.min(ratio ?? Infinity, member.aspectRatio)
+  }
+  if (ratio !== null) {
+    ;[minW, maxW, minH, maxH] = [
+      Math.max(minW, minH * ratio),
+      Math.min(maxW, maxH * ratio),
+      Math.max(minH, minW / ratio),
+      Math.min(maxH, maxW / ratio),
+    ]
+  }
+  return { width: [Math.min(minW, maxW), maxW], height: [Math.min(minH, maxH), maxH] }
+}
+
 function visibleIds(state: ManagerState): string[] {
   return state.order.filter((id) => {
     const win = state.windows[id]
@@ -85,17 +129,22 @@ function violations(state: ManagerState, label: string): string[] {
 
   for (const id of ids) {
     const win = state.windows[id] as WindowState
-    if (win.bounds.width < win.minSize.width - 0.5) {
+    const fullSize = win.stage === 'maximized' || win.restoreStage === 'maximized'
+    const range = sizeRange(state, win)
+    if (!fullSize && win.bounds.width < range.width[0] - 0.5) {
       found.push(`${label}: ${id} is narrower than its minimum`)
     }
-    if (win.bounds.height < win.minSize.height - 0.5) {
+    if (!fullSize && win.bounds.height < range.height[0] - 0.5) {
       found.push(`${label}: ${id} is shorter than its minimum`)
     }
-    if (win.maxSize && win.bounds.width > win.maxSize.width + 0.5) {
+    if (!fullSize && win.bounds.width > range.width[1] + 0.5) {
       found.push(`${label}: ${id} is wider than its maximum`)
     }
-    if (!Number.isFinite(win.bounds.x) || !Number.isFinite(win.bounds.y)) {
-      found.push(`${label}: ${id} has non-finite bounds`)
+    if (!fullSize && win.bounds.height > range.height[1] + 0.5) {
+      found.push(`${label}: ${id} is taller than its maximum`)
+    }
+    for (const value of numbersOf(win)) {
+      if (!Number.isFinite(value)) found.push(`${label}: ${id} holds the number ${value}`)
     }
     if (win.stage !== 'minimized' && win.restoreStage === 'minimized') {
       found.push(`${label}: ${id} would restore into a minimized stage`)
@@ -165,6 +214,45 @@ function violations(state: ManagerState, label: string): string[] {
   }
 
   return found
+}
+
+const BAD = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, undefined, -5, 0]
+
+function hostile(wm: WindowManager, id: string, pick: <T>(items: readonly T[]) => T): void {
+  const bad = () => pick(BAD) as number
+  switch (pick([0, 1, 2, 3, 4, 5, 6] as const)) {
+    case 0:
+      wm.move(id, bad(), 10)
+      break
+    case 1:
+      wm.resize(id, { width: bad(), height: pick([undefined, 300, bad()]) })
+      break
+    case 2:
+      wm.snapTo(id, { x: bad(), y: pick([0, 2, -1]), width: pick([0.5, 3, bad()]), height: 1 })
+      break
+    case 3:
+      wm.update(id, {
+        minSize: { width: bad(), height: 100 },
+        maxSize: { width: bad(), height: 400 },
+      })
+      break
+    case 4:
+      wm.open({
+        x: bad(),
+        y: bad(),
+        width: bad(),
+        height: bad(),
+        minWidth: bad(),
+        maxHeight: bad(),
+      })
+      break
+    case 5:
+      wm.restoreTo(id, { x: bad(), y: 0, width: 300, height: bad() })
+      break
+    default:
+      wm.setViewport({ width: bad(), height: 600 })
+      break
+  }
 }
 
 function drive(wm: WindowManager, seed: number, steps: number): string[] {
@@ -274,6 +362,9 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
       case 22:
         wm.cycleTab(random() < 0.5 ? 1 : -1)
         break
+      case 23:
+        if (id) hostile(wm, id, pick)
+        break
       case 24:
         wm.blur()
         break
@@ -299,6 +390,287 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
   return found
 }
 
+interface Picture {
+  windows: Record<string, unknown>
+  order: readonly string[]
+  focusedId: string | null
+  workspace: number
+  groups: Record<string, unknown>
+  extensions: Record<string, unknown>
+}
+
+function picture(state: ManagerState): Picture {
+  return JSON.parse(
+    JSON.stringify({
+      windows: { ...state.windows },
+      order: state.order,
+      focusedId: state.focusedId,
+      workspace: state.workspace,
+      groups: { ...state.groups },
+      extensions: state.extensions,
+    }),
+  )
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value && typeof value === 'object') {
+    const sorted: Record<string, unknown> = {}
+    for (const key of Object.keys(value).sort()) {
+      sorted[key] = canonical((value as Record<string, unknown>)[key])
+    }
+    return sorted
+  }
+  return value
+}
+
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
+}
+
+function focusOnly(a: Picture, b: Picture): boolean {
+  return (
+    !same(a, b) && same({ ...a, order: [], focusedId: null }, { ...b, order: [], focusedId: null })
+  )
+}
+
+function audit(seed: number, steps: number, report: string[]): void {
+  const random = rng(seed)
+  const wm = createWindowManager({ viewport: { width: 1280, height: 800 }, historyLimit: 30 })
+  const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
+  const anyId = (): string | null => {
+    const ids = wm.getState().order
+    return ids.length === 0 ? null : (pick(ids) as string)
+  }
+  const live = new Set<string>()
+  wm.on('open', ({ window: win }) => {
+    if (live.has(win.id)) report.push(`seed ${seed}: open twice for ${win.id}`)
+    live.add(win.id)
+  })
+  wm.on('close', ({ window: win }) => {
+    if (!live.has(win.id)) report.push(`seed ${seed}: close for unknown ${win.id}`)
+    live.delete(win.id)
+  })
+  let changes = 0
+  wm.subscribe(() => {
+    changes += 1
+  })
+
+  const act = (): string => {
+    const id = anyId()
+    const name = pick([
+      'open',
+      'close',
+      'focus',
+      'focus',
+      'focus',
+      'minimize',
+      'maximize',
+      'restore',
+      'snap',
+      'snapTo',
+      'move',
+      'resize',
+      'restoreTo',
+      'group',
+      'ungroup',
+      'activateTab',
+      'workspace',
+      'extension',
+      'constraints',
+      'layer',
+      'sendToBack',
+      'arrange',
+      'minimizeAll',
+      'restoreAll',
+      'closeAll',
+      'hostile',
+    ] as const)
+    switch (name) {
+      case 'open':
+        wm.open({
+          width: 120 + Math.floor(random() * 400),
+          height: 120 + Math.floor(random() * 300),
+          minWidth: 100 + Math.floor(random() * 120),
+          minHeight: 80 + Math.floor(random() * 120),
+          maxWidth: random() < 0.3 ? 300 + Math.floor(random() * 400) : undefined,
+          maxHeight: random() < 0.3 ? 250 + Math.floor(random() * 300) : undefined,
+          aspectRatio: random() < 0.2 ? 0.5 + random() * 2 : undefined,
+          layer: pick(['normal', 'normal', 'floating', 'modal'] as const),
+          workspace: Math.floor(random() * 3),
+          stage: pick(['normal', 'normal', 'normal', 'minimized', 'maximized'] as const),
+        })
+        break
+      case 'group': {
+        const ids = wm.getState().order
+        if (ids.length >= 2) wm.group([pick(ids) as string, pick(ids) as string])
+        break
+      }
+      case 'workspace':
+        if (random() < 0.5) wm.setWorkspace(Math.floor(random() * 3))
+        else if (id) wm.moveToWorkspace(id, Math.floor(random() * 3))
+        break
+      case 'extension':
+        wm.setExtension(
+          pick(['dock', 'notes']),
+          random() < 0.2 ? undefined : { n: Math.floor(random() * 5) },
+        )
+        break
+      case 'arrange':
+        wm.arrange(random() < 0.5 ? 'tile' : 'cascade')
+        break
+      case 'minimizeAll':
+        wm.minimizeAll()
+        break
+      case 'restoreAll':
+        wm.restoreAll()
+        break
+      case 'closeAll':
+        if (random() < 0.15) wm.closeAll()
+        break
+      default:
+        if (!id) break
+        if (name === 'close') wm.close(id)
+        else if (name === 'focus') wm.focus(id)
+        else if (name === 'minimize') wm.minimize(id)
+        else if (name === 'maximize') wm.maximize(id)
+        else if (name === 'restore') wm.restore(id)
+        else if (name === 'snap') wm.snap(id, pick(ZONES))
+        else if (name === 'ungroup') wm.ungroup(id)
+        else if (name === 'activateTab') wm.activateTab(id)
+        else if (name === 'sendToBack') wm.sendToBack(id)
+        else if (name === 'hostile') hostile(wm, id, pick)
+        else if (name === 'layer') {
+          wm.update(id, { layer: pick(['normal', 'floating', 'modal'] as const) })
+        } else if (name === 'snapTo') {
+          const x = Math.floor(random() * 3) / 4
+          const y = Math.floor(random() * 3) / 4
+          wm.snapTo(id, { x, y, width: (1 - x) * (0.5 + random() / 2), height: 1 - y })
+        } else if (name === 'move') {
+          wm.move(id, Math.floor(random() * 1400) - 200, Math.floor(random() * 900) - 200)
+        } else if (name === 'resize') {
+          wm.resize(id, { width: Math.floor(random() * 700), height: Math.floor(random() * 500) })
+        } else if (name === 'restoreTo') {
+          wm.restoreTo(id, {
+            x: Math.floor(random() * 1400) - 200,
+            y: Math.floor(random() * 900) - 200,
+            width: Math.floor(random() * 700),
+            height: Math.floor(random() * 500),
+          })
+        } else {
+          wm.update(id, {
+            minSize:
+              random() < 0.5
+                ? {
+                    width: 80 + Math.floor(random() * 300),
+                    height: 60 + Math.floor(random() * 200),
+                  }
+                : undefined,
+            maxSize:
+              random() < 0.4
+                ? random() < 0.3
+                  ? null
+                  : {
+                      width: 200 + Math.floor(random() * 600),
+                      height: 150 + Math.floor(random() * 500),
+                    }
+                : undefined,
+            aspectRatio: random() < 0.3 ? (random() < 0.5 ? null : 0.5 + random() * 2) : undefined,
+          })
+        }
+        break
+    }
+    return name
+  }
+
+  let chain: Picture | null = null
+  for (let step = 0; step < steps; step += 1) {
+    const stateBefore = wm.getState()
+    const before = picture(stateBefore)
+    const changesBefore = changes
+    const mode = random()
+    const names: string[] = []
+    let recorded = true
+    let merges = true
+    if (mode < 0.05) {
+      names.push('setViewport')
+      recorded = false
+      wm.setViewport({
+        width: 320 + Math.floor(random() * 1600),
+        height: 240 + Math.floor(random() * 900),
+      })
+    } else if (mode < 0.08) {
+      names.push('hydrate')
+      recorded = false
+      chain = null
+      wm.hydrate(JSON.parse(JSON.stringify(wm.serialize())))
+    } else if (mode < 0.16) {
+      names.push('batch')
+      wm.batch(() => {
+        for (let i = 1 + Math.floor(random() * 3); i > 0; i -= 1) names.push(act())
+      })
+    } else if (mode < 0.24) {
+      names.push('interaction')
+      merges = false
+      wm.beginInteraction()
+      for (let i = 1 + Math.floor(random() * 4); i > 0; i -= 1) names.push(act())
+      if (random() < 0.3) {
+        wm.beginInteraction()
+        names.push(act())
+        wm.abortInteraction()
+      }
+      wm.endInteraction()
+    } else {
+      names.push(act())
+    }
+    const label = `seed ${seed} step ${step} [${names.join(',')}]`
+    const stateAfter = wm.getState()
+    const after = picture(stateAfter)
+
+    if (!same(picture(stateBefore), before)) report.push(`${label}: an earlier snapshot changed`)
+    if ((stateAfter !== stateBefore) !== changes > changesBefore) {
+      report.push(`${label}: snapshot identity disagrees with the change events`)
+    }
+    if (!same([...live].sort(), Object.keys(stateAfter.windows).sort())) {
+      report.push(`${label}: open and close events disagree with state.windows`)
+    }
+    for (const id of Object.keys(stateAfter.windows)) {
+      const next = stateAfter.windows[id] as WindowState
+      const prev = stateBefore.windows[id]
+      if (names.length === 1 && prev && prev !== next && same(prev, next)) {
+        report.push(`${label}: ${id} was replaced by an equal object`)
+      }
+      if (next.stage === 'snapped' && next.snapZone === null && next.snapRect === null) {
+        report.push(`${label}: ${id} is snapped to nothing`)
+      }
+    }
+    for (const message of violations(stateAfter, label)) report.push(message)
+
+    const copy = createWindowManager({ viewport: stateAfter.viewport })
+    if (!copy.hydrate(JSON.parse(JSON.stringify(wm.serialize())))) {
+      report.push(`${label}: hydrate refused the serialized state`)
+    } else if (!same(picture(copy.getState()), after)) {
+      report.push(`${label}: hydrate(serialize()) differs`)
+    }
+
+    if (!recorded) {
+      if (!same(before, after)) chain = null
+      continue
+    }
+    if (same(before, after)) continue
+    const target: Picture = merges && chain && focusOnly(before, after) ? chain : before
+    chain = focusOnly(before, after) ? target : null
+    if (!wm.canUndo()) {
+      report.push(`${label}: the state changed but canUndo() is false`)
+      continue
+    }
+    wm.undo()
+    if (!same(picture(wm.getState()), target)) report.push(`${label}: undo missed its target`)
+    wm.redo()
+    if (!same(picture(wm.getState()), after)) report.push(`${label}: redo missed its target`)
+  }
+}
+
 describe('random operation sequences keep the state machine honest', () => {
   for (const seed of [1, 2, 3, 7, 11, 42, 99, 1234, 31337, 65535]) {
     it(`holds every invariant for seed ${seed}`, () => {
@@ -318,6 +690,12 @@ describe('random operation sequences keep the state machine honest', () => {
       expect(violations(copy.getState(), `hydrated seed ${seed}`)).toEqual([])
       expect(copy.serialize()).toEqual(data)
     }
+  })
+
+  it('keeps history, events and persistence truthful over long random runs', () => {
+    const report: string[] = []
+    for (let seed = 1; seed <= 24; seed += 1) audit(seed, 200, report)
+    expect(report.slice(0, 6)).toEqual([])
   })
 
   it('re-syncs a hand-edited snapshot whose group members drifted apart', () => {
