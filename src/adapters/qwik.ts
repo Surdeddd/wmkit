@@ -4,13 +4,16 @@ import {
   jsx,
   type NoSerialize,
   noSerialize,
+  type QRL,
   type Signal,
   Slot,
+  untrack,
   useComputed$,
   useContext,
   useContextProvider,
   useSignal,
   useStore,
+  useTask$,
   useVisibleTask$,
 } from '@builder.io/qwik'
 import {
@@ -34,6 +37,7 @@ export const WmContext = createContextId<WmStore>('wmkit.desktop')
 
 export interface WmDesktopProps {
   options?: DesktopOptions & ManagerOptions
+  options$?: QRL<() => DesktopOptions & ManagerOptions>
   class?: string
 }
 
@@ -41,22 +45,30 @@ export const WmDesktop = component$<WmDesktopProps>((props) => {
   const element = useSignal<HTMLElement>()
   const store = useStore<WmStore>({ wm: undefined, binder: undefined, version: 0 })
   useContextProvider(WmContext, store)
-  useVisibleTask$(({ cleanup }) => {
-    const wm = createWindowManager(props.options)
-    const binder = createDesktopBinder(wm, props.options)
+  useVisibleTask$(async ({ cleanup }) => {
+    let live = true
+    let stop = () => {}
+    cleanup(() => {
+      live = false
+      stop()
+    })
+    const options = { ...props.options, ...(props.options$ ? await props.options$() : null) }
+    if (!live) return
+    const wm = createWindowManager(options)
+    const binder = createDesktopBinder(wm, options)
     binder.bindDesktop(element.value as HTMLElement)
-    const stop = wm.subscribe(() => {
+    const unsubscribe = wm.subscribe(() => {
       store.version += 1
     })
     store.wm = noSerialize(wm)
     store.binder = noSerialize(binder)
-    cleanup(() => {
-      stop()
+    stop = () => {
+      unsubscribe()
       binder.destroy()
       wm.destroy()
       store.wm = undefined
       store.binder = undefined
-    })
+    }
   })
   return jsx('div', { ref: element, class: props.class, children: jsx(Slot, {}) })
 })
@@ -86,23 +98,56 @@ export const WmWindow = component$<WmWindowProps>((props) => {
     const title = track(() => props.title)
     store.wm?.update(props.id, { title: title ?? '' })
   })
+  const placed = useStore(() => ({
+    x: props.x,
+    y: props.y,
+    width: props.width,
+    height: props.height,
+  }))
+  useTask$(({ track }) => {
+    const next = {
+      x: track(() => props.x),
+      y: track(() => props.y),
+      width: track(() => props.width),
+      height: track(() => props.height),
+    }
+    const wm = store.wm
+    const now = wm?.get(props.id)?.bounds
+    if (wm && now) {
+      const b = { ...now }
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        const value = next[key]
+        if (value !== undefined && value !== placed[key]) b[key] = value
+      }
+      wm.batch(() => {
+        if (b.x !== now.x || b.y !== now.y) wm.move(props.id, b.x, b.y)
+        if (b.width !== now.width || b.height !== now.height) {
+          wm.resize(props.id, { width: b.width, height: b.height })
+        }
+      })
+    }
+    Object.assign(placed, next)
+  })
   const closed = useComputed$(() => {
     void store.version
     return store.wm !== undefined && !store.wm.get(props.id)
   })
   const px = (value: number | undefined) => (value === undefined ? undefined : `${value}px`)
-  return jsx('section', {
-    ref: element,
-    class: props.class,
-    hidden: closed.value,
-    style: {
+  const frame = useSignal(
+    untrack(() => ({
       position: 'absolute',
       left: 0,
       top: 0,
       transform: `translate3d(${props.x ?? 0}px, ${props.y ?? 0}px, 0)`,
       width: px(props.width),
       height: px(props.height),
-    },
+    })),
+  )
+  return jsx('section', {
+    ref: element,
+    class: props.class,
+    hidden: closed.value,
+    style: frame.value,
     children: [
       jsx('header', {
         'data-wm-drag': '',
