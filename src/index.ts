@@ -43,6 +43,7 @@ export { createDesktopBinder } from './dom/binder'
 export { attachDesktop } from './dom/controller'
 export type {
   ActiveGesture,
+  AnimationOptions,
   DesktopController,
   DesktopGesture,
   DesktopKeyboardOptions,
@@ -51,11 +52,13 @@ export type {
   DropHit,
   DropTarget,
   GestureContext,
+  GroupingOptions,
   HitAreaOptions,
   MagnetismOptions,
   MountedWindow,
   SkinContext,
   SkinMount,
+  StackingOptions,
   WindowAttachOptions,
   WindowSkin,
 } from './dom/shared'

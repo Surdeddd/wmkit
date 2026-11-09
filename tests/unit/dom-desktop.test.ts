@@ -4,6 +4,7 @@ import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
+import type { AnimationOptions, GroupingOptions, StackingOptions } from '../../src/index'
 
 const VIEWPORT = { width: 800, height: 600 }
 
@@ -85,6 +86,16 @@ afterEach(() => {
   frames.clear()
   vi.unstubAllGlobals()
   document.body.replaceChildren()
+})
+
+describe('option types', () => {
+  it('names every nested desktop option from the package entry', () => {
+    const grouping: GroupingOptions = { dwell: 200 }
+    const stacking: StackingOptions = { base: 10, gap: 4, isolate: false, deep: 6 }
+    const animation: AnimationOptions = { duration: 120, easing: 'linear' }
+    const options: DesktopOptions = { grouping, stacking, animation }
+    expect(options.stacking?.deep).toBe(6)
+  })
 })
 
 describe('windows follow a resizing desktop live', () => {
