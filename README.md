@@ -231,7 +231,7 @@ export class DesktopComponent implements AfterViewInit {
 }
 ```
 
-`useWmState` returns a read-only `Signal<ManagerState>` and `useWmWindow(wm, id)` a computed per-window signal, so templates track updates fine-grained. Hooks called in an injection context clean up through `DestroyRef` automatically; outside one they simply skip auto-cleanup.
+`useWmState` returns a read-only `Signal<ManagerState>` and `useWmWindow(wm, id)` a computed per-window signal, so templates track updates fine-grained. Hooks called in an injection context clean up through `DestroyRef` automatically; outside one they simply skip auto-cleanup. `dk.desktop(el)` and `dk.window(id)(el)` return a function that releases the binding, and take a `DestroyRef` or `Injector` as their last argument when you bind outside an injection context.
 
 ## Snap zones in action
 
@@ -274,7 +274,7 @@ Manager methods:
 | `update(id, patch)` | title, layer, min/max size, `aspectRatio`, per-window flags, `meta`; a patch that changes nothing is a no-op |
 | `setViewport(size)` | re-derives maximized/snapped bounds, clamps the rest; never recorded in history; a zero or negative size (a hidden desktop) is ignored |
 | `workspace()` / `setWorkspace(n)` / `moveToWorkspace(id, n)` | virtual desktops; focusing a window switches to its workspace |
-| `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop, re-derived against the current viewport |
+| `serialize()` / `hydrate(data)` | JSON-safe snapshot of the whole desktop, re-derived against the current viewport; a damaged window is repaired instead of costing the whole snapshot |
 | `undo()` / `redo()` / `canUndo()` / `canRedo()` / `clearHistory()` | every mutation is one step; a whole drag or resize collapses into a single entry |
 | `beginInteraction()` / `endInteraction()` / `abortInteraction()` | group a live gesture into one history entry, or drop it entirely on cancel |
 | `saveLayout(name)` / `loadLayout(name)` / `deleteLayout(name)` / `layoutNames()` | named desktop snapshots; `getLayout`/`setLayout` for external storage |
@@ -292,7 +292,7 @@ DOM controller: pointer drag with capture (touch/pen included), 8-direction resi
 ```ts
 interface DesktopOptions {
   snap?: boolean | { threshold?: number; cornerSize?: number; preview?: boolean; topEdge?: 'maximize' | 'top' | 'none' }
-  keyboard?: boolean | { moveStep?: number; cycle?: boolean; snapShortcuts?: boolean; historyShortcuts?: boolean }
+  keyboard?: boolean | { moveStep?: number; cycle?: boolean; snapShortcuts?: boolean; historyShortcuts?: boolean; tabShortcuts?: boolean }
   announce?: boolean | Partial<AnnouncerMessages>   // localize screen-reader strings here
   autoViewport?: boolean                            // ResizeObserver → wm.setViewport (default true)
   magnetism?: boolean | { threshold?: number }      // edge-align to neighbours + viewport while dragging (default on, 8 px / 12 px coarse)
@@ -302,7 +302,7 @@ interface DesktopOptions {
 }
 ```
 
-Keyboard defaults: arrows move the focused window (16 px) while keyboard focus is on the window or its titlebar (content widgets keep their arrows), `Alt` for 1 px steps, `Shift+arrows` resize, `Ctrl/⌘+Alt+←/→` snap to a half, `Ctrl/⌘+Alt+↑/↓` maximize or minimize, `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` undo and redo (also on non-Latin layouts), `F6` / `Shift+F6` cycle windows, from inside a field too, `Escape` cancels an in-flight drag or resize (and drops it from the history).
+Keyboard defaults: arrows move the focused window (16 px) while keyboard focus is on the window or its titlebar (content widgets keep their arrows), `Alt` for 1 px steps, `Shift+arrows` resize, `Ctrl/⌘+Alt+←/→` snap to a half, `Ctrl/⌘+Alt+↑/↓` maximize or minimize, `Ctrl/⌘+Alt+PageDown/PageUp` switch tabs, `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` undo and redo (also on non-Latin layouts), `F6` / `Shift+F6` cycle windows, from inside a field too, `Escape` cancels an in-flight drag or resize (and drops it from the history).
 
 ### `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 
@@ -313,7 +313,7 @@ const store = persist(wm, { key: 'my-desktop' })  // auto-restores, then debounc
 store.clear()
 ```
 
-Storage defaults to `localStorage` (a missing or throwing one turns the plugin into a no-op — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation.
+Storage defaults to `localStorage` (a missing or throwing one turns the plugin into a no-op — SSR and private-mode friendly) and accepts any `getItem/setItem/removeItem` implementation. Saves are debounced and still happen at least every `maxWait` ms under constant change; failed loads, migrations and saves go to `onError` instead of throwing.
 
 Payloads are wrapped in a `{ version, state }` envelope. Bump `version` when your window contract changes and pass `migrate` to upgrade older data — anything you cannot migrate is discarded instead of restored broken:
 
