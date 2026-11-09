@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WindowManager } from '../../src/core/types'
 import WinBox, { type WinBoxOptions, winboxMessagesRu } from '../../src/plugins/winbox'
 
 class StubObserver {
@@ -468,6 +469,77 @@ describe('hidden windows', () => {
   })
 })
 
+describe('tearing down', () => {
+  const managerOf = (made: WinBox) =>
+    (made as unknown as { runtime: { wm: WindowManager } }).runtime.wm
+
+  it('drops the desktop and its listeners with the last window and builds a fresh one for the next', () => {
+    const removed: string[] = []
+    const real = window.removeEventListener.bind(window)
+    const spy = vi
+      .spyOn(window, 'removeEventListener')
+      .mockImplementation((type, listener, options) => {
+        removed.push(type)
+        real(type, listener, options)
+      })
+    const first = box('First')
+    const second = box('Second')
+    const wm = managerOf(first)
+    const layer = root.querySelector('[data-winbox-root]')
+    first.close()
+    expect(root.querySelector('[data-winbox-root]')).toBe(layer)
+    expect(removed).not.toContain('blur')
+    second.close()
+    expect(layer?.isConnected).toBe(false)
+    expect(removed).toContain('blur')
+    spy.mockRestore()
+
+    const next = box('Next')
+    expect(managerOf(next)).not.toBe(wm)
+    expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
+    expect(root.querySelector('[data-winbox-root]')).not.toBe(layer)
+    next.maximize()
+    expect(next.hasClass('max')).toBe(true)
+
+    wm.open({ id: 'stale' })
+    const again = box('Again')
+    expect(managerOf(again)).toBe(managerOf(next))
+    expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
+  })
+
+  it('keeps the desktop when a new window arrives in the same batch as the last one leaves', () => {
+    const only = box('Only')
+    const wm = managerOf(only)
+    let replacement: WinBox | undefined
+    wm.batch(() => {
+      only.close()
+      replacement = box('Replacement')
+    })
+    expect(managerOf(replacement as WinBox)).toBe(wm)
+    expect(replacement?.window.isConnected).toBe(true)
+  })
+
+  it('counts only its own windows, not ones opened on the manager directly', () => {
+    const made = box('Made')
+    const wm = managerOf(made)
+    wm.open({ id: 'raw' })
+    wm.close('raw')
+    expect(made.window.isConnected).toBe(true)
+    expect(root.querySelector('[data-winbox-root]')?.isConnected).toBe(true)
+  })
+
+  it('keeps the desktop whose manager the app asked for, so persist and other plugins stay wired', () => {
+    const wm = WinBox.manager(root)
+    wm.setViewport({ width: 900, height: 700 })
+    const first = box('First')
+    first.close()
+    expect(WinBox.manager(root)).toBe(wm)
+    const second = box('Second')
+    expect(managerOf(second)).toBe(wm)
+    expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
+  })
+})
+
 describe('methods and properties', () => {
   it('moves, resizes and renames through properties and chained calls', () => {
     const made = box('Props')
@@ -586,6 +658,7 @@ describe('the desktop around the windows', () => {
   })
 
   it('dims the page behind a modal', () => {
+    box('Below')
     const modal = box('Modal', { modal: true })
     const backdrop = root.querySelector('.wb-backdrop') as HTMLElement
     expect(backdrop.hidden).toBe(false)

@@ -99,6 +99,8 @@ interface Runtime {
   strip: HTMLElement
   backdrop: HTMLElement
   insets: number[]
+  boxes: number
+  held: boolean
   sync(): void
 }
 
@@ -249,6 +251,8 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     strip,
     backdrop,
     insets,
+    boxes: 0,
+    held: false,
     sync() {
       const state = wm.getState()
       if (!replaying && hiddenBox(state.focusedId)) {
@@ -290,7 +294,18 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     },
   }
 
-  wm.subscribe(() => runtime.sync())
+  let doomed = false
+  const stop = wm.subscribe(() => {
+    if (doomed && runtime.boxes === 0 && !runtime.held) {
+      stop()
+      desktop.destroy()
+      layer.remove()
+      forRoot.delete(key)
+      return
+    }
+    doomed = false
+    runtime.sync()
+  })
   wm.on('close', ({ window: win }) => {
     const box = boxes.get(win.id)
     if (!box) return
@@ -299,6 +314,8 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     seen.delete(win.id)
     const index = history.indexOf(box)
     if (index !== -1) history.splice(index, 1)
+    runtime.boxes -= 1
+    doomed = true
   })
 
   if (!watchedDocs.has(doc)) {
@@ -356,7 +373,9 @@ export class WinBox {
   }
 
   static manager(root?: HTMLElement): WindowManager {
-    return runtimeFor(root ?? document.body, [0, 0, 0, 0], false).wm
+    const runtime = runtimeFor(root ?? document.body, [0, 0, 0, 0], false)
+    runtime.held = true
+    return runtime.wm
   }
 
   static configure(next: WinBoxConfig): void {
@@ -380,6 +399,7 @@ export class WinBox {
     const [top, right, bottom, left] = insets as [number, number, number, number]
     const area = { width: outer.width - left - right, height: outer.height - top - bottom }
     this.runtime = runtimeFor(root, insets, settings.overflow === true)
+    this.runtime.boxes += 1
     const { wm } = this.runtime
 
     const classes =
