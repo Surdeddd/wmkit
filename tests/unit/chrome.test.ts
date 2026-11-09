@@ -145,6 +145,70 @@ describe('template compiler', () => {
     ).toThrow(`({{title}} after '123456789"><a href="')`)
   })
 
+  it('never lets a space HTML does not know split a tag where a title could become an attribute', () => {
+    const payload = 'x onmouseover=alert(1)//'
+    const strays: string[] = []
+    for (let code = 0; code <= 0xffff; code += 1) {
+      const char = String.fromCharCode(code)
+      if (/\s/.test(char) && !/[\t\n\f\r ]/.test(char)) strays.push(char)
+    }
+    expect(strays.map((char) => char.charCodeAt(0))).toEqual(
+      expect.arrayContaining([0x0b, 0xa0, 0x1680, 0x2000, 0x2028, 0x202f, 0x3000, 0xfeff]),
+    )
+    for (const char of strays) {
+      for (const template of [
+        `<div title=${char}"{{title}}"></div>`,
+        `<div title${char}="{{title}}"></div>`,
+        `<span${char}title="{{title}}">t</span>`,
+        `<div data-a=1${char}title="{{title}}"></div>`,
+        `<div title="{{title}}"${char}data-a=1></div>`,
+        `<div${char}data-a=1>{{title}}</div>`,
+      ]) {
+        let render: ((values: Record<string, string>) => string) | null = null
+        try {
+          render = compileTemplate(template)
+        } catch (error) {
+          expect((error as Error).message, template).toMatch(/^wmkit: /)
+        }
+        if (render === null) continue
+        const holder = document.createElement('template')
+        holder.innerHTML = render({ title: payload })
+        for (const node of holder.content.querySelectorAll('*')) {
+          expect(node.getAttributeNames(), template).not.toContain('onmouseover')
+        }
+      }
+    }
+  })
+
+  it('names the stray space and the markup before it', () => {
+    expect(() => compileTemplate('<div title= "{{title}}"></div>')).toThrow(
+      `wmkit: a tag may only be spaced with tab, line feed, form feed, carriage return or space (U+00A0 after '<div title=')`,
+    )
+    expect(() => compileTemplate('<b>{{id}}</b><i\u000btitle="x"></i>')).toThrow(
+      `(U+000B after '<b>{{id}}</b><i')`,
+    )
+    expect(() => skin({ template: '<div　data-wm-content></div>' })).toThrow(/U\+3000/)
+  })
+
+  it('splits a tag on exactly the spaces HTML splits it on', () => {
+    const render = compileTemplate(
+      '<b\ttitle="{{title}}"\ndata-a=1\fdata-b="{{id}}"\r\nid=x >{{title}}</b>',
+    )
+    expect(render({ title: 't', id: 'i' })).toBe(
+      '<b\ttitle="t"\ndata-a=1\fdata-b="i"\r\nid=x >t</b>',
+    )
+    expect(() => compileTemplate('<b title=x\fonclick="{{title}}"></b>')).toThrow(/placeholder/)
+    expect(compileTemplate('<p title=" {{title}} "> {{title}}</p>')({ title: 't' })).toBe(
+      '<p title=" t "> t</p>',
+    )
+  })
+
+  it('ends a raw-text element only where HTML ends it', () => {
+    expect(() => compileTemplate('<style></style >{{title}}</style>')).toThrow(/placeholder/)
+    expect(() => compileTemplate('<title></title >{{title}}</title>')).toThrow(/placeholder/)
+    expect(compileTemplate('<style></style\f>{{title}}')({ title: 't' })).toBe('<style></style\f>t')
+  })
+
   it('admits for, value, placeholder and label, and nothing else that could carry a meaning', () => {
     const render = compileTemplate(
       '<label for="f-{{id}}">x</label><input value="{{title}}" placeholder="{{title}}">' +

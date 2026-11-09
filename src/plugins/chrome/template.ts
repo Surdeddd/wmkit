@@ -10,9 +10,11 @@ const ESCAPES: Record<string, string> = {
 const INERT = /^(aria-|data-)|^(title|alt|class|id|role|lang|dir|for|value|placeholder|label)$/i
 const RAW = /^(script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)$/i
 const NEVER = /(?!)/
-const SPACE = /\s/
+const SPACE = /[\t\n\f\r ]/
 const UNSAFE =
   'wmkit: a {{placeholder}} belongs in text or in a quoted aria-*, data-*, title, alt, class, id, role, lang, dir, for, value, placeholder or label attribute'
+const STRAY =
+  'wmkit: a tag may only be spaced with tab, line feed, form feed, carriage return or space'
 
 const TEXT = 0
 const TAG = 1
@@ -65,7 +67,7 @@ export function compile(template: string): Compiled {
       }
       if (foreign === 0) {
         state = RAWTEXT
-        close = name === 'plaintext' ? NEVER : new RegExp(`</${name}(?=[\\s/>])`, 'i')
+        close = name === 'plaintext' ? NEVER : new RegExp(`</${name}(?=[\\t\\n\\f\\r />])`, 'i')
       }
     }
   }
@@ -74,10 +76,14 @@ export function compile(template: string): Compiled {
     close = pattern
   }
 
+  const fail = (message: string, found: string, before: string) => {
+    throw new Error(`${message} (${found} after '${before.slice(-20)}')`)
+  }
+
   parts.forEach((part, index) => {
     if (index % 2 === 1) {
       if (tainted || (state !== TEXT && !(state === QUOTED && INERT.test(attribute)))) {
-        throw new Error(`${UNSAFE} ({{${part}}} after '${seen.slice(-20)}')`)
+        fail(UNSAFE, `{{${part}}}`, seen)
       }
       seen += `{{${part}}}`
       return
@@ -108,6 +114,12 @@ export function compile(template: string): Compiled {
           state = TAG
           attribute = ''
         }
+      } else if (/\s/.test(char) && !SPACE.test(char)) {
+        fail(
+          STRAY,
+          `U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
+          seen.slice(0, i - part.length),
+        )
       } else if (char === '>') end(part[i - 1] === '/')
       else if (state === VALUE) {
         if (char === '"' || char === "'") {
