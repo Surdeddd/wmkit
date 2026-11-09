@@ -35,13 +35,17 @@ export const elementsMessagesRu: ElementsMessages = {
 
 export type WmDesktopOptions = DesktopOptions & ManagerOptions
 
+export type WmDesktopStyles = string | CSSStyleSheet | ReadonlyArray<string | CSSStyleSheet>
+
 const CHROME_CSS = `:host{position:absolute;left:0;top:0;display:flex;flex-direction:column;box-sizing:border-box;color:var(--wm-text,#1d1d1f);background:var(--wm-bg,#fff);border:1px solid var(--wm-border,rgba(0,0,0,.14));border-radius:var(--wm-radius,10px);box-shadow:var(--wm-shadow,0 8px 28px rgba(0,0,0,.2))}
 :host([hidden]),:host([closed]){display:none!important}
 [hidden]{display:none!important}
 [part=titlebar]{border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0;display:flex;align-items:center;gap:6px;flex:none;height:36px;padding:0 6px 0 12px;background:var(--wm-titlebar-bg,transparent);user-select:none;-webkit-user-select:none;touch-action:none}
 [part=title]{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:600 13px/1 system-ui,sans-serif}
+[data-wm-controls]{display:contents}
 [part~=control]{width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:inherit;font:16px/1 system-ui,sans-serif;cursor:pointer;opacity:.7}
 [part~=control]:hover,[part~=control]:focus-visible{opacity:1;outline:2px solid var(--wm-accent,currentColor)}
+[data-wm-minimize]::after{content:"–"}[data-wm-maximize]::after{content:"□"}[data-wm-close]::after{content:"×"}
 [part=tabs]{flex:1;display:flex;gap:2px;min-width:0;overflow:hidden}
 [part~=tab]{min-width:0;max-width:16ch;height:26px;padding:0 10px;border:0;border-radius:6px;background:none;color:inherit;font:13px/1 system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;opacity:.7}
 [part~=tab]:hover,[part~=active]{opacity:1}
@@ -75,7 +79,9 @@ const FLAGS = [
 const KEY = 'elements'
 const OPEN = Symbol('wmkit-open')
 const SYNC = Symbol('wmkit-sync')
+const ADOPT = Symbol('wmkit-adopt')
 const MEMBERS = Symbol('wmkit-members')
+const SHEETS = Symbol('wmkit-sheets')
 
 const Base = (typeof HTMLElement === 'undefined' ? Object : HTMLElement) as typeof HTMLElement
 
@@ -113,9 +119,28 @@ export class WmDesktopElement extends Base {
   options: WmDesktopOptions = {}
   messages: ElementsMessages | null = null
   readonly windows = new Map<string, WmWindowElement>()
-  readonly [MEMBERS] = new Set<WmWindowElement>()
+  readonly [MEMBERS] = new Set<WmWindowElement>();
+  [SHEETS]: CSSStyleSheet[] = []
+  private css: WmDesktopStyles | null = null
   private store: PersistController | null = null
   private stops: Array<() => void> = []
+
+  get styles(): WmDesktopStyles | null {
+    return this.css
+  }
+
+  set styles(value: WmDesktopStyles | null) {
+    this.css = value
+    const Sheet = (this.ownerDocument.defaultView as Window & typeof globalThis).CSSStyleSheet
+    this[SHEETS] = [value ?? []].flat().flatMap((css) => {
+      if (typeof css !== 'string') return [css]
+      if (typeof Sheet.prototype.replaceSync !== 'function') return []
+      const sheet = new Sheet()
+      sheet.replaceSync(css)
+      return [sheet]
+    })
+    for (const element of this[MEMBERS]) element[ADOPT](this[SHEETS])
+  }
 
   connectedCallback(): void {
     if (this.manager) return
@@ -202,6 +227,7 @@ export class WmWindowElement extends Base {
   private quiet = false
   private last: WindowState | null = null
   private tabs = ''
+  private adopted: CSSStyleSheet[] = []
   private controls: Array<[keyof WindowFlags, HTMLElement]> = []
 
   get manager(): WindowManager | null {
@@ -321,6 +347,14 @@ export class WmWindowElement extends Base {
     if (opened) emit(this, 'wm-open', { window: win })
   }
 
+  [ADOPT](sheets: CSSStyleSheet[]): void {
+    if (sheets.length + this.adopted.length === 0) return
+    const root = this.shadowRoot as ShadowRoot
+    const others = (root.adoptedStyleSheets ?? []).filter((sheet) => !this.adopted.includes(sheet))
+    root.adoptedStyleSheets = [...others, ...sheets]
+    this.adopted = sheets
+  }
+
   [OPEN](reopen = false): void {
     let host = this.parentElement
     while (host && !(host instanceof WmDesktopElement)) host = host.parentElement
@@ -333,6 +367,7 @@ export class WmWindowElement extends Base {
     if (!host || !wm) return
     this.host = host
     host[MEMBERS].add(this)
+    this[ADOPT](host[SHEETS])
     const id = this.getAttribute('window-id') ?? this.windowId
     this.windowId = id
     if (id === null || !wm.get(id)) {
@@ -406,20 +441,21 @@ export class WmWindowElement extends Base {
     })
     const actions = doc.createElement('slot')
     actions.name = 'actions'
-    bar.append(title, strip, actions)
-    for (const [action, glyph, label, flag] of [
-      ['wmMinimize', '–', messages.minimize, 'minimizable'],
-      ['wmMaximize', '□', messages.maximize, 'maximizable'],
-      ['wmClose', '×', messages.close, 'closable'],
+    const controls = doc.createElement('span')
+    controls.dataset.wmControls = ''
+    for (const [action, flag] of [
+      ['minimize', 'minimizable'],
+      ['maximize', 'maximizable'],
+      ['close', 'closable'],
     ] as const) {
-      const button = part(doc, 'button', `control ${action.slice(2).toLowerCase()}`)
+      const button = part(doc, 'button', `control ${action}`)
       button.setAttribute('type', 'button')
-      button.setAttribute('aria-label', label)
-      button.dataset[action] = ''
-      button.textContent = glyph
-      bar.append(button)
+      button.setAttribute('aria-label', messages[action])
+      button.setAttribute(`data-wm-${action}`, '')
+      controls.append(button)
       this.controls.push([flag, button])
     }
+    bar.append(title, strip, actions, controls)
     const content = part(doc, 'div', 'content')
     content.append(doc.createElement('slot'))
     root.append(style, bar, content)

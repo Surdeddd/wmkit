@@ -6,6 +6,7 @@ import {
   type WmDesktopElement,
   type WmWindowElement,
 } from '../../src/plugins/elements'
+import { themeStyle } from '../../src/themes'
 
 class StubObserver {
   observe(): void {}
@@ -53,6 +54,10 @@ describe('the chrome buttons', () => {
     expect(shown(desktop, 'b')).toEqual(['control minimize', 'control maximize', 'control close'])
     desktop.manager?.update('a', { minimizable: false, closable: true })
     expect(shown(desktop, 'a')).toEqual(['control maximize', 'control close'])
+    const close = rootOf(desktop, 'b').querySelector('[part~=close]') as HTMLElement
+    expect(close.textContent).toBe('')
+    expect(close.hasAttribute('data-wm-close')).toBe(true)
+    expect(close.parentElement?.hasAttribute('data-wm-controls')).toBe(true)
   })
 
   it('drop the minimize button while the window is docked', () => {
@@ -207,5 +212,112 @@ describe('a tab group', () => {
     desktop.remove()
     await new Promise<void>((resolve) => queueMicrotask(resolve))
     expect(() => log.click()).not.toThrow()
+  })
+})
+
+describe('desktop styles', () => {
+  const adopted = new WeakMap<ShadowRoot, CSSStyleSheet[]>()
+
+  function constructable(): void {
+    Object.defineProperty(ShadowRoot.prototype, 'adoptedStyleSheets', {
+      configurable: true,
+      get(this: ShadowRoot) {
+        return adopted.get(this) ?? []
+      },
+      set(this: ShadowRoot, sheets: CSSStyleSheet[]) {
+        adopted.set(this, sheets)
+      },
+    })
+    Object.defineProperty(CSSStyleSheet.prototype, 'replaceSync', {
+      configurable: true,
+      value(this: CSSStyleSheet, text: string) {
+        const style = document.createElement('style')
+        style.textContent = text
+        document.head.append(style)
+        for (const rule of (style.sheet as CSSStyleSheet).cssRules) {
+          this.insertRule(rule.cssText, this.cssRules.length)
+        }
+        style.remove()
+      },
+    })
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(ShadowRoot.prototype, 'adoptedStyleSheets')
+    Reflect.deleteProperty(CSSStyleSheet.prototype, 'replaceSync')
+  })
+
+  const textOf = (sheet: CSSStyleSheet) => [...sheet.cssRules].map((rule) => rule.cssText).join('')
+
+  it('adopts a string, a sheet or a list of both into every window, later ones too', () => {
+    constructable()
+    const desktop = mount('<wm-desktop><wm-window window-id="a"></wm-window></wm-desktop>')
+    expect(desktop.styles).toBeNull()
+    desktop.styles = '[part=title]{color:red}'
+    expect(desktop.styles).toBe('[part=title]{color:red}')
+    expect(rootOf(desktop, 'a').adoptedStyleSheets.map(textOf)).toEqual([
+      '[part=title] {color: red;}',
+    ])
+
+    const own = new CSSStyleSheet()
+    own.insertRule('[part=content]{padding:4px}', 0)
+    const foreign = new CSSStyleSheet()
+    rootOf(desktop, 'a').adoptedStyleSheets = [foreign, ...rootOf(desktop, 'a').adoptedStyleSheets]
+    desktop.styles = [own, '[part=titlebar]{height:20px}']
+    expect(rootOf(desktop, 'a').adoptedStyleSheets[0]).toBe(foreign)
+    expect(rootOf(desktop, 'a').adoptedStyleSheets[1]).toBe(own)
+    expect(rootOf(desktop, 'a').adoptedStyleSheets.map(textOf).slice(1)).toEqual([
+      '[part=content] {padding: 4px;}',
+      '[part=titlebar] {height: 20px;}',
+    ])
+
+    const later = document.createElement('wm-window')
+    desktop.append(later)
+    expect(later.shadowRoot?.adoptedStyleSheets[0]).toBe(own)
+    desktop.styles = own
+    expect(later.shadowRoot?.adoptedStyleSheets).toEqual([own])
+    desktop.styles = null
+    expect(rootOf(desktop, 'a').adoptedStyleSheets).toEqual([foreign])
+    expect(later.shadowRoot?.adoptedStyleSheets).toEqual([])
+  })
+
+  it('brings the structural rules of a shadow theme into the chrome', () => {
+    constructable()
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="a" label="A"></wm-window></wm-desktop>',
+    )
+    desktop.styles = themeStyle('retro', { shadow: true })
+    const root = rootOf(desktop, 'a')
+    const rules = [...(root.adoptedStyleSheets[0] as CSSStyleSheet).cssRules] as CSSStyleRule[]
+    const ruleFor = (selector: string) =>
+      rules.find((rule) => rule.selectorText?.replace(/\s+/g, ' ') === selector)
+    const titlebar = root.querySelector('[part=titlebar]') as HTMLElement
+    const drag = ruleFor('[data-wm-drag]') as CSSStyleRule
+    expect(titlebar.matches(drag.selectorText)).toBe(true)
+    expect(drag.cssText).toContain('var(--wm-title-inactive)')
+    const title = ruleFor('[data-wm-title]') as CSSStyleRule
+    expect((root.querySelector('[part=title]') as HTMLElement).matches(title.selectorText)).toBe(
+      true,
+    )
+    const controls = ruleFor('[data-wm-controls]') as CSSStyleRule
+    const close = root.querySelector('[part~=close]') as HTMLElement
+    expect((close.parentElement as HTMLElement).matches(controls.selectorText)).toBe(true)
+    const buttons = ruleFor(
+      '[data-wm-close], [data-wm-minimize], [data-wm-maximize]',
+    ) as CSSStyleRule
+    for (const button of root.querySelectorAll('[part~=control]')) {
+      expect(button.matches(buttons.selectorText)).toBe(true)
+    }
+  })
+
+  it('skips strings where constructable sheets are missing and still adopts given sheets', () => {
+    const desktop = mount('<wm-desktop><wm-window window-id="a"></wm-window></wm-desktop>')
+    expect(() => {
+      desktop.styles = '[part=title]{color:red}'
+    }).not.toThrow()
+    expect(rootOf(desktop, 'a').adoptedStyleSheets).toBeUndefined()
+    const sheet = new CSSStyleSheet()
+    desktop.styles = [sheet]
+    expect(rootOf(desktop, 'a').adoptedStyleSheets).toEqual([sheet])
   })
 })
