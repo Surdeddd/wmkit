@@ -21,6 +21,7 @@ export interface DesktopKeyboardOptions {
   cycle?: boolean
   snapShortcuts?: boolean
   historyShortcuts?: boolean
+  tabShortcuts?: boolean
 }
 
 export interface HitAreaOptions {

@@ -251,3 +251,59 @@ describe('windows deep in the stack', () => {
     expect(deepOf(h)).toEqual([])
   })
 })
+
+function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+  target.dispatchEvent(event)
+  return event
+}
+
+describe('tab shortcuts', () => {
+  function grouped(options: DesktopOptions = {}) {
+    const h = makeHarness(options)
+    for (const id of ['a', 'b', 'c']) h.add({ id, x: 10, y: 10, width: 300, height: 200 })
+    h.wm.group(['a', 'b', 'c'])
+    h.wm.activateTab('a')
+    return h
+  }
+
+  const activeTab = (h: Harness) => {
+    const id = h.wm.getState().focusedId as string
+    return h.wm.getState().groups[h.wm.get(id)?.groupId as string]?.activeId
+  }
+
+  it('moves to the next and previous tab with Ctrl or Cmd, Alt and PageDown or PageUp', () => {
+    const h = grouped()
+    const next = press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
+    expect(next.defaultPrevented).toBe(true)
+    expect(activeTab(h)).toBe('b')
+    press(h.element, 'PageDown', { metaKey: true, altKey: true })
+    expect(activeTab(h)).toBe('c')
+    press(h.element, 'PageUp', { ctrlKey: true, altKey: true })
+    expect(activeTab(h)).toBe('b')
+  })
+
+  it('keeps out of the way without the modifiers, in fields or when switched off', () => {
+    const h = grouped()
+    expect(press(h.element, 'PageDown', { ctrlKey: true }).defaultPrevented).toBe(false)
+    expect(press(h.element, 'PageDown', { altKey: true }).defaultPrevented).toBe(false)
+    const field = document.createElement('input')
+    h.element.append(field)
+    press(field, 'PageDown', { ctrlKey: true, altKey: true })
+    expect(activeTab(h)).toBe('a')
+
+    const off = grouped({ keyboard: { tabShortcuts: false } })
+    expect(press(off.element, 'PageDown', { ctrlKey: true, altKey: true }).defaultPrevented).toBe(
+      false,
+    )
+    expect(activeTab(off)).toBe('a')
+  })
+
+  it('still snaps with the arrows when only the tab shortcuts are on', () => {
+    const h = grouped({ keyboard: { snapShortcuts: false } })
+    press(h.element, 'ArrowLeft', { ctrlKey: true, altKey: true })
+    expect(h.wm.get('a')?.stage).toBe('normal')
+    press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
+    expect(activeTab(h)).toBe('b')
+  })
+})

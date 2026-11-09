@@ -197,6 +197,7 @@ export function attachDesktop(
   const cycleEnabled = keyboardOptions.cycle !== false
   const snapShortcuts = keyboardOptions.snapShortcuts !== false
   const historyShortcuts = keyboardOptions.historyShortcuts !== false
+  const tabShortcuts = keyboardOptions.tabShortcuts !== false
   const hitEdge = options.hitAreas?.edge ?? (coarsePointer ? 16 : 8)
   const hitCorner = options.hitAreas?.corner ?? (coarsePointer ? 24 : 12)
   const magnetThreshold =
@@ -679,10 +680,18 @@ export function attachDesktop(
         else wm.undo()
         return
       }
-      if (!snapShortcuts || !event.altKey) return
+      if (!event.altKey) return
       const focused = wm.getState().focusedId
       const win = focused ? wm.get(focused) : undefined
       if (!win) return
+      if (event.key === 'PageDown' || event.key === 'PageUp') {
+        if (tabShortcuts) {
+          event.preventDefault()
+          wm.cycleTab(event.key === 'PageUp' ? -1 : 1)
+        }
+        return
+      }
+      if (!snapShortcuts) return
       const zone = SNAP_SHORTCUTS[event.key]
       if (zone) {
         event.preventDefault()
