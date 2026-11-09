@@ -474,6 +474,7 @@ export class WmWindowElement extends Base {
     }
     bar.append(title, strip, actions, controls)
     const content = part(doc, 'div', 'content')
+    content.dataset.wmContent = ''
     content.append(doc.createElement('slot'))
     root.append(style, bar, content)
   }

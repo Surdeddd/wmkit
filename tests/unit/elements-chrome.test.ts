@@ -60,6 +60,15 @@ describe('the chrome buttons', () => {
     expect(close.parentElement?.hasAttribute('data-wm-controls')).toBe(true)
   })
 
+  it('mark the content box for theme styles, out of reach of light-DOM lookups', () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="a"><p>body</p></wm-window></wm-desktop>',
+    )
+    const content = rootOf(desktop, 'a').querySelector('[data-wm-content]')
+    expect(content?.getAttribute('part')).toBe('content')
+    expect(windowOf(desktop, 'a').querySelector('[data-wm-content]')).toBeNull()
+  })
+
   it('drop the minimize button while the window is docked', () => {
     const desktop = mount(
       '<wm-desktop><wm-window window-id="a"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
