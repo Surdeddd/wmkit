@@ -2,6 +2,7 @@ import { createWindowManager } from '../../core/manager'
 import type {
   ManagerOptions,
   ManagerState,
+  Size,
   WindowFlags,
   WindowInit,
   WindowManager,
@@ -266,25 +267,25 @@ export class WmWindowElement extends Base {
       else for (let i = 0; i < 2 && wm.get(id)?.stage !== 'normal'; i += 1) wm.restore(id)
     } else if (name === 'workspace') wm.moveToWorkspace(id, numberAt(this, name) ?? 0)
     else if (name === 'x' || name === 'y') {
-      wm.move(id, numberAt(this, 'x') ?? win.bounds.x, numberAt(this, 'y') ?? win.bounds.y)
+      const at = numberAt(this, name)
+      if (at !== undefined) {
+        wm.move(id, name === 'x' ? at : win.bounds.x, name === 'y' ? at : win.bounds.y)
+      }
     } else if (name === 'width' || name === 'height') {
       const size = numberAt(this, name)
       if (size !== undefined) wm.resize(id, { [name]: size })
     } else if (name === 'aspect-ratio') wm.update(id, { aspectRatio: numberAt(this, name) ?? null })
-    else if (name.startsWith('min-')) {
-      wm.update(id, {
-        minSize: {
-          width: numberAt(this, 'min-width') ?? win.minSize.width,
-          height: numberAt(this, 'min-height') ?? win.minSize.height,
-        },
-      })
-    } else if (name.startsWith('max-')) {
-      wm.update(id, {
-        maxSize: {
-          width: numberAt(this, 'max-width') ?? Number.POSITIVE_INFINITY,
-          height: numberAt(this, 'max-height') ?? Number.POSITIVE_INFINITY,
-        },
-      })
+    else if (name.startsWith('min-') || name.startsWith('max-')) {
+      const side = name.slice(4) as keyof Size
+      const at = numberAt(this, name)
+      if (name.startsWith('min-')) {
+        wm.update(id, { minSize: { ...win.minSize, [side]: at ?? win.minSize[side] } })
+      } else {
+        const none = Number.POSITIVE_INFINITY
+        wm.update(id, {
+          maxSize: { width: none, height: none, ...win.maxSize, [side]: at ?? none },
+        })
+      }
     } else wm.update(id, { [name]: value !== 'false' } as WindowUpdate)
   }
 

@@ -76,6 +76,41 @@ describe('a size attribute', () => {
     expect(wm?.get('a')?.bounds).toMatchObject({ width: 420, height: 260 })
     expect(Object.values(wm?.get('a')?.bounds ?? {}).every(Number.isFinite)).toBe(true)
   })
+
+  it('moves along one axis and keeps the other where the manager put it', () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="a" x="10" y="20" width="300" height="200"></wm-window></wm-desktop>',
+    )
+    const wm = desktop.manager
+    const element = windowOf(desktop, 'a')
+    wm?.move('a', 300, 200)
+    element.setAttribute('x', '50')
+    expect(wm?.get('a')?.bounds).toMatchObject({ x: 50, y: 200 })
+    element.setAttribute('y', '60')
+    expect(wm?.get('a')?.bounds).toMatchObject({ x: 50, y: 60 })
+    element.removeAttribute('x')
+    element.setAttribute('y', 'up')
+    expect(wm?.get('a')?.bounds).toMatchObject({ x: 50, y: 60 })
+  })
+
+  it('changes one side of a size limit and keeps the other side', () => {
+    const desktop = mount(`<wm-desktop><wm-window window-id="a" width="300" height="200"
+      min-width="150" min-height="100" max-width="600" max-height="500"></wm-window></wm-desktop>`)
+    const wm = desktop.manager
+    const element = windowOf(desktop, 'a')
+    wm?.update('a', { minSize: { width: 150, height: 180 }, maxSize: { width: 600, height: 450 } })
+    element.setAttribute('min-width', '170')
+    expect(wm?.get('a')?.minSize).toEqual({ width: 170, height: 180 })
+    element.removeAttribute('min-height')
+    expect(wm?.get('a')?.minSize).toEqual({ width: 170, height: 180 })
+    element.setAttribute('max-width', '650')
+    expect(wm?.get('a')?.maxSize).toEqual({ width: 650, height: 450 })
+    element.removeAttribute('max-height')
+    expect(wm?.get('a')?.maxSize).toEqual({ width: 650, height: Number.POSITIVE_INFINITY })
+    wm?.update('a', { maxSize: null })
+    element.setAttribute('max-height', '480')
+    expect(wm?.get('a')?.maxSize).toEqual({ width: Number.POSITIVE_INFINITY, height: 480 })
+  })
 })
 
 describe('an element follows the manager', () => {
