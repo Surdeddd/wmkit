@@ -4,7 +4,7 @@ description: Every export of @surdeddd/wmkit and its subpaths — the window man
 
 # API reference
 
-Everything exported from `@surdeddd/wmkit` and its subpaths. Types are the real ones from `src/core/types.ts` and `src/dom/shared.ts`.
+Everything exported from `@surdeddd/wmkit` and its subpaths. Types are the real ones from `src/core/types.ts` and `src/dom/shared.ts`. The framework adapters and the `<wm-desktop>` web components (`./elements`) are described in [Adapters](adapters.md), the WinBox entry (`./winbox`) in [Migrating from WinBox](winbox-migration.md).
 
 - [Core types](#core-types)
 - [createWindowManager](#createwindowmanageroptions)
@@ -16,8 +16,11 @@ Everything exported from `@surdeddd/wmkit` and its subpaths. Types are the real 
 - [Animation helpers](#animation-helpers)
 - [Announcer](#announcer)
 - [Emitter](#emitter)
+- [chrome](#skinspec--surdedddwmkitchrome)
+- [themes](#themenames-themestylename-options--surdedddwmkitthemes)
 - [persist](#persistwm-options--surdedddwmkitpersist)
 - [popout](#popoutwm-id-content-options--surdedddwmkitpopout)
+- [dock](#createdockdesktop-options--surdedddwmkitdock)
 - [devtools](#createdevtoolswm-options--surdedddwmkitdevtools)
 
 ## Core types
@@ -60,7 +63,7 @@ The flags are advisory state: the DOM layer refuses the matching gesture, while 
 
 ### WindowState
 
-Every field is JSON-safe. Objects are replaced, never mutated, so `previous === next` is a valid "nothing changed" check.
+Objects are replaced, never mutated, so `previous === next` is a valid "nothing changed" check.
 
 ```ts
 interface WindowState extends WindowFlags {
@@ -83,27 +86,31 @@ interface WindowState extends WindowFlags {
 }
 ```
 
+Every number in a window is finite, with one exception: an unbounded `maxSize` axis is `Infinity`. `JSON.stringify` writes `Infinity` as `null`, so save a desktop through `serialize()`, which writes that axis as `null` on purpose and which `hydrate()` reads back as unbounded, rather than by stringifying the state yourself. `meta` holds whatever you put in it and is only as JSON-safe as your values.
+
 ### WindowInit
 
 ```ts
 interface WindowInit extends Partial<WindowFlags> {
   id?: string          // generated as `${idPrefix}-${n}` when omitted or empty; duplicates throw
   title?: string       // 'Window'
-  x?: number           // cascades when x or y is omitted
+  x?: number           // cascades when x or y is omitted or not finite
   y?: number
-  width?: number       // defaultSize.width
-  height?: number      // defaultSize.height
-  minWidth?: number    // 160
-  minHeight?: number   // 100
-  maxWidth?: number
+  width?: number       // defaultSize.width when omitted, not finite or not above 0
+  height?: number      // defaultSize.height, same rule
+  minWidth?: number    // 160 when omitted, negative or not finite
+  minHeight?: number   // 100, same rule
+  maxWidth?: number    // unbounded when omitted or not above 0
   maxHeight?: number
   aspectRatio?: number // ignored unless finite and > 0
   stage?: WindowStage  // 'snapped' is downgraded to 'normal' (no zone to snap to yet)
-  layer?: WindowLayer
+  layer?: WindowLayer  // 'normal' when omitted or unknown
   workspace?: number   // active workspace; non-integers and negatives fall back
   meta?: Record<string, unknown>
 }
 ```
+
+`open()` throws only for a duplicate id. A field it cannot use falls back to what omitting the field would give, as the comments above say, so a bad number never reaches the state.
 
 ### ManagerState
 
@@ -121,6 +128,8 @@ interface ManagerState {
 
 `getState()` returns a cached object that is replaced on every change, so a `!==` check is enough to know something happened. Window ids may be any string, `constructor` and `__proto__` included: `windows` has a null prototype, so read it with `Object.keys`, `in` or `Object.hasOwn`, not `windows.hasOwnProperty`.
 
+The keys of `windows` are in opening order, also after `hydrate` and `loadLayout`, with one exception that comes from JavaScript itself: keys that look like integers (`'42'`) always come first, in numeric order. When you render a list from `windows`, use ids that are not bare integers, or sort by `openedSeq`.
+
 ### SerializedState
 
 ```ts
@@ -135,7 +144,15 @@ interface SerializedState {
 }
 ```
 
-`hydrate()` validates the payload and returns `false` instead of throwing: wrong `version`, a non-array `windows`, duplicate ids, a missing `bounds`, or an unknown `stage`/`layer` all reject the whole snapshot. Unknown per-window fields are replaced with defaults rather than rejected. A valid snapshot keeps its bounds as stored, `meta` is copied, and group members are re-synced to their active tab (an `activeTabs` entry that names no member falls back to the group's first). `focusedId: null` keeps the desktop blurred; only a missing or invalid id falls back to the top window.
+`hydrate()` returns `false` instead of throwing. It rejects the whole snapshot only when its structure is wrong: a value that is not an object, a `version` other than `1`, `windows` that is not an array, an entry that is not an object, an id that is not a non-empty string, `bounds` that is not an object, an unknown `stage` or `layer`, or a duplicate id. Anything else is repaired window by window, so one damaged window does not cost the rest of the layout:
+
+- a position that is not finite takes the cascade position; a width or height that is not finite or not above 0 takes `defaultSize`
+- the size is clamped into the window's own limits; an invalid minimum axis takes its default (160 or 100), an invalid maximum axis becomes unbounded
+- a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is clamped into the unit square, or dropped when nothing of it lies inside
+- `stage: 'snapped'` with neither a known `snapZone` nor a `snapRect` becomes `'normal'`
+- an `openedSeq` that is not finite gets a new one, and any other unknown per-window field takes its default
+
+`meta` is copied, and group members are re-synced to their active tab (an `activeTabs` entry that names no member falls back to the group's first); the frame of a group honours the limits of all its members, as below. `focusedId: null` keeps the desktop blurred; only a missing or invalid id falls back to the top window.
 
 ## `createWindowManager(options?)`
 
@@ -150,14 +167,18 @@ interface ManagerOptions {
   cascadeOffset?: number               // 32
   cascadeOrigin?: { x: number; y: number } // { x: 32, y: 32 }
   idPrefix?: string                    // 'wm'
-  historyLimit?: number                // 50; 0 disables undo/redo
+  historyLimit?: number                // 50; 0 disables undo/redo, Infinity keeps every step
   workspace?: number                   // 0
 }
 ```
 
-With `viewport` at its zero default, `clampToViewport` is a no-op — so a manager hydrated before mount keeps its stored geometry, and the first `setViewport()` (usually from the controller's `ResizeObserver`) re-derives everything. Until the viewport is known, `maximize` and `open({ stage: 'maximized' })` keep the window's own frame, and undo, redo and hydrate do not re-derive geometry either. Under jsdom `clientWidth`/`clientHeight` are 0, so with `autoViewport` on the `setViewport` at mount is ignored and the constructor viewport stays: pass `viewport` to `createWindowManager` in tests.
+A numeric option that cannot be used falls back to its default rather than breaking the manager: a `viewport` or `defaultSize` with an axis that is not finite and above 0, a `cascadeOffset` or `cascadeOrigin` that is not finite, a `minVisible` that is negative or not finite, and a `historyLimit` that is negative or `NaN`. A rejected `viewport` leaves the viewport unknown.
+
+With `viewport` at its zero default, `clampToViewport` is a no-op — so a manager hydrated before mount keeps its stored geometry, and the first `setViewport()` (usually from the controller's `ResizeObserver`) re-derives everything. Until the viewport is known, `maximize` and `open({ stage: 'maximized' })` keep the window's own frame, `center()` returns `false`, `arrange('tile')` does nothing, and undo, redo and hydrate do not re-derive geometry either. Under jsdom `clientWidth`/`clientHeight` are 0, so with `autoViewport` on the `setViewport` at mount is ignored and the constructor viewport stays: pass `viewport` to `createWindowManager` in tests.
 
 ## WindowManager methods
+
+A call that changes nothing is a no-op: the state object stays the same, no event fires and no history entry is written. That covers, among others, `resize(id, {})`, `focus` on the focused window when it is already on top, a repeated `arrange`, and `snap`, `snapTo` or `restoreTo` to where the window already is when the focus has nowhere to move (these three return `true`).
 
 ### Lifecycle
 
@@ -165,7 +186,7 @@ With `viewport` at its zero default, `clampToViewport` is a no-op — so a manag
 | --- | --- | --- |
 | `open(init?)` | `WindowState` | throws on a duplicate id; cascades when `x`/`y` are omitted; focuses unless minimized or on another workspace |
 | `close(id)` | `boolean` | `false` for unknown ids; focus moves to the next eligible window |
-| `closeAll()` | `void` | every workspace, one transaction |
+| `closeAll()` | `void` | every workspace, one transaction. Emits `close` for each window in opening order, one `order`, then `group` for each group that dissolved, and no `focus` |
 | `destroy()` | `void` | drops all listeners; the state object stays usable |
 
 ### Focus and order
@@ -185,9 +206,11 @@ With `viewport` at its zero default, `clampToViewport` is a no-op — so a manag
 | `maximize(id)` | `boolean` | fills the viewport; keeps geometry in `restoreBounds` |
 | `toggleMaximize(id)` | `boolean` | maximize, or restore when already maximized |
 | `restore(id)` | `boolean` | from minimized returns to the remembered stage (a window returning to `normal` is re-clamped against the viewport when `keepInViewport` is on); from maximized/snapped returns to `restoreBounds`, re-clamped against min/max and the viewport — except a maximized window that carries a `snapRect`, which goes back to that rectangle |
-| `restoreTo(id, bounds)` | `boolean` | forces `normal` at explicit bounds; used by drag-off-snap |
-| `snap(id, zone)` | `boolean` | zone geometry, clamped to the window's own min/max |
+| `restoreTo(id, bounds)` | `boolean` | forces `normal` at explicit bounds; used by drag-off-snap. `false` when a value is not finite |
+| `snap(id, zone)` | `boolean` | zone geometry, clamped to the window's own min/max; `false` for an unknown zone |
 | `snapTo(id, rect)` | `boolean` | snaps to any rectangle given in viewport fractions (`{ x: 0.5, y: 0, width: 0.5, height: 1 }` is the right half); it follows viewport changes like a zone does, and the first drag frame tears the window out. Unlike `snap` it neither focuses nor raises the window. The dock plugin is built on it |
+
+`snapTo` clamps its rectangle into the unit square: `{ x: -1, y: 0.5, width: 3, height: 3 }` is stored as `{ x: 0, y: 0.5, width: 1, height: 0.5 }`. It returns `false` when a value is not finite or nothing of the rectangle lies inside the square.
 
 `maximize`, `snap`, `restore`, `restoreTo`, `group` and `ungroup` focus the window the way `focus()` does: they switch to its workspace first, even when a modal is up on the current workspace. When a modal blocks the window they skip the focus silently and do not emit `modalblocked`, which means a blocked `focus()` call.
 
@@ -197,10 +220,14 @@ With `viewport` at its zero default, `clampToViewport` is a no-op — so a manag
 | --- | --- | --- |
 | `move(id, x, y)` | `boolean` | `normal` stage only; `true` when the clamp made it a no-op |
 | `moveBy(id, dx, dy)` | `boolean` | relative `move` |
-| `center(id)` | `boolean` | centres a `normal` window in the viewport |
-| `resize(id, patch)` | `boolean` | `Partial<Bounds>`; unsnaps a snapped window; honours `aspectRatio`, driven by the axis that changed most |
-| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). A patch that sets the values the window already has is a no-op: same object, no events, no history entry. Primitives compare by value; a new `meta`, `minSize` or `maxSize` object always counts as a change. Changing the constraints of a snapped window re-derives its zone |
-| `setViewport(size)` | `void` | re-derives maximized and snapped bounds, clamps the rest; never recorded in history; a size with a zero or negative dimension (a hidden desktop) is ignored and the last known viewport stays |
+| `center(id)` | `boolean` | centres a `normal` window in the viewport; `false` while the viewport is unknown |
+| `resize(id, patch)` | `boolean` | `Partial<Bounds>`; `false` while the window is maximized or minimized. Unsnaps a snapped window, unless its bounds do not actually change; honours `aspectRatio`, driven by the axis that changed most |
+| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). Changing the constraints of a snapped window re-derives its zone. See below for what it refuses and what counts as a change |
+| `setViewport(size)` | `void` | re-derives maximized and snapped bounds, clamps the rest; never recorded in history; a size with a dimension that is not finite and above 0 (a hidden desktop, for one) is ignored and the last known viewport stays |
+
+A number that is not finite never enters the state: `move`, `moveBy`, `resize`, `restoreTo` and `snapTo` given `NaN` or `Infinity` change nothing and return `false`. A partial patch keeps what it does not name, so `wm.resize(id, { width: 400, height: undefined })` keeps the height, and so does `height: null`. Sizes never go below 1 px, whatever the minimum says.
+
+`update(id, patch)` returns `false` and changes nothing for an impossible limit — a `minSize` axis that is negative, not finite or missing, a `maxSize` axis that is not above 0 or missing (`Infinity` is fine) — or for an unknown layer. It stores copies of `minSize` and `maxSize`, so mutating the object you passed changes nothing later. A patch that leaves the window equal to what it was is a no-op: same object, no events, no history entry. Values are compared, not objects: `update(id, { meta: { n: 1 } })` on a window whose `meta` already equals `{ n: 1 }` changes nothing, while a value nested inside `meta` compares by identity.
 
 ### Workspaces
 
@@ -219,7 +246,7 @@ share geometry; exactly one member is visible at a time and the rest behave like
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `group(ids)` | `string \| null` | `null` for fewer than two known windows; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them |
+| `group(ids)` | `string \| null` | `null` for fewer than two known windows; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them; when the ids already form one group, its id is returned and the first id becomes the active tab |
 | `ungroup(id)` | `boolean` | detaches one member, the rest stay contiguous in `order` (emits `order`); a group left with a single member dissolves entirely |
 | `activateTab(id)` | `boolean` | makes a member the visible tab; `false` when it is already active or not grouped. Focus follows the tab, but only when the member going hidden was the focused window |
 | `moveTab(id, index)` | `boolean` | moves a member to another slot in the tab order; the index is clamped, and `false` means nothing moved. The active tab, the focus and the geometry stay put |
@@ -241,10 +268,13 @@ Invariants the manager maintains for you:
   viewport reflow and drag magnetism, exactly like windows on another workspace — the group counts
   as one frame, driven by its visible tab
 - a maximized group fills the viewport exactly, member constraints ignored, like a single maximized window
-- otherwise the frame is sized so it satisfies every member's `minSize` and `maxSize`, not just the host's —
-  including later moves, resizes and stage changes, so resizing one tab can grow the frame rather
-  than push a sibling under its own minimum. The `resize` and `update` events carry the frame the
-  group actually took, which is not always the one you asked for
+- otherwise the frame honours the limits of every member, not just the host's: the largest
+  `minSize`, the smallest `maxSize` and the smallest `aspectRatio`; when a minimum exceeds a maximum,
+  the maximum wins. That holds for later moves, resizes and stage changes too, so resizing one tab
+  can grow the frame rather than push a sibling under its own minimum, and the frame comes out the
+  same after undo, after `hydrate(serialize())` and after a viewport change. The `resize` and
+  `update` events carry the frame the group actually took, which is not always the one you asked for
+- a window that leaves a group, or whose group dissolves, is fitted back into its own limits
 - `focus(id)` on an inactive tab activates it first, so DOM focus never lands on a hidden element;
   a focus a modal refuses leaves the active tab untouched
 - members stay contiguous in `order`, so switching tabs never changes where the frame sits in the
@@ -275,10 +305,12 @@ The `group` event fires on creation, activation and membership changes, includin
 | `undo()` / `redo()` | `boolean` | `false` when the stack is empty |
 | `canUndo()` / `canRedo()` | `boolean` | |
 | `clearHistory()` | `void` | both stacks. Inside a `batch` history restarts at the call, and later changes in the same batch undo back to it. During a gesture the rest of that gesture is not recorded, and `abortInteraction()` restores the history from before the gesture, which brings back what was cleared |
-| `beginInteraction()` / `endInteraction()` | `void` | collapse a gesture into one entry; nestable |
-| `abortInteraction()` | `void` | ends the interaction and drops the entry it created — for cancelled gestures |
+| `beginInteraction()` / `endInteraction()` | `void` | collapse a gesture into one entry; nestable. An interaction whose state ends equal to how it started leaves no entry, and the redo stack survives it |
+| `abortInteraction()` | `void` | at the outermost level, ends the interaction and drops the entry it created — for cancelled gestures. The changes made inside stay in the state and do not become a step of their own, so roll them back before aborting (the controller does on Escape). Inside a nested interaction it only leaves the inner level, and the outer interaction keeps its single entry |
 
-`hydrate()` and `loadLayout()` clear the history: you cannot undo across a restore. Undo or redo during an interaction makes the rest of the gesture a new step and clears redo.
+Steps that change only focus and stacking order collapse when they follow each other: three clicks on other windows after a move leave two undo steps, the move and one focus step.
+
+`hydrate()` and `loadLayout()` clear the history: you cannot undo across a restore. `undo()` and `redo()` called inside a `batch` or an interaction behave as if the batch or the interaction had ended just before the call and started again right after it, so the rest of a gesture becomes a new step.
 
 ### Layouts and arrangement
 
@@ -289,10 +321,12 @@ The `group` event fires on creation, activation and membership changes, includin
 | `getLayout(name)` | `SerializedState \| undefined` | isolated copy |
 | `setLayout(name, data)` | `boolean` | validates like `hydrate` |
 | `deleteLayout(name)` / `layoutNames()` | `boolean` / `string[]` | |
-| `arrange(mode)` | `void` | `'cascade'` staggers from `cascadeOrigin`; `'tile'` fills a `ceil(sqrt(n))` grid; both skip minimized windows and other workspaces |
-| `minimizeAll()` / `restoreAll()` | `void` | active workspace, one history entry |
+| `arrange(mode)` | `void` | `'cascade'` staggers from `cascadeOrigin`; `'tile'` fills a `ceil(sqrt(n))` grid. Both skip minimized windows, other workspaces and windows snapped to an explicit rectangle (`snapTo`, docked panels); see below |
+| `minimizeAll()` / `restoreAll()` | `void` | active workspace, one history entry. `minimizeAll` skips windows with `minimizable: false`; `restoreAll` emits at most one `order` |
 
-Layout storage is in-memory. Persist it yourself with `getLayout`/`setLayout`, or use the persist plugin for the live desktop.
+`arrange` emits `move` and `resize` for each window it places, raises the arranged windows once and focuses the last of them, or the top modal when one is up; calling it again with nothing changed is a no-op. `arrange`, `minimizeAll`, `restoreAll` and `closeAll` take time linear in the number of windows when no tab groups are involved.
+
+Layout storage is in-memory. Persist it yourself with `getLayout`/`setLayout`, or use the persist plugin for the live desktop. Layouts are copied with `structuredClone`, so cyclic values, `Date`s and `Infinity` in `meta` or in an extension survive. A value that cannot be cloned, such as a function, makes the copy go through JSON instead: functions are dropped, `Date`s become strings and `Infinity` becomes `null`.
 
 ### Reading and subscribing
 
@@ -302,9 +336,9 @@ Layout storage is in-memory. Persist it yourself with `getLayout`/`setLayout`, o
 | `getState()` | `ManagerState` | cached until the next change |
 | `minimized()` | `readonly WindowState[]` | active workspace, ordered by `openedSeq` — taskbar order |
 | `serialize()` | `SerializedState` | |
-| `hydrate(data)` | `boolean` | emits `open`/`close` for the difference (and `focus` when focus moves), re-derives against the viewport |
+| `hydrate(data)` | `boolean` | repairs or rejects as described under [SerializedState](#serializedstate), re-derives against the viewport, emits the difference (see [Events](#events)) |
 | `subscribe(fn)` | `() => void` | one call per committed transaction; changes made by listeners during a dispatch can share one call. A transaction that only emits events, such as a blocked `focus`, delivers them without a `change` |
-| `on(event, fn)` | `() => void` | granular events, see below |
+| `on(event, fn)` | `() => void` | granular events, see below. Subscribing the same function twice gives two subscriptions, and each returned function removes only its own |
 | `batch(fn)` | `void` | one `change`, one history entry, events flushed at the end |
 | `setExtension(key, value)` | `void` | stores plugin state under `getState().extensions[key]`; it is serialized, restored by `hydrate` and recorded in history, so a plugin change and the window changes in the same `batch` undo together. `undefined` removes the key; the same value is a no-op |
 
@@ -337,11 +371,13 @@ A call made from inside a listener is queued behind the events already being del
 
 `open` and `close` cover every way a window appears or disappears, not just the calls named after them: `hydrate`, `loadLayout`, `undo` and `redo` all report the difference they made, so mounting your content on `open` and disposing it on `close` stays correct across history. Their `open` payloads carry the final geometry, and a window that appears gets no `move` or `resize` before its `open`. It is safe to call `attachWindow` straight from an `open` handler.
 
+Those four calls keep the object of every window they did not change, so `previous === next` holds across them, and report the windows that did change with the granular events: for each window `close`, or `stage` (with the stage the window really had before), `move`, `resize` and `update`; then `open` for the windows that appeared, one `order` when the stacking changed, `group` for each group that changed, and `focus`. `restoreTo` emits `stage` only when the stage changes, plus `move` and `resize` for the geometry that did.
+
 The controller moves real DOM focus into the window that `focus` reports, so an app that applies remote `hydrate` or `loadLayout` snapshots while the user types takes the focus away from the input.
 
 ## `attachDesktop(wm, element, options?)`
 
-Binds the manager to a DOM subtree and returns a `DesktopController`. The element becomes the coordinate space; it gets `data-wm-desktop`, `tabindex="-1"` and `position: relative` when it was `static`.
+Binds the manager to a DOM subtree and returns a `DesktopController`. The element becomes the coordinate space; it gets `data-wm-desktop`, `tabindex="-1"` and `position: relative` when it was `static`. Pointer positions account for the element's border, its scroll offset and a scale transform on it.
 
 ```ts
 interface DesktopOptions {
@@ -357,6 +393,7 @@ interface DesktopOptions {
     cycle?: boolean           // true — F6
     snapShortcuts?: boolean   // true — Ctrl/Cmd+Alt+arrows
     historyShortcuts?: boolean // true — Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z
+    tabShortcuts?: boolean    // true — Ctrl/Cmd+Alt+PageDown/PageUp
   }
   announce?: boolean | Partial<AnnouncerMessages>
   autoViewport?: boolean      // true — ResizeObserver drives setViewport
@@ -366,6 +403,7 @@ interface DesktopOptions {
     base?: number      // 0 — z-index of the desktop floor
     gap?: number       // 32 — room left between neighbours for cheap reordering
     isolate?: boolean  // true — isolation:isolate so window layers stay inside the desktop
+    deep?: number | false  // 12 — windows further below the top carry data-wm-deep; false turns it off
   }
   animation?: boolean | {
     duration?: number   // 260
@@ -381,6 +419,10 @@ interface DesktopOptions {
 }
 ```
 
+The nested option objects are exported as types: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `StackingOptions` and `AnimationOptions`.
+
+`beforeClose` is asked whenever the user closes a window: by a `data-wm-close` button, through `desktop.actions(id).close()` and through the close action a skin receives. A direct `wm.close(id)` does not ask it. Where `ResizeObserver` is missing, `autoViewport` measures the element once at attach and does not follow it afterwards.
+
 ### Gestures
 
 The desktop ships no gestures of its own. Pass the ones you want and only those
@@ -395,7 +437,7 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 
 `@surdeddd/wmkit/gestures` exports three factories: `pinch(options?)`,
 `swipe(options?)` and `touchGestures({ pinch, swipe })` when you want both from
-one listener.
+one listener. Their options are the types `PinchOptions` and `SwipeOptions`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -403,6 +445,8 @@ one listener.
 | `pinch.lockTouchAction` | `false` | set `touch-action: none` on the desktop instead of `pan-x pan-y` (any two-finger gesture sets `pan-x pan-y`; `pinch()` and `swipe()` together restore the original value on destroy) |
 | `swipe.threshold` | `72` | how far two fingers must travel sideways |
 | `swipe.workspaces` | `0` | no upper bound; set it to stop at the last workspace |
+
+A lifted finger is heard on the page's `window` in the capture phase, so content that calls `stopPropagation()` on `pointerup` does not leave the gesture holding a finger that is gone, and a new first touch drops any finger left over from before.
 
 A gesture is a function. It receives a `GestureContext` and returns its own
 teardown, so you can write your own the same way the shipped ones are written:
@@ -426,7 +470,7 @@ interface GestureContext {
 
 `claim` is what keeps gestures from fighting the built-in drag and resize: the
 desktop holds one interaction at a time, and `busy()` tells you whether it is
-already taken.
+already taken. Claiming while a drag or resize runs cancels that gesture. `toLocal` returns desktop coordinates, the space window bounds live in.
 
 ```ts
 interface DesktopController {
@@ -435,6 +479,7 @@ interface DesktopController {
   attachWindow(id: string, element: HTMLElement, options?: WindowAttachOptions): () => void
   mountWindow(id: string, skin: WindowSkin | string, options?: WindowAttachOptions): MountedWindow
   actions(id: string): WindowActions
+  addDropTarget(target: DropTarget): () => void
   destroy(): void
 }
 
@@ -445,9 +490,9 @@ interface WindowAttachOptions {
 }
 ```
 
-`attachWindow` throws for an unknown id or an id that is already attached. It returns a detach function; `destroy()` detaches everything, cancels an in-flight gesture and removes the snap preview, and the elements lose `data-wm-window` and `data-wm-focused` exactly as with a detach.
+`attachWindow` throws for an unknown id, for an id that is already attached and for an element that already drives another window (`wmkit: window "<id>" is already attached`), and after `destroy()` (`wmkit: the desktop is destroyed`). It returns a detach function; `destroy()` detaches everything, cancels an in-flight gesture and removes the snap preview, and the elements lose `data-wm-window` and `data-wm-focused` exactly as with a detach. Detaching a window that still exists also clears `hidden` on its element.
 
-A window that the manager closes — including one that `undo` takes away — is detached for you: its listeners and resize handles go, and the element loses `data-wm-window` so nothing mistakes it for a live window afterwards. The element itself stays in the page unless you passed `removeOnClose`, and the detach function you were handed is safe to call again at any point, including after you have attached that same element to a different window or after `desktop.destroy()`.
+A window that the manager closes — including one that `undo` takes away — is detached for you: its listeners and resize handles go, and the element loses `data-wm-window` so nothing mistakes it for a live window afterwards. The element itself stays in the page unless you passed `removeOnClose`, and the detach function you were handed is safe to call again at any point, including after you have attached that same element to a different window or after `desktop.destroy()`. Pass `removeOnClose` only for elements you created yourself; see [createDesktopBinder](#createdesktopbinderwm-options) for why.
 
 ### `desktop.actions(id)`
 
@@ -458,19 +503,19 @@ const act = desktop.actions('notes')
 closeButton.onclick = () => act.close()
 ```
 
-`focus`, `close`, `minimize`, `maximize`, `toggleMaximize`, `restore`, `center`, `sendToBack`, `snap(zone)` and `moveToWorkspace(n)`. Each returns the same boolean the manager returns, and each returns `false` once the window is gone rather than throwing.
+`focus`, `close`, `minimize`, `maximize`, `toggleMaximize`, `restore`, `center`, `sendToBack`, `snap(zone)` and `moveToWorkspace(n)`. Each returns the same boolean the manager returns, and each returns `false` once the window is gone rather than throwing. `close()` asks `beforeClose` first and returns `false` when it refuses.
 
 ### `desktop.addDropTarget(hit)`
 
 ```ts
-type DropTarget = (clientX: number, clientY: number, id: string) => DropHit | null
+type DropTarget = (clientX: number, clientY: number, id: string, local: { x: number; y: number }) => DropHit | null
 interface DropHit {
   preview: Bounds   // desktop-local rectangle shown while the pointer is over the target
   commit(): void    // runs when the drag ends there
 }
 ```
 
-Lets a plugin claim a window drag. On every drag frame the targets are asked in the order they were added, before tab grouping and snapping, and the first hit wins: its `preview` is drawn with the snap preview element, marked `data-wm-drop`, and its `commit` runs when the pointer is released there. Cancelling the drag (Escape, a lost pointer) commits nothing. The drop preview shows even with `snap: { preview: false }`. Returns a function that removes the target. The dock plugin is built on it.
+Lets a plugin claim a window drag. On every drag frame the targets are asked in the order they were added, before tab grouping and snapping, and the first hit wins: its `preview` is drawn with the snap preview element, marked `data-wm-drop`, and its `commit` runs exactly once when the pointer is released there. `local` is the pointer in desktop coordinates, the space window bounds live in; a target written with three parameters works as well. Cancelling the drag (Escape, a lost pointer) commits nothing. The drop preview shows even with `snap: { preview: false }`. Returns a function that removes the target. The dock plugin is built on it.
 
 ### Driving a window from markup
 
@@ -478,7 +523,7 @@ Any element inside a window can carry one of these and the controller will act o
 
 | attribute | effect |
 | --- | --- |
-| `data-wm-close` | closes the window |
+| `data-wm-close` | closes the window, after asking `beforeClose` |
 | `data-wm-minimize` | minimizes it |
 | `data-wm-maximize` | toggles maximized |
 | `data-wm-restore` | returns it to its stored bounds |
@@ -487,7 +532,7 @@ Any element inside a window can carry one of these and the controller will act o
 | `data-wm-snap="left"` | snaps it to that zone, if the window is snappable |
 | `data-wm-to-workspace="2"` | moves it to that workspace |
 
-An unknown snap zone is ignored rather than thrown, so a typo in a template never takes the page down with it.
+An attribute acts only on the window it sits in, also when one desktop is nested inside another window. An unknown snap zone is ignored rather than thrown, so a typo in a template never takes the page down with it. The buttons and the keyboard work the same for a desktop that lives in another document, such as a same-origin iframe or a popup the app renders into through a portal.
 
 ### `desktop.mountWindow(id, skin, options?)`
 
@@ -516,7 +561,7 @@ interface MountedWindow {
 }
 ```
 
-`skin` is either a factory or the name of one registered in `attachDesktop(wm, root, { skins })`; an unregistered name throws. A `meta.skin` change to an unregistered name, or to a factory that throws, throws once from the call that made the change: the window keeps its current skin and stays fully driven, and the controller does not retry until `meta.skin` changes again. The returned `element` and `content` are live: after the window is rebuilt they point at the new nodes, so a reference you took at mount time never goes stale. A handle whose window closed keeps pointing at its last nodes and never adopts a later window that reuses the id.
+`skin` is either a factory or the name of one registered in `attachDesktop(wm, root, { skins })`; an unregistered name throws. A `meta.skin` change to an unregistered name, or to a factory that throws, throws once from the call that made the change: the window keeps its current skin and stays fully driven, and the controller does not retry until `meta.skin` changes again. When several windows change skin in one transaction and one of them fails, the others are still rebuilt and the stacking and focus of that pass still apply; the first error is thrown once the pass is over. The returned `element` and `content` are live: after the window is rebuilt they point at the new nodes, so a reference you took at mount time never goes stale. A handle whose window closed keeps pointing at its last nodes and never adopts a later window that reuses the id.
 
 A window is rebuilt when `meta.skin` changes to another registered name, or when you call `mountWindow` again for the same id. Either way the content children move across, the id, geometry, focus and stacking survive, and the previous skin's `destroy` runs after the swap. Windows you attached yourself with `attachWindow` are never rebuilt behind your back. Mounting under a name other than `meta.skin` is kept; it is not corrected on the next change.
 
@@ -524,18 +569,29 @@ A skin's `destroy` runs exactly once: after a rebuild swap, on close, on `detach
 
 ### What the controller writes
 
-On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`. The first sync briefly sets `transition: none`, and an inline `transition` your app set is restored afterwards.
+On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `data-wm-variant` (when `windowVariant` names one), `data-wm-group` and `data-wm-tab` (on grouped windows), `data-wm-tab-target` (on the window a drag would group with), `data-wm-live`, `data-wm-deep`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`. The first sync briefly sets `transition: none`, and an inline `transition` your app set is restored afterwards. [Theming](theming.md#the-attribute-contract) lists the values; plugins add their own attributes (`data-wm-pinching`, `data-wm-docked`, `data-wm-skin`).
+
+<span v-pre>In `[data-wm-title]` the controller replaces only the title text, so an icon or static text around it stays: `<span data-wm-title><i class="icon"></i> {{title}}</span>`. The old title is found by its text, so static text placed before the title that contains the same string is replaced instead.</span>
 
 `data-wm-flash` is set when an interaction is blocked by a modal and stays until the next blocked interaction or until the window detaches, so style the flash with an animation that runs once per set rather than a static rule.
 
+`data-wm-live` is on every bound window while the desktop element is being resized (the `autoViewport` path): it is set before the manager learns the new viewport and removed one frame after the frame that drew the last change, and every further change re-arms it. Themes drop their geometry transition while it is there, so windows keep up with the resize instead of easing after it. The controller never removes a `data-wm-live` it did not set, so a plugin or the application can hold it during its own live edits.
+
+`data-wm-deep` marks the visible windows of the current workspace that sit more than `stacking.deep` places below the top of the stack: with the default `12`, the 13 topmost visible windows never carry it. Hidden windows never carry it, and it is removed on detach. Themes with `backdrop-filter` drop the blur on such windows, see [Theming](theming.md#large-desktops-and-live-resizing).
+
 The controller moves keyboard focus into a window when the manager focuses it, or when its titlebar or a grip is pressed, returning it to the control that last had focus in that window; a press into the content is left to the browser. It parks focus on the desktop when its window closes or hides. Generated title ids are `wmkit-title-<id>-<n>`, unique per page.
 
-Under a visible modal the DOM layer refuses pointer interaction on the lower windows: presses, drags, resizes, double clicks, action attributes and the titlebar menu. A blocked press flashes the modal. Keyboard input into lower windows is not blocked: Tab arriving from outside the desktop, or typing in a control that already had focus. An `iframe` as the first or last stop of a modal lets Tab leave from inside the frame, because key events inside a frame do not reach the parent document.
+Under a visible modal the DOM layer refuses pointer interaction on the lower windows: presses, drags, resizes, double and middle clicks, action attributes and the titlebar menu. A blocked press flashes the modal. Keyboard input into lower windows is not blocked: Tab arriving from outside the desktop, or typing in a control that already had focus. Tab inside a modal cycles through its controls, `position: fixed` ones included. An `iframe` as the first or last stop of a modal lets Tab leave from inside the frame, because key events inside a frame do not reach the parent document.
 
-Frames inside windows (`iframe`, `object`, `embed`) never send their pointer or key events to the page, so the controller watches where focus goes instead: while the pointer is over a frame, and once whenever the page loses focus, a frame that took focus raises and focuses its window. Under a visible modal the frames in the lower windows get `pointer-events: none` until the modal goes away, so a click cannot reach their content.
+Frames inside windows (`iframe`, `object`, `embed`) never send their pointer or key events to the page, so the controller watches where focus goes instead: while the pointer is over a frame, and once whenever the page loses focus, a frame that has just taken focus raises and focuses its window. The watch stops when the pointer leaves the frame, and a frame that already had focus does not pull it back after `wm.blur()` or when another window opens. Under a visible modal the frames in the lower windows get `pointer-events: none` until the modal goes away, so a click cannot reach their content; that includes windows attached while the modal is up, a frame added to a lower window is covered from that window's next state change, and the `pointer-events` value the application had set comes back afterwards.
+
 ### Touch
 
-Every gesture is driven by pointer events, so a finger and a mouse take the same path. The drag handle and the resize grips are given `touch-action: none`, which is what stops the browser from panning the page out from under a drag, and hit areas grow on coarse pointers — the defaults above show both figures. Only one gesture runs at a time: a second finger landing on another titlebar mid-drag is ignored entirely, so it neither starts a competing drag nor focuses or raises that window. A drag or resize whose `setPointerCapture` throws does not start, and losing pointer capture cancels the gesture like `pointercancel`. A press on a control inside a web component in the titlebar does not start a drag (the inner target is read through `composedPath()`), and drop-to-group only targets the topmost window under the pointer. A long press produces a `contextmenu` event like anywhere else, which is where `onTitlebarContextMenu` is called from, with the browser's own menu suppressed for you.
+Every gesture is driven by pointer events, so a finger and a mouse take the same path. The drag handle and the resize grips are given `touch-action: none`, which is what stops the browser from panning the page out from under a drag, and hit areas grow on coarse pointers — the defaults above show both figures. Only one gesture runs at a time: a second finger landing on another titlebar mid-drag is ignored entirely, so it neither starts a competing drag nor focuses or raises that window. A drag or resize whose `setPointerCapture` throws does not start, and losing pointer capture cancels the gesture like `pointercancel`. A press on a control inside a web component in the titlebar does not start a drag (the inner target is read through `composedPath()`). A long press produces a `contextmenu` event like anywhere else, which is where `onTitlebarContextMenu` is called from, with the browser's own menu suppressed for you.
+
+Drop-to-group finds its target from the window bounds rather than by hit-testing the page: the topmost visible window of this desktop under the pointer, and only while the pointer is over that window's drag handle. Elements of the page lying over a titlebar do not block it, and a modal window is never grouped, neither as the dragged window nor as the target.
+
+The end of a drag or resize (`pointerup`, `pointercancel`, `lostpointercapture`) is heard on the document in the capture phase, so the gesture also ends cleanly when its handle is removed from the page halfway through. Escape restores exactly the state the gesture started from — stage, bounds, restore bounds, snap zone and `snapRect`, also for a window that was maximized over a `snapRect` — and the key does not reach the page's own handlers. Closing the window in the middle of its own drag or resize, or from a drop target's `commit`, ends the gesture as committed: one undo step brings the window back where it was before the gesture.
 
 The desktop element itself gets `isolation: isolate`, so the `z-index` values the controller writes stay inside it and can never fight the host page's own layers. Turn that off with `stacking: { isolate: false }` when the desktop must share a stacking context with the page around it.
 
@@ -552,12 +608,15 @@ It also injects `[data-wm-resize]` handles, one `[data-wm-snap-preview]` per des
 | `Shift` + arrows | resize |
 | `Ctrl`/`Cmd` + `Alt` + `←`/`→` | snap to a half |
 | `Ctrl`/`Cmd` + `Alt` + `↑`/`↓` | maximize / minimize or restore |
+| `Ctrl`/`Cmd` + `Alt` + `PageDown`/`PageUp` | next / previous tab of the focused window's group |
 | `Ctrl`/`Cmd` + `Z`, `+ Shift` | undo, redo; non-Latin layouts work too, through the layout's Z key |
-| `F6`, `Shift` + `F6` | cycle focus |
+| `F6`, `Shift` + `F6` | cycle focus; not during a drag |
 | `Escape` during a gesture | cancel and drop it from history |
 | double click on the handle | toggle maximize |
 
-Shortcuts never fire while the event target is a `button, input, select, textarea, a[href], [contenteditable]`, with one exception: `F6` and `Shift+F6` cycle windows from anywhere, including inside a field, because that is how keyboard users leave one.
+Holding an arrow key is one undo step: the step ends on `keyup`, on any other key, when focus moves and when the browser window loses focus.
+
+The shortcuts — undo and redo, snapping, tabs — never fire in an editing surface (`input`, `textarea`, `select`, `[contenteditable]`), whatever `interactiveSelector` says, and skip an event that is already `defaultPrevented`. An application that handles `Ctrl+Z` itself, on a canvas for example, calls `preventDefault()` in a listener that runs before the desktop's: on the canvas, or in the capture phase. On a button inside a window, `Ctrl+Z` undoes. The arrow keys also stay away from anything matching `interactiveSelector`. `F6` and `Shift+F6` cycle windows from anywhere, including inside a field, because that is how keyboard users leave one.
 
 ## `createDesktopBinder(wm, options?)`
 
@@ -573,10 +632,10 @@ interface DesktopBinder {
 }
 ```
 
-`bindDesktop` throws if a desktop is already bound. Unbinding and re-binding is supported — the binder re-subscribes, which is what makes React StrictMode double-mounting harmless.
+`bindDesktop` throws if a desktop is already bound. Unbinding and re-binding is supported — the binder re-subscribes, which is what makes React StrictMode double-mounting harmless. Unbinding the desktop keeps the window bindings, and they attach to the next desktop element.
 
-- A bound element with no parent (one that was removed, for example by `removeOnClose` when its window closed) is appended to the desktop element when its window attaches, so a window that comes back through undo or a reopen is visible again. Elements still inside some tree are left where they are, even an off-document one. The element comes back as a direct child of the desktop, not inside the wrapper it lived in, so use `removeOnClose` only for nodes you created yourself, never for nodes a framework renders.
-- When a window opens, only the first element bound to that id attaches, so `wm.open` never throws from the binder.
+- A bound element with no parent (one that was removed, for example by `removeOnClose` when its window closed) is appended to the desktop element when its window attaches, so a window that comes back through undo or a reopen is visible again. Elements still inside some tree are left where they are, even an off-document one. The element comes back as a direct child of the desktop, not inside the wrapper it lived in, so use `removeOnClose` only for nodes you created yourself, never for nodes a framework renders. A framework removes its own nodes: render the window only while it exists, as every example in [Adapters](adapters.md) does.
+- When a window opens, only the first element bound to that id attaches, so `wm.open` never throws from the binder. When the attached element unbinds, the next element bound to the same id takes over.
 - A `bindWindow` call that throws (for example "already attached") leaves no binding behind.
 
 ## Geometry helpers
@@ -590,8 +649,9 @@ clampToViewport(bounds, viewport, minVisible): Bounds
 boundsEqual(a, b): boolean
 zoneBounds(zone, viewport): Bounds
 applyAspect(size, ratio, min, max, drive: 'width' | 'height'): Size
-detectSnapZone(x, y, viewport, options?: { threshold?: number; cornerSize?: number }): SnapZone | null
+detectSnapZone(x, y, viewport, options?: SnapDetectOptions): SnapZone | null
 magnetize(bounds, targets: readonly Bounds[], threshold): MagnetResult
+interface SnapDetectOptions { threshold?: number; cornerSize?: number }
 ```
 
 `zoneBounds` tiles exactly: halves, quarters and thirds add back up to the viewport with no gap or overlap on odd sizes. `clampToViewport` keeps `minVisible` pixels reachable and never pushes a window narrower than that off both edges. `magnetize` returns `{ x, y, snappedX, snappedY }` and aligns any edge pair within `threshold`.
@@ -611,6 +671,7 @@ Both flips render a throwaway ghost element and remove it on finish or cancel. T
 
 ```ts
 createAnnouncer(wm, container, messages?: Partial<AnnouncerMessages>): Announcer
+const defaultMessages: AnnouncerMessages   // the English catalogue
 
 interface AnnouncerMessages {
   opened(title: string): string
@@ -621,6 +682,10 @@ interface AnnouncerMessages {
   snapped(title: string, zone: string): string
   focused(title: string): string
   workspace(index: number): string
+  openedMany?(count: number): string     // '5 windows opened'
+  closedMany?(count: number): string
+  minimizedMany?(count: number): string
+  restoredMany?(count: number): string
 }
 
 interface Announcer {
@@ -630,20 +695,23 @@ interface Announcer {
 }
 ```
 
-`attachDesktop` creates one unless `announce: false`; pass an object to localise. A stage or workspace message always wins over the focus message produced in the same transaction, so the region never narrates "focused" over "maximized". Two identical announcements in a row still change the live region's text (a trailing no-break space toggles), so a screen reader speaks both.
+`attachDesktop` creates one unless `announce: false`; pass an object to localise. A message set to `undefined` (`announce: { opened: undefined }`) silences that event. A stage or workspace message always wins over the focus message produced in the same transaction, so the region never narrates "focused" over "maximized". Two identical announcements in a row still change the live region's text (a trailing no-break space toggles), so a screen reader speaks both.
+
+When several windows open, close, minimize or restore in one transaction, the region reads one summary instead of the last window's message. The English summaries are used only while the matching single message is the default one: once you replace `opened`, the default `openedMany` is dropped and the region falls back to the last window's message. A translated catalogue should therefore bring its own summaries.
 
 ## Emitter
 
 ```ts
 createEmitter<Events>(): Emitter<Events>
 interface Emitter<Events> {
-  on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void): () => void
+  on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void
   emit<K extends keyof Events>(event: K, payload: Events[K]): void
   clear(): void
 }
+type Listener<T> = (payload: T) => void
 ```
 
-Listeners are snapshotted before dispatch, so subscribing or unsubscribing inside a handler is safe. The manager's own events add the re-entrancy and error rules described under [Events](#events).
+Listeners are snapshotted before dispatch, so subscribing or unsubscribing inside a handler is safe. Subscribing the same function twice gives two subscriptions, and each returned function removes only its own. The manager's own events add the re-entrancy and error rules described under [Events](#events).
 
 ## `skin(spec)` — `@surdeddd/wmkit/chrome`
 
@@ -672,11 +740,15 @@ const chromeMessages: ChromeMessages    // English
 const chromeMessagesRu: ChromeMessages  // Russian
 ```
 
-Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out (`{` included), so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.
+<span v-pre>Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out (`{` included), so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.</span>
 
-A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, anything after `<noscript>`, and anything after a `<style>` or `<script>` inside SVG. The compiler models the HTML tokenizer only, not SVG or MathML foreign-content breakout, so do not build placeholders inside foreign content that relies on breakout tags.
+A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, and anything after `<noscript>`.
 
-Only `{{title}}` inside `[data-wm-title]` follows state afterwards. Every other placeholder is rendered at mount or rebuild and goes stale, `aria-label="Close {{title}}"` included.
+<span v-pre>Inside SVG and MathML the compiler follows the HTML parser's foreign-content rules, and it refuses a template wherever a browser could build a different tree than the compiler expects. It throws for a placeholder after a raw-text element (`textarea`, `style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`) inside SVG. Once the markup holds `<math>`, `<select>`, an HTML tag directly inside `<svg>`, a mismatched end tag, or an `<a>` inside `foreignObject`, `desc` or `title`, it also throws for a placeholder after any later raw-text element, CDATA section or `<title>` with markup in it. `<svg><title>{{title}}</title></svg>`, ordinary inline icons and HTML inside `foreignObject` keep working.</span>
+
+Inside a tag, only the five characters HTML treats as whitespace may separate its parts: tab, line feed, form feed, carriage return and space. Any other, such as a no-break space typed by accident, throws `wmkit: a tag may only be spaced with tab, line feed, form feed, carriage return or space (U+00A0 after '<div title=')`.
+
+<span v-pre>Only `{{title}}` inside `[data-wm-title]` follows state afterwards. Every other placeholder is rendered at mount or rebuild and goes stale, `aria-label="Close {{title}}"` included.</span>
 
 A template must contain exactly one `[data-wm-content]` attribute (a mention in text, a comment or an attribute value does not count) and a single root element, and `skin()` throws while you are writing it rather than silently dropping your content; extra roots throw `wmkit: a skin template needs a single root element …` at mount. `styles` without a `name` throws too — there would be nothing to scope the rules to.
 
@@ -689,13 +761,18 @@ With `shadow: true` the chrome is built inside an open shadow root; the template
 The sixteen shipped stylesheets as strings, for skins that cannot be reached by a stylesheet in `document.head`.
 
 ```ts
+const glassTheme: string                         // one export per theme: amberTheme … terminalTheme
+const glassShadowTheme: string                   // and per shadow flavour: amberShadowTheme … terminalShadowTheme
 const themeNames: readonly ThemeName[]
 const themeCss: Record<ThemeName, string>        // byte for byte the .css files
 const themeShadowCss: Record<ThemeName, string>  // the same rules re-anchored to :host
-function themeStyle(name: ThemeName, options?: { shadow?: boolean }): string
+function themeStyle(name: ThemeName, options?: ThemeStyleOptions): string
+interface ThemeStyleOptions { shadow?: boolean }
 ```
 
-Pass `{ shadow: true }` for a shadow skin. Custom properties inherit through a shadow boundary, so the plain text delivers a theme's tokens and none of its rules — every rule is written from `[data-wm-window]`, and inside a shadow root nothing carries that attribute. See [theming.md](theming.md).
+Every theme is its own export in both flavours, `<name>Theme` and `<name>ShadowTheme`, so a bundler keeps only the themes you import: `import { retroShadowTheme } from '@surdeddd/wmkit/themes'`. `themeStyle`, `themeCss` and `themeShadowCss` reach every theme by name, so using any of them brings all thirty-two strings into the bundle.
+
+Pass `{ shadow: true }`, or take the `ShadowTheme` export, for a shadow skin. Custom properties inherit through a shadow boundary, so the plain text delivers a theme's tokens and none of its rules — every rule is written from `[data-wm-window]`, and inside a shadow root nothing carries that attribute. See [theming.md](theming.md).
 
 ## `persist(wm, options?)` — `@surdeddd/wmkit/persist`
 
@@ -704,9 +781,11 @@ interface PersistOptions {
   key?: string             // 'wmkit'
   storage?: PersistStorage // localStorage, when reading it does not throw
   debounce?: number        // 150 ms
+  maxWait?: number         // 2000 ms; Infinity removes the bound
   autoRestore?: boolean    // true
   version?: number         // 0
   migrate?: (state: unknown, from: number) => SerializedState | null
+  onError?: (error: unknown, phase: 'load' | 'migrate' | 'save') => void  // globalThis.reportError
 }
 
 interface PersistStorage {
@@ -723,7 +802,19 @@ interface PersistController {
 }
 ```
 
-Stored shape is `{ version, state }`. A payload from another `version` is passed to `migrate`; returning `null` (or having no `migrate`) discards it rather than restoring something broken, and a successful migration is written back immediately. Payloads written before the envelope existed are still read, as version `0`. Every storage call is wrapped: a throwing or absent storage turns the plugin into a no-op instead of an exception. There is no write probe: a full storage is still read, and a failed write is swallowed. A pending save is flushed on `pagehide` and on `destroy()`; `clear()` also cancels a pending save.
+Stored shape is `{ version, state }`. A payload from another `version` is passed to `migrate`; returning `null` (or having no `migrate`) discards it rather than restoring something broken, and a successful migration is written back immediately. Payloads written before the envelope existed are still read, as version `0`.
+
+A change is saved `debounce` ms after the last one; under a steady stream of changes a save still happens at least every `maxWait` ms. A pending save is flushed on `pagehide` and on `destroy()`; `clear()` also cancels a pending save.
+
+Nothing the plugin does throws at you. An absent storage turns it into a no-op, and a failure goes to `onError` with the phase it happened in:
+
+| Phase | When |
+| --- | --- |
+| `'load'` | `getItem` threw, or the payload is not JSON |
+| `'migrate'` | `migrate` threw; `restore()` returns `false` and `persist()` still returns its controller |
+| `'save'` | the state cannot be serialized (a circular value, a `BigInt`) or the storage threw, in `clear()` too |
+
+Without `onError` the error goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
 
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 
@@ -733,6 +824,15 @@ listScreens(): Promise<readonly PopoutScreen[] | null> // null: no Window Manage
 popout(wm, id, content: HTMLElement, options?: PopoutOptions): Promise<PopoutHandle>
 
 type PopoutTarget = 'auto' | 'pip' | 'window'          // auto: picture-in-picture when available, else a popup
+
+interface PopoutScreen {
+  availLeft: number
+  availTop: number
+  availWidth: number
+  availHeight: number
+  isPrimary?: boolean
+  label?: string
+}
 
 interface PopoutOptions {
   target?: PopoutTarget             // 'auto'
@@ -756,11 +856,13 @@ interface PopoutHandle {
 }
 ```
 
-Moves the live element into a separate OS window — same JS context, same manager, no re-render. Two kinds exist. Document Picture-in-Picture (Chrome and Edge 116+, Firefox 151+) is always on top and sized by the browser; there is one per page. A popup (`window.open`, every engine) can be placed: `screen: 'other'` centres it on the first screen that is not the current one, `screen: 'current'` on the current one, or pass a screen from `listScreens()`. Placement needs the Window Management API (Chromium) and its permission; without either the popup opens where the browser puts it. A popup has to be opened from a user gesture, or the browser blocks it and `popout()` rejects with `wmkit: the popout window was blocked`.
+Moves the live element into a separate OS window — same JS context, same manager, no re-render. Two kinds exist. Document Picture-in-Picture (Chrome and Edge 116+, Firefox 151+) is always on top and sized by the browser; there is one per page. A popup (`window.open`, every engine) can be placed: `screen: 'other'` centres it on the first screen that is not the current one, `screen: 'current'` on the current one, or pass a screen from `listScreens()`. Placement needs the Window Management API (Chromium) and its permission; without either the popup opens where the browser puts it. A popup has to be opened from a user gesture, or the browser blocks it and `popout()` rejects with `wmkit: the popout window was blocked`. With `screen: 'current'` or `'other'` the popup opens at once, inside the gesture, and moves to its screen when the screen details arrive; a `PopoutScreen` object places it straight away.
+
+One window has at most one popout. Calling `popout(wm, id, …)` again while that window is out, or while its popout is still opening, resolves to the same handle and focuses the popout; the new content and options are ignored. Once the handle has closed, or the first call has rejected, the next call opens a fresh popout.
 
 A comment marker holds the content's place in the original tree. When the popout closes — `close()`, the user closing it, the window closing in the manager, or the page itself going away — the content goes back to the marker, or into the window's current `[data-wm-content]` if a skin rebuild discarded the marker's place. The popout's title follows the window's title. A window the popout minimized is restored only if it is still minimized, so a window the user restored and maximized meanwhile is left alone.
 
-React (and any framework that delegates events from its root) loses its handlers on a node moved into another document. Use `mode: 'container'` and render into the popout through a portal — see the recipe in `recipes.md`.
+React (and any framework that delegates events from its root) loses its handlers on a node moved into another document. Use `mode: 'container'` and render into the popout through a portal — see the recipe in [Recipes](recipes.md#popping-a-react-window-out-to-another-monitor).
 
 ## `createDock(desktop, options?)` — `@surdeddd/wmkit/dock`
 
@@ -819,4 +921,4 @@ interface DevtoolsController {
 }
 ```
 
-A panel with the live window table, an event log and undo, redo and copy-state controls. It follows the manager, never the DOM. The row buttons are fixed glyphs; copy writes `serialize()` as JSON to the clipboard and shows the JSON itself when the clipboard is missing or rejects the write.
+A panel with the live window table, an event log and undo, redo and copy-state controls. It follows the manager, never the DOM. After its first paint it repaints at most once per animation frame however many events arrive, and appends new log lines instead of rebuilding the log. The row buttons are fixed glyphs; copy writes `serialize()` as JSON to the clipboard and shows the JSON itself when the clipboard is missing or rejects the write. The entry also exports the types `DevtoolsMessages`, `DevtoolsEvent`, `DevtoolsAction` and `DevtoolsLogEntry`.
