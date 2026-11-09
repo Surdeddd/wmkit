@@ -240,17 +240,16 @@ export function createDragStarter(ctx: SessionContext) {
         if (session.raf !== 0) view.cancelAnimationFrame(session.raf)
         if (!cancelled) step()
         if (cancelled) {
+          const { startStage, startRect, startZone } = session
           if (session.moved && session.restored) {
-            if (session.startStage === 'maximized') {
-              wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
-              wm.maximize(id)
-            } else if (
-              session.startStage === 'snapped' &&
-              (session.startRect || session.startZone)
+            if (
+              startStage === 'maximized' ||
+              (startStage === 'snapped' && (startRect || startZone))
             ) {
               wm.restoreTo(id, session.startRestoreBounds ?? session.startBounds)
-              if (session.startRect) wm.snapTo(id, session.startRect)
-              else wm.snap(id, session.startZone as SnapZone)
+              if (startRect) wm.snapTo(id, startRect)
+              else if (startZone) wm.snap(id, startZone)
+              if (startStage === 'maximized') wm.maximize(id)
             } else {
               wm.move(id, session.startBounds.x, session.startBounds.y)
             }

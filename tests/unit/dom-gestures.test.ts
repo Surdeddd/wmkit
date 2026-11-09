@@ -4,6 +4,7 @@ import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
+import { createDock, dockLayout } from '../../src/plugins/dock'
 
 const VIEWPORT = { width: 800, height: 600 }
 const TRASH = { x: 600, y: 400, width: 200, height: 200 }
@@ -95,6 +96,12 @@ function dragTo(h: Harness, handle: HTMLElement, from: [number, number], to: [nu
   handle.dispatchEvent(pointerEvent('pointerdown', from[0], from[1]))
   handle.dispatchEvent(pointerEvent('pointermove', to[0], to[1]))
   h.flush()
+}
+
+function escape(): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  document.dispatchEvent(event)
+  return event
 }
 
 afterEach(() => {
@@ -212,5 +219,89 @@ describe('a gesture whose window closes', () => {
     expect(h.wm.canUndo()).toBe(true)
     h.wm.undo()
     expect(h.wm.get('a')?.bounds).toMatchObject({ width: 200, height: 150 })
+  })
+})
+
+describe('escape from a drag', () => {
+  const RECT = { x: 0.5, y: 0, width: 0.5, height: 1 }
+  const shape = (h: Harness) => {
+    const { stage, bounds, restoreBounds, snapZone, snapRect } = h.wm.get('a') ?? {}
+    return { stage, bounds, restoreBounds, snapZone, snapRect }
+  }
+
+  it('puts a window maximized over a snap rectangle back exactly as it was', () => {
+    const h = makeHarness()
+    const { handle } = h.add({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    h.wm.snapTo('a', RECT)
+    h.wm.maximize('a')
+    const before = shape(h)
+
+    dragTo(h, handle, [400, 10], [420, 60])
+    expect(h.wm.get('a')?.stage).toBe('normal')
+    escape()
+
+    expect(shape(h)).toEqual(before)
+    h.wm.restore('a')
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', snapRect: RECT })
+  })
+
+  it('puts a plainly maximized and a zone-snapped window back exactly as they were', () => {
+    const h = makeHarness()
+    const { handle } = h.add({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    h.wm.maximize('a')
+    let before = shape(h)
+    dragTo(h, handle, [400, 10], [420, 60])
+    escape()
+    expect(shape(h)).toEqual(before)
+
+    h.wm.restore('a')
+    h.wm.snap('a', 'left')
+    before = shape(h)
+    dragTo(h, handle, [100, 10], [420, 260])
+    escape()
+    expect(shape(h)).toEqual(before)
+  })
+
+  it('puts a dragged maximized dock panel back into its place', () => {
+    const element = document.createElement('div')
+    document.body.append(element)
+    stubPointerCapture()
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(() => callback(0))
+      return frames.length
+    })
+    const wm = createWindowManager({ viewport: { width: 1000, height: 600 } })
+    const desktop = attachDesktop(wm, element, {
+      autoViewport: false,
+      announce: false,
+      magnetism: false,
+    })
+    const dock = createDock(desktop)
+    const add = (id: string) => {
+      wm.open({ id, x: 10, y: 10, width: 300, height: 200 })
+      const root = document.createElement('section')
+      root.innerHTML = '<header data-wm-drag><span data-wm-title></span></header><div></div>'
+      element.append(root)
+      desktop.attachWindow(id, root)
+      return root
+    }
+    add('a')
+    const b = add('b')
+    dock.dock('a')
+    dock.dock('b', { side: 'right' })
+    wm.maximize('b')
+    const handle = b.querySelector('[data-wm-drag]') as HTMLElement
+
+    handle.dispatchEvent(pointerEvent('pointerdown', 500, 10))
+    handle.dispatchEvent(pointerEvent('pointermove', 400, 200))
+    for (const frame of frames.splice(0)) frame()
+    escape()
+
+    expect(wm.get('b')).toMatchObject({ stage: 'maximized' })
+    expect(wm.get('b')?.snapRect).not.toBeNull()
+    expect(dockLayout.windowsOf(dock.layout())).toEqual(['a', 'b'])
+    wm.restore('b')
+    expect(wm.get('b')).toMatchObject({ stage: 'snapped', bounds: { x: 503 } })
+    expect(dockLayout.windowsOf(dock.layout())).toEqual(['a', 'b'])
   })
 })
