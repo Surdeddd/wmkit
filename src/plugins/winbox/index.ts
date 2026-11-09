@@ -191,6 +191,26 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     },
   })
 
+  const seen = new Map<string, WindowState>()
+  const mirror = (win: WindowState) => {
+    const box = boxes.get(win.id)
+    const before = seen.get(win.id)
+    if (!box || before === win) return
+    seen.set(win.id, win)
+    box.window.classList.toggle('min', win.stage === 'minimized')
+    box.window.classList.toggle('max', win.stage === 'maximized')
+    if (!before) return
+    const { x, y, width, height } = win.bounds
+    if (width !== before.bounds.width || height !== before.bounds.height) {
+      box.onresize?.call(box, width, height)
+    }
+    if (x !== before.bounds.x || y !== before.bounds.y) box.onmove?.call(box, x, y)
+    if (win.stage === before.stage) return
+    if (win.stage === 'minimized') box.onminimize?.call(box)
+    else if (win.stage === 'maximized') box.onmaximize?.call(box)
+    else if (before.stage === 'minimized' || before.stage === 'maximized') box.onrestore?.call(box)
+  }
+
   let focused: string | null = null
   let minimizedKey = ''
   const runtime: Runtime = {
@@ -202,6 +222,7 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     insets,
     sync() {
       const state = wm.getState()
+      for (const win of Object.values(state.windows)) mirror(win)
       if (state.focusedId !== focused) {
         const previous = focused === null ? undefined : boxes.get(focused)
         const next = state.focusedId === null ? undefined : boxes.get(state.focusedId)
@@ -236,32 +257,16 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
     },
   }
 
-  const each = (win: WindowState, run: (box: WinBox) => void) => {
-    const box = boxes.get(win.id)
-    if (box) run(box)
-  }
   wm.subscribe(() => runtime.sync())
-  wm.on('move', ({ window: win }) => each(win, (box) => box.onmove?.call(box, box.x, box.y)))
-  wm.on('resize', ({ window: win }) =>
-    each(win, (box) => box.onresize?.call(box, win.bounds.width, win.bounds.height)),
-  )
-  wm.on('stage', ({ window: win, previous }) =>
-    each(win, (box) => {
-      box.window.classList.toggle('min', win.stage === 'minimized')
-      box.window.classList.toggle('max', win.stage === 'maximized')
-      if (win.stage === 'minimized') box.onminimize?.call(box)
-      else if (win.stage === 'maximized') box.onmaximize?.call(box)
-      else if (previous === 'minimized' || previous === 'maximized') box.onrestore?.call(box)
-    }),
-  )
-  wm.on('close', ({ window: win }) =>
-    each(win, (box) => {
-      box.unmount()
-      boxes.delete(win.id)
-      const index = history.indexOf(box)
-      if (index !== -1) history.splice(index, 1)
-    }),
-  )
+  wm.on('close', ({ window: win }) => {
+    const box = boxes.get(win.id)
+    if (!box) return
+    box.unmount()
+    boxes.delete(win.id)
+    seen.delete(win.id)
+    const index = history.indexOf(box)
+    if (index !== -1) history.splice(index, 1)
+  })
 
   if (!watchedDocs.has(doc)) {
     watchedDocs.add(doc)

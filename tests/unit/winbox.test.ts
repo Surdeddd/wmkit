@@ -236,7 +236,11 @@ describe('callbacks', () => {
     expect(log.filter((entry) => !/^(focus|blur)/.test(entry))).toEqual([
       'minimize',
       'restore',
+      'resize 1000x800',
+      'move 0,0',
       'maximize',
+      'resize 300x200',
+      'move 10,20',
       'restore',
     ])
     expect(a.focused).toBe(false)
@@ -280,6 +284,68 @@ describe('callbacks', () => {
     made.show(false)
     made.hide(false)
     expect(log).toEqual(['hide', 'show', 'hide', 'show'])
+  })
+})
+
+describe('following the manager', () => {
+  it('puts the max and min classes and the callbacks back in step after undo and redo', () => {
+    const calls: string[] = []
+    const made = box('T', {
+      onrestore: () => calls.push('restore'),
+      onmaximize: () => calls.push('maximize'),
+      onminimize: () => calls.push('minimize'),
+    })
+    const wm = WinBox.manager(root)
+
+    made.maximize()
+    wm.undo()
+    expect([made.max, made.hasClass('max'), calls]).toEqual([false, false, ['maximize', 'restore']])
+    wm.redo()
+    expect([made.max, made.hasClass('max')]).toEqual([true, true])
+    expect(calls.at(-1)).toBe('maximize')
+
+    calls.length = 0
+    made.maximize(false)
+    made.minimize()
+    wm.undo()
+    expect([made.min, made.hasClass('min'), calls]).toEqual([
+      false,
+      false,
+      ['restore', 'minimize', 'restore'],
+    ])
+  })
+
+  it('reports a move or resize that undo takes back, and nothing for a change that is not its own', () => {
+    const log: string[] = []
+    const made = box('Moved', {
+      x: 10,
+      y: 10,
+      width: 200,
+      height: 100,
+      onmove: (x, y) => log.push(`move ${x},${y}`),
+      onresize: (width, height) => log.push(`resize ${width}x${height}`),
+    })
+    const other = box('Other', { onmove: () => log.push('other') })
+    const wm = WinBox.manager(root)
+    made.move(50, 60)
+    made.resize(300, 200)
+    log.length = 0
+    wm.undo()
+    wm.undo()
+    expect(log).toEqual(['resize 200x100', 'move 10,10'])
+    log.length = 0
+    made.setTitle('Renamed')
+    made.focus()
+    other.focus()
+    expect(log).toEqual([])
+  })
+
+  it('leaves a window opened on the manager directly to the manager', () => {
+    const made = box('Made')
+    const wm = WinBox.manager(root)
+    wm.open({ id: 'raw' })
+    wm.close('raw')
+    expect(made.window.isConnected).toBe(true)
   })
 })
 
