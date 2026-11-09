@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+import { landingPages, RUSSIAN_PAGE } from './landing-plugin'
 
 const pkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
@@ -17,6 +18,7 @@ const testPages =
 
 export default defineConfig({
   base: process.env.VERCEL ? '/' : '/wmkit/',
+  plugins: [landingPages()],
   define: {
     __WMKIT_VERSION__: JSON.stringify(pkg.version),
     'import.meta.env.WMKIT_VERSION': JSON.stringify(pkg.version),
@@ -61,6 +63,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: page('./index.html'),
+        ru: RUSSIAN_PAGE,
         ...testPages,
       },
     },

@@ -102,6 +102,7 @@ function writeStored(key: string, value: string): void {
 function resolveLang(): Lang {
   const fromQuery = new URLSearchParams(location.search).get('lang')
   if (fromQuery === 'ru' || fromQuery === 'en') return fromQuery
+  if (document.documentElement.lang === 'ru') return 'ru'
   const stored = readStored('wmkit-lang')
   if (stored === 'ru' || stored === 'en') return stored
   return navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en'
@@ -898,7 +899,7 @@ function applyStaticI18n(): void {
   }
   for (const node of document.querySelectorAll<HTMLElement>('[data-i18n-href]')) {
     const key = node.dataset.i18nHref
-    if (key && data.ui[key]) node.setAttribute('href', data.ui[key])
+    if (key && data.ui[key]) node.setAttribute('href', `${import.meta.env.BASE_URL}${data.ui[key]}`)
   }
   for (const node of document.querySelectorAll<HTMLButtonElement>('#lang button')) {
     node.setAttribute('aria-pressed', String(node.dataset.lang === lang))

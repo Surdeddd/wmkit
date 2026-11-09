@@ -28,7 +28,7 @@ export interface MenuCopy {
 
 export interface Dict {
   lang: Lang
-  meta: { title: string; description: string; og: string }
+  meta: { title: string; description: string; og: string; image: string }
   ui: Record<string, string>
   announce: AnnouncerMessages
   menus: MenuCopy[]
@@ -133,6 +133,8 @@ const en: Dict = {
     description:
       'Draggable, resizable, snappable windows for any web app. Headless core under 16 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
     og: 'A whole desktop inside the page: windows, dock, workspaces, snapping, undo. This page is the demo — it runs on the library.',
+    image:
+      'The wmkit landing page: the WINDOWS headline beside a readme window and a terminal window, a dock of apps along the bottom.',
   },
   ui: {
     skip: 'Skip to documentation',
@@ -535,6 +537,8 @@ const ru: Dict = {
     description:
       'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 16 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
     og: 'Целый рабочий стол внутри страницы: окна, док, рабочие столы, прилипание, отмена. Эта страница и есть демо — она работает на самой библиотеке.',
+    image:
+      'Лендинг wmkit: заголовок WINDOWS рядом с окнами readme и терминала, внизу док с приложениями.',
   },
   ui: {
     skip: 'Перейти к документации',
