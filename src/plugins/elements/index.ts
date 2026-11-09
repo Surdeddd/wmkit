@@ -1,6 +1,7 @@
 import { createWindowManager } from '../../core/manager'
 import type {
   ManagerOptions,
+  ManagerState,
   WindowInit,
   WindowManager,
   WindowState,
@@ -61,8 +62,10 @@ const FLAGS = [
   'snappable',
 ] as const
 
-const READ = Symbol('wmkit')
+const KEY = 'elements'
 const OPEN = Symbol('wmkit-open')
+const SYNC = Symbol('wmkit-sync')
+const MEMBERS = Symbol('wmkit-members')
 
 const Base = (typeof HTMLElement === 'undefined' ? Object : HTMLElement) as typeof HTMLElement
 
@@ -83,12 +86,18 @@ function emit(element: Element, type: string, detail: unknown, cancelable = fals
   )
 }
 
+function closedIn(state: ManagerState): unknown[] {
+  const closed = (state.extensions[KEY] as { closed?: unknown } | undefined)?.closed
+  return Array.isArray(closed) ? closed : []
+}
+
 export class WmDesktopElement extends Base {
   manager: WindowManager | null = null
   controller: DesktopController | null = null
   options: WmDesktopOptions = {}
   messages: ElementsMessages | null = null
   readonly windows = new Map<string, WmWindowElement>()
+  readonly [MEMBERS] = new Set<WmWindowElement>()
   private store: PersistController | null = null
   private stops: Array<() => void> = []
 
@@ -109,32 +118,15 @@ export class WmDesktopElement extends Base {
       },
       ...this.options,
     })
-    const route =
-      (type: string, pick: (payload: { window: WindowState }) => WindowState) =>
-      (payload: { window: WindowState }) => {
-        const element = this.windows.get(pick(payload).id)
-        if (element) element[READ](type, payload)
-      }
     this.stops = [
-      wm.on(
-        'move',
-        route('wm-move', (p) => p.window),
-      ),
-      wm.on(
-        'resize',
-        route('wm-resize', (p) => p.window),
-      ),
-      wm.on(
-        'stage',
-        route('wm-stage', (p) => p.window),
-      ),
-      wm.on(
-        'focus',
-        route('wm-focus', (p) => p.window),
-      ),
-      wm.on(
-        'close',
-        route('wm-close', (p) => p.window),
+      wm.subscribe((state) => this.follow(state)),
+      ...(['move', 'resize', 'stage', 'focus', 'close'] as const).map((type) =>
+        wm.on(type as 'move', (payload) => {
+          const element = this.windows.get(payload.window.id)
+          if (!element) return
+          element[SYNC](wm.getState())
+          emit(element, `wm-${type}`, payload)
+        }),
       ),
     ]
     const key = this.getAttribute('persist')
@@ -157,6 +149,25 @@ export class WmDesktopElement extends Base {
       this.store = null
     })
   }
+
+  private follow(state: ManagerState): void {
+    const stored = closedIn(state)
+    const closed = stored.filter((id) => !state.windows[id as string])
+    let changed = closed.length !== stored.length
+    for (const element of this[MEMBERS]) {
+      element[SYNC](state)
+      const id = element.windowId
+      if (id !== null && !state.windows[id] && !closed.includes(id)) {
+        closed.push(id)
+        changed = true
+      }
+    }
+    if (!changed) return
+    const wm = this.manager as WindowManager
+    wm.beginInteraction()
+    wm.setExtension(KEY, closed.length > 0 ? { closed } : undefined)
+    wm.abortInteraction()
+  }
 }
 
 export class WmWindowElement extends Base {
@@ -173,6 +184,7 @@ export class WmWindowElement extends Base {
   private host: WmDesktopElement | null = null
   private detach: (() => void) | null = null
   private quiet = false
+  private last: WindowState | null = null
 
   get manager(): WindowManager | null {
     return this.host?.manager ?? null
@@ -183,6 +195,7 @@ export class WmWindowElement extends Base {
   }
 
   disconnectedCallback(): void {
+    this.host?.[MEMBERS].delete(this)
     queueMicrotask(() => {
       if (this.isConnected) return
       this.release(true)
@@ -194,7 +207,7 @@ export class WmWindowElement extends Base {
     const id = this.windowId
     if (this.quiet) return
     if (name === 'closed') {
-      if (value === null) this[OPEN]()
+      if (value === null) this[OPEN](true)
       else if (wm && id) wm.close(id)
       return
     }
@@ -231,46 +244,70 @@ export class WmWindowElement extends Base {
     } else wm.update(id, { [name]: value !== 'false' } as WindowUpdate)
   }
 
-  [READ](type: string, payload: { window: WindowState }): void {
-    if (type === 'wm-stage') this.reflect('stage', payload.window.stage)
-    if (type === 'wm-close') {
-      this.release(false)
-      this.reflect('closed', '')
-    }
-    emit(this, type, payload)
-  }
-
-  private reflect(name: string, value: string): void {
+  private reflect(change: () => void): void {
     this.quiet = true
-    this.setAttribute(name, value)
+    change()
     this.quiet = false
   }
 
-  [OPEN](): void {
+  [SYNC](state: ManagerState): void {
+    const host = this.host
+    const id = this.windowId
+    if (!host || id === null) return
+    const win = state.windows[id]
+    this.reflect(() => this.toggleAttribute('closed', !win))
+    if (!win) {
+      this.release(false)
+      return
+    }
+    const opened = !this.detach
+    if (opened) {
+      if (host.windows.has(id)) return
+      this.detach = (host.controller as DesktopController).attachWindow(id, this)
+      host.windows.set(id, this)
+    }
+    if (win !== this.last) {
+      this.last = win
+      if ((this.getAttribute('stage') ?? 'normal') !== win.stage) {
+        this.reflect(() => this.setAttribute('stage', win.stage))
+      }
+    }
+    if (opened) emit(this, 'wm-open', { window: win })
+  }
+
+  [OPEN](reopen = false): void {
     let host = this.parentElement
     while (host && !(host instanceof WmDesktopElement)) host = host.parentElement
     this.chrome(host?.messages ?? catalogueFor(this))
+    if (this.detach) {
+      ;(this.host as WmDesktopElement)[MEMBERS].add(this)
+      return
+    }
     const wm = host?.manager
-    const controller = host?.controller
-    if (this.detach || this.hasAttribute('closed') || !host || !wm || !controller) return
+    if (!host || !wm) return
     this.host = host
-    const init: WindowInit = {
-      id: this.getAttribute('window-id') ?? this.windowId ?? undefined,
-      title: this.getAttribute('label') ?? '',
-      stage: (this.getAttribute('stage') ?? undefined) as WindowInit['stage'],
-      layer: (this.getAttribute('layer') ?? undefined) as WindowInit['layer'],
-    }
-    for (const [attribute, key] of Object.entries(NUMBERS)) {
-      const value = numberAt(this, attribute)
-      if (value !== undefined) (init as Record<string, unknown>)[key] = value
-    }
-    for (const flag of FLAGS) if (this.getAttribute(flag) === 'false') init[flag] = false
-    const existing = init.id === undefined ? undefined : wm.get(init.id)
-    const id = existing?.id ?? wm.open(init).id
+    host[MEMBERS].add(this)
+    const id = this.getAttribute('window-id') ?? this.windowId
     this.windowId = id
-    host.windows.set(id, this)
-    this.detach = controller.attachWindow(id, this)
-    emit(this, 'wm-open', { window: wm.get(id) })
+    if (id === null || !wm.get(id)) {
+      if (!reopen && (this.hasAttribute('closed') || closedIn(wm.getState()).includes(id))) {
+        this.reflect(() => this.toggleAttribute('closed', true))
+        return
+      }
+      const init: WindowInit = {
+        id: id ?? undefined,
+        title: this.getAttribute('label') ?? '',
+        stage: (this.getAttribute('stage') ?? undefined) as WindowInit['stage'],
+        layer: (this.getAttribute('layer') ?? undefined) as WindowInit['layer'],
+      }
+      for (const [attribute, key] of Object.entries(NUMBERS)) {
+        const value = numberAt(this, attribute)
+        if (value !== undefined) (init as Record<string, unknown>)[key] = value
+      }
+      for (const flag of FLAGS) if (this.getAttribute(flag) === 'false') init[flag] = false
+      this.windowId = wm.open(init).id
+    }
+    this[SYNC](wm.getState())
   }
 
   private release(close: boolean): void {
@@ -279,6 +316,7 @@ export class WmWindowElement extends Base {
     if (!host || !id || !this.detach) return
     const detach = this.detach
     this.detach = null
+    this.last = null
     host.windows.delete(id)
     detach()
     if (close) host.manager?.close(id)
