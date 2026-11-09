@@ -1260,7 +1260,7 @@ describe('desktop controller', () => {
 
     title.innerHTML = '<b>bold</b>'
     harness.wm.update('a', { title: 'Fourth' })
-    expect(title.innerHTML).toBe('<b>Fourth</b>')
+    expect(title.innerHTML).toBe('<b>bold</b>Fourth')
   })
 
   it('never touches the title node when the title has not changed', () => {

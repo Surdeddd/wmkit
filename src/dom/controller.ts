@@ -102,20 +102,25 @@ function setAttr(el: HTMLElement, name: string, value: string | null): void {
 }
 
 function setText(el: HTMLElement, text: string, previous: string): void {
-  if (el.textContent === text) return
+  const all = el.textContent as string
+  if (all === text) return
   const walker = el.ownerDocument.createTreeWalker(el, 4)
   let first: Text | null = null
+  let found: Text | null = null
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
-    const at = previous ? node.data.indexOf(previous) : -1
-    if (at >= 0) {
-      if (text !== previous) {
-        node.data = node.data.slice(0, at) + text + node.data.slice(at + previous.length)
-      }
-      return
+    const direct = node.parentNode === el
+    if (direct) first ??= node
+    if (previous && node.data.includes(previous) && (direct || !found)) {
+      found = node
+      if (direct) break
     }
-    first ??= node
   }
+  if (found) {
+    if (text !== previous) found.data = found.data.replace(previous, () => text)
+    return
+  }
+  if (text && all.includes(text)) return
   if (first) first.data = text
   else el.append(text)
 }

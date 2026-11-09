@@ -738,10 +738,25 @@ describe('the title node', () => {
     expect(image.title.textContent).toBe(' Plans')
   })
 
-  it('finds the title inside a nested element', () => {
+  it('renames a title the template put inside a child element', () => {
     const { h, title } = titled('<b>Notes</b>')
+    expect(title.innerHTML).toBe('<b>Notes</b>')
+    h.wm.update('a', { title: 'Plans $&' })
+    expect(title.innerHTML).toBe('<b>Plans $&amp;</b>')
+  })
+
+  it('keeps a ligature icon through an attach with an empty title and a rename', () => {
+    const { h, title } = titled('<i class="material-icons">close</i>', '')
     h.wm.update('a', { title: 'Plans' })
-    expect(title.innerHTML).toBe('<b>Plans</b>')
+    expect(title.innerHTML).toBe('<i class="material-icons">close</i>Plans')
+    h.wm.update('a', { title: 'Notes' })
+    expect(title.innerHTML).toBe('<i class="material-icons">close</i>Notes')
+  })
+
+  it('renames the title, not the icon, when both read the same', () => {
+    const { h, title } = titled('<i class="material-icons">close</i> close', 'close')
+    h.wm.update('a', { title: 'Plans' })
+    expect(title.innerHTML).toBe('<i class="material-icons">close</i> Plans')
   })
 
   it('writes a title it cannot find into the first text and keeps the elements', () => {
