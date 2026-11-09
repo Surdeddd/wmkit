@@ -638,4 +638,21 @@ describe('resizing a tab group from the left or top', () => {
     expect(bounds.width).toBe(550)
     expect(bounds.x + bounds.width).toBe(600)
   })
+
+  it('keeps the opposite edge still under the smallest aspect ratio of the group', () => {
+    for (const [direction, axis] of [
+      ['w', 'x'],
+      ['n', 'y'],
+    ] as const) {
+      const h = group({ aspectRatio: 1.5 }, { aspectRatio: 2 })
+      const start = h.wm.get('a')?.bounds as { x: number; y: number; width: number; height: number }
+      const far = axis === 'x' ? start.x + start.width : start.y + start.height
+      const from: [number, number] = axis === 'x' ? [start.x, 250] : [300, start.y]
+      const to: [number, number] = axis === 'x' ? [start.x + 120, 250] : [300, start.y + 60]
+      const bounds = pull(h, direction, from, to)
+      const size = axis === 'x' ? bounds.width : bounds.height
+      expect(bounds[axis] + size).toBeCloseTo(far, 6)
+      expect(bounds.width / bounds.height).toBeCloseTo(1.5, 6)
+    }
+  })
 })

@@ -41,9 +41,9 @@ export function createResizeStarter(ctx: SessionContext) {
     const startZone = win.snapZone
     const startRect = win.snapRect
     const startRestore = win.restoreBounds
-    let minSize = win.minSize
-    let maxSize = win.maxSize
-    for (const { minSize: low, maxSize: high } of win.groupId ? wm.groupMembers(win.groupId) : []) {
+    let { minSize, maxSize, aspectRatio: aspect } = win
+    for (const member of win.groupId ? wm.groupMembers(win.groupId) : []) {
+      const { minSize: low, maxSize: high, aspectRatio: ratio } = member
       minSize = {
         width: Math.max(minSize.width, low.width),
         height: Math.max(minSize.height, low.height),
@@ -54,8 +54,8 @@ export function createResizeStarter(ctx: SessionContext) {
           height: Math.min(maxSize?.height ?? high.height, high.height),
         }
       }
+      if (ratio !== null) aspect = Math.min(aspect ?? ratio, ratio)
     }
-    const aspect = win.aspectRatio
     const drive = direction === 'n' || direction === 's' ? 'height' : 'width'
     let raf = 0
     let pendingX = 0
