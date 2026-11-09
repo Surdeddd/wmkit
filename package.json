@@ -258,8 +258,10 @@
     "size": "size-limit",
     "attw": "attw --pack .",
     "publint": "publint",
+    "smoke": "node scripts/consumer-smoke.mjs",
+    "smoke:template": "node scripts/consumer-smoke.mjs --template",
     "prepublishOnly": "pnpm build",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm size && pnpm publint && pnpm attw && pnpm test:e2e",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm size && pnpm publint && pnpm attw && pnpm smoke && pnpm test:e2e",
     "release": "semantic-release",
     "bench": "vitest bench --run"
   },

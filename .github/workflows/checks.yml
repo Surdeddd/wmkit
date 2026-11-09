@@ -26,6 +26,8 @@ jobs:
       - run: pnpm size
       - run: pnpm publint
       - run: pnpm attw
+      - run: pnpm smoke
+      - run: pnpm smoke:template
 
   e2e:
     runs-on: ubuntu-latest
