@@ -265,9 +265,9 @@ export function createDragStarter(ctx: SessionContext) {
       } finally {
         releaseRect()
         handle.removeEventListener('pointermove', onMove)
-        handle.removeEventListener('pointerup', onUp)
-        handle.removeEventListener('pointercancel', onCancel)
-        handle.removeEventListener('lostpointercapture', onCancel)
+        doc.removeEventListener('pointerup', onUp, true)
+        doc.removeEventListener('pointercancel', onCancel, true)
+        doc.removeEventListener('lostpointercapture', onCancel, true)
         doc.removeEventListener('keydown', onKeydown, true)
         if (handle.hasPointerCapture(session.pointerId)) {
           handle.releasePointerCapture(session.pointerId)
@@ -287,9 +287,9 @@ export function createDragStarter(ctx: SessionContext) {
     wm.beginInteraction()
     ctx.claimDrag(session)
     handle.addEventListener('pointermove', onMove)
-    handle.addEventListener('pointerup', onUp)
-    handle.addEventListener('pointercancel', onCancel)
-    handle.addEventListener('lostpointercapture', onCancel)
+    doc.addEventListener('pointerup', onUp, true)
+    doc.addEventListener('pointercancel', onCancel, true)
+    doc.addEventListener('lostpointercapture', onCancel, true)
     doc.addEventListener('keydown', onKeydown, true)
   }
 }

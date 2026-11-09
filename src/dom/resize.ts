@@ -117,9 +117,9 @@ export function createResizeStarter(ctx: SessionContext) {
       } finally {
         releaseRect()
         handleEl.removeEventListener('pointermove', onMove)
-        handleEl.removeEventListener('pointerup', onUp)
-        handleEl.removeEventListener('pointercancel', onCancelPointer)
-        handleEl.removeEventListener('lostpointercapture', onCancelPointer)
+        doc.removeEventListener('pointerup', onUp, true)
+        doc.removeEventListener('pointercancel', onCancelPointer, true)
+        doc.removeEventListener('lostpointercapture', onCancelPointer, true)
         doc.removeEventListener('keydown', onKeydown, true)
         if (handleEl.hasPointerCapture(event.pointerId)) {
           handleEl.releasePointerCapture(event.pointerId)
@@ -148,9 +148,9 @@ export function createResizeStarter(ctx: SessionContext) {
     }
 
     handleEl.addEventListener('pointermove', onMove)
-    handleEl.addEventListener('pointerup', onUp)
-    handleEl.addEventListener('pointercancel', onCancelPointer)
-    handleEl.addEventListener('lostpointercapture', onCancelPointer)
+    doc.addEventListener('pointerup', onUp, true)
+    doc.addEventListener('pointercancel', onCancelPointer, true)
+    doc.addEventListener('lostpointercapture', onCancelPointer, true)
     doc.addEventListener('keydown', onKeydown, true)
   }
 }
