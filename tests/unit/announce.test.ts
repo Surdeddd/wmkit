@@ -127,6 +127,57 @@ describe('announcer', () => {
     announcer.announce('Saved')
     expect(announcer.element.textContent).toBe(first)
   })
+
+  it('stays quiet for a message the app left undefined', () => {
+    const silent: { opened?: (title: string) => string } = {}
+    silent.opened = undefined
+    const { wm, announcer } = makeAnnouncer(silent)
+    expect(() => wm.open({ id: 'a', title: 'Notes' })).not.toThrow()
+    expect(announcer.element.textContent).toBe('')
+    wm.open({ id: 'b', title: 'Plans' })
+    wm.focus('a')
+    expect(announcer.element.textContent).toBe('Notes focused')
+  })
+
+  it('sums up many windows changed at once in one message', () => {
+    const source = createWindowManager(VIEWPORT)
+    for (let i = 0; i < 5; i += 1) source.open({ id: `w${i}`, title: `Doc ${i}` })
+    const { wm, announcer } = makeAnnouncer()
+    wm.hydrate(source.serialize())
+    expect(announcer.element.textContent).toBe('5 windows opened')
+
+    wm.minimizeAll()
+    expect(announcer.element.textContent).toBe('5 windows minimized')
+    wm.restoreAll()
+    expect(announcer.element.textContent).toBe('5 windows restored')
+    wm.closeAll()
+    expect(announcer.element.textContent).toBe('5 windows closed')
+  })
+
+  it('takes localised summaries and keeps the single message where it has none', () => {
+    const { wm, announcer } = makeAnnouncer({
+      openedMany: (count: number) => `открыто окон: ${count}`,
+    })
+    wm.batch(() => {
+      wm.open({ id: 'a', title: 'A' })
+      wm.open({ id: 'b', title: 'B' })
+    })
+    expect(announcer.element.textContent).toBe('открыто окон: 2')
+    wm.batch(() => {
+      wm.maximize('a')
+      wm.maximize('b')
+    })
+    expect(announcer.element.textContent).toBe('B maximized')
+  })
+
+  it('never mixes a default summary into messages the app translated itself', () => {
+    const { wm, announcer } = makeAnnouncer({ opened: (title: string) => `${title}: открыто` })
+    wm.batch(() => {
+      wm.open({ id: 'a', title: 'A' })
+      wm.open({ id: 'b', title: 'B' })
+    })
+    expect(announcer.element.textContent).toBe('B: открыто')
+  })
 })
 
 describe('flip animations', () => {

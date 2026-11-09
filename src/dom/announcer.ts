@@ -9,6 +9,10 @@ export interface AnnouncerMessages {
   snapped(title: string, zone: string): string
   focused(title: string): string
   workspace(index: number): string
+  openedMany?(count: number): string
+  closedMany?(count: number): string
+  minimizedMany?(count: number): string
+  restoredMany?(count: number): string
 }
 
 export const defaultMessages: AnnouncerMessages = {
@@ -20,6 +24,10 @@ export const defaultMessages: AnnouncerMessages = {
   snapped: (title, zone) => `${title} snapped to ${zone.replace('-', ' ')}`,
   focused: (title) => `${title} focused`,
   workspace: (index) => `workspace ${index + 1}`,
+  openedMany: (count) => `${count} windows opened`,
+  closedMany: (count) => `${count} windows closed`,
+  minimizedMany: (count) => `${count} windows minimized`,
+  restoredMany: (count) => `${count} windows restored`,
 }
 
 export interface Announcer {
@@ -33,7 +41,10 @@ export function createAnnouncer(
   container: HTMLElement,
   messages: Partial<AnnouncerMessages> = {},
 ): Announcer {
-  const dict: AnnouncerMessages = { ...defaultMessages, ...messages }
+  const dict: Partial<AnnouncerMessages> = { ...defaultMessages, ...messages }
+  for (const key of ['opened', 'closed', 'minimized', 'restored'] as const) {
+    if (key in messages) dict[`${key}Many`] = messages[`${key}Many`]
+  }
   const element = container.ownerDocument.createElement('div')
   element.setAttribute('role', 'status')
   element.setAttribute('aria-live', 'polite')
@@ -44,43 +55,45 @@ export function createAnnouncer(
 
   let clearTimer: ReturnType<typeof setTimeout> | undefined
   let detailed = false
+  let kind = ''
+  let times = 0
 
   function announce(message: string): void {
-    element.textContent = element.textContent === message ? `${message}\u00a0` : message
+    element.textContent = element.textContent === message ? `${message} ` : message
     if (clearTimer !== undefined) clearTimeout(clearTimer)
     clearTimer = setTimeout(() => {
       element.textContent = ''
     }, 2000)
   }
 
+  function say(next: string, message?: string): void {
+    times = next === kind ? times + 1 : 1
+    kind = next
+    detailed = true
+    const many = dict[`${next}Many` as 'openedMany']
+    if (message) announce(times > 1 && many ? many(times) : message)
+  }
+
   const unsubscribers = [
-    wm.on('open', ({ window: win }) => {
-      announce(dict.opened(win.title))
-      detailed = true
-    }),
-    wm.on('close', ({ window: win }) => {
-      announce(dict.closed(win.title))
-      detailed = true
-    }),
+    wm.on('open', ({ window: win }) => say('opened', dict.opened?.(win.title))),
+    wm.on('close', ({ window: win }) => say('closed', dict.closed?.(win.title))),
     wm.on('stage', ({ window: win, previous }) => {
-      if (win.stage === 'minimized') announce(dict.minimized(win.title))
-      else if (win.stage === 'maximized') announce(dict.maximized(win.title))
+      const title = win.title
+      if (win.stage === 'minimized') say('minimized', dict.minimized?.(title))
+      else if (win.stage === 'maximized') say('maximized', dict.maximized?.(title))
       else if (win.stage === 'snapped' && win.snapZone)
-        announce(dict.snapped(win.title, win.snapZone))
-      else if (win.stage === 'normal' && previous !== 'normal') announce(dict.restored(win.title))
-      else return
-      detailed = true
+        say('snapped', dict.snapped?.(title, win.snapZone))
+      else if (win.stage === 'normal' && previous !== 'normal')
+        say('restored', dict.restored?.(title))
     }),
     wm.on('focus', ({ window: win, previous }) => {
-      if (detailed || previous === null) return
-      announce(dict.focused(win.title))
+      const message = detailed || previous === null ? undefined : dict.focused?.(win.title)
+      if (message) announce(message)
     }),
-    wm.on('workspace', ({ workspace }) => {
-      announce(dict.workspace(workspace))
-      detailed = true
-    }),
+    wm.on('workspace', ({ workspace }) => say('workspace', dict.workspace?.(workspace))),
     wm.subscribe(() => {
       detailed = false
+      kind = ''
     }),
   ]
 
