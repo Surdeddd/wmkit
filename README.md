@@ -484,7 +484,8 @@ pnpm install
 pnpm dev          # landing + playground on Vite
 pnpm test         # unit tests
 pnpm test:e2e     # Playwright matrix
-pnpm verify       # the full gate: lint, types, coverage, build, size, publint, e2e
+pnpm smoke        # pack the build and import every entry in Node, as ESM and CommonJS
+pnpm verify       # the full gate: lint, types, coverage, build, size, publint, attw, smoke, e2e
 ```
 
 ## License
