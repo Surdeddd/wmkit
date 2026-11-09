@@ -279,18 +279,20 @@ describe('tab shortcuts', () => {
   function grouped(options: DesktopOptions = {}) {
     const h = makeHarness(options)
     for (const id of ['a', 'b', 'c']) h.add({ id, x: 10, y: 10, width: 300, height: 200 })
-    h.wm.group(['a', 'b', 'c'])
+    const groupId = h.wm.group(['a', 'b', 'c']) as string
     h.wm.activateTab('a')
-    return { ...h, cycle: vi.spyOn(h.wm, 'cycleTab').mockReturnValue(null) }
+    return { ...h, active: () => h.wm.getState().groups[groupId]?.activeId }
   }
 
   it('cycles the tabs of the focused group with Ctrl or Cmd, Alt and PageDown or PageUp', () => {
     const h = grouped()
     const next = press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
     expect(next.defaultPrevented).toBe(true)
+    expect(h.active()).toBe('b')
     press(h.element, 'PageDown', { metaKey: true, altKey: true })
+    expect(h.active()).toBe('c')
     press(h.element, 'PageUp', { ctrlKey: true, altKey: true })
-    expect(h.cycle.mock.calls).toEqual([[1], [1], [-1]])
+    expect(h.active()).toBe('b')
   })
 
   it('keeps out of the way without the modifiers, in fields or when switched off', () => {
@@ -300,13 +302,13 @@ describe('tab shortcuts', () => {
     const field = document.createElement('input')
     h.element.append(field)
     press(field, 'PageDown', { ctrlKey: true, altKey: true })
-    expect(h.cycle).not.toHaveBeenCalled()
+    expect(h.active()).toBe('a')
 
     const off = grouped({ keyboard: { tabShortcuts: false } })
     expect(press(off.element, 'PageDown', { ctrlKey: true, altKey: true }).defaultPrevented).toBe(
       false,
     )
-    expect(off.cycle).not.toHaveBeenCalled()
+    expect(off.active()).toBe('a')
   })
 
   it('still cycles tabs when only the snap shortcuts are off', () => {
@@ -314,7 +316,7 @@ describe('tab shortcuts', () => {
     press(h.element, 'ArrowLeft', { ctrlKey: true, altKey: true })
     expect(h.wm.get('a')?.stage).toBe('normal')
     press(h.element, 'PageDown', { ctrlKey: true, altKey: true })
-    expect(h.cycle).toHaveBeenCalledWith(1)
+    expect(h.active()).toBe('b')
   })
 })
 
