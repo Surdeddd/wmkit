@@ -187,8 +187,15 @@ function start(ctx: GestureContext, options: Settings): () => void {
     wm.setWorkspace(next)
   }
 
+  function reset(cancelled: boolean): void {
+    if (session) endPinch(cancelled)
+    disarm()
+    fingers.clear()
+  }
+
   function onDown(event: PointerEvent): void {
     if (event.pointerType !== 'touch') return
+    if (event.isPrimary) reset(false)
     if (fingers.size >= 2) {
       disarm()
       return
@@ -249,18 +256,16 @@ function start(ctx: GestureContext, options: Settings): () => void {
 
   element.addEventListener('pointerdown', onDown)
   element.addEventListener('pointermove', onMove)
-  element.addEventListener('pointerup', onRelease)
-  element.addEventListener('pointercancel', onCancel)
+  view.addEventListener('pointerup', onRelease, true)
+  view.addEventListener('pointercancel', onCancel, true)
   doc.addEventListener('keydown', onKeydown, true)
 
   return () => {
-    if (session) endPinch(true)
-    disarm()
-    fingers.clear()
+    reset(true)
     element.removeEventListener('pointerdown', onDown)
     element.removeEventListener('pointermove', onMove)
-    element.removeEventListener('pointerup', onRelease)
-    element.removeEventListener('pointercancel', onCancel)
+    view.removeEventListener('pointerup', onRelease, true)
+    view.removeEventListener('pointercancel', onCancel, true)
     doc.removeEventListener('keydown', onKeydown, true)
   }
 }

@@ -553,6 +553,106 @@ describe('two finger gestures give up cleanly', () => {
   })
 })
 
+describe('fingers lifted where the desktop cannot hear them', () => {
+  function primary(type: string, id: number, x: number, y: number): PointerEvent {
+    const event = touchEvent(type, id, x, y)
+    Object.defineProperty(event, 'isPrimary', { value: true })
+    return event
+  }
+
+  function swallowing(harness: Harness) {
+    const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 400, height: 300 })
+    const widget = document.createElement('div')
+    root.append(widget)
+    const swallow = (event: Event) => event.stopPropagation()
+    widget.addEventListener('pointerup', swallow)
+    widget.addEventListener('pointercancel', swallow)
+    return { root, widget }
+  }
+
+  it('forget a finger whose pointerup a widget kept to itself', () => {
+    const harness = makeHarness()
+    const { widget } = swallowing(harness)
+
+    widget.dispatchEvent(touchEvent('pointerdown', 7, 100, 100))
+    widget.dispatchEvent(touchEvent('pointerup', 7, 100, 100))
+    widget.dispatchEvent(touchEvent('pointerdown', 8, 300, 100))
+    widget.dispatchEvent(touchEvent('pointermove', 8, 100, 100))
+    harness.flushFrames()
+    widget.dispatchEvent(touchEvent('pointerup', 8, 100, 100))
+
+    expect(harness.wm.get('a')?.bounds.width).toBe(400)
+    expect(harness.wm.workspace()).toBe(0)
+  })
+
+  it('forget a cancelled finger the same way, so a real pinch still works afterwards', () => {
+    const harness = makeHarness({ gestures: [pinchGesture()] })
+    const { root, widget } = swallowing(harness)
+
+    widget.dispatchEvent(touchEvent('pointerdown', 1, 100, 100))
+    widget.dispatchEvent(touchEvent('pointerup', 1, 100, 100))
+    widget.dispatchEvent(touchEvent('pointerdown', 2, 110, 100))
+    widget.dispatchEvent(touchEvent('pointercancel', 2, 110, 100))
+
+    pinch(harness, root, [100, 150, 200, 150], [100, 150, 320, 150])
+    expect(harness.wm.get('a')?.bounds.width).toBeGreaterThan(400)
+  })
+
+  it('also hear a finger lifted outside the desktop', () => {
+    const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 60 } })] })
+    const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 400, height: 300 })
+    const outside = document.createElement('div')
+    document.body.append(outside)
+
+    root.dispatchEvent(touchEvent('pointerdown', 1, 100, 100))
+    outside.dispatchEvent(touchEvent('pointerup', 1, 100, 100))
+    root.dispatchEvent(touchEvent('pointerdown', 2, 200, 100))
+    root.dispatchEvent(touchEvent('pointermove', 2, 20, 100))
+    harness.flushFrames()
+
+    expect(harness.wm.workspace()).toBe(0)
+    expect(harness.wm.get('a')?.bounds.width).toBe(400)
+  })
+
+  it('drop every finger they never heard leave when a new first finger lands', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 400, height: 300 })
+
+    root.dispatchEvent(primary('pointerdown', 1, 100, 100))
+    root.dispatchEvent(touchEvent('pointerdown', 2, 300, 100))
+    root.dispatchEvent(touchEvent('pointermove', 2, 200, 100))
+    harness.flushFrames()
+    expect(root.dataset.wmPinching).toBe('')
+    expect(harness.wm.get('a')?.bounds.width).toBe(200)
+
+    root.dispatchEvent(primary('pointerdown', 3, 100, 100))
+    expect(root.dataset.wmPinching).toBeUndefined()
+    expect(harness.wm.get('a')?.bounds.width).toBe(200)
+    root.dispatchEvent(touchEvent('pointermove', 3, 300, 100))
+    harness.flushFrames()
+    root.dispatchEvent(touchEvent('pointerup', 3, 300, 100))
+    expect(harness.wm.get('a')?.bounds.width).toBe(200)
+    harness.wm.undo()
+    expect(harness.wm.get('a')?.bounds.width).toBe(400)
+
+    pinch(harness, root, [100, 150, 200, 150], [100, 150, 150, 150])
+    expect(harness.wm.get('a')?.bounds.width).toBe(200)
+  })
+
+  it('stop listening on the window once the desktop is destroyed', () => {
+    const harness = makeHarness()
+    const removed: string[] = []
+    const real = window.removeEventListener.bind(window)
+    vi.spyOn(window, 'removeEventListener').mockImplementation((type, listener, options) => {
+      removed.push(type)
+      real(type, listener, options)
+    })
+    harness.desktop.destroy()
+    expect(removed).toEqual(expect.arrayContaining(['pointerup', 'pointercancel']))
+    vi.restoreAllMocks()
+  })
+})
+
 describe('two fingers on two windows', () => {
   it('never resizes either of them', () => {
     const harness = makeHarness({ gestures: [touchGestures({ swipe: { threshold: 600 } })] })
