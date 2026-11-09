@@ -11,7 +11,8 @@ The shared contract:
 - **one manager per desktop**, created once and destroyed with the owning component
 - **your markup** carries `data-wm-drag`, `data-wm-title`, `data-wm-content` and the control buttons
 - **binding is order-independent**: bind a window element before or after the desktop exists, before or after `wm.open()`
-- **render windows from `state.windows`**, not `state.order`: `order` is the stacking order and changes on every focus, so a keyed list over it moves DOM nodes — the click that follows the press is lost and iframes reload. The keys of `state.windows` keep opening order, and stacking is applied with `z-index`, so the DOM order never matters
+- **render a window only while it exists**: when its window closes, the framework removes the node it rendered, and renders it again when undo brings the window back. Leave `removeOnClose` to nodes you create yourself ([why](api.md#createdesktopbinderwm-options))
+- **render windows from `state.windows`**, not `state.order`: `order` is the stacking order and changes on every focus, so a keyed list over it moves DOM nodes — the click that follows the press is lost and iframes reload. The keys of `state.windows` keep opening order as long as ids are not bare integers ([why](api.md#managerstate)), and stacking is applied with `z-index`, so the DOM order never matters
 
 ## Vanilla
 
@@ -148,7 +149,7 @@ const binder = useDesktop(wm, host)
 const state = useWmState(wm)
 
 const notes = ref<HTMLElement>()
-useWmWindowEl(binder, 'notes', notes, { removeOnClose: true })
+useWmWindowEl(binder, 'notes', notes)
 const note = useWmWindow(wm, 'notes')
 
 wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
@@ -156,9 +157,9 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 
 <template>
   <div ref="host" style="position: relative; height: 100vh">
-    <section ref="notes">
+    <section v-if="note" ref="notes">
       <header data-wm-drag>
-        <span data-wm-title>{{ note?.title }}</span>
+        <span data-wm-title>{{ note.title }}</span>
         <span data-wm-controls>
           <button data-wm-minimize aria-label="Свернуть" />
           <button data-wm-maximize aria-label="Развернуть" />
@@ -179,7 +180,7 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 | `useDesktop(wm, targetRef, options?)` | `DesktopBinder`, bound with `flush: 'post'` |
 | `useWmWindowEl(binder, id, targetRef, options?)` | binds a window element, rebinding when the id changes |
 
-Everything hooks into the current effect scope, so a component that unmounts cleans up. Outside a scope (a module-level manager, for example) nothing is auto-disposed — call `wm.destroy()` and `binder.destroy()` yourself. During server rendering `useWmState` and `useWmWindow` do not subscribe at all and return live getter refs, so a module-level manager shared across SSR requests does not accumulate listeners.
+`v-if` on the window removes the section when the window closes and renders it again when it comes back; `useWmWindowEl` follows the template ref, so the new node is bound on its own. Everything hooks into the current effect scope, so a component that unmounts cleans up. Outside a scope (a module-level manager, for example) nothing is auto-disposed — call `wm.destroy()` and `binder.destroy()` yourself. During server rendering `useWmState` and `useWmWindow` do not subscribe at all and return live getter refs, so a module-level manager shared across SSR requests does not accumulate listeners.
 
 ## Svelte
 
@@ -199,17 +200,19 @@ Everything hooks into the current effect scope, so a component that unmounts cle
 </script>
 
 <div use:dk.desktop style="position: relative; height: 100vh">
-  <section use:dk.window={{ id: 'notes', removeOnClose: true }}>
-    <header data-wm-drag>
-      <span data-wm-title>{$notes?.title}</span>
-      <span data-wm-controls>
-        <button data-wm-minimize aria-label="Minimize"></button>
-        <button data-wm-maximize aria-label="Maximize"></button>
-        <button data-wm-close aria-label="Close"></button>
-      </span>
-    </header>
-    <div data-wm-content>{$state.order.length} windows open</div>
-  </section>
+  {#if $notes}
+    <section use:dk.window={{ id: 'notes' }}>
+      <header data-wm-drag>
+        <span data-wm-title>{$notes.title}</span>
+        <span data-wm-controls>
+          <button data-wm-minimize aria-label="Minimize"></button>
+          <button data-wm-maximize aria-label="Maximize"></button>
+          <button data-wm-close aria-label="Close"></button>
+        </span>
+      </header>
+      <div data-wm-content>{$state.order.length} windows open</div>
+    </section>
+  {/if}
 </div>
 ```
 
@@ -220,7 +223,7 @@ Everything hooks into the current effect scope, so a component that unmounts cle
 | `wmWindowStore(wm, id)` | readable store of one window, emitting only when that window changes |
 | `createDesktop(wm, options?)` | `{ binder, desktop, window }` actions |
 
-The `window` action only rebinds when `params.id` actually changes, so re-rendering during a drag does not interrupt it. The `desktop` action destroys the binder when the element goes away.
+The `window` action only rebinds when `params.id` actually changes, so re-rendering during a drag does not interrupt it. The `desktop` action releases only its own element when that element goes away: the window bindings stay and attach to the next desktop element, so an `{#if}` or `{#key}` around the desktop does not lose them. `dk.binder.destroy()` drops everything.
 
 ## Solid
 
@@ -244,7 +247,7 @@ export function Desktop() {
         {(id) => {
           const win = useWmWindow(wm, id)
           return (
-            <section ref={dk.window(id, { removeOnClose: true })}>
+            <section ref={dk.window(id)}>
               <header data-wm-drag>
                 <span data-wm-title>{win()?.title}</span>
                 <span data-wm-controls>
@@ -272,47 +275,86 @@ Inside an owner, `dk.desktop` and `dk.window` bind on mount, after Solid inserts
 `@surdeddd/wmkit/angular`
 
 ```ts
-import { Component, ElementRef, afterNextRender, viewChild } from '@angular/core'
-import { useWindowManager, createDesktop, useWmState, useWmWindow } from '@surdeddd/wmkit/angular'
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, inject, input, viewChild,
+} from '@angular/core'
+import {
+  type AngularDesktop, createDesktop, useWindowManager, useWmState, useWmWindow,
+} from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-notes',
+  standalone: true,
+  template: `
+    <section #panel>
+      <header data-wm-drag>
+        <span data-wm-title>Notes</span>
+        <span data-wm-controls>
+          <button data-wm-minimize aria-label="Minimize"></button>
+          <button data-wm-maximize aria-label="Maximize"></button>
+          <button data-wm-close aria-label="Close"></button>
+        </span>
+      </header>
+      <div data-wm-content><ng-content /></div>
+    </section>
+  `,
+})
+export class NotesComponent {
+  dk = input.required<AngularDesktop>()
+  private panel = viewChild.required<ElementRef<HTMLElement>>('panel')
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    afterNextRender(() => {
+      this.dk().window('notes', undefined, this.destroyRef)(this.panel().nativeElement)
+    })
+  }
+}
 
 @Component({
   selector: 'app-desktop',
+  standalone: true,
+  imports: [NotesComponent],
   template: `
     <div class="desktop" #host style="position: relative; height: 100vh">
-      <section #panel>
-        <header data-wm-drag>
-          <span data-wm-title>{{ note()?.title }}</span>
-          <span data-wm-controls>
-            <button data-wm-minimize aria-label="Minimize"></button>
-            <button data-wm-maximize aria-label="Maximize"></button>
-            <button data-wm-close aria-label="Close"></button>
-          </span>
-        </header>
-        <div data-wm-content>{{ state().order.length }} windows open</div>
-      </section>
+      @if (note()) {
+        <app-notes [dk]="dk">{{ state().order.length }} windows open</app-notes>
+      }
     </div>
   `,
 })
 export class DesktopComponent {
   private host = viewChild.required<ElementRef<HTMLElement>>('host')
-  private panel = viewChild.required<ElementRef<HTMLElement>>('panel')
 
   wm = useWindowManager()
   state = useWmState(this.wm)
   note = useWmWindow(this.wm, 'notes')
+  dk = createDesktop(this.wm)
 
   constructor() {
-    const dk = createDesktop(this.wm)
     afterNextRender(() => {
-      dk.desktop(this.host().nativeElement)
+      this.dk.desktop(this.host().nativeElement)
       this.wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
-      dk.window('notes', { removeOnClose: true })(this.panel().nativeElement)
     })
   }
 }
 ```
 
-`useWmState` and `useWmWindow` return real signals, so they work in templates and in `computed()`. The adapter writes its signal `untracked`, so a manager change made inside `effect()` or `computed()` does not throw NG0600 (Angular 16–18) or leave the signal stale. Cleanup goes through `DestroyRef` when you are inside an injection context; outside one, the adapter silently skips it and you dispose manually. Bind elements in `afterNextRender` — the view children do not exist before that.
+| Export | Returns |
+| --- | --- |
+| `useWindowManager(options?)` | a manager, destroyed with the component |
+| `useWmState(wm)` | a read-only `Signal<ManagerState>` |
+| `useWmWindow(wm, id)` | a computed `Signal<WindowState \| undefined>` |
+| `createDesktop(wm, options?)` | `{ binder, desktop(element, lifetime?), window(id, options?, lifetime?) }`; the binder is destroyed with the component |
+| `WmLifetime` | type: `DestroyRef \| Injector`, what a binding releases with |
+
+`useWindowManager`, `useWmState`, `useWmWindow` and `createDesktop` belong in an injection context — a constructor or a field initializer — and release with that component. Called outside one they still work, but nothing releases them: `useWmState` stays subscribed for as long as the manager lives.
+
+`dk.desktop(element, lifetime?)` and `dk.window(id, options?, lifetime?)(element)` bind an element and return a function that releases the binding; calling it twice is harmless. Without a `lifetime` the adapter uses the injection context of the call, so `dk.window('notes')` called in a constructor or a field initializer releases with that component even when the function it returns binds the element later, in `afterNextRender`. Outside an injection context and without a lifetime, call the returned function yourself, or rely on the binder going away with the component that called `createDesktop`. Binding an id again releases an earlier binding whose element has left the document, so a window component rendered again simply binds its new element. Bind elements in `afterNextRender` — the view children do not exist before that.
+
+`@if (note())` renders the window component only while the window exists: when the window closes, Angular destroys the component and its `DestroyRef` releases the binding; when undo brings the window back, the component renders and binds again.
+
+`useWmState` and `useWmWindow` return real signals, so they work in templates and in `computed()`. The adapter writes its signal `untracked`, so a manager change made inside `effect()` or `computed()` does not throw NG0600 (Angular 16–18) or leave the signal stale.
 
 ## Preact
 
@@ -438,14 +480,16 @@ export default component$(() => (
 
 | Export | What it does |
 | --- | --- |
-| `WmDesktop` | renders the desktop element; the manager is created on the client in `useVisibleTask$` and provided through `WmContext`. Props: `options` (desktop and manager options), `class` |
+| `WmDesktop` | renders the desktop element; the manager is created on the client in `useVisibleTask$` and provided through `WmContext`. Props: `options` (desktop and manager options, data only), `options$` (a `QRL` that returns more options, merged over `options` on the client), `class` |
 | `WmWindow` | renders a window section: a titlebar with `data-wm-title`, a `controls` slot and a content slot. Props: `id` plus any `WindowInit` field, `class` |
 | `useWm()` | the desktop store: `wm` and `binder` (both `undefined` until the desktop is visible on the client) and `version`, bumped on every change |
 | `useWmState()` | a computed signal with the `ManagerState`, `undefined` on the server |
 
-`WmWindow` renders its initial bounds inline, so the server markup sits where the client will put it and resuming does not shift the layout. The window opens and attaches once the desktop exists on the client. Qwik owns the node: a window closed through the manager is hidden, and it comes back attached when its id is opened again. Unmounting a `WmWindow` closes its window.
+<span v-pre>`options` is serialized into the server HTML, so it can hold data only. Anything with a function in it goes into `options$`, which runs on the client: `<WmDesktop options={{ snap: true }} options$={() => ({ beforeClose: (w) => w.id !== 'notes' })}>`.</span>
 
-The entry ships as `qwik.qwik.mjs`, so the Qwik optimizer processes it like your own components. Peer range: `@builder.io/qwik` 1.5 and later, below 2. Qwik City and other server-rendered setups load the Qwik loader for you. With a client-only `render()` you have to load it yourself, or no `onClick$` handler runs:
+`WmWindow` renders its initial bounds inline, so the server markup sits where the client will put it and resuming does not shift the layout. That inline style is only the starting position; once the window is attached, the controller owns it. The window opens and attaches once the desktop exists on the client. The geometry props stay live: when `x`, `y`, `width` or `height` changes, the window moves or resizes through the manager, and only the coordinate that changed is applied. The manager's rules still hold, so a position change applies only in the `normal` stage and a size change is ignored while the window is minimized or maximized. Qwik owns the node: a window closed through the manager is hidden, and it comes back attached when its id is opened again. Unmounting a `WmWindow` closes its window.
+
+The entry ships as `qwik.qwik.mjs`, so the Qwik optimizer processes it like your own components. Peer range: `@builder.io/qwik` 1.5 and later, below 2. A test renders the desktop on the server with no DOM and resumes it with the real Qwik loader in jsdom; it does not cover a real browser, streaming or Qwik City. Qwik City and other server-rendered setups load the Qwik loader for you. With a client-only `render()` you have to load it yourself, or no `onClick$` handler runs:
 
 ```ts
 import { render } from '@builder.io/qwik'
@@ -482,7 +526,7 @@ render(document.getElementById('app')!, <App />).then(() => {
 </wm-desktop>
 ```
 
-`@surdeddd/wmkit/elements/define` registers `<wm-desktop>` and `<wm-window>`, and does nothing on the server. For another prefix, call `defineWmElements({ prefix: 'acme' })` from `@surdeddd/wmkit/elements` to get `<acme-desktop>` and `<acme-window>`. The elements work in any framework that renders HTML: React 19, Vue, Angular, Svelte, Solid or plain HTML.
+`@surdeddd/wmkit/elements/define` registers `<wm-desktop>` and `<wm-window>`. On a server (Node, any SSR framework) both entries can be imported safely and do nothing. For another prefix, call `defineWmElements({ prefix: 'acme' })` from `@surdeddd/wmkit/elements` to get `<acme-desktop>` and `<acme-window>`. The elements work in any framework that renders HTML: React 19, Vue, Angular, Svelte, Solid or plain HTML.
 
 `<wm-desktop>`
 
@@ -490,27 +534,36 @@ render(document.getElementById('app')!, <App />).then(() => {
 | --- | --- |
 | `snap`, `keyboard`, `grouping`, `magnetism`, `announce` | on by default; `="false"` turns one off |
 | `persist="key"` | saves the layout to `localStorage` under the key and restores it |
-| `lang` | `ru…` picks the Russian button labels; the nearest `lang` on the page counts |
+| `lang` | `ru…` picks the Russian labels; the nearest `lang` on the page counts |
 | `.options` | any desktop or manager option; set it before the element connects |
-| `.messages` | your own button labels (`{ minimize, maximize, close }`); wins over `lang` |
+| `.messages` | your own labels (`{ minimize, maximize, close, tabs? }`); wins over `lang` |
+| `.styles` | a CSS string, a `CSSStyleSheet` or an array of either, adopted into the shadow root of every `<wm-window>` of this desktop, windows added later included; `null` removes it |
 | `.manager`, `.controller` | the manager and the controller, once connected |
+
+`desktop.styles = retroShadowTheme` (or `themeStyle('retro', { shadow: true })`, both from `@surdeddd/wmkit/themes`) brings a theme's titlebar, buttons and content box into the chrome of every window, not only its tokens. Where constructable stylesheets are missing (Safari before 16.4), strings are skipped silently. `.options`, `.messages`, `.styles` and `.windowId` can be assigned before the elements are defined; the values survive the upgrade.
 
 `<wm-window>`
 
 | Attribute | Meaning |
 | --- | --- |
-| `window-id` | the window id; generated when missing |
+| `window-id` | the window id; generated when missing, and readable as `.windowId` |
 | `label` | the title |
 | `x`, `y`, `width`, `height`, `min-width`, `min-height`, `max-width`, `max-height`, `aspect-ratio`, `workspace` | geometry and constraints |
 | `stage` | `normal`, `minimized` or `maximized`; reflects the current stage back |
 | `layer` | `normal`, `floating` or `modal` |
-| `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | on by default; `="false"` turns one off |
+| `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | on by default; `="false"` turns one off and hides its button |
 | `closed` | the window is closed and hidden; removing the attribute reopens it |
 | `chrome="none"` | hides the built-in titlebar, for your own `data-wm-drag` markup |
 
-Changing an attribute drives the manager, and the manager reflects `stage` and `closed` back. The element is never removed by the library, so the framework that rendered it keeps ownership. Removing the element from the page closes its window; moving it does not.
+Changing an attribute drives the manager. Changing one of `width` / `height`, `x` / `y`, `min-*` or `max-*` changes only that side, and the other keeps its current value. Removing `x`, `y`, `min-width` or `min-height` leaves the window as it is; removing `max-width` or `max-height` lifts that limit.
 
-The chrome lives in a shadow root with the parts `titlebar`, `title`, `control` (plus `minimize`, `maximize`, `close`) and `content`. The children stay in the light DOM, in the default slot, and the `actions` slot puts extra buttons into the titlebar. Style the parts with `::part()` and the theme tokens, which cross the shadow boundary.
+The element mirrors the manager on every change: `stage` and `closed` follow undo, redo, `hydrate` and `loadLayout` too. Undo after closing a `<wm-window>` brings the element back, and it fires `wm-open`; redo closes it again. The element is never removed by the library, so the framework that rendered it keeps ownership. Removing the element from the page closes its window; moving it does not. A second element with the same `window-id` stays unbound instead of throwing.
+
+With `persist`, closed windows stay closed across reloads. The ids of closed elements live in `wm.getState().extensions.elements` (`{ closed: ['log'] }`), which is serialized and part of history but adds no undo step of its own. A `<wm-window>` whose id is listed there connects as `closed`; removing its `closed` attribute opens it and drops the id. Saved state wins over markup: an element marked `closed` whose window is in the restored state connects open. An element without `window-id` cannot stay closed across reloads, because a generated id is not stable.
+
+The chrome lives in a shadow root with the parts `titlebar`, `title`, `tabs`, `tab` (plus `active` on the shown tab), `control` (plus `minimize`, `maximize`, `close`) and `content`. The buttons sit in `span[data-wm-controls]` and show only what the window allows: a button is hidden while `minimizable`, `maximizable` or `closable` is `false`, so a docked panel has no minimize button. Their glyphs come from CSS `::after`, so a theme can replace them. The content box carries `data-wm-content` as well as `part="content"`. The children stay in the light DOM, in the default slot, and the `actions` slot puts extra buttons into the titlebar. Style the parts with `::part()` (`wm-window::part(tab active) { … }`) and the theme tokens, which cross the shadow boundary, or hand a whole theme to the desktop's `.styles`.
+
+When a `<wm-window>` is the active member of a tab group with two or more members, its titlebar shows a tab strip in place of the title: `[part=tabs][role=tablist]` with a `button[role=tab][data-window-id]` per member. A click, Enter or Space activates a tab; ArrowLeft and ArrowRight (wrapping), Home and End move focus between tabs. `messages.tabs` names the tab list (`'Tabs'`, `'Вкладки'` in Russian). A group member that is not a `<wm-window>` still shows up as a tab, but it has no strip of its own to switch back from: offer the keyboard shortcut (`Ctrl`/`⌘` + `Alt` + `PageDown` / `PageUp`) or a control of your own.
 
 Events bubble and cross shadow roots. Each `detail` carries the `window`:
 
@@ -520,6 +573,8 @@ Events bubble and cross shadow roots. Each `detail` carries the `window`:
 | `wm-open`, `wm-close` | the window opened or closed |
 | `wm-beforeclose` | a close was asked for; `preventDefault()` keeps the window open |
 | `wm-move`, `wm-resize`, `wm-stage`, `wm-focus` | geometry, stage or focus changed |
+
+The entry also exports `defineWmElements`, the element classes `WmDesktopElement` and `WmWindowElement`, the label catalogues `elementsMessages` and `elementsMessagesRu`, and the types `ElementsMessages`, `WmDesktopOptions`, `WmDesktopStyles` and `DefineOptions`.
 
 ## Choosing an entry point
 

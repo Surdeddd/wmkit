@@ -4,14 +4,15 @@ description: Полные интеграции wmkit для React, Vue, Svelte, 
 
 # Адаптеры
 
-Каждый адаптер — тонкая обёртка над тем же менеджером и тем же DOM-контроллером. Они нужны, чтобы подключиться и отключиться в нужный момент жизненного цикла компонента, и только. Всё, что можно сделать в одном, можно сделать во всех, и всегда можно спуститься до vanilla API.
+Каждый адаптер — тонкая обёртка над тем же менеджером и тем же DOM-контроллером. Они нужны только для того, чтобы привязаться и отвязаться в нужный момент жизненного цикла компонента. Всё, что можно сделать в одном адаптере, можно сделать в любом другом, и всегда можно спуститься до vanilla API.
 
 Общий контракт:
 
 - **один менеджер на рабочий стол**: создаётся один раз и уничтожается вместе с компонентом-владельцем
 - **ваша разметка** несёт `data-wm-drag`, `data-wm-title`, `data-wm-content` и кнопки управления
 - **привязка не зависит от порядка**: привязывайте элемент окна до или после появления рабочего стола, до или после `wm.open()`
-- **рендерите окна из `state.windows`**, а не из `state.order`: `order` — это порядок наложения, он меняется при каждом фокусе, поэтому список с ключами по нему двигает DOM-узлы — клик, который следует за нажатием, теряется, а iframe перезагружаются. Ключи `state.windows` хранят порядок открытия, а наложение задаётся через `z-index`, поэтому порядок в DOM никогда не важен
+- **рендерите окно, только пока оно существует**: когда окно закрывается, фреймворк удаляет отрендеренный им узел, а когда отмена возвращает окно, рендерит его снова. `removeOnClose` оставьте для узлов, которые создаёте сами ([почему](api.ru.md#createdesktopbinderwm-options))
+- **рендерите окна из `state.windows`**, а не из `state.order`: `order` — это порядок наложения, он меняется при каждой смене фокуса, поэтому список с ключами по нему переставляет DOM-узлы — клик после нажатия теряется, а iframe перезагружаются. Ключи `state.windows` идут в порядке открытия, если id не являются просто числами ([почему](api.ru.md#managerstate)), а наложение задаётся через `z-index`, так что порядок в DOM не важен
 
 ## Vanilla
 
@@ -47,7 +48,7 @@ spawn({ title: 'Notes', width: 420, height: 280 }, (body) => {
 })
 ```
 
-`removeOnClose` отвязывает контроллер и удаляет элемент при закрытии окна, так что узлы никогда не утекают. Через биндер (его и используют адаптеры) у вернувшегося окна — после отмены, повторного открытия, закрытия и открытия в одном батче — элемент перед привязкой снова добавляется в элемент рабочего стола. Вызовите `desktop.destroy()`, когда уходит весь рабочий стол.
+`removeOnClose` отвязывает контроллер и удаляет элемент при закрытии окна, так что узлы не утекают. Если работать через биндер (его используют адаптеры), то у вернувшегося окна — после отмены, повторного открытия, закрытия и открытия в одном `batch` — элемент перед привязкой снова добавляется в элемент рабочего стола. Когда уходит весь рабочий стол, вызовите `desktop.destroy()`.
 
 ## React
 
@@ -117,7 +118,7 @@ function Taskbar({ wm }) {
 
 | Хук | Возвращает |
 | --- | --- |
-| `useWindowManager(options?)` | менеджер, созданный один раз и уничтожаемый на следующей макрозадаче после настоящего размонтирования; имитация размонтирования в StrictMode и Fast Refresh его не уничтожают, поэтому слушатели, добавленные во время рендера или в инициализаторах, в dev выживают |
+| `useWindowManager(options?)` | менеджер, созданный один раз и уничтожаемый на следующей макрозадаче после настоящего размонтирования; имитация размонтирования в StrictMode и Fast Refresh его не уничтожают, поэтому слушатели, добавленные во время рендера или в инициализаторах, в режиме разработки сохраняются |
 | `useWmState(wm)` | весь `ManagerState` через `useSyncExternalStore` |
 | `useWmWindow(wm, id)` | один `WindowState \| undefined`, перерендер только при изменении этого окна |
 | `useDesktop(wm, options?)` | `{ ref, binder, controller() }` — повесьте `ref` на элемент рабочего стола |
@@ -125,10 +126,10 @@ function Taskbar({ wm }) {
 
 Заметки:
 
-- `useWmWindow` — подписка, дружащая с memo: неизменившиеся окна сохраняют ссылочную идентичность, поэтому в списке окон перерендеривается только то, которое сдвинулось.
-- `options` у `useDesktop` и `useWmWindowRef` захватываются на первом рендере (они настраивают уже существующий контроллер). Меняйте поведение через менеджер, а не подменой опций.
+- `useWmWindow` — подписка, удобная для `memo`: неизменившиеся окна сохраняют ссылочную идентичность, поэтому в списке окон перерендеривается только то, которое сдвинулось.
+- `options` у `useDesktop` и `useWmWindowRef` запоминаются на первом рендере (они настраивают уже созданный контроллер). Меняйте поведение через менеджер, а не подменой опций.
 - Узлом окна владеет React, поэтому адаптер никогда не даёт контроллеру его удалить: рендерите окно по условию (`if (!win) return null`, как выше), и React удалит его сам. `removeOnClose` не входит в опции `useWmWindowRef`.
-- Двойное монтирование в StrictMode безопасно: адаптер ничего не разрушает в эффекте. Вызов ref рабочего стола с `null` отвязывает, биндер переподписывается, когда ref привязывается снова, а уничтожение менеджера откладывается и отменяется повторным монтированием. Работает на React 18 и 19.
+- Двойное монтирование в StrictMode безопасно: адаптер ничего не разрушает в эффекте. Вызов ref рабочего стола с `null` отвязывает рабочий стол, биндер переподписывается, когда ref привязывается снова, а уничтожение менеджера откладывается и отменяется повторным монтированием. Работает на React 18 и 19.
 
 ## Vue
 
@@ -148,7 +149,7 @@ const binder = useDesktop(wm, host)
 const state = useWmState(wm)
 
 const notes = ref<HTMLElement>()
-useWmWindowEl(binder, 'notes', notes, { removeOnClose: true })
+useWmWindowEl(binder, 'notes', notes)
 const note = useWmWindow(wm, 'notes')
 
 wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
@@ -156,9 +157,9 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 
 <template>
   <div ref="host" style="position: relative; height: 100vh">
-    <section ref="notes">
+    <section v-if="note" ref="notes">
       <header data-wm-drag>
-        <span data-wm-title>{{ note?.title }}</span>
+        <span data-wm-title>{{ note.title }}</span>
         <span data-wm-controls>
           <button data-wm-minimize aria-label="Свернуть" />
           <button data-wm-maximize aria-label="Развернуть" />
@@ -179,7 +180,7 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 | `useDesktop(wm, targetRef, options?)` | `DesktopBinder`, привязывается с `flush: 'post'` |
 | `useWmWindowEl(binder, id, targetRef, options?)` | привязывает элемент окна и перепривязывает его при смене id |
 
-Всё цепляется к текущему effect scope, так что размонтированный компонент убирает за собой. Вне scope (например, у менеджера на уровне модуля) ничего не освобождается автоматически — вызывайте `wm.destroy()` и `binder.destroy()` сами. Во время серверного рендеринга `useWmState` и `useWmWindow` вообще не подписываются и возвращают живые ref-геттеры, поэтому менеджер на уровне модуля, общий для SSR-запросов, не копит слушателей.
+`v-if` по окну убирает секцию, когда окно закрывается, и рендерит её снова, когда окно возвращается; `useWmWindowEl` следит за template ref, поэтому новый узел привязывается сам. Всё цепляется к текущему effect scope, так что размонтированный компонент убирает за собой. Вне scope (например, у менеджера на уровне модуля) ничего не освобождается автоматически — вызывайте `wm.destroy()` и `binder.destroy()` сами. Во время серверного рендеринга `useWmState` и `useWmWindow` вообще не подписываются и возвращают живые ref-геттеры, поэтому менеджер на уровне модуля, общий для SSR-запросов, не копит слушателей.
 
 ## Svelte
 
@@ -199,17 +200,19 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 </script>
 
 <div use:dk.desktop style="position: relative; height: 100vh">
-  <section use:dk.window={{ id: 'notes', removeOnClose: true }}>
-    <header data-wm-drag>
-      <span data-wm-title>{$notes?.title}</span>
-      <span data-wm-controls>
-        <button data-wm-minimize aria-label="Minimize"></button>
-        <button data-wm-maximize aria-label="Maximize"></button>
-        <button data-wm-close aria-label="Close"></button>
-      </span>
-    </header>
-    <div data-wm-content>{$state.order.length} windows open</div>
-  </section>
+  {#if $notes}
+    <section use:dk.window={{ id: 'notes' }}>
+      <header data-wm-drag>
+        <span data-wm-title>{$notes.title}</span>
+        <span data-wm-controls>
+          <button data-wm-minimize aria-label="Minimize"></button>
+          <button data-wm-maximize aria-label="Maximize"></button>
+          <button data-wm-close aria-label="Close"></button>
+        </span>
+      </header>
+      <div data-wm-content>{$state.order.length} windows open</div>
+    </section>
+  {/if}
 </div>
 ```
 
@@ -217,10 +220,10 @@ wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
 | --- | --- |
 | `createManager(options?)` | обычный менеджер — уничтожайте его сами, если им владеет компонент |
 | `wmStore(wm)` | readable-стор с `ManagerState` |
-| `wmWindowStore(wm, id)` | readable-стор одного окна, который испускает значение, только когда это окно меняется |
+| `wmWindowStore(wm, id)` | readable-стор одного окна, который выдаёт значение, только когда это окно меняется |
 | `createDesktop(wm, options?)` | экшены `{ binder, desktop, window }` |
 
-Экшен `window` перепривязывается, только когда `params.id` действительно меняется, поэтому перерендер во время перетаскивания его не прерывает. Экшен `desktop` уничтожает биндер, когда элемент исчезает.
+Экшен `window` перепривязывается, только когда `params.id` действительно меняется, поэтому перерендер во время перетаскивания его не прерывает. Экшен `desktop`, когда его элемент исчезает, освобождает только этот элемент: привязки окон остаются и подключаются к следующему элементу рабочего стола, так что `{#if}` или `{#key}` вокруг рабочего стола их не теряет. `dk.binder.destroy()` снимает всё.
 
 ## Solid
 
@@ -244,7 +247,7 @@ export function Desktop() {
         {(id) => {
           const win = useWmWindow(wm, id)
           return (
-            <section ref={dk.window(id, { removeOnClose: true })}>
+            <section ref={dk.window(id)}>
               <header data-wm-drag>
                 <span data-wm-title>{win()?.title}</span>
                 <span data-wm-controls>
@@ -272,47 +275,86 @@ export function Desktop() {
 `@surdeddd/wmkit/angular`
 
 ```ts
-import { Component, ElementRef, afterNextRender, viewChild } from '@angular/core'
-import { useWindowManager, createDesktop, useWmState, useWmWindow } from '@surdeddd/wmkit/angular'
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, inject, input, viewChild,
+} from '@angular/core'
+import {
+  type AngularDesktop, createDesktop, useWindowManager, useWmState, useWmWindow,
+} from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-notes',
+  standalone: true,
+  template: `
+    <section #panel>
+      <header data-wm-drag>
+        <span data-wm-title>Notes</span>
+        <span data-wm-controls>
+          <button data-wm-minimize aria-label="Minimize"></button>
+          <button data-wm-maximize aria-label="Maximize"></button>
+          <button data-wm-close aria-label="Close"></button>
+        </span>
+      </header>
+      <div data-wm-content><ng-content /></div>
+    </section>
+  `,
+})
+export class NotesComponent {
+  dk = input.required<AngularDesktop>()
+  private panel = viewChild.required<ElementRef<HTMLElement>>('panel')
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    afterNextRender(() => {
+      this.dk().window('notes', undefined, this.destroyRef)(this.panel().nativeElement)
+    })
+  }
+}
 
 @Component({
   selector: 'app-desktop',
+  standalone: true,
+  imports: [NotesComponent],
   template: `
     <div class="desktop" #host style="position: relative; height: 100vh">
-      <section #panel>
-        <header data-wm-drag>
-          <span data-wm-title>{{ note()?.title }}</span>
-          <span data-wm-controls>
-            <button data-wm-minimize aria-label="Minimize"></button>
-            <button data-wm-maximize aria-label="Maximize"></button>
-            <button data-wm-close aria-label="Close"></button>
-          </span>
-        </header>
-        <div data-wm-content>{{ state().order.length }} windows open</div>
-      </section>
+      @if (note()) {
+        <app-notes [dk]="dk">{{ state().order.length }} windows open</app-notes>
+      }
     </div>
   `,
 })
 export class DesktopComponent {
   private host = viewChild.required<ElementRef<HTMLElement>>('host')
-  private panel = viewChild.required<ElementRef<HTMLElement>>('panel')
 
   wm = useWindowManager()
   state = useWmState(this.wm)
   note = useWmWindow(this.wm, 'notes')
+  dk = createDesktop(this.wm)
 
   constructor() {
-    const dk = createDesktop(this.wm)
     afterNextRender(() => {
-      dk.desktop(this.host().nativeElement)
+      this.dk.desktop(this.host().nativeElement)
       this.wm.open({ id: 'notes', title: 'Notes', width: 420, height: 280 })
-      dk.window('notes', { removeOnClose: true })(this.panel().nativeElement)
     })
   }
 }
 ```
 
-`useWmState` и `useWmWindow` возвращают настоящие сигналы, поэтому работают в шаблонах и в `computed()`. Адаптер пишет свой сигнал через `untracked`, поэтому изменение менеджера внутри `effect()` или `computed()` не бросает NG0600 (Angular 16–18) и не оставляет сигнал устаревшим. Очистка идёт через `DestroyRef`, когда вы внутри injection context; вне его адаптер молча её пропускает, и освобождать ресурсы приходится вручную. Привязывайте элементы в `afterNextRender` — до этого view children не существуют.
+| Экспорт | Возвращает |
+| --- | --- |
+| `useWindowManager(options?)` | менеджер, уничтожается вместе с компонентом |
+| `useWmState(wm)` | `Signal<ManagerState>` только для чтения |
+| `useWmWindow(wm, id)` | вычисляемый `Signal<WindowState \| undefined>` |
+| `createDesktop(wm, options?)` | `{ binder, desktop(element, lifetime?), window(id, options?, lifetime?) }`; биндер уничтожается вместе с компонентом |
+| `WmLifetime` | тип `DestroyRef \| Injector` — то, вместе с чем освобождается привязка |
+
+`useWindowManager`, `useWmState`, `useWmWindow` и `createDesktop` вызываются в injection context — в конструкторе или инициализаторе поля — и освобождаются вместе с этим компонентом. Вне его они тоже работают, но их никто не освобождает: `useWmState` остаётся подписанным, пока жив менеджер.
+
+`dk.desktop(element, lifetime?)` и `dk.window(id, options?, lifetime?)(element)` привязывают элемент и возвращают функцию, которая снимает привязку; повторный вызов ничего не ломает. Без `lifetime` адаптер берёт injection context того места, где сделан вызов, поэтому `dk.window('notes')`, вызванный в конструкторе или инициализаторе поля, освобождается вместе с этим компонентом, даже если возвращённая функция привязывает элемент позже, в `afterNextRender`. Вне injection context и без `lifetime` вызовите возвращённую функцию сами или положитесь на то, что биндер уйдёт вместе с компонентом, вызвавшим `createDesktop`. Повторная привязка того же id снимает прежнюю привязку, если её элемент уже покинул документ, поэтому компонент окна, отрендеренный заново, просто привязывает свой новый элемент. Привязывайте элементы в `afterNextRender` — раньше view children не существуют.
+
+`@if (note())` рендерит компонент окна, только пока окно существует: когда окно закрывается, Angular уничтожает компонент, и его `DestroyRef` снимает привязку; когда отмена возвращает окно, компонент рендерится и привязывается снова.
+
+`useWmState` и `useWmWindow` возвращают настоящие сигналы, поэтому работают в шаблонах и в `computed()`. Адаптер пишет свой сигнал через `untracked`, поэтому изменение менеджера внутри `effect()` или `computed()` не вызывает NG0600 (Angular 16–18) и не оставляет сигнал устаревшим.
 
 ## Preact
 
@@ -351,7 +393,7 @@ export function Desktop() {
 }
 ```
 
-Те же пять хуков с теми же контрактами, что и в React-адаптере, построенные на `preact/hooks` (Preact 10 и новее, JSX работает так же). В Preact нет `useSyncExternalStore`, поэтому хуки подписываются в layout-эффекте и перечитывают снапшот сразу после подписки: изменение между рендером и подпиской не теряется.
+Те же пять хуков с теми же контрактами, что и в React-адаптере, но на `preact/hooks` (Preact 10 и новее, JSX работает так же). В Preact нет `useSyncExternalStore`, поэтому хуки подписываются в layout-эффекте и перечитывают снапшот сразу после подписки: изменение между рендером и подпиской не теряется.
 
 ## Lit
 
@@ -398,12 +440,12 @@ customElements.define('app-desktop', AppDesktop)
 
 | Экспорт | Что делает |
 | --- | --- |
-| `WmStateController(host, wm)` | реактивный контроллер; `.state` — это `ManagerState`, хост перерендеривается на каждое изменение, пока подключён |
+| `WmStateController(host, wm)` | реактивный контроллер; `.state` — это `ManagerState`, хост перерендеривается при каждом изменении, пока подключён |
 | `WmWindowController(host, wm, id)` | `.window` — один `WindowState \| undefined`; хост перерендеривается, только когда меняется это окно |
 | `wmDesktop(binder)` | директива элемента, которая привязывает элемент рабочего стола |
 | `wmWindow(binder, id, options?)` | директива элемента, которая привязывает элемент окна |
 
-Директивы привязываются, когда рендерится part, отпускают элемент при отключении и привязываются снова при переподключении, поэтому перемещать хост по странице безопасно. Контроллеры перечитывают состояние при переподключении, так что хост, отключённый, пока менялся менеджер, рендерит свежие данные. Задавайте ключи списку окон через `repeat`, чтобы экземпляр шаблона оставался со своим окном. Рендерите в light DOM (`createRenderRoot() { return this }`), чтобы таблица стилей темы на странице доставала до окон. Внутри собственного теневого корня элемента вместо этого добавьте тему в его стили: `static styles = unsafeCSS(themeStyle('glass'))`, где `themeStyle` берётся из `@surdeddd/wmkit/themes` ([Темизация](./theming.ru.md)).
+Директивы привязываются, когда рендерится part, отпускают элемент при отключении и привязываются снова при подключении, поэтому хост можно безопасно переносить по странице. Контроллеры перечитывают состояние при подключении, так что хост, отключённый, пока менялся менеджер, рендерит свежие данные. Давайте списку окон ключи через `repeat`, чтобы экземпляр шаблона оставался со своим окном. Рендерите в light DOM (`createRenderRoot() { return this }`), чтобы таблица стилей темы на странице доставала до окон. Внутри собственного теневого корня элемента добавьте тему в его стили: `static styles = unsafeCSS(themeStyle('glass'))`, где `themeStyle` берётся из `@surdeddd/wmkit/themes` ([Темизация](./theming.ru.md#темы-в-виде-текста)).
 
 ## Qwik
 
@@ -438,14 +480,16 @@ export default component$(() => (
 
 | Экспорт | Что делает |
 | --- | --- |
-| `WmDesktop` | рендерит элемент рабочего стола; менеджер создаётся на клиенте в `useVisibleTask$` и передаётся через `WmContext`. Пропсы: `options` (опции рабочего стола и менеджера), `class` |
+| `WmDesktop` | рендерит элемент рабочего стола; менеджер создаётся на клиенте в `useVisibleTask$` и передаётся через `WmContext`. Пропсы: `options` (опции рабочего стола и менеджера, только данные), `options$` (`QRL`, который возвращает дополнительные опции; на клиенте они накладываются поверх `options`), `class` |
 | `WmWindow` | рендерит секцию окна: тайтлбар с `data-wm-title`, слот `controls` и слот для контента. Пропсы: `id` плюс любое поле `WindowInit`, `class` |
 | `useWm()` | стор рабочего стола: `wm` и `binder` (оба `undefined`, пока рабочий стол не стал видимым на клиенте) и `version`, который увеличивается при каждом изменении |
 | `useWmState()` | вычисляемый сигнал с `ManagerState`, на сервере — `undefined` |
 
-`WmWindow` рендерит начальную геометрию инлайн, поэтому серверная разметка стоит там, куда её поставит клиент, и при возобновлении вёрстка не сдвигается. Окно открывается и привязывается, как только рабочий стол появляется на клиенте. Узлом владеет Qwik: окно, закрытое через менеджер, скрывается и возвращается привязанным, когда его id открывают снова. Размонтирование `WmWindow` закрывает его окно.
+<span v-pre>`options` сериализуется в серверный HTML, поэтому в нём могут быть только данные. Всё, где есть функции, кладите в `options$` — он выполняется на клиенте: `<WmDesktop options={{ snap: true }} options$={() => ({ beforeClose: (w) => w.id !== 'notes' })}>`.</span>
 
-Точка входа поставляется как `qwik.qwik.mjs`, поэтому оптимизатор Qwik обрабатывает её как ваши собственные компоненты. Диапазон peer-зависимости: `@builder.io/qwik` от 1.5 и ниже 2. Qwik City и другие сетапы с серверным рендерингом загружают Qwik loader за вас. С чисто клиентским `render()` загружать его придётся самим, иначе ни один обработчик `onClick$` не сработает:
+`WmWindow` рендерит начальную геометрию инлайн-стилем, поэтому серверная разметка стоит там, куда её поставит клиент, и при возобновлении вёрстка не прыгает. Этот инлайн-стиль задаёт только начальное положение; после привязки окна им управляет контроллер. Окно открывается и привязывается, как только рабочий стол появляется на клиенте. Пропсы геометрии остаются живыми: когда меняется `x`, `y`, `width` или `height`, окно двигается или меняет размер через менеджер, причём применяется только изменившаяся координата. Правила менеджера при этом действуют: положение меняется только в стадии `normal`, а изменение размера игнорируется, пока окно свёрнуто или развёрнуто. Узлом владеет Qwik: окно, закрытое через менеджер, скрывается и возвращается привязанным, когда его id открывают снова. Размонтирование `WmWindow` закрывает его окно.
+
+Точка входа поставляется как `qwik.qwik.mjs`, поэтому оптимизатор Qwik обрабатывает её как ваши собственные компоненты. Диапазон peer-зависимости: `@builder.io/qwik` от 1.5 и ниже 2. Тест рендерит рабочий стол на сервере без DOM и возобновляет его настоящим Qwik loader в jsdom; настоящий браузер, потоковый рендеринг и Qwik City он не проверяет. Qwik City и другие сетапы с серверным рендерингом загружают Qwik loader за вас. С чисто клиентским `render()` загружать его придётся самим, иначе ни один обработчик `onClick$` не сработает:
 
 ```ts
 import { render } from '@builder.io/qwik'
@@ -482,7 +526,7 @@ render(document.getElementById('app')!, <App />).then(() => {
 </wm-desktop>
 ```
 
-`@surdeddd/wmkit/elements/define` регистрирует `<wm-desktop>` и `<wm-window>`, а на сервере ничего не делает. Для другого префикса вызовите `defineWmElements({ prefix: 'acme' })` из `@surdeddd/wmkit/elements` — получите `<acme-desktop>` и `<acme-window>`. Элементы работают в любом фреймворке, который рендерит HTML: React 19, Vue, Angular, Svelte, Solid или чистый HTML.
+`@surdeddd/wmkit/elements/define` регистрирует `<wm-desktop>` и `<wm-window>`. На сервере (Node, любой SSR-фреймворк) обе точки входа можно импортировать без опаски — там они ничего не делают. Для другого префикса вызовите `defineWmElements({ prefix: 'acme' })` из `@surdeddd/wmkit/elements` и получите `<acme-desktop>` и `<acme-window>`. Элементы работают в любом фреймворке, который рендерит HTML: React 19, Vue, Angular, Svelte, Solid или чистый HTML.
 
 `<wm-desktop>`
 
@@ -490,27 +534,36 @@ render(document.getElementById('app')!, <App />).then(() => {
 | --- | --- |
 | `snap`, `keyboard`, `grouping`, `magnetism`, `announce` | включены по умолчанию; `="false"` выключает любой из них |
 | `persist="key"` | сохраняет раскладку в `localStorage` под этим ключом и восстанавливает её |
-| `lang` | `ru…` выбирает русские подписи кнопок; учитывается ближайший `lang` на странице |
+| `lang` | `ru…` выбирает русские подписи; учитывается ближайший `lang` на странице |
 | `.options` | любая опция рабочего стола или менеджера; задайте её до подключения элемента |
-| `.messages` | свои подписи кнопок (`{ minimize, maximize, close }`); главнее `lang` |
+| `.messages` | свои подписи (`{ minimize, maximize, close, tabs? }`); главнее `lang` |
+| `.styles` | CSS-строка, `CSSStyleSheet` или массив из них; подключается в теневой корень каждого `<wm-window>` этого рабочего стола, включая окна, добавленные позже; `null` убирает стили |
 | `.manager`, `.controller` | менеджер и контроллер, после подключения |
+
+`desktop.styles = retroShadowTheme` (или `themeStyle('retro', { shadow: true })`, оба из `@surdeddd/wmkit/themes`) переносит в обвязку каждого окна не только токены темы, но и её тайтлбар, кнопки и область контента. Там, где нет constructable stylesheets (Safari до 16.4), строки молча пропускаются. `.options`, `.messages`, `.styles` и `.windowId` можно задать ещё до регистрации элементов: значения переживут апгрейд.
 
 `<wm-window>`
 
 | Атрибут | Смысл |
 | --- | --- |
-| `window-id` | id окна; генерируется, если не задан |
+| `window-id` | id окна; если не задан, генерируется, и его можно прочитать из `.windowId` |
 | `label` | заголовок |
 | `x`, `y`, `width`, `height`, `min-width`, `min-height`, `max-width`, `max-height`, `aspect-ratio`, `workspace` | геометрия и ограничения |
-| `stage` | `normal`, `minimized` или `maximized`; отражает текущую стадию обратно |
+| `stage` | `normal`, `minimized` или `maximized`; отражает текущую стадию |
 | `layer` | `normal`, `floating` или `modal` |
-| `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | включены по умолчанию; `="false"` выключает любой из них |
+| `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | включены по умолчанию; `="false"` выключает любой из них и прячет его кнопку |
 | `closed` | окно закрыто и скрыто; снятие атрибута открывает его снова |
 | `chrome="none"` | скрывает встроенный тайтлбар — для своей разметки с `data-wm-drag` |
 
-Изменение атрибута управляет менеджером, а менеджер отражает `stage` и `closed` обратно. Библиотека никогда не удаляет элемент, так что фреймворк, который его отрендерил, остаётся владельцем. Удаление элемента со страницы закрывает его окно; перемещение — нет.
+Изменение атрибута управляет менеджером. Если изменить один из `width` / `height`, `x` / `y`, `min-*` или `max-*`, меняется только эта сторона, а другая сохраняет текущее значение. Снятие `x`, `y`, `min-width` или `min-height` оставляет окно как есть; снятие `max-width` или `max-height` убирает это ограничение.
 
-Обвязка живёт в теневом корне с частями (parts) `titlebar`, `title`, `control` (плюс `minimize`, `maximize`, `close`) и `content`. Дочерние элементы остаются в light DOM, в слоте по умолчанию, а слот `actions` добавляет кнопки в тайтлбар. Стилизуйте части через `::part()` и токены темы, которые проходят через теневую границу.
+Элемент повторяет за менеджером каждое изменение: `stage` и `closed` следуют и за отменой, повтором, `hydrate` и `loadLayout`. Отмена после закрытия `<wm-window>` возвращает элемент, и он испускает `wm-open`; повтор снова его закрывает. Библиотека никогда не удаляет элемент, так что фреймворк, который его отрендерил, остаётся владельцем. Удаление элемента со страницы закрывает его окно; перемещение — нет. Второй элемент с тем же `window-id` остаётся непривязанным, а не бросает исключение.
+
+С `persist` закрытые окна остаются закрытыми и после перезагрузки. id закрытых элементов хранятся в `wm.getState().extensions.elements` (`{ closed: ['log'] }`): это состояние сериализуется и входит в историю, но собственного шага отмены не добавляет. `<wm-window>`, чей id там указан, подключается с атрибутом `closed`; снятие атрибута открывает окно и убирает id из списка. Сохранённое состояние главнее разметки: элемент с `closed`, чьё окно есть в восстановленном состоянии, подключается открытым. Элемент без `window-id` не может оставаться закрытым после перезагрузки, потому что сгенерированный id не постоянен.
+
+Обвязка живёт в теневом корне с частями (parts) `titlebar`, `title`, `tabs`, `tab` (плюс `active` у показанной вкладки), `control` (плюс `minimize`, `maximize`, `close`) и `content`. Кнопки лежат в `span[data-wm-controls]` и показывают только то, что окну разрешено: кнопка скрыта, пока `minimizable`, `maximizable` или `closable` равен `false`, поэтому у закреплённой панели нет кнопки сворачивания. Их значки задаются через CSS `::after`, так что тема может их заменить. Область контента несёт и `data-wm-content`, и `part="content"`. Дочерние элементы остаются в light DOM, в слоте по умолчанию, а слот `actions` добавляет кнопки в тайтлбар. Стилизуйте части через `::part()` (`wm-window::part(tab active) { … }`) и токены темы, которые проходят через теневую границу, или передайте всю тему в `.styles` рабочего стола.
+
+Когда `<wm-window>` — активный участник вкладочной группы из двух и более окон, в его тайтлбаре вместо заголовка появляется полоса вкладок: `[part=tabs][role=tablist]` с кнопкой `button[role=tab][data-window-id]` на каждого участника. Клик, Enter или Space активируют вкладку; ArrowLeft и ArrowRight (по кругу), Home и End переводят фокус между вкладками. `messages.tabs` задаёт подпись списка вкладок (`'Tabs'`, по-русски `'Вкладки'`). Участник группы, который не является `<wm-window>`, тоже показывается вкладкой, но своей полосы вкладок, чтобы переключиться обратно, у него нет: дайте пользователю сочетание клавиш (`Ctrl`/`⌘` + `Alt` + `PageDown` / `PageUp`) или свой элемент управления.
 
 События всплывают и проходят через теневые корни. Каждый `detail` несёт `window`:
 
@@ -521,12 +574,14 @@ render(document.getElementById('app')!, <App />).then(() => {
 | `wm-beforeclose` | запрошено закрытие; `preventDefault()` оставляет окно открытым |
 | `wm-move`, `wm-resize`, `wm-stage`, `wm-focus` | изменились геометрия, стадия или фокус |
 
+Кроме того, точка входа экспортирует `defineWmElements`, классы элементов `WmDesktopElement` и `WmWindowElement`, каталоги подписей `elementsMessages` и `elementsMessagesRu` и типы `ElementsMessages`, `WmDesktopOptions`, `WmDesktopStyles` и `DefineOptions`.
+
 ## Какую точку входа выбрать
 
 | Вам нужно | Используйте |
 | --- | --- |
-| полный контроль, без фреймворка | `attachDesktop` напрямую |
-| чтобы связкой управлял жизненный цикл фреймворка | соответствующий адаптер |
+| полный контроль без фреймворка | `attachDesktop` напрямую |
+| чтобы привязкой управлял жизненный цикл фреймворка | соответствующий адаптер |
 | несколько рабочих столов на одной странице | по менеджеру и биндеру на каждый рабочий стол |
 | рабочий стол рендерит один фреймворк, а окна — другой | общий для них `createDesktopBinder` |
-| вообще без DOM (тесты, SSR, нативный рендерер) | только `createWindowManager` |
+| совсем без DOM (тесты, SSR, нативный рендерер) | только `createWindowManager` |
