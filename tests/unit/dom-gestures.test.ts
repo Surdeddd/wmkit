@@ -532,3 +532,41 @@ describe('a gesture whose handle leaves the page', () => {
     expect(h.wm.get('a')?.bounds).toMatchObject({ width: 200, height: 150 })
   })
 })
+
+describe('resizing a tab group from the left or top', () => {
+  function group(b: WindowInit, a: WindowInit = {}) {
+    const h = makeHarness()
+    h.add({ ...a, id: 'a', x: 100, y: 100, width: 500, height: 300 })
+    h.add({ ...b, id: 'b', x: 100, y: 100, width: 500, height: 300 })
+    h.wm.group(['a', 'b'])
+    h.wm.activateTab('a')
+    return h
+  }
+
+  function pull(h: Harness, direction: string, from: [number, number], to: [number, number]) {
+    const grip = h.grip('a', direction)
+    grip.dispatchEvent(pointerEvent('pointerdown', from[0], from[1]))
+    grip.dispatchEvent(pointerEvent('pointermove', to[0], to[1]))
+    h.flush()
+    grip.dispatchEvent(pointerEvent('pointerup', to[0], to[1]))
+    return h.wm.get('a')?.bounds as { x: number; y: number; width: number; height: number }
+  }
+
+  it('keeps the right edge still when a tab sets a larger minimum width', () => {
+    const bounds = pull(group({ minWidth: 400 }), 'w', [100, 250], [400, 250])
+    expect(bounds.width).toBe(400)
+    expect(bounds.x + bounds.width).toBe(600)
+  })
+
+  it('keeps the bottom edge still when a tab sets a larger minimum height', () => {
+    const bounds = pull(group({ minHeight: 250 }), 'n', [300, 100], [300, 300])
+    expect(bounds.height).toBe(250)
+    expect(bounds.y + bounds.height).toBe(400)
+  })
+
+  it('stops at the smallest maximum of the group and keeps the right edge still', () => {
+    const bounds = pull(group({ maxWidth: 550 }, { maxWidth: 700 }), 'w', [100, 250], [0, 250])
+    expect(bounds.width).toBe(550)
+    expect(bounds.x + bounds.width).toBe(600)
+  })
+})
