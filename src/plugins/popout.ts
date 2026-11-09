@@ -106,11 +106,35 @@ function copyStylesInto(target: Document, source: Document): void {
   }
 }
 
-export async function popout(
+const live = new WeakMap<WindowManager, Map<string, Promise<PopoutHandle>>>()
+
+export function popout(
   wm: WindowManager,
   id: string,
   content: HTMLElement,
   options: PopoutOptions = {},
+): Promise<PopoutHandle> {
+  const out = live.get(wm) ?? new Map<string, Promise<PopoutHandle>>()
+  live.set(wm, out)
+  const existing = out.get(id)
+  if (existing) {
+    return existing.then((handle) => {
+      handle.window.focus()
+      return handle
+    })
+  }
+  const pending = launch(wm, id, content, options, () => out.delete(id))
+  out.set(id, pending)
+  pending.catch(() => out.delete(id))
+  return pending
+}
+
+async function launch(
+  wm: WindowManager,
+  id: string,
+  content: HTMLElement,
+  options: PopoutOptions,
+  release: () => void,
 ): Promise<PopoutHandle> {
   const win = wm.get(id)
   if (!win) throw new Error(`wmkit: cannot pop out unknown window "${id}"`)
@@ -184,6 +208,7 @@ export async function popout(
   function finish(): void {
     if (done) return
     done = true
+    release()
     for (const stop of stops) stop()
     view?.removeEventListener('pagehide', finish)
     if (moved) {

@@ -274,6 +274,79 @@ describe('popup window', () => {
   })
 })
 
+describe('popping out a window that is already out', () => {
+  it('hands back the open popup and brings it forward instead of opening another', async () => {
+    const { target, open } = stubOpen()
+    const { wm, holder, content } = setup()
+    const first = await popout(wm, 'p', content, { target: 'window' })
+    const second = await popout(wm, 'p', content, { target: 'window' })
+
+    expect(second).toBe(first)
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(target.focus).toHaveBeenCalledTimes(1)
+    expect(handleHolds(first, content)).toBe(true)
+
+    target.hide()
+    expect(content.parentNode).toBe(holder)
+    expect(wm.get('p')?.stage).toBe('normal')
+  })
+
+  it('answers a double click with one picture-in-picture window', async () => {
+    const { target, requestWindow } = stubPip()
+    const { wm, content } = setup()
+    const [first, second] = await Promise.all([popout(wm, 'p', content), popout(wm, 'p', content)])
+    expect(second).toBe(first)
+    expect(requestWindow).toHaveBeenCalledTimes(1)
+    expect(target.focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens a fresh popup once the previous one has closed, even right away', async () => {
+    const opened: FakeWindow[] = []
+    vi.stubGlobal('open', () => {
+      const target = fakeWindow()
+      opened.push(target)
+      return target
+    })
+    const { wm, content } = setup()
+    const first = await popout(wm, 'p', content)
+    first.close()
+    const second = popout(wm, 'p', content)
+    expect(opened).toHaveLength(2)
+    expect(await second).not.toBe(first)
+    wm.close('p')
+    wm.open({ id: 'p' })
+    expect(await popout(wm, 'p', content)).not.toBe(await second)
+    expect(opened).toHaveLength(3)
+  })
+
+  it('tries again after a popup that was blocked or refused', async () => {
+    const { wm, content } = setup()
+    stubOpen(null)
+    await expect(popout(wm, 'p', content)).rejects.toThrow(/blocked/)
+    const { target } = stubOpen()
+    expect((await popout(wm, 'p', content)).window).toBe(target)
+  })
+
+  it('keeps windows of different managers apart', async () => {
+    const opened: FakeWindow[] = []
+    vi.stubGlobal('open', () => {
+      const target = fakeWindow()
+      opened.push(target)
+      return target
+    })
+    const one = setup()
+    const two = setup()
+    const a = await popout(one.wm, 'p', one.content)
+    const b = await popout(two.wm, 'p', two.content)
+    expect(b).not.toBe(a)
+    expect(opened).toHaveLength(2)
+  })
+})
+
+function handleHolds(handle: { container: HTMLElement }, content: HTMLElement): boolean {
+  return handle.container.contains(content)
+}
+
 describe('staying in step with the window', () => {
   it('follows the title, and closes with the window', async () => {
     const { target } = stubPip()
