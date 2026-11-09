@@ -732,7 +732,7 @@ export function attachDesktop(
     const onDesktopKeydown = (event: KeyboardEvent) => {
       if (cycleEnabled && event.key === 'F6') {
         event.preventDefault()
-        wm.cycleFocus(event.shiftKey ? -1 : 1)
+        if (!drag) wm.cycleFocus(event.shiftKey ? -1 : 1)
         return
       }
       if (!event.ctrlKey && !event.metaKey) return

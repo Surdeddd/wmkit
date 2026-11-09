@@ -419,6 +419,21 @@ describe('escape from a drag', () => {
   })
 })
 
+describe('keys in the middle of a drag', () => {
+  it('keeps F6 from switching windows while a pointer drag holds one', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.add({ id: 'b', x: 400, y: 100, width: 200, height: 150 })
+    h.wm.focus('a')
+    dragTo(h, a.handle, [150, 110], [180, 140])
+    const f6 = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true })
+    h.element.dispatchEvent(f6)
+    expect(f6.defaultPrevented).toBe(true)
+    expect(h.wm.getState().focusedId).toBe('a')
+    a.handle.dispatchEvent(pointerEvent('pointerup', 180, 140))
+  })
+})
+
 describe('a held arrow key', () => {
   function key(target: EventTarget, type: string, name: string, init: KeyboardEventInit = {}) {
     target.dispatchEvent(new KeyboardEvent(type, { key: name, bubbles: true, ...init }))
