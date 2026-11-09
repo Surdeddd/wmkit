@@ -43,6 +43,8 @@ interface AttachedWindow {
   lastZ: number
   lastWorkspace: number
   lastTab: boolean
+  hidden: boolean
+  deep: boolean
   cleanup: Array<() => void>
 }
 
@@ -204,6 +206,7 @@ export function attachDesktop(
         (coarsePointer ? 12 : 8))
   const zIndexBase = options.stacking?.base ?? 0
   const zIndexGap = options.stacking?.gap ?? 32
+  const deepLimit = options.stacking?.deep ?? 12
   const interactiveSelector = options.interactiveSelector ?? INTERACTIVE_SELECTOR
   const animationEnabled = options.animation !== false
   const animationOptions: AnimationOptions =
@@ -445,6 +448,10 @@ export function attachDesktop(
         })
       }
       if (el.hidden !== hide) el.hidden = hide
+      if (attached.hidden !== hide) {
+        attached.hidden = hide
+        reshown = true
+      }
       setAttr(el, 'aria-label', win.title)
       if (attached.title) setText(attached.title, win.title)
       setAttr(el, 'aria-modal', win.layer === 'modal' ? 'true' : null)
@@ -485,9 +492,23 @@ export function attachDesktop(
     stackRows.length = length
   }
 
+  function markDeep(order: readonly string[]): void {
+    let rank = 0
+    for (let i = order.length; i-- > 0; ) {
+      const attached = registry.get(order[i] as string)
+      if (!attached) continue
+      const deep = !attached.hidden && rank++ > (deepLimit as number)
+      if (attached.deep !== deep) {
+        attached.deep = deep
+        attached.element.toggleAttribute('data-wm-deep', deep)
+      }
+    }
+  }
+
   let syncing = false
   let syncAgain = false
   let shielded = false
+  let reshown = false
 
   function syncAll(): void {
     if (syncing) {
@@ -550,6 +571,8 @@ export function attachDesktop(
       return
     }
     if (orderChanged) applyStacking(state.order)
+    if (deepLimit !== false && (orderChanged || reshown)) markDeep(state.order)
+    reshown = false
     if (modal !== shielded) {
       shielded = modal
       for (const { element: el } of registry.values()) {
@@ -709,6 +732,8 @@ export function attachDesktop(
       lastZ: UNASSIGNED,
       lastWorkspace: -1,
       lastTab: true,
+      hidden: false,
+      deep: false,
       cleanup: [],
     }
 
@@ -927,6 +952,8 @@ export function attachDesktop(
       delete windowElement.dataset.wmFocused
       delete windowElement.dataset.wmTabTarget
       delete windowElement.dataset.wmFlash
+      delete windowElement.dataset.wmDeep
+      reshown = true
       if (focusedEl === windowElement) focusedEl = null
       if (groupTargetEl === windowElement) {
         groupTargetId = null

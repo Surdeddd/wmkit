@@ -29,6 +29,7 @@ interface Harness {
   desktop: DesktopController
   element: HTMLElement
   add(init: WindowInit & { id: string }, html?: string): HTMLElement
+  detach(id: string): void
 }
 
 function makeHarness(options: DesktopOptions = {}, element = document.createElement('div')) {
@@ -36,6 +37,7 @@ function makeHarness(options: DesktopOptions = {}, element = document.createElem
   if (!element.isConnected) document.body.append(element)
   const wm = createWindowManager({ viewport: VIEWPORT })
   const desktop = attachDesktop(wm, element, { autoViewport: false, announce: false, ...options })
+  const detachers = new Map<string, () => void>()
   const harness: Harness = {
     wm,
     desktop,
@@ -45,8 +47,11 @@ function makeHarness(options: DesktopOptions = {}, element = document.createElem
       const root = document.createElement('section')
       root.innerHTML = html
       element.append(root)
-      desktop.attachWindow(init.id, root)
+      detachers.set(init.id, desktop.attachWindow(init.id, root))
       return root
+    },
+    detach(id) {
+      detachers.get(id)?.()
     },
   }
   return harness
@@ -169,5 +174,80 @@ describe('windows follow a resizing desktop live', () => {
     const h = makeHarness({ autoViewport: true }, element)
     expect(h.wm.getState().viewport).toEqual({ width: 640, height: 480 })
     expect(() => h.desktop.destroy()).not.toThrow()
+  })
+})
+
+describe('windows deep in the stack', () => {
+  function deepOf(h: Harness): string[] {
+    return [...h.element.querySelectorAll<HTMLElement>('[data-wm-deep]')].map(
+      (node) => node.dataset.wmWindow as string,
+    )
+  }
+
+  function stack(h: Harness, count: number): HTMLElement[] {
+    const roots: HTMLElement[] = []
+    for (let i = 0; i < count; i += 1) {
+      roots.push(h.add({ id: `w${i}`, x: i * 4, y: i * 4, width: 200, height: 150 }))
+    }
+    return roots
+  }
+
+  it('marks the visible windows more than twelve places below the top', () => {
+    const h = makeHarness()
+    stack(h, 15)
+    expect(deepOf(h)).toEqual(['w0', 'w1'])
+  })
+
+  it('follows the stacking order and skips hidden windows when it counts', () => {
+    const h = makeHarness({ stacking: { deep: 2 } })
+    stack(h, 5)
+    expect(deepOf(h)).toEqual(['w0', 'w1'])
+
+    h.wm.focus('w0')
+    expect(deepOf(h)).toEqual(['w1', 'w2'])
+
+    h.wm.minimize('w4')
+    expect(deepOf(h)).toEqual(['w1'])
+
+    h.wm.moveToWorkspace('w3', 1)
+    expect(deepOf(h)).toEqual([])
+  })
+
+  it('writes the attribute only when a window crosses the line, never per drag frame', () => {
+    const h = makeHarness({ stacking: { deep: 1 } })
+    const roots = stack(h, 4)
+    const writes: MutationRecord[] = []
+    const observer = new MutationObserver((records) => writes.push(...records))
+    for (const root of roots) {
+      observer.observe(root, { attributes: true, attributeFilter: ['data-wm-deep'] })
+    }
+    for (let i = 0; i < 20; i += 1) h.wm.move('w3', 100 + i, 100)
+    h.wm.update('w2', { title: 'renamed' })
+    writes.push(...observer.takeRecords())
+    expect(writes).toHaveLength(0)
+
+    h.wm.focus('w1')
+    writes.push(...observer.takeRecords())
+    observer.disconnect()
+    expect(writes.map((record) => (record.target as HTMLElement).dataset.wmWindow)).toEqual([
+      'w1',
+      'w2',
+    ])
+  })
+
+  it('takes the mark off a detached window and recounts the rest on the next change', () => {
+    const h = makeHarness({ stacking: { deep: 1 } })
+    const roots = stack(h, 4)
+    h.detach('w0')
+    expect((roots[0] as HTMLElement).hasAttribute('data-wm-deep')).toBe(false)
+    h.detach('w3')
+    h.wm.update('w2', { title: 'renamed' })
+    expect(deepOf(h)).toEqual([])
+  })
+
+  it('can be switched off', () => {
+    const h = makeHarness({ stacking: { deep: false } })
+    stack(h, 15)
+    expect(deepOf(h)).toEqual([])
   })
 })

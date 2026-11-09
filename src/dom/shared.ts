@@ -40,6 +40,7 @@ export interface StackingOptions {
   base?: number
   gap?: number
   isolate?: boolean
+  deep?: number | false
 }
 
 export interface DesktopOptions {
