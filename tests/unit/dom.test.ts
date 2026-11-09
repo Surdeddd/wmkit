@@ -2939,7 +2939,7 @@ describe('drop targets', () => {
     const { commit, hit } = withTarget(harness)
 
     drag(harness, handle, [150, 110], [799, 300])
-    expect(hit).toHaveBeenLastCalledWith(799, 300, 'a')
+    expect(hit).toHaveBeenLastCalledWith(799, 300, 'a', { x: 799, y: 300 })
     const preview = previewOf(harness) as HTMLElement
     expect(preview.hasAttribute('data-wm-drop')).toBe(true)
     expect(preview.style.display).toBe('block')
@@ -2984,6 +2984,33 @@ describe('drop targets', () => {
     drag(harness, handle, [700, 310], [720, 320])
     handle.dispatchEvent(pointerEvent('pointerup', 720, 320))
     expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands the target the pointer in desktop coordinates without measuring per frame', () => {
+    const harness = makeHarness({ magnetism: false, snap: false })
+    const { handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    let reads = 0
+    harness.element.getBoundingClientRect = () => {
+      reads += 1
+      return { left: 40, top: 30, right: 840, bottom: 630, width: 800, height: 600 } as DOMRect
+    }
+    const seen: Array<{ x: number; y: number }> = []
+    harness.desktop.addDropTarget((_x, _y, _id, local) => {
+      seen.push({ ...local })
+      return null
+    })
+    handle.dispatchEvent(pointerEvent('pointerdown', 190, 140))
+    for (let i = 1; i <= 3; i += 1) {
+      handle.dispatchEvent(pointerEvent('pointermove', 190 + i * 50, 140 + i * 20))
+      harness.flushFrames()
+    }
+    handle.dispatchEvent(pointerEvent('pointerup', 340, 200))
+    expect(seen).toEqual([
+      { x: 200, y: 130 },
+      { x: 250, y: 150 },
+      { x: 300, y: 170 },
+    ])
+    expect(reads).toBe(1)
   })
 
   it('asks every target in turn and takes the first hit', () => {

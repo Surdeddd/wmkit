@@ -1,6 +1,6 @@
 import { clamp, detectSnapZone, magnetize, zoneBounds } from '../core/geometry'
 import type { Bounds, SnapZone, WindowStage } from '../core/types'
-import type { ActiveDrag, DropHit, SessionContext } from './shared'
+import type { ActiveDrag, DropHit, Point, SessionContext } from './shared'
 
 interface DragSession extends ActiveDrag {
   pointerId: number
@@ -21,6 +21,7 @@ interface DragSession extends ActiveDrag {
   hoverTimer: number
   clientX: number
   clientY: number
+  local: Point
   raf: number
   pendingX: number
   pendingY: number
@@ -65,6 +66,7 @@ export function createDragStarter(ctx: SessionContext) {
       hoverTimer: 0,
       clientX: event.clientX,
       clientY: event.clientY,
+      local: point,
       raf: 0,
       pendingX: 0,
       pendingY: 0,
@@ -140,7 +142,7 @@ export function createDragStarter(ctx: SessionContext) {
       }
       wm.move(id, nextX, nextY)
 
-      const drop = ctx.dropAt(session.clientX, session.clientY, id)
+      const drop = ctx.dropAt(session.clientX, session.clientY, id, session.local)
       if (session.drop && !drop) ctx.hidePreview()
       session.drop = drop
       if (drop) {
@@ -203,6 +205,7 @@ export function createDragStarter(ctx: SessionContext) {
       }
       session.pendingX = movePoint.x
       session.pendingY = movePoint.y
+      session.local = movePoint
       session.clientX = moveEvent.clientX
       session.clientY = moveEvent.clientY
       session.hasPending = true

@@ -94,7 +94,12 @@ export interface DropHit {
   commit(): void
 }
 
-export type DropTarget = (clientX: number, clientY: number, id: string) => DropHit | null
+export type DropTarget = (
+  clientX: number,
+  clientY: number,
+  id: string,
+  local: Point,
+) => DropHit | null
 
 export interface MountedWindow {
   element: HTMLElement
@@ -152,7 +157,7 @@ export interface SessionContext {
   magnetThreshold: number
   groupDwell: number
   groupTarget(clientX: number, clientY: number, selfId: string): string | null
-  dropAt(clientX: number, clientY: number, id: string): DropHit | null
+  dropAt(clientX: number, clientY: number, id: string, local: Point): DropHit | null
   markGroupTarget(id: string | null): void
   currentDrag(): ActiveDrag | null
   claimDrag(session: ActiveDrag): void

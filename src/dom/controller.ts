@@ -319,9 +319,9 @@ export function attachDesktop(
       }
       return null
     },
-    dropAt(clientX, clientY, id) {
+    dropAt(clientX, clientY, id, local) {
       for (const hit of dropTargets) {
-        const found = hit(clientX, clientY, id)
+        const found = hit(clientX, clientY, id, local)
         if (found) return found
       }
       return null
