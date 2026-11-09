@@ -58,6 +58,10 @@ function num(value: unknown, min = Number.NEGATIVE_INFINITY): number | undefined
   return Number.isFinite(value) && (value as number) >= min ? (value as number) : undefined
 }
 
+function usable(size: Size | undefined, fallback: Size): Size {
+  return size && sized(size) && finite(size.width, size.height) ? size : fallback
+}
+
 function cap(value: unknown): number {
   return typeof value === 'number' && value > 0 ? value : INFINITE
 }
@@ -95,12 +99,13 @@ function unitRect(rect: Bounds): Bounds | null {
 export function createWindowManager(options: ManagerOptions = {}): WindowManager {
   const emitter = createEmitter<ManagerEvents>()
   const keepInViewport = options.keepInViewport ?? true
-  const minVisible = options.minVisible ?? 48
-  const defaultSize = options.defaultSize ?? { width: 480, height: 320 }
-  const cascadeOffset = options.cascadeOffset ?? 32
-  const cascadeOrigin = options.cascadeOrigin ?? { x: 32, y: 32 }
+  const minVisible = num(options.minVisible, 0) ?? 48
+  const defaultSize = usable(options.defaultSize, { width: 480, height: 320 })
+  const cascadeOffset = num(options.cascadeOffset) ?? 32
+  const origin = options.cascadeOrigin
+  const cascadeOrigin = origin && finite(origin.x, origin.y) ? origin : { x: 32, y: 32 }
   const idPrefix = options.idPrefix ?? 'wm'
-  const historyLimit = options.historyLimit ?? 50
+  const historyLimit = (options.historyLimit as number) >= 0 ? (options.historyLimit as number) : 50
 
   let windows: Readonly<Record<string, WindowState>> = Object.create(null)
   let windowsShared = false
@@ -111,7 +116,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let groupsDirty = false
   let order: string[] = []
   let focusedId: string | null = null
-  let viewport: Size = options.viewport ?? { width: 0, height: 0 }
+  let viewport = usable(options.viewport, { width: 0, height: 0 })
   let workspace = normalizeWorkspace(options.workspace, 0)
   let activeTabs: Record<string, string> = {}
   let extensions: Record<string, unknown> = {}
@@ -924,8 +929,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function setViewport(next: Size): void {
     if (
-      !sized(next) ||
-      !finite(next.width, next.height) ||
+      usable(next, viewport) !== next ||
       (next.width === viewport.width && next.height === viewport.height)
     ) {
       return

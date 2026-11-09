@@ -180,6 +180,49 @@ describe('non-finite numbers never enter the state', () => {
   })
 })
 
+describe('manager options fall back to the defaults for bad numbers', () => {
+  it('ignores a bad viewport, default size, cascade, visibility and history limit', () => {
+    const wm = createWindowManager({
+      viewport: { width: Number.NaN, height: 600 },
+      defaultSize: { width: -1, height: 300 },
+      cascadeOffset: Number.NaN,
+      cascadeOrigin: { x: Number.POSITIVE_INFINITY, y: 0 },
+      minVisible: -5,
+      historyLimit: Number.NaN,
+    })
+    expect(wm.getState().viewport).toEqual({ width: 0, height: 0 })
+    expect(wm.open({ id: 'a' }).bounds).toEqual({ x: 32, y: 32, width: 480, height: 320 })
+    expect(wm.open({ id: 'b' }).bounds).toMatchObject({ x: 64, y: 64 })
+    wm.setViewport(VIEWPORT)
+    wm.move('a', -1000, 0)
+    expect(wm.get('a')?.bounds.x).toBe(48 - 480)
+    for (let i = 0; i < 60; i += 1) wm.move('b', i, 100)
+    let steps = 0
+    while (wm.undo()) steps += 1
+    expect(steps).toBe(50)
+  })
+
+  it('keeps zero and unbounded limits where they mean something', () => {
+    const none = createWindowManager({ viewport: VIEWPORT, historyLimit: 0, minVisible: 0 })
+    none.open({ id: 'a', width: 200, height: 150 })
+    none.move('a', -150, 0)
+    expect(none.get('a')?.bounds.x).toBe(-150)
+    expect(none.canUndo()).toBe(false)
+    const all = createWindowManager({
+      viewport: VIEWPORT,
+      historyLimit: Number.POSITIVE_INFINITY,
+      cascadeOffset: 0,
+      cascadeOrigin: { x: 0, y: 0 },
+    })
+    expect(all.open({ id: 'a' }).bounds).toMatchObject({ x: 0, y: 0 })
+    expect(all.open({ id: 'b' }).bounds).toMatchObject({ x: 0, y: 0 })
+    for (let i = 1; i <= 80; i += 1) all.move('a', i, 0)
+    let steps = 0
+    while (all.undo()) steps += 1
+    expect(steps).toBe(82)
+  })
+})
+
 describe('hydrate repairs a window instead of rejecting the snapshot', () => {
   it('replaces a non-finite position and size with what open would give', () => {
     const wm = createWindowManager({ viewport: VIEWPORT })
