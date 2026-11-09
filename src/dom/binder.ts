@@ -63,8 +63,12 @@ export function createDesktopBinder(wm: WindowManager, options?: DesktopOptions)
       attachEntry(entry)
       entries.add(entry)
       return () => {
-        entry.detach?.()
+        const attached = entry.detach
+        attached?.()
         entries.delete(entry)
+        if (attached) {
+          for (const other of entries) if (other.id === id) return attachEntry(other)
+        }
       }
     },
     destroy() {

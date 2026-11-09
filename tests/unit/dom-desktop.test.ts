@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowInit, WindowManager } from '../../src/core/types'
+import { createDesktopBinder } from '../../src/dom/binder'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, DesktopOptions, WindowSkin } from '../../src/dom/shared'
 import type { AnimationOptions, GroupingOptions, StackingOptions } from '../../src/index'
@@ -446,6 +447,26 @@ describe('attaching windows', () => {
     expect(a.dataset.wmWindow).toBe('a')
     h.wm.move('a', 40, 40)
     expect(a.style.transform).toBe('translate3d(40px, 40px, 0)')
+  })
+
+  it('hands a window to the next bound element when the attached one unbinds', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const binder = createDesktopBinder(wm, { autoViewport: false, announce: false })
+    const host = document.createElement('div')
+    document.body.append(host)
+    binder.bindDesktop(host)
+    const first = document.createElement('section')
+    const second = document.createElement('section')
+    host.append(first, second)
+    const unbindFirst = binder.bindWindow('notes', first)
+    binder.bindWindow('notes', second)
+    wm.open({ id: 'notes' })
+    expect(first.dataset.wmWindow).toBe('notes')
+
+    unbindFirst()
+    wm.move('notes', 300, 200)
+    expect(second.dataset.wmWindow).toBe('notes')
+    expect(second.style.transform).toBe('translate3d(300px, 200px, 0)')
   })
 })
 
