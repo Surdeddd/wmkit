@@ -427,6 +427,36 @@ describe('the frame shield under a modal', () => {
   })
 })
 
+describe('DOM focus after a restore', () => {
+  it('follows the window the manager focused last in the same task', async () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+    const b = h.add({ id: 'b', x: 300, y: 0, width: 200, height: 150 })
+    h.wm.minimize('a')
+    h.wm.restore('a')
+    h.wm.focus('b')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(b.dataset.wmFocused).toBe('')
+    expect(b.contains(document.activeElement)).toBe(true)
+    expect(a.contains(document.activeElement)).toBe(false)
+    press(document.activeElement as HTMLElement, 'ArrowRight')
+    expect(h.wm.get('a')?.bounds.x).toBe(0)
+  })
+
+  it('still goes back into a restored window that keeps the focus', async () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+    h.add({ id: 'b', x: 300, y: 0, width: 200, height: 150 })
+    h.wm.focus('a')
+    h.wm.minimize('a')
+    h.wm.restore('a')
+    await Promise.resolve()
+    expect(a.contains(document.activeElement)).toBe(true)
+  })
+})
+
 describe('a desktop that lives in another document', () => {
   function framed() {
     const frame = document.createElement('iframe')

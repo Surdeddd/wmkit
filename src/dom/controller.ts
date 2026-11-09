@@ -445,7 +445,7 @@ export function attachDesktop(
       if (hide && !el.hidden) rescue(el)
       if (!hide && el.hidden && wm.getState().focusedId === win.id) {
         queueMicrotask(() => {
-          if (!el.hidden) pull(attached)
+          if (!el.hidden && wm.getState().focusedId === win.id) pull(attached)
         })
       }
       if (el.hidden !== hide) el.hidden = hide
