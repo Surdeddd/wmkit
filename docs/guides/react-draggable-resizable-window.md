@@ -63,7 +63,7 @@ export function Desktop() {
 }
 ```
 
-`data-wm-drag` marks the drag handle, `data-wm-title` receives the title, and the three buttons work by attribute alone. The resize handles on all eight sides are added for you. Iterate `state.windows`, not `state.order`: `order` is the stacking order and changes on every click, and re-ordering DOM nodes in the middle of a click drops it.
+`data-wm-drag` marks the drag handle, `data-wm-title` receives the title, and the three buttons work by attribute alone. The resize handles on all eight sides are added for you. Iterate `state.windows`, not `state.order`: `order` is the stacking order and changes on every click, and re-ordering DOM nodes in the middle of a click drops it. The keys of `state.windows` stay in opening order as long as window ids are not bare integers ([why](../api.md#managerstate)).
 
 ## What you get without writing it
 
@@ -71,7 +71,7 @@ export function Desktop() {
 - **Constraints**: `minWidth`, `minHeight`, `maxWidth`, `maxHeight` and `aspectRatio` are honoured by every move, including keyboard resizing and snapping.
 - **Focus and stacking**: a press raises the window, focus moves into it, `Tab` stays inside a modal, and `F6` cycles windows.
 - **Snapping** to halves, quarters and thirds with a live preview, and a drag off a snapped window tears it out at the cursor.
-- **Keyboard**: arrows move, Shift+arrows resize, Ctrl/⌘+Alt+arrows snap, Ctrl/⌘+Z undoes the last move.
+- **Keyboard**: arrows move, Shift+arrows resize, Ctrl/⌘+Alt+arrows snap, Ctrl/⌘+Alt+PageDown/PageUp switch tabs, Ctrl/⌘+Z undoes the last move.
 - **Screen readers** hear what happened ("Notes maximized", "Notes snapped to left") through one live region, in words you can replace.
 - **Undo and redo**: a whole drag is one history step.
 
