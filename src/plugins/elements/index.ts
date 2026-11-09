@@ -64,6 +64,8 @@ const FLAGS = [
 const READ = Symbol('wmkit')
 const OPEN = Symbol('wmkit-open')
 
+const Base = (typeof HTMLElement === 'undefined' ? Object : HTMLElement) as typeof HTMLElement
+
 function numberAt(element: Element, name: string): number | undefined {
   const raw = element.getAttribute(name)
   const value = raw === null ? Number.NaN : Number(raw)
@@ -81,7 +83,7 @@ function emit(element: Element, type: string, detail: unknown, cancelable = fals
   )
 }
 
-export class WmDesktopElement extends HTMLElement {
+export class WmDesktopElement extends Base {
   manager: WindowManager | null = null
   controller: DesktopController | null = null
   options: WmDesktopOptions = {}
@@ -157,7 +159,7 @@ export class WmDesktopElement extends HTMLElement {
   }
 }
 
-export class WmWindowElement extends HTMLElement {
+export class WmWindowElement extends Base {
   static observedAttributes = [
     'label',
     'stage',
