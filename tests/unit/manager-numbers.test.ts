@@ -254,6 +254,34 @@ describe('hydrate repairs a window instead of rejecting the snapshot', () => {
 })
 
 describe('named layouts take what serialize and JSON take', () => {
+  it('keeps cyclic meta, dates and infinite limits exactly as before', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    const cyclic: Record<string, unknown> = { n: 1 }
+    cyclic.self = cyclic
+    const at = new Date(0)
+    wm.open({ id: 'a', meta: { cyclic, at } })
+    wm.update('a', { maxSize: { width: Number.POSITIVE_INFINITY, height: 500 } })
+    const saved = wm.saveLayout('x')
+    expect(saved.windows[0]?.meta.at).toBe(at)
+    const stored = wm.getLayout('x')?.windows[0]
+    const copy = stored?.meta.cyclic as Record<string, unknown>
+    expect(stored?.meta.at).toEqual(at)
+    expect(copy.self).toBe(copy)
+    expect(wm.loadLayout('x')).toBe(true)
+    expect(wm.get('a')?.meta.at).toBeInstanceOf(Date)
+    expect(wm.get('a')?.maxSize).toEqual({ width: Number.POSITIVE_INFINITY, height: 500 })
+    const data = wm.serialize()
+    ;(data.windows[0] as { maxSize: unknown }).maxSize = {
+      width: Number.POSITIVE_INFINITY,
+      height: 400,
+    }
+    expect(wm.setLayout('y', data)).toBe(true)
+    expect(wm.getLayout('y')?.windows[0]?.maxSize).toEqual({
+      width: Number.POSITIVE_INFINITY,
+      height: 400,
+    })
+  })
+
   it('saves and loads a layout with a function in meta or in an extension', () => {
     const wm = createWindowManager({ viewport: VIEWPORT })
     wm.open({ id: 'a', meta: { onSave: () => {}, n: 1 } })

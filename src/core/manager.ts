@@ -1344,13 +1344,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function clone<T>(value: T): T {
-    return JSON.parse(JSON.stringify(value))
+    try {
+      return structuredClone(value)
+    } catch {
+      return JSON.parse(JSON.stringify(value))
+    }
   }
 
   function saveLayout(name: string): SerializedState {
-    const data = clone(serialize())
-    layouts.set(name, data)
-    return clone(data)
+    const data = serialize()
+    layouts.set(name, clone(data))
+    return data
   }
 
   function loadLayout(name: string): boolean {
