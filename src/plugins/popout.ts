@@ -76,8 +76,7 @@ export async function listScreens(): Promise<readonly PopoutScreen[] | null> {
   return (await screenDetails())?.screens ?? null
 }
 
-async function screenFor(choice: PopoutOptions['screen']): Promise<PopoutScreen | null> {
-  if (typeof choice === 'object') return choice
+async function screenFor(choice: 'current' | 'other'): Promise<PopoutScreen | null> {
   const details = await screenDetails()
   if (!details) return null
   const { screens, currentScreen } = details
@@ -128,9 +127,12 @@ export async function popout(
   if (usePip) {
     target = await (pip as DocumentPictureInPictureApi).requestWindow({ width, height })
   } else {
-    const screen = options.screen === undefined ? null : await screenFor(options.screen)
-    const left = options.left ?? (screen && screen.availLeft + (screen.availWidth - width) / 2)
-    const top = options.top ?? (screen && screen.availTop + (screen.availHeight - height) / 2)
+    const spot = (screen: PopoutScreen | null): [number | null, number | null] => [
+      options.left ?? (screen && screen.availLeft + (screen.availWidth - width) / 2),
+      options.top ?? (screen && screen.availTop + (screen.availHeight - height) / 2),
+    ]
+    const choice = options.screen
+    const [left, top] = spot(typeof choice === 'object' ? choice : null)
     const place = (name: string, value: number | null) =>
       value === null ? '' : `,${name}=${Math.round(value)}`
     target = view.open(
@@ -138,6 +140,14 @@ export async function popout(
       '_blank',
       `popup,width=${width},height=${height}${place('left', left)}${place('top', top)}`,
     )
+    const opened = target
+    if (opened && typeof choice === 'string') {
+      void screenFor(choice).then((screen) => {
+        if (!screen || opened.closed) return
+        const [x, y] = spot(screen) as [number, number]
+        opened.moveTo(Math.round(x), Math.round(y))
+      })
+    }
   }
   if (!target) throw new Error('wmkit: the popout window was blocked')
   const popped = target

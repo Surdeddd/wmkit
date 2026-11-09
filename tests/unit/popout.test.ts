@@ -9,6 +9,8 @@ interface FakeWindow {
   document: Document
   closed: boolean
   close: () => void
+  focus: () => void
+  moveTo: (x: number, y: number) => void
   addEventListener: (type: string, listener: () => void) => void
   hide: () => void
 }
@@ -21,6 +23,8 @@ function fakeWindow(): FakeWindow {
     close: vi.fn(() => {
       win.closed = true
     }),
+    focus: vi.fn(),
+    moveTo: vi.fn(),
     addEventListener: (type, listener) => {
       if (type === 'pagehide') listeners.push(listener)
     },
@@ -157,63 +161,107 @@ describe('popup window', () => {
     expect(open).toHaveBeenCalled()
   })
 
-  it('centres the popup on another screen when the Window Management API allows it', async () => {
+  function stubScreens(details: () => Promise<unknown>) {
+    Object.defineProperty(window, 'getScreenDetails', { configurable: true, value: details })
+  }
+
+  function stubOpens() {
+    const opened: FakeWindow[] = []
+    const open = vi.fn(() => {
+      const target = fakeWindow()
+      opened.push(target)
+      return target as unknown as Window
+    })
+    vi.stubGlobal('open', open)
+    return { opened, open }
+  }
+
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('opens at once and then centres the popup on another screen when the Window Management API allows it', async () => {
     const left = { availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1080 }
     const right = { availLeft: 1920, availTop: 20, availWidth: 1280, availHeight: 1000 }
-    Object.defineProperty(window, 'getScreenDetails', {
-      configurable: true,
-      value: async () => ({ screens: [left, right], currentScreen: left }),
-    })
-    const { open } = stubOpen()
+    stubScreens(async () => ({ screens: [left, right], currentScreen: left }))
+    const { opened, open } = stubOpens()
     const { wm, content } = setup()
-    await popout(wm, 'p', content, { screen: 'other' })
+
+    const other = await popout(wm, 'p', content, { screen: 'other' })
+    expect(open).toHaveBeenLastCalledWith('', '_blank', 'popup,width=300,height=200')
+    await settled()
+    expect(opened[0]?.moveTo).toHaveBeenCalledWith(2410, 420)
+    other.close()
+
+    const current = await popout(wm, 'p', content, { screen: 'current', top: 7 })
+    await settled()
+    expect(opened[1]?.moveTo).toHaveBeenCalledWith(810, 7)
+    current.close()
+
+    await popout(wm, 'p', content, { screen: right, top: 6 })
     expect(open).toHaveBeenLastCalledWith(
       '',
       '_blank',
-      'popup,width=300,height=200,left=2410,top=420',
+      'popup,width=300,height=200,left=2410,top=6',
     )
-    await popout(wm, 'p', content, { screen: 'current' })
-    expect(open).toHaveBeenLastCalledWith(
-      '',
-      '_blank',
-      'popup,width=300,height=200,left=810,top=440',
-    )
-    await popout(wm, 'p', content, { screen: right, left: 5, top: 6 })
-    expect(open).toHaveBeenLastCalledWith('', '_blank', 'popup,width=300,height=200,left=5,top=6')
+    await settled()
+    expect(opened[2]?.moveTo).not.toHaveBeenCalled()
     expect(await listScreens()).toEqual([left, right])
+  })
+
+  it('opens the popup inside the gesture, before the screen details arrive', () => {
+    let answer: (details: unknown) => void = () => {}
+    const details = vi.fn(() => new Promise((resolve) => (answer = resolve)))
+    stubScreens(details)
+    const { opened, open } = stubOpens()
+    const { wm, content } = setup()
+
+    void popout(wm, 'p', content, { screen: 'other' })
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(details).toHaveBeenCalledTimes(1)
+    expect(opened[0]?.moveTo).not.toHaveBeenCalled()
+    answer({
+      screens: [],
+      currentScreen: { availLeft: 0, availTop: 0, availWidth: 300, availHeight: 200 },
+    })
+  })
+
+  it('leaves a popup that closed before the screen details arrived alone', async () => {
+    let answer: (details: unknown) => void = () => {}
+    stubScreens(() => new Promise((resolve) => (answer = resolve)))
+    const { opened } = stubOpens()
+    const { wm, content } = setup()
+    const handle = await popout(wm, 'p', content, { screen: 'other' })
+    handle.close()
+    const only = { availLeft: 0, availTop: 0, availWidth: 1000, availHeight: 800 }
+    answer({ screens: [only], currentScreen: only })
+    await settled()
+    expect(opened[0]?.moveTo).not.toHaveBeenCalled()
   })
 
   it('stays on the current screen when there is only one', async () => {
     const only = { availLeft: 0, availTop: 0, availWidth: 1000, availHeight: 800 }
-    Object.defineProperty(window, 'getScreenDetails', {
-      configurable: true,
-      value: async () => ({ screens: [only], currentScreen: only }),
-    })
-    const { open } = stubOpen()
+    stubScreens(async () => ({ screens: [only], currentScreen: only }))
+    const { opened } = stubOpens()
     const { wm, content } = setup()
     await popout(wm, 'p', content, { screen: 'other' })
-    expect(open).toHaveBeenLastCalledWith(
-      '',
-      '_blank',
-      'popup,width=300,height=200,left=350,top=300',
-    )
+    await settled()
+    expect(opened[0]?.moveTo).toHaveBeenCalledWith(350, 300)
   })
 
   it('falls back to the default placement when the API is missing or denied', async () => {
-    const { open } = stubOpen()
+    const { opened, open } = stubOpens()
     const { wm, content } = setup()
     expect(await listScreens()).toBeNull()
-    await popout(wm, 'p', content, { screen: 'other' })
+    ;(await popout(wm, 'p', content, { screen: 'other' })).close()
     expect(open).toHaveBeenLastCalledWith('', '_blank', 'popup,width=300,height=200')
-    Object.defineProperty(window, 'getScreenDetails', {
-      configurable: true,
-      value: async () => {
-        throw new DOMException('denied', 'NotAllowedError')
-      },
+    stubScreens(async () => {
+      throw new DOMException('denied', 'NotAllowedError')
     })
     expect(await listScreens()).toBeNull()
     await popout(wm, 'p', content, { screen: 'other' })
     expect(open).toHaveBeenLastCalledWith('', '_blank', 'popup,width=300,height=200')
+    await settled()
+    expect(opened[0]?.moveTo).not.toHaveBeenCalled()
+    expect(opened[1]?.moveTo).not.toHaveBeenCalled()
   })
 
   it('closes every popup when the page itself goes away', async () => {
