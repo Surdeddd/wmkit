@@ -591,6 +591,10 @@ const ru: Dict = {
     snapped: (title, zone) => `Окно «${title}» прилеплено: ${ZONES_RU[zone] ?? zone}`,
     focused: (title) => `Окно «${title}» в фокусе`,
     workspace: (index) => `Рабочий стол ${index + 1}`,
+    openedMany: (count) => `Открыто окон: ${count}`,
+    closedMany: (count) => `Закрыто окон: ${count}`,
+    minimizedMany: (count) => `Свёрнуто окон: ${count}`,
+    restoredMany: (count) => `Восстановлено окон: ${count}`,
   },
   menus: [
     {

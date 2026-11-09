@@ -280,6 +280,10 @@ const narration: AnnouncerMessages = {
   snapped: (title, zone) => dict().announce.snapped(title, zone),
   focused: (title) => dict().announce.focused(title),
   workspace: (index) => dict().announce.workspace(index),
+  openedMany: (count) => dict().announce.openedMany?.(count) ?? String(count),
+  closedMany: (count) => dict().announce.closedMany?.(count) ?? String(count),
+  minimizedMany: (count) => dict().announce.minimizedMany?.(count) ?? String(count),
+  restoredMany: (count) => dict().announce.restoredMany?.(count) ?? String(count),
 }
 
 function desktopOptions(): DesktopOptions {

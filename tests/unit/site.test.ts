@@ -24,6 +24,18 @@ function attribute(doc: Document, selector: string, name: string): string | null
   return doc.querySelector(selector)?.getAttribute(name) ?? null
 }
 
+describe('what the landing tells a screen reader', () => {
+  it('sums up many windows changed at once, in the language of the page', () => {
+    for (const key of ['openedMany', 'closedMany', 'minimizedMany', 'restoredMany'] as const) {
+      const [en, ru] = LANGS.map((lang) => dictionaries[lang].announce[key]?.(5) ?? '')
+      expect(en, key).toMatch(/5/)
+      expect(en, key).not.toMatch(/[а-яё]/i)
+      expect(ru, key).toMatch(/5/)
+      expect(ru, key).toMatch(/[а-яё]/i)
+    }
+  })
+})
+
 describe('the landing page before its script runs', () => {
   it('shows the English catalogue as its static text', () => {
     const nodes = [...page.querySelectorAll<HTMLElement>('[data-i18n]')]
