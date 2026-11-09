@@ -470,6 +470,28 @@ describe('attaching windows', () => {
   })
 })
 
+describe('detaching windows', () => {
+  it('shows a window again that was detached while the desktop hid it', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+    const b = h.add({ id: 'b', x: 0, y: 0, width: 200, height: 150 })
+    h.wm.minimize('a')
+    h.wm.moveToWorkspace('b', 2)
+    h.detach('a')
+    h.desktop.destroy()
+    expect(a.hidden).toBe(false)
+    expect(b.hidden).toBe(false)
+  })
+
+  it('leaves a window hidden that closed while minimized', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+    h.wm.minimize('a')
+    h.wm.close('a')
+    expect(a.hidden).toBe(true)
+  })
+})
+
 describe('input routed to the right window', () => {
   it('lets the close button of a nested desktop close only its own window', () => {
     const h = makeHarness()

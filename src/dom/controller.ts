@@ -1038,6 +1038,7 @@ export function attachDesktop(
       delete windowElement.dataset.wmTabTarget
       delete windowElement.dataset.wmFlash
       delete windowElement.dataset.wmDeep
+      if (wm.get(id)) windowElement.hidden = false
       reshown = true
       if (focusedEl === windowElement) focusedEl = null
       if (groupTargetEl === windowElement) {
