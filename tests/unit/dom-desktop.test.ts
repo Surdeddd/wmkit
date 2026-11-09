@@ -492,6 +492,27 @@ describe('detaching windows', () => {
   })
 })
 
+describe('reading the page less', () => {
+  it('decides a click under a modal without reading every window', () => {
+    const h = makeHarness()
+    const lower = h.add({ id: 'lower', x: 0, y: 0, width: 200, height: 150 })
+    const modal = h.add({ id: 'modal', layer: 'modal', x: 300, y: 300, width: 200, height: 150 })
+    let reads = 0
+    Object.defineProperty(modal, 'hidden', {
+      configurable: true,
+      get: () => {
+        reads += 1
+        return false
+      },
+      set: () => {},
+    })
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    lower.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(true)
+    expect(reads).toBe(0)
+  })
+})
+
 describe('input routed to the right window', () => {
   it('lets the close button of a nested desktop close only its own window', () => {
     const h = makeHarness()

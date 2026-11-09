@@ -416,9 +416,6 @@ export function attachDesktop(
     if (!el.contains(doc.activeElement)) el.focus({ preventScroll: true })
   }
 
-  const modalUp = () =>
-    [...registry.values()].some(({ element: el }) => el.dataset.wmLayer === 'modal' && !el.hidden)
-
   function syncWindow(
     attached: AttachedWindow,
     win: WindowState,
@@ -853,7 +850,7 @@ export function attachDesktop(
     )
 
     const onBlockedInput = (event: Event) => {
-      if (windowElement.dataset.wmLayer !== 'modal' && modalUp()) {
+      if (shielded && attached.lastState?.layer !== 'modal') {
         event.preventDefault()
         event.stopPropagation()
       }
