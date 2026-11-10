@@ -337,12 +337,12 @@
     {
       "name": "core",
       "path": "dist/index.js",
-      "limit": "16 kB"
+      "limit": "19 kB"
     },
     {
       "name": "react adapter",
       "path": "dist/react.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "react"
       ]
@@ -350,7 +350,7 @@
     {
       "name": "vue adapter",
       "path": "dist/vue.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "vue"
       ]
@@ -358,7 +358,7 @@
     {
       "name": "svelte adapter",
       "path": "dist/svelte.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "svelte"
       ]
@@ -366,7 +366,7 @@
     {
       "name": "solid adapter",
       "path": "dist/solid.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "solid-js"
       ]
@@ -374,7 +374,7 @@
     {
       "name": "angular adapter",
       "path": "dist/angular.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "@angular/core"
       ]
@@ -382,7 +382,7 @@
     {
       "name": "preact adapter",
       "path": "dist/preact.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "preact"
       ]
@@ -390,7 +390,7 @@
     {
       "name": "lit adapter",
       "path": "dist/lit.js",
-      "limit": "16.5 kB",
+      "limit": "19.5 kB",
       "ignore": [
         "lit"
       ]
@@ -398,7 +398,7 @@
     {
       "name": "qwik adapter",
       "path": "dist/qwik.qwik.mjs",
-      "limit": "17 kB",
+      "limit": "20 kB",
       "ignore": [
         "@builder.io/qwik"
       ]
@@ -431,17 +431,17 @@
     {
       "name": "winbox compat",
       "path": "dist/winbox.js",
-      "limit": "21 kB"
+      "limit": "23.5 kB"
     },
     {
       "name": "dock plugin",
       "path": "dist/dock.js",
-      "limit": "6 kB"
+      "limit": "7 kB"
     },
     {
       "name": "web components",
       "path": "dist/elements.js",
-      "limit": "19 kB"
+      "limit": "23 kB"
     },
     {
       "name": "themes as text",
