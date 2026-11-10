@@ -81,6 +81,33 @@ function fieldsOf(text: string, name: string): Map<string, string> {
   return fields
 }
 
+function blockOf(text: string, name: string): { parents: string[]; body: string } {
+  const block = new RegExp(`interface ${name}\\b([^{\\n]*)\\{\\n([\\s\\S]*?)\\n\\}`).exec(text)
+  const parents = /extends ([\w, ]+)/.exec(block?.[1] ?? '')?.[1]?.split(',') ?? []
+  return { parents: parents.map((parent) => parent.trim()), body: block?.[2] ?? '' }
+}
+
+/** member names of an interface, inherited ones included, methods and properties alike */
+function membersOf(text: string, name: string): string[] {
+  const { parents, body } = blockOf(text, name)
+  const own = [...body.matchAll(/^ {2}(\w+)\??[(:]/gm)].map((match) => match[1] as string)
+  return [...parents.flatMap((parent) => membersOf(text, parent)), ...own]
+}
+
+/** member names of an option object the docs write out inline, on one line or several */
+function inlineMembersOf(body: string, field: string): string[] {
+  const line = new RegExp(`^ {2}${field}\\?: [^\\n]*$`, 'm').exec(body)
+  if (!line) return []
+  const head = line[0].replace(/\s*\/\/.*$/, '')
+  if (head.endsWith('{')) {
+    const rest = body.slice(line.index + line[0].length)
+    const nested = rest.slice(0, rest.search(/^ {2}\}/m))
+    return [...nested.matchAll(/^ {4}(\w+)\??:/gm)].map((match) => match[1] as string)
+  }
+  const inline = /\{([^}]*)\}/.exec(head)?.[1] ?? ''
+  return [...inline.matchAll(/(\w+)\??:/g)].map((match) => match[1] as string)
+}
+
 describe('the markdown we ship', () => {
   it('keeps double braces in inline code out of the page compiler', () => {
     const marked: Array<[string, string]> = []
@@ -185,6 +212,39 @@ describe('the markdown we ship', () => {
       for (const field of documented.keys()) {
         if (!declared.has(field)) drifted.push(`${name}.${field}: documented, not in the source`)
       }
+    }
+    expect(drifted, drifted.join('\n')).toEqual([])
+  })
+
+  it('lists every member of the desktop options and controller the source declares', () => {
+    const source = ['src/dom/shared.ts', 'src/core/geometry.ts']
+      .map((file) => readFileSync(join(root, file), 'utf8'))
+      .join('\n')
+    const api = readFileSync(join(root, 'docs/api.md'), 'utf8')
+    const drifted: string[] = []
+    const compare = (label: string, declared: string[], documented: string[]) => {
+      expect(declared.length, `${label} was not found in the source`).toBeGreaterThan(0)
+      expect(documented.length, `${label} was not found in docs/api.md`).toBeGreaterThan(0)
+      for (const member of declared) {
+        if (!documented.includes(member)) drifted.push(`${label}.${member}: not documented`)
+      }
+      for (const member of documented) {
+        if (!declared.includes(member)) drifted.push(`${label}.${member}: not in the source`)
+      }
+    }
+    for (const name of ['DesktopOptions', 'DesktopController']) {
+      compare(name, membersOf(source, name), membersOf(api, name))
+    }
+    const options = blockOf(source, 'DesktopOptions').body
+    const documented = blockOf(api, 'DesktopOptions').body
+    const nested = [...options.matchAll(/^ {2}(\w+)\?: (?:boolean \| )?(\w+Options)$/gm)]
+    expect(nested.length, 'no nested option object was found').toBeGreaterThanOrEqual(6)
+    for (const [, field, type] of nested) {
+      compare(
+        `DesktopOptions.${field}`,
+        membersOf(source, type as string),
+        inlineMembersOf(documented, field as string),
+      )
     }
     expect(drifted, drifted.join('\n')).toEqual([])
   })
