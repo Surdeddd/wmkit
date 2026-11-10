@@ -801,6 +801,17 @@ describe('the title node', () => {
     expect(title.innerHTML).toBe('<i class="material-icons">close</i>Notes')
   })
 
+  it('shows a first title that matches the ligature of an icon beside it', () => {
+    const { h, title } = titled('<i class="material-icons">home</i>', '')
+    h.wm.update('a', { title: 'home' })
+    expect(title.innerHTML).toBe('<i class="material-icons">home</i>home')
+
+    const shown = titled('<i class="material-icons">home</i>', '')
+    shown.title.append('home')
+    shown.h.wm.update('a', { title: 'home' })
+    expect(shown.title.innerHTML).toBe('<i class="material-icons">home</i>home')
+  })
+
   it('renames the title, not the icon, when both read the same', () => {
     const { h, title } = titled('<i class="material-icons">close</i> close', 'close')
     h.wm.update('a', { title: 'Plans' })
