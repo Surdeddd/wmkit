@@ -288,8 +288,11 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
 
   function unpin(id: string): void {
     const win = wm.get(id) as WindowState
+    const to = win.restoreBounds ?? win.bounds
+    if (win.workspace !== wm.workspace() && win.stage === 'snapped') wm.resize(id, to)
+    if (wm.get(id)?.stage === 'normal') return
     wm.moveToWorkspace(id, wm.workspace())
-    wm.restoreTo(id, win.restoreBounds ?? win.bounds)
+    wm.restoreTo(id, to)
     wm.moveToWorkspace(id, win.workspace)
   }
 

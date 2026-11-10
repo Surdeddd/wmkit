@@ -973,6 +973,46 @@ describe('following changes made around the dock', () => {
     })
   })
 
+  it('a docked window moved to another workspace leaves the focus here alone', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('f', { layer: 'floating' })
+    h.add('g')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.focus('g')
+    const order = h.wm.getState().order
+    const focused = vi.fn()
+    h.wm.on('focus', focused)
+    h.wm.moveToWorkspace('b', 1)
+    expect(h.wm.get('b')).toMatchObject({ stage: 'normal', workspace: 1, bounds: { x: 40 } })
+    expect(h.wm.getState().focusedId).toBe('g')
+    expect(h.wm.getState().order.filter((id) => id !== 'b')).toEqual(
+      order.filter((id) => id !== 'b'),
+    )
+    expect(focused).not.toHaveBeenCalled()
+  })
+
+  it('a maximized or unmeasured docked window moved to another workspace floats there too', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('c')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.dock.dock('c', { side: 'bottom' })
+    h.wm.maximize('b')
+    h.wm.moveToWorkspace('b', 1)
+    expect(h.wm.get('b')).toMatchObject({ stage: 'normal', workspace: 1, snapRect: null })
+    const data = h.wm.serialize()
+    for (const win of data.windows) win.restoreBounds = null
+    h.wm.hydrate(data)
+    h.wm.moveToWorkspace('c', 1)
+    expect(h.wm.get('c')).toMatchObject({ stage: 'normal', workspace: 1, snapRect: null })
+    expect(h.wm.workspace()).toBe(0)
+  })
+
   it('arrange and minimizeAll leave the docked panels in place', () => {
     const h = setup()
     h.add('a')
