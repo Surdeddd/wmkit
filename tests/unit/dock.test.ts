@@ -1352,6 +1352,23 @@ describe('a stored layout', () => {
     again.destroy()
     expect(createDock(h.desktop).layout().root).not.toBeNull()
   })
+
+  it('leaves nothing locked behind once docking is removed for good', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.dock.setLayout({ root: null })
+    h.dock.destroy()
+    h.wm.clearHistory()
+    expect(h.wm.getState().extensions.dock).toBeUndefined()
+    for (const id of ['a', 'b']) {
+      expect(h.wm.get(id)).toMatchObject({ stage: 'normal', resizable: true, snapRect: null })
+    }
+    expect(h.wm.canUndo()).toBe(false)
+    expect(h.wm.canRedo()).toBe(false)
+  })
 })
 
 describe('separators and docked windows while dragging', () => {

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
-import type { WindowManager } from '../../src/core/types'
+import type { SerializedState, Size, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
+import type { DesktopController } from '../../src/dom/shared'
 import {
   createDock,
   type Dock,
@@ -16,6 +17,7 @@ const SIDES = ['left', 'right', 'top', 'bottom', 'center'] as const
 
 interface World {
   wm: WindowManager
+  desktop: DesktopController
   dock: Dock
   element: HTMLElement
 }
@@ -38,27 +40,31 @@ function stacksOf(node: DockNode | null): DockStack[] {
   return node.kind === 'stack' ? [node] : node.children.flatMap(stacksOf)
 }
 
-function world(): World {
+function world(viewport?: Size, data?: SerializedState): World {
   const element = document.createElement('div')
   document.body.append(element)
-  const wm = createWindowManager({ viewport: { width: 1400, height: 900 } })
+  const wm = createWindowManager({ viewport })
+  if (data) wm.hydrate(data)
   const desktop = attachDesktop(wm, element, {
     autoViewport: false,
     magnetism: false,
     announce: false,
   })
   const dock = createDock(desktop)
-  POOL.forEach((id, i) => {
-    wm.open({ id, title: id, x: 20 + i * 30, y: 20 + i * 30, width: 300, height: 200 })
-  })
-  wm.clearHistory()
-  return { wm, dock, element }
+  if (!data) {
+    POOL.forEach((id, i) => {
+      wm.open({ id, title: id, x: 20 + i * 30, y: 20 + i * 30, width: 300, height: 200 })
+    })
+    wm.clearHistory()
+  }
+  return { wm, desktop, dock, element }
 }
 
 function check({ wm, dock }: World): string | null {
   const layout = dock.layout()
   if (!dockLayout.validate(layout)) return 'tree fails validate'
   const state = wm.getState()
+  const known = state.viewport.width > 0
   const placed = dockLayout.rects(
     layout,
     { x: 0, y: 0, ...state.viewport },
@@ -89,11 +95,12 @@ function check({ wm, dock }: World): string | null {
     for (const id of stack.windows) {
       const win = wm.get(id)
       if (!win) return `tree names missing window ${id}`
-      if (win.stage === 'normal') return `docked ${id} floats`
+      if (known && win.stage === 'normal') return `docked ${id} floats`
       if (win.resizable || win.maxSize || win.aspectRatio) return `docked ${id} is not locked`
       groups.add(win.groupId)
       const b = win.bounds
       if (
+        known &&
         win.stage === 'snapped' &&
         rect &&
         fits &&
@@ -220,6 +227,24 @@ const OPS: Op[] = [
         minSize: { width: 100 + Math.floor(r() * 200), height: 80 + Math.floor(r() * 100) },
       }),
   ],
+  [
+    'remount',
+    (w) => {
+      w.dock.destroy()
+      w.dock = createDock(w.desktop)
+    },
+  ],
+  [
+    'reload',
+    (w, r) => {
+      const data = JSON.parse(JSON.stringify(w.wm.serialize()))
+      w.dock.destroy()
+      w.desktop.destroy()
+      w.element.remove()
+      const size = { width: 1000 + Math.floor(r() * 800), height: 600 + Math.floor(r() * 600) }
+      Object.assign(w, world(size, data))
+    },
+  ],
   ['arrange', (w, r) => void w.wm.arrange(pick(r, ['tile', 'cascade'] as const))],
   ['minimize-all', (w) => w.wm.minimizeAll()],
   ['undo', (w) => void w.wm.undo()],
@@ -230,7 +255,7 @@ function run(seeds: number, steps: number, offset: number): string[] {
   const problems: string[] = []
   for (let seed = offset; seed < offset + seeds; seed += 1) {
     const random = rng(seed * 7919)
-    const w = world()
+    const w = world(seed % 4 === 0 ? undefined : { width: 1400, height: 900 })
     const trail: string[] = []
     for (let step = 0; step < steps; step += 1) {
       const [label, op] = pick(random, OPS)
