@@ -119,6 +119,12 @@ describe('focus changes share one history entry', () => {
           wm.move('a', 0, 0)
           wm.abortInteraction()
         }),
+      (wm) => {
+        wm.beginInteraction()
+        wm.moveBy('a', 10, 0)
+        wm.moveBy('a', -10, 0)
+        wm.endInteraction()
+      },
     ]
     for (const gesture of cancelled) {
       const wm = makeWm()
