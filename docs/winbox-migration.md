@@ -49,13 +49,13 @@ The state classes and the callbacks follow the manager rather than the call that
 
 - **Snapping and keyboard control are on.** Drag a window to an edge to snap it, use the arrow keys on a focused window. Turn either off with `WinBox.configure({ snap: false, keyboard: false })`. Grouping windows into tabs is off by default and comes back with `grouping: true`.
 - **The control buttons work from the keyboard.** They take focus and answer Enter and Space, those added with `addControl` too. A hidden window cannot take the focus, so F6 skips it, and passing the focus on from a window you hide records no undo step, during undo and redo too.
-- **Closing is final.** A closed window never comes back through undo, redo or a restored layout; open a new one instead.
+- **Closing is final.** A closed window never comes back through undo, redo or a restored layout; open a new one instead. Undoing the close of a box therefore shows nothing — the box is gone and its window closes again at once — and the next undo goes on to the step before. An undo whose only effect would be to put the focus back on a hidden box shows nothing either.
 - **The last window takes its desktop along.** When the last window of a desktop closes, the desktop, its controller and their listeners on the page are removed, and the next `new WinBox()` builds a fresh one. A desktop whose manager you took with `WinBox.manager()` stays, so `persist(WinBox.manager(), …)` keeps working.
 - **Minimized windows** wait in a strip of title buttons along the bottom edge; a click restores them.
 - **`top`/`right`/`bottom`/`left` belong to a desktop, not a window.** Windows created with the same set share one desktop; another set gets its own. Positions are measured inside that area.
 - **`index`** is ignored: stacking is the manager's job.
 - **`html`** writes `innerHTML`, as in WinBox. Pages that enforce Trusted Types or a strict CSP should pass `mount` instead.
-- **Size.** The compat entry is about 19 kB brotli with the manager inside it; `winbox.bundle.min.js` 0.2.82 is 5.4 kB. The difference pays for snapping, undo, persistence, keyboard control, focus management and the screen-reader layer — if you need none of those, WinBox stays the lighter choice.
+- **Size.** The compat entry is about 22 kB brotli with the manager inside it; `winbox.bundle.min.js` 0.2.82 is 5.4 kB. The difference pays for snapping, undo, persistence, keyboard control, focus management and the screen-reader layer — if you need none of those, WinBox stays the lighter choice.
 
 ## Going further
 
