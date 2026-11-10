@@ -1015,4 +1015,117 @@ describe('size limits while docked', () => {
     other.dock.undock('a')
     expect(wm.get('a')?.maxSize).toEqual({ width: Number.POSITIVE_INFINITY, height: 150 })
   })
+
+  it('takes the limits of a layout saved before they were lifted', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a', maxWidth: 300, resizable: false })
+    wm.open({ id: 'b', maxWidth: 200, resizable: false })
+    wm.snapTo('a', { x: 0, y: 0, width: 1, height: 1 })
+    wm.setExtension('dock', {
+      root: {
+        kind: 'split',
+        id: 'r',
+        axis: 'row',
+        sizes: [0.5, 0.5],
+        children: [
+          { kind: 'stack', id: 's', windows: ['a'], active: 'a' },
+          { kind: 'stack', id: 't', windows: ['b'], active: 'b' },
+        ],
+      },
+      flags: {
+        a: { resizable: true, minimizable: true, snappable: true },
+        b: { resizable: true, minimizable: true, snappable: true },
+      },
+      workspace: 0,
+    })
+    const h = setup({}, wm)
+    expect(h.wm.get('b')).toMatchObject({ resizable: true, maxSize: { width: 200 } })
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    expect(h.wm.get('a')).toMatchObject({ maxSize: null, resizable: false })
+    expect(bounds(h.wm, 'a')).toBe('0,0 1000x600')
+    h.dock.undock('a')
+    expect(h.wm.get('a')).toMatchObject({ resizable: true, maxSize: { width: 300 } })
+  })
+})
+
+describe('a stored layout', () => {
+  it('drops a window that no longer exists', () => {
+    const donor = setup()
+    donor.add('a')
+    donor.add('b')
+    donor.dock.dock('a')
+    donor.dock.dock('b', { side: 'right' })
+    const data = donor.wm.serialize()
+    data.windows = data.windows.filter((win) => win.id !== 'b')
+    data.order = data.order.filter((id) => id !== 'b')
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.hydrate(data)
+    const h = setup({}, wm)
+    h.add('a')
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    expect(bounds(h.wm, 'a')).toBe('0,0 1000x600')
+    expect(h.wm.canUndo()).toBe(false)
+  })
+
+  it.each([
+    ['a tree without children', { root: { kind: 'split', id: 'x', axis: 'row' }, flags: {} }],
+    ['a value that is not an object', 'garbage'],
+    ['a state without flags', { root: null, workspace: 0 }],
+    ['an empty layout', { root: null, flags: {}, workspace: 0 }],
+  ])('treats %s as no layout and cleans it away', (_name, stored) => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.setExtension('dock', stored)
+    const h = setup({}, wm)
+    h.add('a')
+    expect(h.dock.layout().root).toBeNull()
+    expect(h.wm.getState().extensions.dock).toBeUndefined()
+    expect(h.dock.dock('a')).toBe(true)
+  })
+
+  it('cleans a broken layout that arrives later', () => {
+    const h = setup()
+    h.add('a')
+    h.wm.setExtension('dock', { root: 7, flags: {}, workspace: 0 })
+    expect(h.wm.getState().extensions.dock).toBeUndefined()
+  })
+
+  it('places the panels of a layout loaded at another size before anything changes', () => {
+    const area = (viewport: { width: number; height: number }) => ({
+      x: 0,
+      y: 40,
+      width: viewport.width,
+      height: viewport.height - 40,
+    })
+    const donor = setup({ area })
+    donor.add('a')
+    donor.add('b')
+    donor.dock.dock('a')
+    donor.dock.dock('b', { side: 'bottom' })
+    const wm = createWindowManager({ viewport: { width: 1000, height: 300 } })
+    wm.hydrate(donor.wm.serialize())
+    const h = setup({ area }, wm)
+    expect({ a: bounds(h.wm, 'a'), b: bounds(h.wm, 'b') }).toEqual({
+      a: '0,40 1000x127',
+      b: '0,173 1000x127',
+    })
+  })
+
+  it('destroy gives back flags and limits and keeps the layout for the next dock', () => {
+    const h = setup()
+    h.add('a', { maxWidth: 400 })
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.dock.destroy()
+    expect(h.wm.get('a')).toMatchObject({ resizable: true, minimizable: true, snappable: true })
+    expect(h.wm.get('a')?.maxSize?.width).toBe(400)
+    expect(h.wm.getState().extensions.dock).toBeDefined()
+    const again = createDock(h.desktop)
+    expect(dockLayout.windowsOf(again.layout())).toEqual(['a', 'b'])
+    expect(h.wm.get('a')).toMatchObject({ resizable: false, maxSize: null })
+    expect(bounds(h.wm, 'a')).toBe('0,0 497x600')
+    again.undock('a')
+    expect(h.wm.get('a')?.maxSize?.width).toBe(400)
+  })
 })

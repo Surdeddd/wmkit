@@ -93,6 +93,7 @@ interface DockState {
 type Followed = [state: DockState, out: string[], loose: string[]]
 
 const KEY = 'dock'
+const EMPTY: DockState = { root: null, flags: {}, workspace: 0 }
 const LOCKED: WindowUpdate = {
   resizable: false,
   minimizable: false,
@@ -125,6 +126,16 @@ function close(a: Bounds | null, b: Bounds): boolean {
     Math.abs(a.y - b.y) < 1e-6 &&
     Math.abs(a.width - b.width) < 1e-6 &&
     Math.abs(a.height - b.height) < 1e-6
+  )
+}
+
+function valid(value: unknown): value is DockState {
+  const state = value as DockState | null
+  return (
+    typeof state?.flags === 'object' &&
+    state.flags !== null &&
+    Number.isInteger(state.workspace) &&
+    validate({ root: state.root })
   )
 }
 
@@ -180,8 +191,8 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   let floating = false
 
   function read(): DockState {
-    const stored = wm.getState().extensions[KEY] as DockState | undefined
-    return stored ?? { root: null, flags: {}, workspace: wm.workspace() }
+    const stored = wm.getState().extensions[KEY]
+    return valid(stored) ? stored : EMPTY
   }
 
   function areaOf(): Bounds {
@@ -396,7 +407,8 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const state = read()
     const followed = follow(state)
     const [next, out] = followed
-    if (next.root !== state.root) {
+    const stored = wm.getState().extensions[KEY]
+    if (next.root !== state.root || stored !== (state.root ? state : undefined)) {
       const stack = stackOf(state, out[0] as string)
       const rect =
         stack?.windows.every((id) => out.includes(id) && wm.get(id)?.stage === 'normal') &&
@@ -633,7 +645,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     element.addEventListener('keydown', onKeydown, true)
     stops.push(() => element.removeEventListener('keydown', onKeydown, true))
   }
-  render()
+  quiet(() => settle(follow()))
 
   return {
     dock,
@@ -643,6 +655,15 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     destroy() {
       sliding?.finish(true)
       for (const stop of stops) stop()
+      const state = read()
+      wm.beginInteraction()
+      wm.batch(() => {
+        for (const id of windowsOf(state)) {
+          const saved = state.flags[id]
+          if (saved && wm.get(id)) wm.update(id, unlock(saved))
+        }
+      })
+      wm.abortInteraction()
       for (const node of sashes.values()) node.remove()
       sashes.clear()
       style.remove()
