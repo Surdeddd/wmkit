@@ -89,6 +89,7 @@ interface DockState {
   root: DockNode | null
   flags: Record<string, Saved>
   workspace: number
+  waiting?: boolean
 }
 
 type Followed = [state: DockState, out: string[], loose: string[]]
@@ -265,7 +266,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     }
     for (const id of windowsOf(state)) {
       const win = windows[id]
-      if (!win?.snapRect || win.stage === 'normal') leave(id)
+      if (!win || (!state.waiting && (!win.snapRect || win.stage === 'normal'))) leave(id)
       else if (win.workspace !== state.workspace) leave(id, true)
     }
     for (const stack of stacks(layout.root)) {
@@ -296,7 +297,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     wm.moveToWorkspace(id, win.workspace)
   }
 
-  function place(state: DockState, named?: boolean): void {
+  function place(state: DockState, named?: boolean): boolean {
     for (const id of windowsOf(state)) wm.update(id, LOCKED)
     for (const stack of stacks(state.root)) {
       for (const id of stack.windows) {
@@ -311,7 +312,8 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
         }
       }
     }
-    for (const [id, rect] of expected(state)) {
+    const placed = expected(state)
+    for (const [id, rect] of placed) {
       const win = wm.get(id) as WindowState
       if (
         win.stage === 'normal' ||
@@ -333,6 +335,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       }
       if (fresh || named) wm.activateTab(stack.active)
     }
+    return state.root !== null && placed.size === 0
   }
 
   function rescue(stored: unknown): void {
@@ -360,10 +363,12 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
         flags[id] = { ...capture(wm.get(id) as WindowState), ...flags[id] }
       }
     }
-    place(next, named)
+    const waiting = place(next, named)
     let shown: DockLayout = next
     for (const group of Object.values(wm.getState().groups)) shown = activate(shown, group.activeId)
-    wm.setExtension(KEY, shown.root ? { ...next, root: shown.root, flags } : undefined)
+    const { waiting: _held, ...rest } = next
+    const state = { ...rest, root: shown.root, flags, ...(waiting ? { waiting } : {}) }
+    wm.setExtension(KEY, shown.root ? state : undefined)
     for (const id of loose) unpin(id)
     torn = null
   }
@@ -457,7 +462,11 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     seen = now
     const followed = follow(state)
     const [next, out] = followed
-    if (next.root !== state.root || extensions[KEY] !== (state.root ? state : undefined)) {
+    if (
+      next.root !== state.root ||
+      extensions[KEY] !== (state.root ? state : undefined) ||
+      (state.waiting && viewport.width > 0)
+    ) {
       const stack = stackOf(state, out[0] as string)
       const rect =
         stack?.windows.every((id) => out.includes(id) && wm.get(id)?.stage === 'normal') &&

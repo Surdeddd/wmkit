@@ -122,6 +122,23 @@ describe('the dashboard layout', () => {
     expect(wm.get('orders')).toBeUndefined()
   })
 
+  it('places a layout set before the desktop had a size once the size arrives', () => {
+    const holder = document.createElement('div')
+    holder.innerHTML = `<wm-desktop>${IDS.map((id) => `<wm-window window-id="${id}" label="${id}"></wm-window>`).join('')}</wm-desktop>`
+    document.body.append(holder)
+    const desktop = holder.querySelector('wm-desktop') as WmDesktopElement
+    const wm = desktop.manager as WindowManager
+    const dock = createDock(desktop.controller as NonNullable<WmDesktopElement['controller']>)
+    dock.setLayout(DEFAULT)
+    wm.setViewport({ width: 1200, height: 700 })
+    expect(dockLayout.windowsOf(dock.layout())).toEqual(IDS)
+    for (const id of IDS) {
+      const [own, panel] = (panels(wm, dock)[id] as string).split(' in ')
+      expect(own, id).toBe(panel)
+    }
+    expect(desktop.querySelectorAll('[data-wm-docked]')).toHaveLength(4)
+  })
+
   it('switches the tabs of a stack from the strip, and a picked tab stays picked', () => {
     const { desktop, wm, dock } = dashboard()
     dock.dock('log', { stackId: 'graph' })

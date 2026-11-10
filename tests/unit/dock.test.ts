@@ -384,6 +384,64 @@ describe('keeping the layout in step', () => {
   })
 })
 
+describe('a desktop without a size yet', () => {
+  const ROW = {
+    root: {
+      kind: 'split',
+      id: 'r',
+      axis: 'row',
+      sizes: [0.5, 0.5],
+      children: [
+        { kind: 'stack', id: 'l', windows: ['a'], active: 'a' },
+        { kind: 'stack', id: 'r2', windows: ['b', 'c'], active: 'c' },
+      ],
+    },
+  } as const
+
+  it('keeps a layout set before the size is known and places it when the size arrives', () => {
+    const h = setup({}, createWindowManager())
+    const roots = ['a', 'b', 'c'].map((id) => h.add(id))
+    expect(h.dock.setLayout(structuredClone(ROW) as never)).toBe(true)
+    h.wm.focus('a')
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b', 'c'])
+    h.wm.setViewport({ width: 1000, height: 600 })
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b', 'c'])
+    expect({ a: bounds(h.wm, 'a'), c: bounds(h.wm, 'c') }).toEqual({
+      a: '0,0 497x600',
+      c: '503,0 497x600',
+    })
+    expect(h.wm.get('b')?.groupId).toBe(h.wm.get('c')?.groupId)
+    expect(activeOf(h.wm, 'b')).toBe('c')
+    expect(roots.every((root) => root.hasAttribute('data-wm-docked'))).toBe(true)
+  })
+
+  it('keeps windows docked one by one before the size is known', () => {
+    const h = setup({}, createWindowManager())
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.setViewport({ width: 1000, height: 600 })
+    expect({ a: bounds(h.wm, 'a'), b: bounds(h.wm, 'b') }).toEqual({
+      a: '0,0 497x600',
+      b: '503,0 497x600',
+    })
+  })
+
+  it('ignores a desktop that reports no size after it had one', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.clearHistory()
+    const before = h.wm.getState()
+    h.wm.setViewport({ width: 0, height: 0 })
+    expect(h.wm.getState()).toBe(before)
+    expect(bounds(h.wm, 'b')).toBe('503,0 497x600')
+  })
+})
+
 describe('setLayout', () => {
   it('applies a valid layout, undocking windows it leaves out', () => {
     const h = setup()
