@@ -86,6 +86,86 @@ test('a frame in a window below a modal takes no clicks', async ({ page }) => {
   await expect.poll(() => focused(page)).toBe('a')
 })
 
+test('a frame in a window opened under a modal is shielded and given back as it was', async ({
+  page,
+}) => {
+  await spawn(page, 'modal')
+  const modal = await page.evaluate(() => window.__wm.getState().focusedId as string)
+  await page.evaluate(() => {
+    window.__spawn({ id: 'late', title: 'late', x: 4, y: 60, width: 190, height: 260 }, (body) => {
+      const frame = document.createElement('iframe')
+      frame.id = 'frame-late'
+      frame.srcdoc = '<body style="margin:0;height:100vh"><input id="field"></body>'
+      frame.style.cssText = 'display:block;width:100%;height:100%;border:0;pointer-events:auto'
+      body.append(frame)
+    })
+  })
+  const pointerEvents = () =>
+    page.evaluate(() => (document.querySelector('#frame-late') as HTMLElement).style.pointerEvents)
+  expect(await pointerEvents()).toBe('none')
+  expect(await focused(page)).toBe(modal)
+
+  await page.evaluate((id) => window.__wm.close(id), modal)
+  await expect.poll(pointerEvents).toBe('auto')
+  await clickInFrame(page, 'late')
+  await expect.poll(() => focused(page)).toBe('late')
+})
+
+test('a desktop inside a same-origin frame answers its buttons and keys', async ({ page }) => {
+  await page.evaluate(() => {
+    const frame = document.createElement('iframe')
+    frame.id = 'inner'
+    frame.style.cssText =
+      'position:fixed;left:0;top:0;width:360px;height:300px;border:0;z-index:99999;background:#fff'
+    document.body.append(frame)
+    const doc = frame.contentDocument as Document
+    doc.body.style.margin = '0'
+    doc.body.innerHTML =
+      '<div id="desk" style="position:relative;width:360px;height:300px;overflow:hidden"></div>'
+    const desk = doc.querySelector('#desk') as HTMLElement
+    const { attachDesktop, createWindowManager } = window.__wmkit
+    const wm = createWindowManager()
+    const desktop = attachDesktop(wm, desk, { animation: false })
+    wm.open({ id: 'inside', title: 'inside', x: 20, y: 20, width: 220, height: 160 })
+    const el = doc.createElement('section')
+    el.style.cssText = 'background:#eee;border:1px solid #888'
+    el.innerHTML =
+      '<header data-wm-drag style="display:flex;height:28px"><span data-wm-title>inside</span>' +
+      '<button type="button" data-wm-maximize aria-label="Maximize">M</button>' +
+      '<button type="button" data-wm-close aria-label="Close">X</button></header>' +
+      '<div data-wm-content><input id="field"></div>'
+    desk.append(el)
+    desktop.attachWindow('inside', el)
+    ;(window as unknown as { __inner: typeof wm }).__inner = wm
+  })
+  const inner = page.frameLocator('#inner')
+  const bounds = () =>
+    page.evaluate(
+      () => (window as unknown as { __inner: typeof window.__wm }).__inner.get('inside') ?? null,
+    )
+
+  await inner.getByRole('button', { name: 'Maximize' }).click()
+  await expect.poll(async () => (await bounds())?.stage).toBe('maximized')
+  await inner.getByRole('button', { name: 'Maximize' }).click()
+  await expect.poll(async () => (await bounds())?.stage).toBe('normal')
+
+  await inner.locator('section[data-wm-window]').focus()
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(async () => (await bounds())?.bounds.x).toBe(36)
+
+  await inner.locator('#field').click()
+  await inner.locator('#field').pressSequentially('ab')
+  await page.keyboard.press('ControlOrMeta+z')
+  expect((await bounds())?.bounds.x, 'undo typed into a field undid the window').toBe(36)
+
+  await inner.locator('section[data-wm-window]').focus()
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(async () => (await bounds())?.bounds.x).toBe(20)
+
+  await inner.getByRole('button', { name: 'Close' }).click()
+  await expect.poll(bounds).toBeNull()
+})
+
 test('a resize across a frame keeps tracking the pointer', async ({ page }) => {
   await openFrameWindow(page, 'a', 4)
   await spawn(page, 'fixed')

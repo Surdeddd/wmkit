@@ -187,9 +187,14 @@ declare global {
     __spawn: typeof spawn
     __desktop: typeof desktop
     __popout: typeof popout
+    __wmkit: {
+      attachDesktop: typeof attachDesktop
+      createWindowManager: typeof createWindowManager
+    }
   }
 }
 window.__wm = wm
 window.__spawn = spawn
 window.__desktop = desktop
 window.__popout = popout
+window.__wmkit = { attachDesktop, createWindowManager }
