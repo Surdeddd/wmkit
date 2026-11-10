@@ -148,7 +148,7 @@ interface SerializedState {
 
 - a position that is not finite takes the cascade position; a width or height that is not finite or not above 0 takes `defaultSize`
 - the size is clamped into the window's own limits; an invalid minimum axis takes its default (160 or 100), an invalid maximum axis becomes unbounded
-- a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is clamped into the unit square, or dropped when `snapTo` would refuse it
+- a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is treated the way `snapTo` treats its rectangle: clamped, or dropped when `snapTo` would refuse it, and a window left `'snapped'` with nothing to snap to becomes `'normal'`
 - `stage: 'snapped'` with neither a known `snapZone` nor a `snapRect` becomes `'normal'`
 - an `openedSeq` that is not finite gets a new one, and any other unknown per-window field takes its default
 
@@ -210,7 +210,7 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 | `snap(id, zone)` | `boolean` | zone geometry, clamped to the window's own min/max; `false` for an unknown zone |
 | `snapTo(id, rect)` | `boolean` | snaps to any rectangle given in viewport fractions (`{ x: 0.5, y: 0, width: 0.5, height: 1 }` is the right half); it follows viewport changes like a zone does, and the first drag frame tears the window out. Unlike `snap` it neither focuses nor raises the window. The dock plugin is built on it |
 
-`snapTo` clamps its rectangle into the unit square: `{ x: 0.5, y: 0.5, width: 3, height: 3 }` is stored as `{ x: 0.5, y: 0.5, width: 0.5, height: 0.5 }`. It returns `false` for a value that is not finite, a negative width or height, or an origin outside the unit square. An empty rectangle whose origin lies inside is accepted, and the window takes its minimum size.
+`snapTo` returns `false` for a value that is not finite and for a negative width or height. A rectangle whose origin lies inside the unit square is accepted, an empty one too (the window then takes its minimum size), and its extent is clamped at the far edge. A rectangle that starts outside the square but overlaps it is clamped to the overlap: `{ x: -1, y: 0.5, width: 3, height: 3 }` is stored as `{ x: 0, y: 0.5, width: 1, height: 0.5 }`. A rectangle with no overlap returns `false`.
 
 `maximize`, `snap`, `restore`, `restoreTo`, `group` and `ungroup` focus the window the way `focus()` does: they switch to its workspace first, even when a modal is up on the current workspace. When a modal blocks the window they skip the focus silently and do not emit `modalblocked`, which means a blocked `focus()` call.
 
@@ -222,7 +222,7 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 | `moveBy(id, dx, dy)` | `boolean` | relative `move` |
 | `center(id)` | `boolean` | centres a `normal` window in the viewport; `false` while the viewport is unknown |
 | `resize(id, patch)` | `boolean` | `Partial<Bounds>`; `false` while the window is maximized or minimized. Unsnaps a snapped window, unless its bounds do not actually change; honours `aspectRatio`, driven by the axis that changed most |
-| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). A patch that sets the values the window already has is a no-op: same object, no events, no history entry. Primitives compare by value; a new `meta`, `minSize` or `maxSize` object always counts as a change. Changing the constraints of a snapped window re-derives its zone |
+| `update(id, patch)` | `boolean` | title, layer, min/max size, `aspectRatio`, flags, `meta` (shallow-merged). A patch that sets the values the window already has is a no-op: same object, no events, no history entry. Primitives compare by value; a `meta`, `minSize` or `maxSize` object in the patch always counts as a change (a new window object, an `update` event, a history entry), so `update(id, { meta: { data } })` announces a change you made in place. Passing back the very `minSize` or `maxSize` object the window already holds changes nothing. Changing the constraints of a snapped window re-derives its zone |
 | `setViewport(size)` | `void` | re-derives maximized and snapped bounds, clamps the rest; never recorded in history; a size with a dimension that is not finite and above 0 (a hidden desktop, for one) is ignored and the last known viewport stays |
 
 A number that is not finite never enters the state: `move`, `moveBy`, `resize`, `restoreTo` and `snapTo` given `NaN` or `Infinity` change nothing and return `false`. A partial patch keeps what it does not name, so `wm.resize(id, { width: 400, height: undefined })` keeps the height, and so does `height: null`. Sizes never go below 1 px, whatever the minimum says.
@@ -308,7 +308,7 @@ The `group` event fires on creation, activation and membership changes, includin
 | `beginInteraction()` / `endInteraction()` | `void` | collapse a gesture into one entry; nestable. An interaction whose state ends equal to how it started leaves no entry, and the redo stack survives it |
 | `abortInteraction()` | `void` | at the outermost level, ends the interaction and drops the entry it created — for cancelled gestures. The changes made inside stay in the state and do not become a step of their own, so roll them back before aborting (the controller does on Escape). Inside a nested interaction it only leaves the inner level, and the outer interaction keeps its single entry |
 
-Steps that change only focus and stacking order collapse when they follow each other: three clicks on other windows after a move leave two undo steps, the move and one focus step. A collapsed step that ends where it started disappears, so an `undo()` that returns `true` always changes something.
+Steps that change only focus and stacking order collapse when they follow each other: three clicks on other windows after a move leave two undo steps, the move and one focus step, and focus changes that end where they began leave no step at all. Every `undo()` or `redo()` that returns `true` changes the state. An entry that has become identical to the present state, after a viewport change for example, is skipped, so `undo()` can return `false` although `canUndo()` was `true` a moment before: trust the return value.
 
 `hydrate()` and `loadLayout()` clear the history: you cannot undo across a restore. `undo()` and `redo()` called inside a `batch` or an interaction behave as if the batch or the interaction had ended just before the call and started again right after it, so the rest of a gesture becomes a new step.
 
@@ -583,7 +583,7 @@ A skin's `destroy` runs exactly once: after a rebuild swap, on close, on `detach
 
 On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `data-wm-variant` (when `windowVariant` names one), `data-wm-group` and `data-wm-tab` (on grouped windows), `data-wm-tab-target` (on the window a drag would group with), `data-wm-live`, `data-wm-deep`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`. The first sync briefly sets `transition: none`, and an inline `transition` your app set is restored afterwards. [Theming](theming.md#the-attribute-contract) lists the values; plugins add their own attributes (`data-wm-pinching`, `data-wm-docked`, `data-wm-skin`).
 
-<span v-pre>In `[data-wm-title]` the controller replaces only the title text, so an icon or static text around it stays: `<span data-wm-title><i class="icon"></i> {{title}}</span>`. The old title is found by its text, so static text placed before the title that contains the same string is replaced instead.</span>
+In `[data-wm-title]` the controller replaces the previous title where it stands — in a direct text child of the node first, then deeper inside, as in `<b>{{title}}</b>` — so an icon or static text around it stays: `<span data-wm-title><i class="icon"></i> {{title}}</span>`. When the previous title cannot be found, the controller writes into a direct text child of the node, or appends one, and never into a child element, so a ligature icon keeps its glyph. The previous title is found by its text, so static text in the node that contains the same string can be replaced in its place.
 
 `data-wm-flash` is set when an interaction is blocked by a modal and stays until the next blocked interaction or until the window detaches, so style the flash with an animation that runs once per set rather than a static rule.
 
@@ -601,7 +601,7 @@ Frames inside windows (`iframe`, `object`, `embed`) never send their pointer or 
 
 Every gesture is driven by pointer events, so a finger and a mouse take the same path. The drag handle and the resize grips are given `touch-action: none`, which is what stops the browser from panning the page out from under a drag, and hit areas grow on coarse pointers — the defaults above show both figures. Only one gesture runs at a time: a second finger landing on another titlebar mid-drag is ignored entirely, so it neither starts a competing drag nor focuses or raises that window. A drag or resize whose `setPointerCapture` throws does not start, and losing pointer capture cancels the gesture like `pointercancel`. A press on a control inside a web component in the titlebar does not start a drag (the inner target is read through `composedPath()`). A long press produces a `contextmenu` event like anywhere else, which is where `onTitlebarContextMenu` is called from, with the browser's own menu suppressed for you.
 
-Drop-to-group finds its target from the window bounds rather than by hit-testing the page: the topmost visible window of this desktop under the pointer, and only while the pointer is over that window's drag handle. Elements of the page lying over a titlebar do not block it, and a modal window is never grouped, neither as the dragged window nor as the target.
+Drop-to-group finds its target from the window bounds rather than by hit-testing the page: the topmost visible window of this desktop under the pointer, and only while the pointer is over that window's drag handle. Elements of the page lying over a titlebar do not block it, and a modal window is never grouped, neither as the dragged window nor as the target. Resizing a tab group honours the same combined limits as the manager — the largest minimum, the smallest maximum and the smallest aspect ratio of its members — and keeps the opposite edge still when one of them stops a resize from the left or top.
 
 The end of a drag or resize (`pointerup`, `pointercancel`, `lostpointercapture`) is heard on the document in the capture phase, so the gesture also ends cleanly when its handle is removed from the page halfway through. Escape restores exactly the state the gesture started from — stage, bounds, restore bounds, snap zone and `snapRect`, also for a window that was maximized over a `snapRect` — and the key does not reach the page's own handlers. Closing the window in the middle of its own drag or resize, or from a drop target's `commit`, ends the gesture as committed: one undo step brings the window back where it was before the gesture.
 
@@ -620,7 +620,7 @@ It also injects `[data-wm-resize]` handles, one `[data-wm-snap-preview]` per des
 | `Shift` + arrows | resize |
 | `Ctrl`/`Cmd` + `Alt` + `←`/`→` | snap to a half |
 | `Ctrl`/`Cmd` + `Alt` + `↑`/`↓` | maximize / minimize or restore |
-| `Ctrl`/`Cmd` + `Alt` + `PageDown`/`PageUp` | next / previous tab of the focused window's group |
+| `Ctrl`/`Cmd` + `Alt` + `PageDown`/`PageUp` | next / previous tab of the focused window's group; left to the page when that window has no tabs |
 | `Ctrl`/`Cmd` + `Z`, `+ Shift` | undo, redo; non-Latin layouts work too, through the layout's Z key |
 | `F6`, `Shift` + `F6` | cycle focus; not during a drag |
 | `Escape` during a gesture | cancel and drop it from history |
@@ -752,15 +752,15 @@ const chromeMessages: ChromeMessages    // English
 const chromeMessagesRu: ChromeMessages  // Russian
 ```
 
-<span v-pre>Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out (`{` included), so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.</span>
+Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`. Every substitution is HTML-escaped with no opt-out (`{` included), so a window title can never smuggle markup into the chrome around it; an unknown placeholder expands to nothing rather than throwing, because a template outlives a rename.
 
-A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, and anything after `<noscript>` or `<script>`.
+A placeholder may sit only in text or in a *quoted* value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`. Anywhere else, `compileTemplate()` and `skin()` throw a message naming the placeholder and the markup before it: an unquoted value, a tag or attribute name, any other attribute (URLs, `style`, `on*`, `srcdoc` …), a comment, the content of `script`, `style`, `textarea`, `title`, `xmp`, `iframe`, `noembed`, `noframes` and `plaintext`, anything after `<noscript>`, and anything after a `<script>` whose content contains `<!--` (the one case where a browser can keep the script open past its first end tag; a plain script compiles).
 
-<span v-pre>Inside SVG and MathML the compiler follows the HTML parser's foreign-content rules, and it refuses a template wherever a browser could build a different tree than the compiler expects. It throws for a placeholder after a raw-text element (`textarea`, `style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`) inside SVG. Once the markup holds `<math>`, `<select>`, an HTML tag directly inside `<svg>`, a mismatched end tag, or an `<a>` inside `foreignObject`, `desc` or `title`, it also throws for a placeholder after any later raw-text element, CDATA section or `<title>` with markup in it. `<svg><title>{{title}}</title></svg>`, ordinary inline icons and HTML inside `foreignObject` keep working.</span>
+Inside SVG and MathML the compiler follows the HTML parser's foreign-content rules, and it refuses a template wherever a browser could build a different tree than the compiler expects. It throws for a placeholder after a raw-text element (`textarea`, `style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`) inside SVG. Once the markup holds `<math>`, `<select>`, an HTML tag directly inside `<svg>`, a mismatched end tag, or an `<a>` inside `foreignObject`, `desc` or `title`, it also throws for a placeholder after any later raw-text element, CDATA section or `<title>` with markup in it. `<svg><title>{{title}}</title></svg>`, ordinary inline icons and HTML inside `foreignObject` keep working.
 
 Inside a tag, only the five characters HTML treats as whitespace may separate its parts: tab, line feed, form feed, carriage return and space. Any other, such as a no-break space typed by accident, throws `wmkit: a tag may only be spaced with tab, line feed, form feed, carriage return or space (U+00A0 after '<div title=')`.
 
-<span v-pre>Only `{{title}}` inside `[data-wm-title]` follows state afterwards. Every other placeholder is rendered at mount or rebuild and goes stale, `aria-label="Close {{title}}"` included.</span>
+Only `{{title}}` inside `[data-wm-title]` follows state afterwards. Every other placeholder is rendered at mount or rebuild and goes stale, `aria-label="Close {{title}}"` included.
 
 A template must contain exactly one `[data-wm-content]` attribute (a mention in text, a comment or an attribute value does not count) and a single root element, and `skin()` throws while you are writing it rather than silently dropping your content; extra roots throw `wmkit: a skin template needs a single root element …` at mount. `styles` without a `name` throws too — there would be nothing to scope the rules to.
 
@@ -816,7 +816,7 @@ interface PersistController {
 
 Stored shape is `{ version, state }`. A payload from another `version` is passed to `migrate`; returning `null` (or having no `migrate`) discards it rather than restoring something broken, and a successful migration is written back immediately. Payloads written before the envelope existed are still read, as version `0`.
 
-A change is saved `debounce` ms after the last one; under a steady stream of changes a save still happens at least every `maxWait` ms. A pending save is flushed on `pagehide` and on `destroy()`; `clear()` also cancels a pending save.
+A change is saved `debounce` ms after the last one; under a steady stream of changes a save still happens at least every `maxWait` ms. A `maxWait` that is not a number of 0 or more means the default. A pending save is flushed on `pagehide` and on `destroy()`; `clear()` also cancels a pending save.
 
 Nothing the plugin does throws at you. An absent storage turns it into a no-op, and a failure goes to `onError` with the phase it happened in:
 
@@ -826,7 +826,7 @@ Nothing the plugin does throws at you. An absent storage turns it into a no-op, 
 | `'migrate'` | `migrate` threw; `restore()` returns `false` and `persist()` still returns its controller |
 | `'save'` | the state cannot be serialized (a circular value, a `BigInt`) or the storage threw, in `clear()` too |
 
-Without `onError` the first failure of a run goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything; further failures stay quiet until the next success, after which reporting resumes. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
+With `onError`, every failure is passed to it. Without it, the first failure of each phase goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything, and that phase then stays quiet until it succeeds again. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
 
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 
@@ -888,34 +888,69 @@ interface DockOptions {
   minSize?: Size                      // floor for every panel; a panel never goes below its windows' own minSize
   keyboard?: boolean                  // true — Ctrl/⌘+Alt+Shift+arrows dock the focused window
   messages?: Partial<DockMessages>    // English; dockMessagesRu for Russian
+  float?: (event: PointerEvent) => boolean  // (event) => event.shiftKey — true keeps a dragged window floating
 }
 
 interface Dock {
-  dock(id: string, target?: { stackId?: string; side?: DockSide }): boolean
+  dock(id: string, target?: DockTarget): boolean
   undock(id: string): boolean
   layout(): DockLayout
   setLayout(layout: DockLayout): boolean
   destroy(): void
 }
 
+interface DockTarget { stackId?: string; side?: DockSide }
 type DockSide = 'left' | 'right' | 'top' | 'bottom' | 'center'
-type DockLayout = { root: DockNode | null }
-type DockNode =
-  | { kind: 'stack'; id: string; windows: string[]; active: string }
-  | { kind: 'split'; id: string; axis: 'row' | 'column'; children: DockNode[]; sizes: number[] }
+type DockAxis = 'row' | 'column'
+interface DockLayout { root: DockNode | null }
+type DockNode = DockStack | DockSplit
+interface DockStack { kind: 'stack'; id: string; windows: string[]; active: string }
+interface DockSplit { kind: 'split'; id: string; axis: DockAxis; children: DockNode[]; sizes: number[] }
+
+interface DockMessages {
+  docked(title: string): string
+  undocked(title: string): string
+  resized(percent: number): string
+  separator: string
+}
+const dockMessages: DockMessages     // English
+const dockMessagesRu: DockMessages   // Russian
 ```
 
-Tiles windows into a layout of panels, dockview style, while the other windows keep floating above it. A docked window is a snapped window with a `snapRect`: the panel rectangle in viewport fractions. It loses `resizable`, `minimizable` and `snappable` while docked and gets them back on undock, and its element carries `data-wm-docked` (square corners, no shadow). A panel with several windows is a tab group, so tabs come from the group machinery. The layout lives in `getState().extensions.dock`, which gives three things for free. One dock operation, with all its window changes, is one undo step. `persist` saves and restores the layout. `hydrate` places it on a desktop of any size.
+Tiles windows into a layout of panels, dockview style, while the other windows keep floating above it. A docked window is a snapped window with a `snapRect`: the panel rectangle in viewport fractions. While docked it loses `resizable`, `minimizable` and `snappable`, and its `maxSize` and `aspectRatio` are lifted (`null`) so that it fills its panel; all of them come back on undock and on `destroy()`. They are kept in `extensions.dock.flags[id]`, with `maxSize` as `{ width: number | null, height: number | null } | null`. The element of a docked window carries `data-wm-docked` (square corners, no shadow). A panel with several windows is a tab group, so tabs come from the group machinery. The layout lives in `getState().extensions.dock`, which gives three things for free. One dock operation, with all its window changes, is one undo step. `persist` saves and restores the layout. `hydrate` places it on a desktop of any size.
 
 - `dock(id)` with no target tabs the window into the first panel, or fills the area when nothing is docked. `side` splits the root, or a panel when `stackId` is given; `center` tabs in. `false` when nothing changed, the window is unknown, or it is on another workspace than the layout.
-- `undock(id)` returns the window to its floating geometry.
-- `setLayout(layout)` docks exactly the windows the layout names and undocks the rest. `false` for a layout that breaks an invariant (an empty panel, a split with one child, sizes that do not add up to 1, a window twice) or names an unknown window. `dockLayout` exports the pure operations (`insert`, `remove`, `resize`, `activate`, `moveInStack`, `stackOf`, `windowsOf`, `rects`, `validate`, `emptyLayout`) for building one.
+- `undock(id)` returns the window to its floating geometry. There is no keyboard shortcut for it, so call it from a control of your own.
+- `setLayout(layout)` docks exactly the windows the layout names, undocks the rest and shows the active tab each stack names. `false` for a layout that breaks an invariant (an empty panel, a split with one child, sizes that do not add up to 1, a window twice) or names an unknown window. `dockLayout` exports the pure operations (`insert`, `remove`, `resize`, `activate`, `moveInStack`, `stackOf`, `windowsOf`, `rects`, `validate`, `emptyLayout`) for building one; `rects` takes a `DockGeometry` and returns `DockRects`, made of `StackRect` and `SashRect` entries, and those types are exported too.
+- `layout()` reports the active tab the manager shows. A tab the user picked — by a click, focus, the tab shortcut or maximizing it — stays picked through later dock operations.
 
-Dragging a window over the area previews where it would land and docks it there on release. Near a panel edge it splits that panel, at the panel's centre it tabs in, and inside the edge band of the area it docks to the root. Hold Shift while dragging to keep a window floating over the layout. Windows on the `floating` or `modal` layer never dock by drag, and neither does a drop outside `area`. The first drag frame of a docked window tears it out and the panels close the gap. A cancelled drag puts it back.
+After `dock()` or `setLayout()` returns, every docked window sits in its own panel, whatever regrouping the change needed, such as moving a tab out of a stack or splitting a stack apart. All three calls work inside `wm.batch()`, also after windows were closed or restored earlier in the same batch.
 
-Separators between panels are `div[data-wm-sash][role=separator]` with `aria-orientation` and `aria-valuenow`/`min`/`max` in percent. Drag one with the pointer (one undo step per drag), or focus it and press the arrow keys (16 px, 1 px with Shift) or Home/End for the limits. A panel never shrinks below the largest `minSize` of its windows, or `options.minSize` when that is larger.
+Dragging a window over the area previews where it would land and docks it there on release. Near a panel edge it splits that panel, at the panel's centre it tabs in, and inside the edge band of the area it docks to the root. Windows on the `floating` or `modal` layer never dock by drag, and neither does a drop outside `area`. Drop targeting works in desktop coordinates, so it respects the desktop's scroll, border and scale. The first drag frame of a docked window tears it out and the panels close the gap; dragging a panel of several tabs by its titlebar tears out the whole tab group, which stays grouped. Escape or another cancelled drag puts it back.
 
-A docked window that closes, is restored, is torn out or moves to another workspace leaves the layout, without an extra undo step: undoing the close brings back both the window and its panel. Maximizing a panel keeps it docked, and restoring returns it to the panel. A viewport change re-tiles the panels without touching history. The layout belongs to one workspace, and its separators hide on the others.
+`float` is asked on every pointer move over the desktop. While it returns `true` — by default while Shift is held — a dragged window stays floating: no preview, no docking. A touch screen has no Shift, so wire it to a control of your own:
+
+```js
+const toggle = document.querySelector('#float')
+createDock(desktop, {
+  float: (event) => event.shiftKey || toggle.getAttribute('aria-pressed') === 'true',
+})
+```
+
+Separators between panels are `div[data-wm-sash][role=separator]` with `aria-orientation` and `aria-valuenow`/`min`/`max` in percent. Drag one with the pointer (one undo step per drag), or focus it and press the arrow keys (16 px, 1 px with Shift) or Home/End for the limits. While a separator is dragged, the docked window elements carry `data-wm-live`, so a theme lets the panels follow the separator instead of easing behind it; the dock removes only the marks it set. A panel never shrinks below the largest `minSize` of its windows, or `options.minSize` when that is larger, unless those minimums add up to more than the area: then the panels are scaled below them.
+
+A docked window that closes, is restored, is torn out or moves to another workspace leaves the layout, without an extra undo step: undoing the close brings back both the window and its panel. Maximizing a panel keeps it docked, and restoring returns it to the panel. A viewport change re-tiles the panels without touching history. The layout belongs to one workspace, and its separators hide on the others. `arrange()` and `minimizeAll()` leave docked panels in place.
+
+The dock also follows changes made around its API:
+
+- `wm.ungroup(id)` on a docked tab takes it out of the layout, and it floats with its flags back
+- `wm.group(['a', 'f'])` with `a` docked brings `f` into `a`'s panel, locked like any docked window; a floating host pulls docked windows out instead
+- `wm.moveToWorkspace(id, 1)` on a docked window floats it on workspace 1, and the current workspace stays as it is
+- `wm.snap(id, 'left')` on a docked window takes it out of the layout and leaves it in the zone
+
+`destroy()` gives the windows their flags and limits back, leaves them where they are and keeps `extensions.dock`, so a saved layout survives an unmount. `createDock()` on a manager that already holds a layout — restored by `persist` before the dock was created, for example — locks and places those windows at once, as one change with no undo step, so the panels are right from the first frame after a reload at another size. A stored `extensions.dock` that is not a valid dock state (not an object, `flags` not an object, `workspace` not an integer, or a tree that fails `validate`) is ignored and removed, without an undo step and without throwing.
+
+A change that does not concern the dock costs it nothing. `area` is called again only when the viewport, the layout, the workspace or a docked window changes; if your `area` depends on state of your own, call `dock.setLayout(dock.layout())` to make the dock read it again.
 
 ## `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
