@@ -1,4 +1,11 @@
-import type { Bounds, Size, WindowFlags, WindowState } from '../../core/types'
+import type {
+  Bounds,
+  SerializedMaxSize,
+  Size,
+  WindowFlags,
+  WindowState,
+  WindowUpdate,
+} from '../../core/types'
 import type { DesktopController, DropHit } from '../../dom/shared'
 import {
   activate,
@@ -72,7 +79,10 @@ export interface Dock {
   destroy(): void
 }
 
-type Saved = Pick<WindowFlags, 'resizable' | 'minimizable' | 'snappable'>
+type Saved = Pick<WindowFlags, 'resizable' | 'minimizable' | 'snappable'> & {
+  maxSize?: SerializedMaxSize | null
+  aspectRatio?: number | null
+}
 
 interface DockState {
   root: DockNode | null
@@ -83,7 +93,13 @@ interface DockState {
 type Followed = [state: DockState, out: string[], loose: string[]]
 
 const KEY = 'dock'
-const LOCKED: Saved = { resizable: false, minimizable: false, snappable: false }
+const LOCKED: WindowUpdate = {
+  resizable: false,
+  minimizable: false,
+  snappable: false,
+  maxSize: null,
+  aspectRatio: null,
+}
 const SIDES: Record<string, DockSide> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
@@ -113,7 +129,22 @@ function close(a: Bounds | null, b: Bounds): boolean {
 }
 
 function capture(win: WindowState): Saved {
-  return { resizable: win.resizable, minimizable: win.minimizable, snappable: win.snappable }
+  const json = (value: number) => (value < Number.POSITIVE_INFINITY ? value : null)
+  return {
+    resizable: win.resizable,
+    minimizable: win.minimizable,
+    snappable: win.snappable,
+    maxSize: win.maxSize && { width: json(win.maxSize.width), height: json(win.maxSize.height) },
+    aspectRatio: win.aspectRatio,
+  }
+}
+
+function unlock({ maxSize, ...saved }: Saved): WindowUpdate {
+  const open = (value: number | null) => value ?? Number.POSITIVE_INFINITY
+  return {
+    ...saved,
+    maxSize: maxSize && { width: open(maxSize.width), height: open(maxSize.height) },
+  }
 }
 
 function* stacks(node: DockNode | null): Generator<DockStack> {
@@ -265,9 +296,13 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     for (const id of out) {
       const saved = flags[id]
       delete flags[id]
-      if (saved && wm.get(id)) wm.update(id, saved)
+      if (saved && wm.get(id)) wm.update(id, unlock(saved))
     }
-    for (const id of windowsOf(next)) flags[id] ??= capture(wm.get(id) as WindowState)
+    for (const id of windowsOf(next)) {
+      if (flags[id]?.aspectRatio === undefined) {
+        flags[id] = { ...capture(wm.get(id) as WindowState), ...flags[id] }
+      }
+    }
     place(next, named)
     let shown: DockLayout = next
     for (const group of Object.values(wm.getState().groups)) shown = activate(shown, group.activeId)

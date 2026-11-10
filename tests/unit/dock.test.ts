@@ -975,3 +975,44 @@ describe('following changes made around the dock', () => {
     expect(h.wm.get('b')).toMatchObject({ stage: 'normal', resizable: true })
   })
 })
+
+describe('size limits while docked', () => {
+  it('a window narrower than its panel fills it and gets its limits back when undocked', () => {
+    const h = setup()
+    h.add('a', { maxWidth: 300 })
+    h.dock.dock('a')
+    expect(h.wm.get('a')?.bounds.width).toBe(1000)
+    expect(h.wm.get('a')?.maxSize).toBeNull()
+    expect(JSON.parse(JSON.stringify(h.wm.getState().extensions.dock))).toEqual(
+      h.wm.getState().extensions.dock,
+    )
+    h.dock.undock('a')
+    expect(h.wm.get('a')?.maxSize).toEqual({ width: 300, height: Number.POSITIVE_INFINITY })
+    expect(h.wm.get('a')?.bounds.width).toBe(300)
+  })
+
+  it('a window with an aspect ratio fills its panel and in a stack too', () => {
+    const h = setup()
+    h.add('a', { aspectRatio: 1 })
+    h.add('b', { maxWidth: 200, maxHeight: 200 })
+    h.dock.dock('a')
+    expect(bounds(h.wm, 'a')).toBe('0,0 1000x600')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    expect(bounds(h.wm, 'b')).toBe('0,0 1000x600')
+    h.dock.setLayout(dockLayout.emptyLayout)
+    expect(h.wm.get('a')?.aspectRatio).toBe(1)
+    expect(h.wm.get('b')?.maxSize).toEqual({ width: 200, height: 200 })
+  })
+
+  it('limits survive a JSON round trip of the saved state', () => {
+    const h = setup()
+    h.add('a', { maxHeight: 150 })
+    h.dock.dock('a')
+    const data = JSON.parse(JSON.stringify(h.wm.serialize()))
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.hydrate(data)
+    const other = setup({}, wm)
+    other.dock.undock('a')
+    expect(wm.get('a')?.maxSize).toEqual({ width: Number.POSITIVE_INFINITY, height: 150 })
+  })
+})
