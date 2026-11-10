@@ -44,6 +44,49 @@ test('z-order stays consistent through rapid focus switching', async ({ page, is
   expect(zOrder).toEqual(sorted)
 })
 
+test('windows deep in the stack drop the blur of the glass theme', async ({ page }) => {
+  await page.click('#btn-stress')
+  await expect(page.locator('[data-wm-window]')).toHaveCount(50)
+
+  const look = () =>
+    page.evaluate(() => {
+      const fromTop = [...window.__wm.getState().order].reverse()
+      return fromTop.map((id) => {
+        const el = document.querySelector(`[data-testid="window-${id}"]`) as HTMLElement
+        const style = getComputedStyle(el)
+        const blur = style.backdropFilter || style.getPropertyValue('-webkit-backdrop-filter')
+        const alpha = style.backgroundColor.match(/[\d.]+(?=\)$)/)
+        return {
+          id,
+          deep: el.hasAttribute('data-wm-deep'),
+          hidden: el.hidden,
+          blur,
+          opaque: style.backgroundColor.startsWith('rgb(') || Number(alpha?.[0] ?? 1) === 1,
+        }
+      })
+    })
+
+  const stack = await look()
+  expect(stack.slice(0, 13).map((entry) => entry.deep)).toEqual(Array(13).fill(false))
+  expect(stack[13]?.deep, 'the fourteenth window from the top keeps its blur').toBe(true)
+  expect(stack.filter((entry) => entry.deep)).toHaveLength(37)
+  expect(stack[0]?.blur).toContain('blur')
+  expect(stack[12]?.blur).toContain('blur')
+  expect(stack[13]?.blur).toBe('none')
+  expect(stack[13]?.opaque, 'a deep window kept a see-through background').toBe(true)
+
+  await page.evaluate((id) => window.__wm.minimize(id), stack[0]?.id as string)
+  const after = await look()
+  const minimized = after.find((entry) => entry.id === stack[0]?.id)
+  expect(minimized?.hidden).toBe(true)
+  expect(minimized?.deep, 'a hidden window carries the deep mark').toBe(false)
+  const visible = after.filter((entry) => !entry.hidden)
+  expect(visible[12]?.id).toBe(stack[13]?.id)
+  expect(visible[12]?.deep, 'the window that moved up to thirteenth stayed deep').toBe(false)
+  expect(visible[12]?.blur).toContain('blur')
+  expect(visible[13]?.deep).toBe(true)
+})
+
 test('closeAll clears 50 windows in one pass', async ({ page }) => {
   await page.click('#btn-stress')
   await page.click('#btn-clear')
