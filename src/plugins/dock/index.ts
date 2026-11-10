@@ -80,7 +80,7 @@ interface DockState {
   workspace: number
 }
 
-type Followed = [state: DockState, out: string[]]
+type Followed = [state: DockState, out: string[], loose: string[]]
 
 const KEY = 'dock'
 const LOCKED: Saved = { resizable: false, minimizable: false, snappable: false }
@@ -182,18 +182,43 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   }
 
   function follow(state = read()): Followed {
-    const { windows, groups } = wm.getState()
+    const { windows, groups, order } = wm.getState()
     const out: string[] = []
+    const loose: string[] = []
     let layout: DockLayout = state
+    const leave = (id: string, away?: boolean) => {
+      out.push(id)
+      if (away) loose.push(id)
+      layout = remove(layout, id)
+    }
     for (const id of windowsOf(state)) {
       const win = windows[id]
-      if (!win || win.stage === 'normal' || win.workspace !== state.workspace) {
-        out.push(id)
-        layout = remove(layout, id)
-      }
+      if (!win?.snapRect || win.stage === 'normal') leave(id)
+      else if (win.workspace !== state.workspace) leave(id, true)
     }
-    for (const group of Object.values(groups)) layout = activate(layout, group.activeId)
-    return [{ ...state, root: layout.root }, out]
+    for (const stack of stacks(layout.root)) {
+      const free = stack.windows.filter((id) => (windows[id] as WindowState).groupId === null)
+      if (free.length === stack.windows.length) {
+        free.splice(free.indexOf(order.find((id) => free.includes(id)) as string), 1)
+      }
+      for (const id of free) leave(id, true)
+    }
+    for (const group of Object.values(groups)) {
+      const owner = [group.activeId, ...group.members]
+        .map((id) => stackOf(layout, id))
+        .find(Boolean)
+      if (!owner) continue
+      for (const id of group.members) layout = insert(layout, id, { stackId: owner.id })
+      layout = activate(layout, group.activeId)
+    }
+    return [{ ...state, root: layout.root }, out, loose]
+  }
+
+  function unpin(id: string): void {
+    const win = wm.get(id) as WindowState
+    wm.moveToWorkspace(id, wm.workspace())
+    wm.restoreTo(id, win.restoreBounds ?? win.bounds)
+    wm.moveToWorkspace(id, win.workspace)
   }
 
   function place(state: DockState, named?: boolean): void {
@@ -235,7 +260,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     }
   }
 
-  function settle([next, out]: Followed, named?: boolean): void {
+  function settle([next, out, loose]: Followed, named?: boolean): void {
     const flags = { ...next.flags }
     for (const id of out) {
       const saved = flags[id]
@@ -247,6 +272,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     let shown: DockLayout = next
     for (const group of Object.values(wm.getState().groups)) shown = activate(shown, group.activeId)
     wm.setExtension(KEY, shown.root ? { ...next, root: shown.root, flags } : undefined)
+    for (const id of loose) unpin(id)
     torn = null
   }
 
@@ -275,14 +301,14 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
 
   function dock(id: string, target: DockTarget = {}): boolean {
     const win = wm.get(id)
-    const [base, out] = follow()
+    const [base, out, loose] = follow()
     if (!win || (base.root && win.workspace !== base.workspace)) return false
     const next = insert(base, id, target)
     if (next.root === base.root) return false
     const workspace = base.root ? base.workspace : win.workspace
     guard(() => {
       if (win.stage === 'minimized') wm.restore(id)
-      settle([{ ...base, root: next.root, workspace }, out])
+      settle([{ ...base, root: next.root, workspace }, out, loose])
       wm.focus(id)
     })
     announce(messages.docked(win.title))
@@ -290,13 +316,12 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   }
 
   function undock(id: string): boolean {
-    const [base, out] = follow()
+    const [base, out, loose] = follow()
     const win = wm.get(id)
     if (!win || !stackOf(base, id)) return false
     guard(() => {
       wm.ungroup(id)
-      settle([{ ...base, root: remove(base, id).root }, [...out, id]])
-      wm.restoreTo(id, win.restoreBounds ?? win.bounds)
+      settle([{ ...base, root: remove(base, id).root }, [...out, id], [...loose, id]])
     })
     announce(messages.undocked(win.title))
     return true
@@ -305,17 +330,20 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   function setLayout(layout: DockLayout): boolean {
     if (!validate(layout)) return false
     const ids = windowsOf(layout)
-    const [base, out] = follow()
+    const [base, out, loose] = follow()
     const workspace = base.root ? base.workspace : wm.workspace()
     if (!ids.every((id) => wm.get(id)?.workspace === workspace)) return false
     const leaving = windowsOf(base).filter((id) => !ids.includes(id))
     guard(() => {
       for (const id of ids) if (wm.get(id)?.stage === 'minimized') wm.restore(id)
-      settle([{ root: layout.root, flags: base.flags, workspace }, [...out, ...leaving]], true)
-      for (const id of leaving) {
-        const win = wm.get(id) as WindowState
-        wm.restoreTo(id, win.restoreBounds ?? win.bounds)
-      }
+      settle(
+        [
+          { root: layout.root, flags: base.flags, workspace },
+          [...out, ...leaving],
+          [...loose.filter((id) => !ids.includes(id)), ...leaving],
+        ],
+        true,
+      )
     })
     return true
   }
@@ -334,10 +362,12 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const followed = follow(state)
     const [next, out] = followed
     if (next.root !== state.root) {
-      const single = out.length === 1 ? wm.get(out[0] as string) : undefined
-      const rect = single?.stage === 'normal' ? expected(state).get(single.id) : undefined
+      const stack = stackOf(state, out[0] as string)
+      const rect =
+        stack?.windows.every((id) => out.includes(id) && wm.get(id)?.stage === 'normal') &&
+        expected(state).get(stack.windows[0] as string)
       quiet(() => settle(followed))
-      if (single && rect) torn = { id: single.id, state, rect }
+      if (stack && rect) torn = { id: stack.windows[0] as string, state, rect }
       for (const id of out) {
         const win = wm.get(id)
         if (win) announce(messages.undocked(win.title))

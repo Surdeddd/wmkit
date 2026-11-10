@@ -255,26 +255,20 @@ describe('docking', () => {
 })
 
 describe('keeping the layout in step', () => {
-  it('regroups a stack whose tab group drifted, and lets go of windows leaving together', () => {
+  it('keeps a stack in one tab group across later operations, and lets go of windows leaving together', () => {
     const h = setup()
     h.add('a')
     h.add('b')
-    h.add('c')
     h.add('d')
     h.dock.dock('a')
     const stack = (h.dock.layout().root as DockStack).id
     h.dock.dock('b', { stackId: stack })
-    h.wm.ungroup('b')
-    h.dock.dock('d', { side: 'right' })
-    expect(h.wm.get('b')?.groupId).toBe(h.wm.get('a')?.groupId)
-    expect(h.wm.get('a')?.groupId).not.toBeNull()
     const kept = h.wm.get('a')?.groupId
+    expect(kept).not.toBeNull()
+    h.dock.dock('d', { side: 'right' })
     h.dock.dock('d', { side: 'bottom' })
     expect(h.wm.get('a')?.groupId).toBe(kept)
-    h.wm.group(['a', 'c'])
-    h.dock.dock('d', { side: 'left' })
-    expect(h.wm.get('c')?.groupId).toBeNull()
-    expect(h.wm.groupMembers(h.wm.get('a')?.groupId as string)).toHaveLength(2)
+    expect(h.wm.get('b')?.groupId).toBe(kept)
     h.wm.batch(() => {
       h.wm.close('a')
       h.wm.close('d')
@@ -628,6 +622,23 @@ describe('dropping a window onto the layout', () => {
     expect(h.wm.get('b')).toMatchObject({ stage: 'snapped', bounds: { x: 503 } })
   })
 
+  it('tears a whole stack out with its title and puts it back together on Escape', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('c')
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    h.dock.dock('c', { side: 'right' })
+    drag(h, 'b', [100, 10], [300, 300])
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['c'])
+    expect(h.wm.get('a')?.groupId).toBe(h.wm.get('b')?.groupId)
+    document.dispatchEvent(key('Escape'))
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b', 'c'])
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', resizable: false, bounds: { x: 0 } })
+    expect(activeOf(h.wm, 'a')).toBe('b')
+  })
+
   it('lets floating-layer windows and other workspaces drift over the layout', () => {
     const h = setup()
     h.add('a')
@@ -817,6 +828,84 @@ describe('the active tab follows the manager', () => {
 })
 
 describe('following changes made around the dock', () => {
+  it('a docked tab that is ungrouped leaves the layout and floats with its flags back', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b', { resizable: true })
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    h.wm.ungroup('b')
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    expect(h.wm.get('b')).toMatchObject({ stage: 'normal', resizable: true, snapRect: null })
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', groupId: null, resizable: false })
+    expect(bounds(h.wm, 'a')).toBe('0,0 1000x600')
+  })
+
+  it('ungrouping one tab of three keeps the other two together', () => {
+    const h = setup()
+    for (const id of ['a', 'b', 'c']) h.add(id)
+    h.dock.dock('a')
+    const stack = (h.dock.layout().root as DockStack).id
+    h.dock.dock('b', { stackId: stack })
+    h.dock.dock('c', { stackId: stack })
+    h.wm.ungroup('a')
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['b', 'c'])
+    expect(h.wm.get('a')?.stage).toBe('normal')
+    expect(h.wm.get('b')?.groupId).toBe(h.wm.get('c')?.groupId)
+  })
+
+  it('a floating window grouped with a docked one joins its stack, locked', () => {
+    const h = setup()
+    h.add('a')
+    h.add('f')
+    h.dock.dock('a')
+    h.wm.group(['a', 'f'])
+    expect(dockLayout.stackOf(h.dock.layout(), 'f')?.windows).toEqual(['a', 'f'])
+    expect(h.wm.get('f')).toMatchObject({ stage: 'snapped', resizable: false })
+    h.dock.undock('f')
+    expect(h.wm.get('f')).toMatchObject({ stage: 'normal', resizable: true })
+  })
+
+  it('two docked windows grouped together share the panel of the group', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.group(['b', 'a'])
+    const stack = dockLayout.stackOf(h.dock.layout(), 'a') as DockStack
+    expect(stack.windows).toEqual(['b', 'a'])
+    expect(stack.active).toBe('b')
+    expect(bounds(h.wm, 'a')).toBe('0,0 1000x600')
+  })
+
+  it('a group whose floating host pulls docked windows out lets them go', () => {
+    const h = setup()
+    h.add('a')
+    h.add('f')
+    h.dock.dock('a')
+    h.wm.group(['f', 'a'])
+    expect(h.dock.layout().root).toBeNull()
+    expect(h.wm.get('a')).toMatchObject({ stage: 'normal', resizable: true })
+  })
+
+  it('a docked window moved to another workspace floats there without switching', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b', { resizable: true })
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.moveToWorkspace('b', 1)
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    expect(h.wm.workspace()).toBe(0)
+    expect(h.wm.get('b')).toMatchObject({
+      stage: 'normal',
+      workspace: 1,
+      snapRect: null,
+      resizable: true,
+    })
+  })
+
   it('arrange and minimizeAll leave the docked panels in place', () => {
     const h = setup()
     h.add('a')
