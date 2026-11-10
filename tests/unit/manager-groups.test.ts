@@ -216,7 +216,18 @@ describe('bulk commands', () => {
     expect(changes).toBe(3)
   })
 
-  it('costs linear time in the number of windows', () => {
+  it('walks the window list a constant number of times however many windows there are', () => {
+    const SCANS = [
+      'every',
+      'filter',
+      'find',
+      'forEach',
+      'includes',
+      'indexOf',
+      'map',
+      'some',
+      'sort',
+    ]
     const make = (n: number) => {
       const wm = createWindowManager({ viewport: { width: 4000, height: 3000 }, historyLimit: 0 })
       wm.batch(() => {
@@ -224,15 +235,26 @@ describe('bulk commands', () => {
       })
       return wm
     }
-    const time = (n: number, run: (wm: ReturnType<typeof make>) => void) => {
-      let best = Number.POSITIVE_INFINITY
-      for (let i = 0; i < 3; i += 1) {
-        const wm = make(n)
-        const start = performance.now()
+    const work = (n: number, run: (wm: ReturnType<typeof make>) => void) => {
+      const wm = make(n)
+      const proto = Array.prototype as unknown as Record<string, (...args: unknown[]) => unknown>
+      const originals = SCANS.map((name) => proto[name] as (...args: unknown[]) => unknown)
+      let visited = 0
+      SCANS.forEach((name, index) => {
+        const original = originals[index] as (...args: unknown[]) => unknown
+        proto[name] = function (this: unknown[], ...args: unknown[]) {
+          visited += this.length
+          return original.apply(this, args)
+        }
+      })
+      try {
         run(wm)
-        best = Math.min(best, performance.now() - start)
+      } finally {
+        SCANS.forEach((name, index) => {
+          proto[name] = originals[index] as (...args: unknown[]) => unknown
+        })
       }
-      return best
+      return visited
     }
     const runs: Record<string, (wm: ReturnType<typeof make>) => void> = {
       closeAll: (wm) => wm.closeAll(),
@@ -244,9 +266,7 @@ describe('bulk commands', () => {
       },
     }
     for (const [name, run] of Object.entries(runs)) {
-      time(250, run)
-      const ratio = time(2000, run) / Math.max(0.5, time(500, run))
-      expect(ratio, name).toBeLessThan(8)
+      expect(work(2000, run) / Math.max(1, work(500, run)), name).toBeLessThan(5)
     }
-  }, 30_000)
+  })
 })
