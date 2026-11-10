@@ -197,6 +197,51 @@ test.describe('touch input', () => {
     await expect(page.locator(readme)).not.toHaveAttribute('data-wm-pinching', '')
   })
 
+  test('a finger lifted over content that stops the event leaves no ghost behind', async ({
+    page,
+    context,
+  }) => {
+    const cdp = await context.newCDPSession(page)
+    await page.goto('?lang=en')
+    await expect(page.locator(readme)).toBeVisible()
+    await page.evaluate(() =>
+      window.__wmDemo.wm.restoreTo('readme', { x: 8, y: 8, width: 360, height: 320 }),
+    )
+    await settle(page)
+    await page.evaluate(() => {
+      const content = document.querySelector(
+        '[data-testid="window-readme"] [data-wm-content]',
+      ) as HTMLElement
+      content.style.touchAction = 'none'
+      for (const type of ['pointerup', 'pointercancel']) {
+        content.addEventListener(type, (event) => event.stopPropagation())
+      }
+    })
+
+    const before = await boundsOf(page, 'readme')
+    const box = await page.locator(`${readme} [data-wm-content]`).boundingBox()
+    const first = { x: (box?.x ?? 0) + 30, y: (box?.y ?? 0) + 30 }
+    const second = { x: (box?.x ?? 0) + (box?.width ?? 0) - 30, y: (box?.y ?? 0) + 90 }
+
+    const lone = (type: TouchPhase, point?: Finger) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: point ? [{ x: point.x, y: point.y, id: 7 }] : [],
+      })
+    await touch(cdp, 'touchStart', [first])
+    await touch(cdp, 'touchEnd', [])
+    await lone('touchStart', second)
+    for (let step = 1; step <= 6; step += 1) {
+      await lone('touchMove', { x: second.x - step * 12, y: second.y + step * 10 })
+    }
+    await lone('touchEnd')
+    await settle(page)
+
+    expect(await boundsOf(page, 'readme'), 'one finger pinched the window').toEqual(before)
+    expect(await page.evaluate(() => window.__wmDemo.wm.workspace())).toBe(0)
+    await expect(page.locator(readme)).not.toHaveAttribute('data-wm-pinching', '')
+  })
+
   test('two fingers swiped sideways change workspace', async ({ page, context }) => {
     const cdp = await context.newCDPSession(page)
     await page.goto('?lang=en')
