@@ -131,7 +131,7 @@ const en: Dict = {
   meta: {
     title: 'wmkit — headless window manager for the web',
     description:
-      'Draggable, resizable, snappable windows for any web app. Headless core under 16 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
+      'Draggable, resizable, snappable windows for any web app. Headless core under 19 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
     og: 'A whole desktop inside the page: windows, dock, workspaces, snapping, undo. This page is the demo — it runs on the library.',
     image:
       'The wmkit landing page: the WINDOWS headline beside a readme window and a terminal window, a dock of apps along the bottom.',
@@ -233,7 +233,7 @@ const en: Dict = {
     body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, and the web components, are thin wrappers over the same object.',
     badges: [
       ['0', 'dependencies'],
-      ['<16 kB', 'brotli core'],
+      ['<19 kB', 'brotli core'],
       ['100%', 'core coverage'],
       ['MIT', 'license'],
     ],
@@ -300,7 +300,7 @@ const en: Dict = {
     off: 'off',
   },
   devtools: {
-    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.8 kB entry point you can drop into your own app. It follows the manager, not this page.',
+    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.9 kB entry point you can drop into your own app. It follows the manager, not this page.',
   },
   skins: {
     lead: 'Sixteen shipped themes dress every window. A variant dresses one: the desktop mirrors it to data-wm-variant and your CSS overrides the tokens from there.',
@@ -507,7 +507,7 @@ const en: Dict = {
     {
       label: 'Bundle (brotli)',
       cells: [
-        { text: '~15 kB', tone: 'plain' },
+        { text: '~18 kB', tone: 'plain' },
         { text: '~15 kB', tone: 'plain' },
         { text: '~60 kB', tone: 'bad' },
         { text: '~10 kB', tone: 'good' },
@@ -535,7 +535,7 @@ const ru: Dict = {
   meta: {
     title: 'wmkit — headless-оконный менеджер для веба',
     description:
-      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 16 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
+      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 19 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
     og: 'Целый рабочий стол внутри страницы: окна, док, рабочие столы, прилипание, отмена. Эта страница и есть демо — она работает на самой библиотеке.',
     image:
       'Лендинг wmkit: заголовок WINDOWS рядом с окнами readme и терминала, внизу док с приложениями.',
@@ -650,7 +650,7 @@ const ru: Dict = {
     body: 'Ядро это чистая машина состояний: границы, порядок, стадии и фокус — и ни одного обращения к DOM. DOM-слой превращает события указателя в переходы состояний на 60fps, а адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik и веб-компоненты — тонкие обёртки над тем же объектом.',
     badges: [
       ['0', 'зависимостей'],
-      ['<16 кБ', 'ядро в brotli'],
+      ['<19 кБ', 'ядро в brotli'],
       ['100%', 'покрытие ядра'],
       ['MIT', 'лицензия'],
     ],
@@ -717,7 +717,7 @@ const ru: Dict = {
     off: 'выкл',
   },
   devtools: {
-    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.8 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
+    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.9 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
   },
   skins: {
     lead: 'Шестнадцать готовых тем одевают все окна сразу. Вариант одевает одно: десктоп зеркалит его в data-wm-variant, а дальше ваш CSS переопределяет токены.',
@@ -924,7 +924,7 @@ const ru: Dict = {
     {
       label: 'Размер (brotli)',
       cells: [
-        { text: '~15 кБ', tone: 'plain' },
+        { text: '~18 кБ', tone: 'plain' },
         { text: '~15 кБ', tone: 'plain' },
         { text: '~60 кБ', tone: 'bad' },
         { text: '~10 кБ', tone: 'good' },
