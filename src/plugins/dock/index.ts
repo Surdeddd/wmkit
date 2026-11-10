@@ -185,7 +185,6 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       'wmkit: this window manager already has a dock, destroy it before creating another',
     )
   }
-  docked.add(wm)
   let alive = true
   const doc = element.ownerDocument
   const view = doc.defaultView as Window & typeof globalThis
@@ -208,7 +207,6 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   const style = doc.createElement('style')
   style.dataset.wmDock = ''
   style.textContent = CSS
-  element.append(style)
   let applying = 0
   let torn: { id: string; state: DockState; rect: Bounds } | null = null
   let sliding: { key: string; finish(cancelled: boolean): void } | null = null
@@ -702,47 +700,53 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   const track = (event: PointerEvent) => {
     floating = floats(event)
   }
-  element.addEventListener('pointermove', track, true)
   const watcher = new MutationObserver(mark)
-  watcher.observe(element, { subtree: true, attributeFilter: ['data-wm-window'] })
-  const stops = [
-    wm.subscribe(reconcile),
-    desktop.addDropTarget(hit),
-    () => watcher.disconnect(),
-    () => element.removeEventListener('pointermove', track, true),
-  ]
-  if (options.keyboard !== false) {
-    element.addEventListener('keydown', onKeydown, true)
-    stops.push(() => element.removeEventListener('keydown', onKeydown, true))
-  }
-  quiet(() => settle(follow()))
+  const stops: Array<() => void> = []
 
-  return {
-    dock,
-    undock,
-    layout: () => ({ root: read().root }),
-    setLayout,
-    destroy() {
-      if (!alive) return
-      alive = false
-      docked.delete(wm)
-      sliding?.finish(true)
-      for (const stop of stops) stop()
-      const { flags } = read()
-      wm.beginInteraction()
+  function destroy(): void {
+    if (!alive) return
+    alive = false
+    docked.delete(wm)
+    sliding?.finish(true)
+    for (const stop of stops) stop()
+    for (const node of sashes.values()) node.remove()
+    sashes.clear()
+    style.remove()
+    for (const node of element.querySelectorAll('[data-wm-docked]')) {
+      node.removeAttribute('data-wm-docked')
+    }
+    const { flags } = read()
+    wm.beginInteraction()
+    try {
       wm.batch(() => {
         for (const id of cache[2]) {
           const saved = flags[id]
           if (saved && wm.get(id)) wm.update(id, unlock(saved))
         }
       })
+    } finally {
       wm.abortInteraction()
-      for (const node of sashes.values()) node.remove()
-      sashes.clear()
-      style.remove()
-      for (const node of element.querySelectorAll('[data-wm-docked]')) {
-        node.removeAttribute('data-wm-docked')
-      }
-    },
+    }
   }
+
+  try {
+    docked.add(wm)
+    element.append(style)
+    element.addEventListener('pointermove', track, true)
+    stops.push(() => element.removeEventListener('pointermove', track, true))
+    watcher.observe(element, { subtree: true, attributeFilter: ['data-wm-window'] })
+    stops.push(() => watcher.disconnect(), wm.subscribe(reconcile), desktop.addDropTarget(hit))
+    if (options.keyboard !== false) {
+      element.addEventListener('keydown', onKeydown, true)
+      stops.push(() => element.removeEventListener('keydown', onKeydown, true))
+    }
+    quiet(() => settle(follow()))
+  } catch (error) {
+    try {
+      destroy()
+    } catch {}
+    throw error
+  }
+
+  return { dock, undock, layout: () => ({ root: read().root }), setLayout, destroy }
 }

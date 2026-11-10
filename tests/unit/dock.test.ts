@@ -1353,6 +1353,52 @@ describe('a stored layout', () => {
     expect(createDock(h.desktop).layout().root).not.toBeNull()
   })
 
+  it('leaves nothing behind when its creation fails, and can be created again', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.setExtension('dock', 'garbage')
+    let armed = true
+    wm.subscribe(() => {
+      if (!armed) return
+      armed = false
+      throw new Error('listener failed')
+    })
+    const element = document.createElement('div')
+    document.body.append(element)
+    const desktop = attachDesktop(wm, element, { autoViewport: false, magnetism: false })
+    expect(() => createDock(desktop)).toThrow('listener failed')
+    expect(element.querySelector('style[data-wm-dock]')).toBeNull()
+    const dock = createDock(desktop)
+    dock.dock('a')
+    dock.dock('b', { side: 'right' })
+    expect(element.querySelectorAll('style[data-wm-dock]')).toHaveLength(1)
+    expect(element.querySelectorAll('[data-wm-sash]')).toHaveLength(1)
+    expect(wm.get('a')?.resizable).toBe(false)
+    dock.destroy()
+    expect(wm.get('a')?.resizable).toBe(true)
+    expect(wm.canUndo()).toBe(true)
+  })
+
+  it('reports the first error when cleaning up a failed creation fails too', () => {
+    const h = setup()
+    h.add('a')
+    h.dock.dock('a')
+    h.dock.destroy()
+    let failures = 0
+    const stop = h.wm.subscribe(() => {
+      failures += 1
+      throw new Error(`listener failed ${failures}`)
+    })
+    expect(() => createDock(h.desktop)).toThrow('listener failed 1')
+    expect(failures).toBe(2)
+    expect(h.wm.get('a')?.resizable).toBe(true)
+    expect(h.element.querySelector('style[data-wm-dock]')).toBeNull()
+    stop()
+    createDock(h.desktop)
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', resizable: false })
+  })
+
   it('leaves nothing locked behind once docking is removed for good', () => {
     const h = setup()
     h.add('a')
