@@ -6,6 +6,7 @@ const SCOPE = '[data-wm-desktop] [data-wm-window][data-wm-skin="custom"]'
 
 async function openBuilder(page: Page, lang = 'en'): Promise<void> {
   await page.goto(`?lang=${lang}`)
+  await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
   await page.locator('#builder').scrollIntoViewIfNeeded()
   await expect(page.locator(PREVIEW)).toBeVisible()
 }

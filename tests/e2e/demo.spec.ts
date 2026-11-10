@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, type Page, test } from './fixtures'
+import { settle } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 const latin = /[A-Za-z]/
@@ -13,6 +14,7 @@ async function launch(page: Page, app: string) {
   await page.click(`#launcher button[data-app="${app}"]`)
   const window = page.locator(`[data-testid="window-${app}"]`)
   await expect(window).toBeVisible()
+  await settle(window)
   return window
 }
 

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from './fixtures'
+import { settle } from './utils'
 
 const CUSTOM =
   '<section data-testid="window-{{id}}">' +
@@ -46,8 +47,10 @@ function shadowRules(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('?lang=en')
+  await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
   await page.click('#launcher button[data-app="skins"]')
   await expect(page.locator('[data-testid="window-skins"]')).toBeVisible()
+  await settle(page.locator('[data-testid="window-skins"]'))
 })
 
 test('a layout rebuilds every window and keeps what it was showing', async ({ page }) => {
@@ -169,6 +172,7 @@ test('a window opened after a shadow skin is dressed like the others', async ({ 
 test('a grouped shadow window still shows its tabs', async ({ page }) => {
   await page.click('#launcher button[data-app="paint"]')
   await expect(page.locator('[data-testid="window-paint"]')).toBeVisible()
+  await settle(page.locator('[data-testid="window-paint"]'))
   await applyShadow(page)
   await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'paint']))
 
