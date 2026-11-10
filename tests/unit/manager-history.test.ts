@@ -21,19 +21,58 @@ function record(wm: WindowManager, names: (keyof ManagerEvents)[]): string[] {
 }
 
 describe('focus changes share one history entry', () => {
+  function undoAll(wm: WindowManager): string[] {
+    const seen: string[] = []
+    for (;;) {
+      const before = JSON.stringify(wm.serialize())
+      if (!wm.undo()) return seen
+      const after = JSON.stringify(wm.serialize())
+      expect(after).not.toBe(before)
+      seen.push(after)
+    }
+  }
+
   it('keeps a move in a short history however often the focus changes after it', () => {
-    const wm = makeWm(5)
+    for (const clicks of [5, 6]) {
+      const wm = makeWm(5)
+      wm.open({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+      wm.open({ id: 'b', x: 0, y: 0, width: 200, height: 150 })
+      wm.clearHistory()
+      wm.move('a', 300, 300)
+      for (let i = 0; i < clicks; i += 1) wm.focus(i % 2 === 0 ? 'a' : 'b')
+      expect(undoAll(wm)).toHaveLength(clicks % 2 === 0 ? 1 : 2)
+      expect(wm.get('a')?.bounds.x).toBe(0)
+    }
+  })
+
+  it('drops the focus step that ends where it began and gives the redo back', () => {
+    const wm = makeWm()
     wm.open({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
     wm.open({ id: 'b', x: 0, y: 0, width: 200, height: 150 })
     wm.clearHistory()
     wm.move('a', 300, 300)
-    for (let i = 0; i < 6; i += 1) wm.focus(i % 2 === 0 ? 'a' : 'b')
-    expect(wm.undo()).toBe(true)
-    expect(wm.getState().order).toEqual(['a', 'b'])
-    expect(wm.get('a')?.bounds.x).toBe(300)
-    expect(wm.undo()).toBe(true)
-    expect(wm.get('a')?.bounds.x).toBe(0)
+    wm.undo()
+    wm.focus('a')
+    expect(wm.canRedo()).toBe(false)
+    wm.focus('b')
     expect(wm.canUndo()).toBe(false)
+    expect(wm.canRedo()).toBe(true)
+    wm.redo()
+    expect(wm.get('a')?.bounds.x).toBe(300)
+  })
+
+  it('skips a step that a smaller viewport has made identical to the present', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    wm.clearHistory()
+    wm.move('a', 700, 450)
+    wm.move('a', 750, 500)
+    wm.setViewport({ width: 100, height: 100 })
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 52, y: 52 })
+    expect(undoAll(wm)).toHaveLength(1)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 10, y: 10 })
+    wm.redo()
+    expect(wm.get('a')?.bounds).toMatchObject({ x: 52, y: 52 })
   })
 
   it('starts a new entry for focus changes that follow a real change', () => {

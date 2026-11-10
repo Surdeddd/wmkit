@@ -134,6 +134,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let interactionRecorded = false
   let interactionMark: { past: HistoryEntry[]; future: HistoryEntry[] } | null = null
   let pendingHistory: HistoryEntry | null = null
+  let dropped: [HistoryEntry, HistoryEntry[]] | undefined
   const layouts = new Map<string, SerializedState>()
 
   function getState(): ManagerState {
@@ -1195,8 +1196,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (interactionDepth > 0) interactionRecorded = true
     else if (top && focusOnly(top, pendingHistory) && focusOnly(pendingHistory, now)) {
       future = []
+      if (equal(top, now, 4, true)) {
+        past.pop()
+        if (dropped?.[0] === top) future = dropped[1]
+      }
       return
     }
+    dropped = [pendingHistory, future]
     past.push(pendingHistory)
     if (past.length > historyLimit) past.shift()
     future = []
@@ -1305,12 +1311,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       recordHistory()
       restart()
     }
-    const entry = (back ? past : future).pop()
-    if (!entry) return false
-    ;(back ? future : past).push(captureEntry())
-    applyEntry(entry)
-    restart()
-    return true
+    for (let entry = (back ? past : future).pop(); entry; entry = (back ? past : future).pop()) {
+      const before = captureEntry()
+      applyEntry(entry)
+      if (!equal(before, current(), 4, true)) {
+        ;(back ? future : past).push(before)
+        restart()
+        return true
+      }
+    }
+    return false
   }
 
   function beginInteraction(): void {

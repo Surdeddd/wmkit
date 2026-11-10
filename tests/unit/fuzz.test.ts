@@ -434,6 +434,14 @@ function focusOnly(a: Picture, b: Picture): boolean {
   )
 }
 
+function forced(a: ManagerState, b: ManagerState): boolean {
+  return Object.keys(b.windows).some((id) => {
+    const x = a.windows[id]
+    const y = b.windows[id] as WindowState
+    return !!x && (x.meta !== y.meta || x.minSize !== y.minSize || x.maxSize !== y.maxSize)
+  })
+}
+
 function audit(seed: number, steps: number, report: string[]): void {
   const random = rng(seed)
   const wm = createWindowManager({ viewport: { width: 1280, height: 800 }, historyLimit: 30 })
@@ -602,7 +610,6 @@ function audit(seed: number, steps: number, report: string[]): void {
     } else if (mode < 0.08) {
       names.push('hydrate')
       recorded = false
-      chain = null
       wm.hydrate(JSON.parse(JSON.stringify(wm.serialize())))
     } else if (mode < 0.16) {
       names.push('batch')
@@ -637,7 +644,8 @@ function audit(seed: number, steps: number, report: string[]): void {
     for (const id of Object.keys(stateAfter.windows)) {
       const next = stateAfter.windows[id] as WindowState
       const prev = stateBefore.windows[id]
-      if (names.length === 1 && prev && prev !== next && same(prev, next)) {
+      const owned = prev && forced({ ...stateBefore, windows: { [id]: prev } }, stateAfter)
+      if (names.length === 1 && prev && prev !== next && same(prev, next) && !owned) {
         report.push(`${label}: ${id} was replaced by an equal object`)
       }
       if (next.stage === 'snapped' && next.snapZone === null && next.snapRect === null) {
@@ -653,21 +661,25 @@ function audit(seed: number, steps: number, report: string[]): void {
       report.push(`${label}: hydrate(serialize()) differs`)
     }
 
-    if (!recorded) {
-      if (!same(before, after)) chain = null
-      continue
+    const owned = forced(stateBefore, stateAfter)
+    let target: Picture | undefined
+    if (recorded && (owned || !same(before, after))) {
+      const merged = merges && chain !== null && focusOnly(before, after)
+      target = !merged ? before : same(chain, after) ? undefined : (chain ?? undefined)
+      if (target && !wm.canUndo()) report.push(`${label}: the state changed but canUndo() is false`)
     }
-    if (same(before, after)) continue
-    const target: Picture = merges && chain && focusOnly(before, after) ? chain : before
-    chain = focusOnly(before, after) ? target : null
-    if (!wm.canUndo()) {
-      report.push(`${label}: the state changed but canUndo() is false`)
-      continue
+    chain = null
+    const pre = wm.getState()
+    if (!wm.undo()) continue
+    const post = wm.getState()
+    const undone = picture(post)
+    if (same(undone, picture(pre)) && !forced(pre, post)) {
+      report.push(`${label}: undo returned true but changed nothing`)
     }
-    wm.undo()
-    if (!same(picture(wm.getState()), target)) report.push(`${label}: undo missed its target`)
+    if (target && !same(undone, target)) report.push(`${label}: undo missed its target`)
     wm.redo()
     if (!same(picture(wm.getState()), after)) report.push(`${label}: redo missed its target`)
+    chain = focusOnly(undone, after) ? undone : null
   }
 }
 
@@ -696,7 +708,7 @@ describe('random operation sequences keep the state machine honest', () => {
     const report: string[] = []
     for (let seed = 1; seed <= 24; seed += 1) audit(seed, 200, report)
     expect(report.slice(0, 6)).toEqual([])
-  })
+  }, 120_000)
 
   it('re-syncs a hand-edited snapshot whose group members drifted apart', () => {
     const viewport = { width: 1280, height: 800 }

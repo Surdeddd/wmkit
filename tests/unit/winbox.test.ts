@@ -595,7 +595,7 @@ describe('windows of closed boxes', () => {
     expect(wm.undo()).toBe(true)
     expect(ids(wm)).toEqual(['gb'])
     expect(wm.canRedo()).toBe(true)
-    expect(wm.redo()).toBe(true)
+    expect(wm.redo()).toBe(false)
     expect(ids(wm)).toEqual(['gb'])
     expect(wm.canRedo()).toBe(false)
     expect(root.querySelectorAll('.winbox')).toHaveLength(1)
@@ -614,11 +614,8 @@ describe('windows of closed boxes', () => {
       seen.push(ids(wm))
     }
     expect(wm.get('rb')?.bounds.x).not.toBe(60)
-    for (let step = 0; step < 3; step += 1) {
-      expect(wm.redo()).toBe(true)
-      seen.push(ids(wm))
-    }
-    expect(seen).toEqual(Array.from({ length: 6 }, () => ['rb']))
+    while (wm.redo()) seen.push(ids(wm))
+    expect(seen).toEqual(Array.from({ length: seen.length }, () => ['rb']))
     expect(wm.canRedo()).toBe(false)
     expect(wm.get('rb')?.bounds).toMatchObject({ x: 60, y: 70 })
     expect(b.window.isConnected).toBe(true)
