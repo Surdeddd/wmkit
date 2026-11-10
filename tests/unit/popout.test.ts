@@ -291,6 +291,15 @@ describe('popping out a window that is already out', () => {
     expect(wm.get('p')?.stage).toBe('normal')
   })
 
+  it('hands back a popup that cannot take the focus, as a test double may not', async () => {
+    const { target, open } = stubOpen()
+    Object.assign(target, { focus: undefined })
+    const { wm, content } = setup()
+    const first = await popout(wm, 'p', content, { target: 'window' })
+    await expect(popout(wm, 'p', content, { target: 'window' })).resolves.toBe(first)
+    expect(open).toHaveBeenCalledTimes(1)
+  })
+
   it('answers a double click with one picture-in-picture window', async () => {
     const { target, requestWindow } = stubPip()
     const { wm, content } = setup()

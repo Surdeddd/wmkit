@@ -119,7 +119,7 @@ export function popout(
   const existing = out.get(id)
   if (existing) {
     return existing.then((handle) => {
-      handle.window.focus()
+      handle.window.focus?.()
       return handle
     })
   }
