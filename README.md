@@ -29,7 +29,7 @@
 - 🖼️ **Popout** — send a window into Picture-in-Picture or a popup on another monitor
 - 🧩 **Docking** — tile windows into split panels with tabs and draggable separators, dockview style, while the rest keep floating; undoable and persisted
 - 📦 **WinBox compatible** — `@surdeddd/wmkit/winbox` speaks the WinBox.js API; [migrate in one import](docs/winbox-migration.md)
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 16 kB brotli core
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 19 kB brotli core
 
 ## Install
 
@@ -374,7 +374,7 @@ dock.dock('files', { side: 'left' })
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.61 kB brotlied.
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.66 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -387,7 +387,7 @@ A gesture is just a function that takes a `GestureContext` and returns its teard
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 1.9 kB brotlied.
+Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 2.46 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -500,9 +500,10 @@ npx degit Surdeddd/wmkit/templates/dashboard my-dashboard
 
 ## Quality
 
-- 867 unit tests: **100%** line/branch/function/statement coverage on the core state machine, persistence and the dock layout model, fuzzers for the manager, the DOM layer and the dock layout, with enforced floors on the DOM layer, the plugins and the adapters
-- 750+ Playwright scenarios on Chromium, Firefox, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, docking, workspaces, undo after drag, keyboard, touch, iframes, popout, persistence across reloads, 50-window stress, modal traps, every adapter, the docs site and the template, axe accessibility scans, visual regression screenshots
-- performance benchmarks run in CI on every push (`vitest bench`): 1 000 windows open in ~57 ms, a headless move among 50 windows costs ~3 µs, a drag frame among 800 attached windows ~0.09 ms, a full 100-step undo/redo sweep ~80 µs
+- 1 200+ unit tests: **100%** line/branch/function/statement coverage on the core state machine, persistence and the dock layout model, fuzzers for the manager, the DOM layer, the dock layout, the manager together with the dock, and the skin template compiler against a real HTML parser, with enforced floors on the DOM layer, the plugins and the adapters
+- 900+ Playwright scenarios on Chromium, Firefox, WebKit and mobile emulation: drag, 8-way resize, snap, magnetism, docking with panels checked by their rectangles, workspaces, undo after drag, keyboard, touch, iframes, a desktop inside an iframe, popout, persistence across reloads, 50-window stress, modal traps, every adapter, a server-rendered Qwik page resumed in the browser, the web components with their tab strip and closed panels, the docs site, the template and the Russian landing, axe accessibility scans, visual regression screenshots
+- micro-benchmarks in jsdom, run in CI on every push (`vitest bench`). They time the library's own JavaScript and see neither hit-testing nor paint: 1 000 windows open in ~60 ms, a headless move among 50 windows costs ~3 µs, syncing a drag step among 800 attached windows ~0.1 ms, a 100-step undo/redo sweep ~0.4 ms
+- a real-browser benchmark (`pnpm bench:browser`: headless Chromium on the GPU, one window dragged among N with the glass theme and tab grouping on), measured on an M1 Pro: the script per pointer move takes 0.21 / 0.27 / 0.37 ms among 50 / 200 / 400 windows, and frames come in at a median of 8.3 ms with a p95 of about 10 ms on a 120 Hz display; with the CPU throttled four times, 0.73 / 1.21 / 1.43 ms per move. Run it to measure on your own hardware
 - `publint` + `@arethetypeswrong/cli` validate the published package, `size-limit` guards bundle budgets
 
 ## Development
@@ -513,6 +514,7 @@ pnpm dev          # landing + playground on Vite
 pnpm test         # unit tests
 pnpm test:e2e     # Playwright matrix
 pnpm smoke        # pack the build and import every entry in Node, as ESM and CommonJS
+pnpm bench:browser # drag one window among many in headless Chromium, report script and frame times
 pnpm verify       # the full gate: lint, types, coverage, build, size, publint, attw, smoke, e2e
 ```
 
