@@ -37,6 +37,19 @@ test('a docs address without .html opens the page', async ({ page }) => {
   }
 })
 
+test('inline code keeps its template placeholders', async ({ page }) => {
+  for (const path of ['docs/api.html', 'docs/ru/api.html']) {
+    await page.goto(path)
+    const doc = page.locator('.vp-doc')
+    await expect(doc.locator('code', { hasText: /^\{\{title\}\}$/ }).first(), path).toBeVisible()
+    await expect(doc.locator('code', { hasText: /^\{\{id\}\}$/ }).first(), path).toBeVisible()
+    const empty = await doc
+      .locator('p code')
+      .evaluateAll((nodes) => nodes.filter((node) => (node.textContent ?? '').trim() === '').length)
+    expect(empty, `${path} has empty inline code`).toBe(0)
+  }
+})
+
 test('the sidebar navigates and the language menu switches to Russian', async ({
   page,
   isMobile,
