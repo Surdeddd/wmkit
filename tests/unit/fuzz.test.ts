@@ -743,9 +743,8 @@ function audit(seed: number, steps: number, report: string[]): void {
       report.push(`${label}: hydrate(serialize()) differs`)
     }
 
-    const owned = forced(stateBefore, stateAfter)
     let target: Picture | undefined
-    if (recorded && (owned || !same(before, after))) {
+    if (recorded && !same(before, after)) {
       const merged = merges && chain !== null && focusOnly(before, after)
       const known = merged && chain !== 'unknown' && !same(chain, after)
       target = !merged ? before : known ? (chain as Picture) : undefined
@@ -756,7 +755,7 @@ function audit(seed: number, steps: number, report: string[]): void {
     if (!wm.undo()) continue
     const post = wm.getState()
     const undone = picture(post)
-    if (same(undone, picture(pre)) && !forced(pre, post)) {
+    if (same(undone, picture(pre))) {
       report.push(`${label}: undo returned true but changed nothing`)
     }
     if (target && !same(undone, target)) report.push(`${label}: undo missed its target`)
