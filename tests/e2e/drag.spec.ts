@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { boxOf, dragBy, dragTo, handle, openVanilla, spawn, win } from './utils'
+import { boxOf, desktopBox, dragBy, dragTo, handle, openVanilla, settle, spawn, win } from './utils'
 
 test.beforeEach(async ({ page }) => {
   await openVanilla(page)
@@ -180,4 +180,82 @@ test('undo restores the position after a drag', async ({ page }) => {
   })
   const after = await boundsOf()
   expect(after).toEqual(before)
+})
+
+for (const start of ['snapped to a rectangle', 'maximized over a snapped rectangle']) {
+  test(`escape puts a window ${start} back exactly as it was`, async ({ page }) => {
+    await spawn(page, 'fixed')
+    await page.evaluate((maximize) => {
+      window.__wm.snapTo('fixed', { x: 0.5, y: 0, width: 0.5, height: 1 })
+      if (maximize) window.__wm.maximize('fixed')
+      const counter = { escapes: 0 }
+      ;(window as unknown as { __keys: typeof counter }).__keys = counter
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') counter.escapes += 1
+      })
+    }, start.startsWith('maximized'))
+    await settle(win(page, 'fixed'))
+    const before = await page.evaluate(() => window.__wm.get('fixed'))
+
+    await dragBy(page, handle(page, 'fixed'), -120, 90, { release: false })
+    await expect(win(page, 'fixed')).toHaveAttribute('data-wm-stage', 'normal')
+    await page.keyboard.press('Escape')
+    await page.mouse.up()
+
+    expect(await page.evaluate(() => window.__wm.get('fixed'))).toEqual(before)
+    const keys = await page.evaluate(
+      () => (window as unknown as { __keys: { escapes: number } }).__keys.escapes,
+    )
+    expect(keys, 'the Escape that cancelled the drag reached the page').toBe(0)
+  })
+}
+
+test('a window closed by a drop target comes back with one undo', async ({ page }) => {
+  await spawn(page, 'fixed')
+  await page.evaluate(() => {
+    const probe = { commits: 0 }
+    ;(window as unknown as { __drop: typeof probe }).__drop = probe
+    window.__desktop.addDropTarget((_x, _y, id, local) =>
+      local.x < 80
+        ? {
+            preview: { x: 0, y: 0, width: 80, height: 80 },
+            commit() {
+              probe.commits += 1
+              window.__wm.close(id)
+            },
+          }
+        : null,
+    )
+    window.__wm.clearHistory()
+  })
+  const before = await page.evaluate(() => window.__wm.get('fixed'))
+  const desk = await desktopBox(page)
+
+  await dragTo(page, handle(page, 'fixed'), desk.x + 40, desk.y + desk.height / 2)
+  await expect(win(page, 'fixed')).toHaveCount(0)
+  expect(await page.evaluate(() => window.__wm.get('fixed'))).toBeUndefined()
+  const commits = await page.evaluate(
+    () => (window as unknown as { __drop: { commits: number } }).__drop.commits,
+  )
+  expect(commits, 'the drop target committed more than once').toBe(1)
+
+  expect(await page.evaluate(() => window.__wm.undo())).toBe(true)
+  expect(await page.evaluate(() => window.__wm.get('fixed'))).toEqual(before)
+  expect(await page.evaluate(() => window.__wm.canUndo())).toBe(false)
+})
+
+test('a window closed in the middle of its drag comes back where the drag began', async ({
+  page,
+}) => {
+  await spawn(page, 'fixed')
+  await page.evaluate(() => window.__wm.clearHistory())
+  const before = await page.evaluate(() => window.__wm.get('fixed'))
+
+  await dragBy(page, handle(page, 'fixed'), 120, 80, { release: false })
+  await page.evaluate(() => window.__wm.close('fixed'))
+  await page.mouse.up()
+  expect(await page.evaluate(() => window.__wm.get('fixed'))).toBeUndefined()
+
+  expect(await page.evaluate(() => window.__wm.undo())).toBe(true)
+  expect(await page.evaluate(() => window.__wm.get('fixed'))).toEqual(before)
 })
