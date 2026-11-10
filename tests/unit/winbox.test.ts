@@ -631,6 +631,26 @@ describe('windows of closed boxes', () => {
     while (wm.redo()) expect(wm.get('ra')).toBeUndefined()
   })
 
+  it('never make undo or redo stop while real steps are left', () => {
+    const wm = WinBox.manager(root)
+    const a = box('A', { id: 'sa' })
+    const b = box('B', { id: 'sb' })
+    box('C', { id: 'sc' })
+    const start = wm.get('sa')?.bounds.x
+    a.move(5, 5)
+    b.close()
+    a.move(9, 9)
+    for (const x of [5, 5, start]) {
+      expect(wm.undo()).toBe(true)
+      expect(wm.get('sa')?.bounds.x).toBe(x)
+      expect(wm.get('sb')).toBeUndefined()
+    }
+    const positions: Array<number | undefined> = []
+    while (wm.redo()) positions.push(wm.get('sa')?.bounds.x)
+    expect(positions).toEqual([5, 9])
+    expect(ids(wm)).toEqual(['sa', 'sc'])
+  })
+
   it('stay closed after the last box closed on a desktop the app holds', () => {
     const wm = WinBox.manager(root)
     const only = box('Only', { id: 'lo' })
