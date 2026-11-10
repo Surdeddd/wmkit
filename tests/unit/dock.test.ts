@@ -1157,6 +1157,50 @@ describe('a stored layout', () => {
     again.undock('a')
     expect(h.wm.get('a')?.maxSize?.width).toBe(400)
   })
+
+  function dockedState() {
+    const donor = setup()
+    donor.add('a', { maxWidth: 300, minimizable: false })
+    donor.add('b')
+    donor.dock.dock('a')
+    donor.dock.dock('b', { side: 'right' })
+    donor.add('c', { resizable: false })
+    donor.add('d')
+    donor.wm.snapTo('d', { x: 0, y: 0, width: 0.5, height: 1 })
+    const data = donor.wm.serialize()
+    document.body.replaceChildren()
+    return data
+  }
+
+  function load(data: ReturnType<WindowManager['serialize']>, dock: unknown) {
+    data.extensions = { dock }
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.hydrate(JSON.parse(JSON.stringify(data)))
+    return setup({}, wm).wm
+  }
+
+  it('a broken layout gives its windows their own flags and limits back', () => {
+    const data = dockedState()
+    const wm = load(data, { ...(data.extensions?.dock as object), workspace: 'zero' })
+    expect(wm.getState().extensions.dock).toBeUndefined()
+    expect(wm.get('a')).toMatchObject({ resizable: true, minimizable: false, snappable: true })
+    expect(wm.get('a')?.maxSize?.width).toBe(300)
+    expect(wm.get('b')).toMatchObject({ resizable: true, minimizable: true, snappable: true })
+    expect(wm.get('c')?.resizable).toBe(false)
+    expect(wm.canUndo()).toBe(false)
+  })
+
+  it('a broken layout without usable flags unlocks only the windows that carry the lock', () => {
+    const data = dockedState()
+    const { flags } = (data.extensions as { dock: { flags: Record<string, unknown> } }).dock
+    const wm = load(data, { root: 'tree', flags: { ...flags, a: 'junk' } })
+    expect(wm.get('a')).toMatchObject({ resizable: true, minimizable: true, snappable: true })
+    expect(wm.get('b')).toMatchObject({ resizable: true, minimizable: true, snappable: true })
+    expect(wm.get('c')?.resizable).toBe(false)
+    const other = load(dockedState(), 'garbage')
+    expect(other.get('b')).toMatchObject({ resizable: true, snappable: true })
+    expect(other.get('d')).toMatchObject({ stage: 'snapped', resizable: true })
+  })
 })
 
 describe('separators and docked windows while dragging', () => {

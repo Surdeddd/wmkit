@@ -130,11 +130,21 @@ function close(a: Bounds | null, b: Bounds): boolean {
   )
 }
 
+function saved(value: unknown): value is Saved {
+  const entry = value as Saved | null
+  return (
+    typeof entry?.resizable === 'boolean' &&
+    typeof entry.minimizable === 'boolean' &&
+    typeof entry.snappable === 'boolean'
+  )
+}
+
 function valid(value: unknown): value is DockState {
   const state = value as DockState | null
   return (
     typeof state?.flags === 'object' &&
     state.flags !== null &&
+    Object.values(state.flags).every(saved) &&
     Number.isInteger(state.workspace) &&
     validate({ root: state.root })
   )
@@ -152,7 +162,8 @@ function capture(win: WindowState): Saved {
 }
 
 function unlock({ maxSize, ...saved }: Saved): WindowUpdate {
-  const open = (value: number | null) => value ?? Number.POSITIVE_INFINITY
+  const open = (value?: number | null) =>
+    (value ?? 0) > 0 ? (value as number) : Number.POSITIVE_INFINITY
   return {
     ...saved,
     maxSize: maxSize && { width: open(maxSize.width), height: open(maxSize.height) },
@@ -312,12 +323,25 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     }
   }
 
+  function rescue(stored: unknown): void {
+    const flags = (stored as DockState | null)?.flags as Record<string, unknown> | undefined
+    for (const win of Object.values(wm.getState().windows)) {
+      const entry = flags?.[win.id]
+      if (saved(entry)) wm.update(win.id, unlock(entry))
+      else if (win.snapRect && !win.resizable && !win.minimizable && !win.snappable) {
+        wm.update(win.id, { resizable: true, minimizable: true, snappable: true })
+      }
+    }
+  }
+
   function settle([next, out, loose]: Followed, named?: boolean): void {
+    const stored = wm.getState().extensions[KEY]
+    if (stored !== undefined && !valid(stored)) rescue(stored)
     const flags = { ...next.flags }
     for (const id of out) {
-      const saved = flags[id]
+      const entry = flags[id]
       delete flags[id]
-      if (saved && wm.get(id)) wm.update(id, unlock(saved))
+      if (entry && wm.get(id)) wm.update(id, unlock(entry))
     }
     for (const id of windowsOf(next)) {
       if (flags[id]?.aspectRatio === undefined) {
