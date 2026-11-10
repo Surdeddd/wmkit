@@ -104,6 +104,66 @@ test('a separator drags across the iframe panel, and one undo puts it back', asy
     .toBeCloseTo(before.width, 0)
 })
 
+test('panels follow a dragged separator without lagging behind it', async ({ page }) => {
+  const sash = page.locator('[data-wm-sash]')
+  const vertical = (await sash.getAttribute('aria-orientation')) === 'vertical'
+  const box = await boxOf(sash)
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  const gap = () =>
+    page.evaluate(async (vertical) => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const bar = document.querySelector('[data-wm-sash]')?.getBoundingClientRect()
+      const files = document.querySelector('[data-testid="window-files"]')?.getBoundingClientRect()
+      if (!bar || !files) return Number.NaN
+      return Math.round(vertical ? bar.left - files.right : bar.top - files.bottom)
+    }, vertical)
+  const at = (offset: number) => (vertical ? [x + offset, y] : [x, y + offset]) as [number, number]
+
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(...at(4))
+  const rest = await gap()
+  const live = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-wm-docked]')].map((el) => el.hasAttribute('data-wm-live')),
+  )
+  const lags: number[] = []
+  for (const offset of [60, -40, 120, 20, -60]) {
+    await page.mouse.move(...at(offset))
+    lags.push(Math.abs((await gap()) - rest))
+  }
+  await page.mouse.up()
+  expect(
+    Math.max(...lags),
+    `panel edge behind the separator: ${lags.join(' ')} px`,
+  ).toBeLessThanOrEqual(1)
+  expect(live, 'docked panels marked live during the drag').toEqual([true, true])
+  await expect(panel(page, 'files')).not.toHaveAttribute('data-wm-live')
+})
+
+test('with the float hook on, a docked panel dragged over the layout stays floating', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    ;(window as unknown as { __dock: { float: boolean } }).__dock.float = true
+  })
+  const editor = await boxOf(panel(page, 'editor'))
+  await dragTo(
+    page,
+    header(page, 'files'),
+    editor.x + editor.width / 2,
+    editor.y + editor.height / 2,
+    { release: false },
+  )
+  await expect(panel(page, 'files')).toHaveAttribute('data-wm-dragging', '')
+  await expect(page.locator('[data-wm-drop]')).toBeHidden()
+  await page.mouse.up()
+  await expect.poll(() => docked(page)).toEqual(['editor'])
+  await expect(panel(page, 'files')).toHaveAttribute('data-wm-stage', 'normal')
+  await expect(panel(page, 'files')).not.toHaveAttribute('data-wm-docked', '')
+  expect(await groupOf(page, 'files')).toBeNull()
+})
+
 test('the keyboard docks the focused window and moves a separator', async ({ page }) => {
   await panel(page, 'preview')
     .locator('[data-wm-content]')
