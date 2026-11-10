@@ -709,6 +709,22 @@ describe('dropping a window onto the layout', () => {
     h.wm.close('b')
     expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
   })
+
+  it('reads the drop point from the desktop coordinates instead of measuring the page', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    const measure = vi.spyOn(h.element, 'getBoundingClientRect')
+    const handle = drag(h, 'b', [100, 50], [900, 300])
+    for (const x of [910, 920, 930]) {
+      handle.dispatchEvent(pointer('pointermove', x, 300))
+      h.flush()
+    }
+    handle.dispatchEvent(pointer('pointerup', 930, 300))
+    expect(measure.mock.calls.length).toBeLessThanOrEqual(1)
+    expect(h.wm.get('b')?.bounds.x).toBe(503)
+  })
 })
 
 function bounds(wm: WindowManager, id: string): string {
@@ -1127,5 +1143,66 @@ describe('a stored layout', () => {
     expect(bounds(h.wm, 'a')).toBe('0,0 497x600')
     again.undock('a')
     expect(h.wm.get('a')?.maxSize?.width).toBe(400)
+  })
+})
+
+describe('separators and docked windows while dragging', () => {
+  it('mark the docked windows live for the drag and take only their own marks away', () => {
+    const h = setup()
+    const a = h.add('a')
+    const b = h.add('b')
+    const f = h.add('f')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    b.dataset.wmLive = ''
+    const sash = h.sashes()[0] as HTMLElement
+    sash.dispatchEvent(pointer('pointerdown', 500, 300))
+    expect([a, b, f].map((node) => node.hasAttribute('data-wm-live'))).toEqual([true, true, false])
+    sash.dispatchEvent(pointer('pointerup', 500, 300))
+    expect([a, b].map((node) => node.hasAttribute('data-wm-live'))).toEqual([false, true])
+  })
+
+  it('an unrelated change writes nothing, queries nothing and computes no layout', () => {
+    let computed = 0
+    const h = setup({
+      area: (viewport) => {
+        computed += 1
+        return { x: 0, y: 0, ...viewport }
+      },
+    })
+    for (const id of ['a', 'b', 'c', 'd']) h.add(id)
+    h.add('f', { x: 10, y: 10 })
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.dock.dock('c', { side: 'bottom' })
+    h.dock.dock('d', { side: 'left' })
+    h.wm.focus('a')
+    const sash = h.sashes()[0] as HTMLElement
+    const writes = vi.spyOn(sash, 'setAttribute')
+    const query = vi.spyOn(h.element, 'querySelectorAll')
+    computed = 0
+    for (let i = 0; i < 100; i += 1) h.wm.move('f', 20 + i, 20)
+    h.wm.focus('f')
+    expect({
+      writes: writes.mock.calls.length,
+      queries: query.mock.calls.length,
+      computed,
+    }).toEqual({ writes: 0, queries: 0, computed: 0 })
+  })
+
+  it('repaints a separator only when its values change', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    const sash = h.sashes()[0] as HTMLElement
+    const writes = vi.spyOn(sash, 'setAttribute')
+    h.wm.maximize('b')
+    h.wm.restore('b')
+    expect(writes).not.toHaveBeenCalled()
+    h.wm.setViewport({ width: 800, height: 500 })
+    expect(writes).toHaveBeenCalled()
+    expect(sash.style.left).toBe('397px')
   })
 })

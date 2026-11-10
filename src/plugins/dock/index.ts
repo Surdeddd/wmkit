@@ -6,7 +6,7 @@ import type {
   WindowState,
   WindowUpdate,
 } from '../../core/types'
-import type { DesktopController, DropHit } from '../../dom/shared'
+import type { DesktopController, DropHit, Point } from '../../dom/shared'
 import {
   activate,
   type DockGeometry,
@@ -181,6 +181,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   const edgeDrop = options.edgeDrop ?? 24
   const messages = { ...dockMessages, ...options.messages }
   const sashes = new Map<string, HTMLElement>()
+  const painted = new WeakMap<HTMLElement, string>()
   const style = doc.createElement('style')
   style.dataset.wmDock = ''
   style.textContent = CSS
@@ -189,10 +190,17 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   let torn: { id: string; state: DockState; rect: Bounds } | null = null
   let sliding: { key: string; finish(cancelled: boolean): void } | null = null
   let floating = false
+  let cache: [stored: unknown, state: DockState, ids: string[]] = [undefined, EMPTY, []]
+  let seen: unknown[] = []
+  let marked: string | undefined
 
   function read(): DockState {
     const stored = wm.getState().extensions[KEY]
-    return valid(stored) ? stored : EMPTY
+    if (cache[0] !== stored) {
+      const state = valid(stored) ? stored : EMPTY
+      cache = [stored, state, windowsOf(state)]
+    }
+    return cache[1]
   }
 
   function areaOf(): Bounds {
@@ -333,10 +341,6 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   }
 
   function quiet(run: () => void): void {
-    if (sliding || element.querySelector('[data-wm-dragging],[data-wm-resizing]')) {
-      guard(run)
-      return
-    }
     wm.beginInteraction()
     try {
       guard(run)
@@ -404,11 +408,18 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
         return
       }
     }
+    const { extensions, viewport, workspace, windows, groups } = wm.getState()
     const state = read()
+    const now: unknown[] = [extensions[KEY], viewport, workspace]
+    for (const id of cache[2]) {
+      const win = windows[id]
+      now.push(win, win?.groupId && groups[win.groupId]?.activeId)
+    }
+    if (now.length === seen.length && now.every((value, i) => value === seen[i])) return
+    seen = now
     const followed = follow(state)
     const [next, out] = followed
-    const stored = wm.getState().extensions[KEY]
-    if (next.root !== state.root || stored !== (state.root ? state : undefined)) {
+    if (next.root !== state.root || extensions[KEY] !== (state.root ? state : undefined)) {
       const stack = stackOf(state, out[0] as string)
       const rect =
         stack?.windows.every((id) => out.includes(id) && wm.get(id)?.stage === 'normal') &&
@@ -422,7 +433,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       return
     }
     for (const [id, rect] of expected(state)) {
-      const win = wm.get(id) as WindowState
+      const win = windows[id] as WindowState
       if (win.stage === 'snapped' && !close(win.snapRect, rect)) {
         quiet(() => place(state))
         return
@@ -435,10 +446,10 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const state = read()
     const visible = state.root !== null && state.workspace === wm.workspace()
     const placed = visible ? rects(state, areaOf(), geometry).sashes : []
-    const seen = new Set<string>()
+    const keep = new Set<string>()
     for (const sash of placed) {
       const key = `${sash.splitId}:${sash.index}`
-      seen.add(key)
+      keep.add(key)
       let node = sashes.get(key)
       if (!node) {
         node = createSash(key)
@@ -448,7 +459,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       paint(node, sash)
     }
     for (const [key, node] of sashes) {
-      if (seen.has(key)) continue
+      if (keep.has(key)) continue
       if (sliding?.key === key) sliding.finish(false)
       node.remove()
       sashes.delete(key)
@@ -456,26 +467,31 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     mark()
   }
 
-  function mark(): void {
+  function mark(force?: unknown): void {
     const state = read()
-    const docked = new Set(
-      state.workspace === wm.workspace() ? windowsOf({ root: state.root }) : [],
-    )
+    const docked = state.workspace === wm.workspace() ? cache[2] : []
+    const key = docked.join('\n')
+    if (key === marked && !force) return
+    marked = key
     for (const node of element.querySelectorAll<HTMLElement>('[data-wm-window]')) {
-      node.toggleAttribute('data-wm-docked', docked.has(node.dataset.wmWindow as string))
+      node.toggleAttribute('data-wm-docked', docked.includes(node.dataset.wmWindow as string))
     }
   }
 
   function paint(node: HTMLElement, sash: SashRect): void {
     const percent = (value: number) => String(Math.round((value / sash.span) * 100))
+    const { x, y, width, height } = sash.bounds
+    const key = `${sash.axis} ${percent(sash.value)} ${percent(sash.min)} ${percent(sash.max)} ${x} ${y} ${width} ${height}`
+    if (painted.get(node) === key) return
+    painted.set(node, key)
     node.setAttribute('aria-orientation', sash.axis === 'row' ? 'vertical' : 'horizontal')
     node.setAttribute('aria-valuenow', percent(sash.value))
     node.setAttribute('aria-valuemin', percent(sash.min))
     node.setAttribute('aria-valuemax', percent(sash.max))
-    node.style.left = `${sash.bounds.x}px`
-    node.style.top = `${sash.bounds.y}px`
-    node.style.width = `${sash.bounds.width}px`
-    node.style.height = `${sash.bounds.height}px`
+    node.style.left = `${x}px`
+    node.style.top = `${y}px`
+    node.style.width = `${width}px`
+    node.style.height = `${height}px`
   }
 
   function sashAt(key: string): SashRect | undefined {
@@ -487,7 +503,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   function shift(key: string, start: DockState, delta: number): void {
     if (!sashAt(key)) return
     const [splitId, index] = key.split(':') as [string, string]
-    const next = resize({ root: start.root }, splitId, Number(index), delta, areaOf(), geometry)
+    const next = resize(start, splitId, Number(index), delta, areaOf(), geometry)
     if (next.root !== read().root) guard(() => settle(follow({ ...start, root: next.root })))
   }
 
@@ -508,10 +524,14 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       const start = read()
       const sash = sashAt(key) as SashRect
       const from = sash.axis === 'row' ? event.clientX : event.clientY
+      const live = [
+        ...element.querySelectorAll<HTMLElement>('[data-wm-docked]:not([data-wm-live])'),
+      ]
       let raf = 0
       let delta = 0
       wm.beginInteraction()
       node.dataset.wmActive = ''
+      for (const el of live) el.dataset.wmLive = ''
       const flush = () => {
         raf = 0
         shift(key, start, delta)
@@ -539,6 +559,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
         node.removeEventListener('lostpointercapture', lost)
         doc.removeEventListener('keydown', onEscape, true)
         delete node.dataset.wmActive
+        for (const el of live) delete el.dataset.wmLive
         if (cancelled) {
           if (read().root !== start.root) guard(() => settle(follow(start)))
           wm.abortInteraction()
@@ -605,18 +626,17 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     return { stackId: hit.id, side: distance < 0.25 ? side : 'center' }
   }
 
-  function hit(clientX: number, clientY: number, id: string): DropHit | null {
+  function hit(_x: number, _y: number, id: string, local: Point): DropHit | null {
     const win = wm.get(id)
     const state = read()
     if (floating || win?.layer !== 'normal') return null
     if (state.root && win.workspace !== state.workspace) return null
-    const box = element.getBoundingClientRect()
-    const target = targetAt(clientX - box.left, clientY - box.top)
+    const target = targetAt(local.x, local.y)
     if (!target) return null
-    const next = insert({ root: state.root }, id, target)
+    const next = insert(state, id, target)
     const stack = stackOf(next, id) as DockStack
     const placed = rects(next, areaOf(), geometry).stacks.find((rect) => rect.id === stack.id)
-    return { preview: (placed as { bounds: Bounds }).bounds, commit: () => void dock(id, target) }
+    return { preview: (placed as StackRect).bounds, commit: () => void dock(id, target) }
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -655,11 +675,11 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     destroy() {
       sliding?.finish(true)
       for (const stop of stops) stop()
-      const state = read()
+      const { flags } = read()
       wm.beginInteraction()
       wm.batch(() => {
-        for (const id of windowsOf(state)) {
-          const saved = state.flags[id]
+        for (const id of cache[2]) {
+          const saved = flags[id]
           if (saved && wm.get(id)) wm.update(id, unlock(saved))
         }
       })
