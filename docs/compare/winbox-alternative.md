@@ -43,7 +43,7 @@ Options, methods, callbacks and the `.winbox` class names stay the same, so CSS 
 | Framework adapters | community wrappers | React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik, web components |
 | Your own markup | its own DOM | any markup, or the WinBox DOM through the compat entry |
 | TypeScript | community types | strict, shipped |
-| Size (brotli) | 5.4 kB | about 19 kB for the compat entry with the manager inside |
+| Size (brotli) | 5.4 kB | about 22 kB for the compat entry with the manager inside |
 
 WinBox is still the lighter option when you need none of the above. The size difference pays for the behaviour in the rest of the table.
 

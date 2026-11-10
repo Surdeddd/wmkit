@@ -435,7 +435,7 @@ Pass `{ shadow: true }` or the theme arrives with its tokens and none of its rul
 
 ## Touch gestures
 
-Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.61 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
+Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1.66 kB only when you import it. Both answer only `pointerType === 'touch'`, so mouse and pen behaviour is unchanged, and both live behind one listener on the desktop element.
 
 - **Pinch a window to resize it.** Two fingers on the same window scale it around the point between them. The window's own `minSize`, `maxSize` and `aspectRatio` still rule, and the anchor is derived from the clamped size, so the point under your fingers stays put even at the limit. The whole pinch is one undo step; `Escape` or a cancelled pointer puts the start bounds back. While it runs the element carries `data-wm-pinching`.
 - **Swipe two fingers sideways to change workspace.** It works over a window as well as over bare desktop, which matters on a phone where windows cover everything. A gesture commits once the fingers travel `threshold` pixels horizontally and the travel is more than twice the vertical drift.

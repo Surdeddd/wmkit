@@ -242,7 +242,7 @@ A shadow skin wears the theme in its own `styles`, whatever theme the desktop we
 
 `themeNames` is the full list, in the same order the folder holds them. Both flavours come out of `pnpm themes`; a test regenerates them and fails if anyone edits a stylesheet without rerunning the generator.
 
-Each theme is a separate export, so a bundler keeps only the ones you import. `themeStyle`, `themeCss` and `themeShadowCss` reach every theme by name and bring all thirty-two strings into the bundle, so use them only when the choice happens at runtime. Loading a theme the ordinary way, as a `.css` import, keeps it out of your JavaScript altogether.
+Each theme is a separate export, so a bundler keeps only the ones you import: about 1.4 kB brotli for one theme. `themeStyle`, `themeCss` and `themeShadowCss` reach every theme by name and bring all thirty-two strings into the bundle, about 6.3 kB brotli, so use them only when the choice happens at runtime. Loading a theme the ordinary way, as a `.css` import, keeps it out of your JavaScript altogether.
 
 ## Writing a theme from scratch
 
