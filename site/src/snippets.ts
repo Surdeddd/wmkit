@@ -68,7 +68,7 @@ wm.open({ id: 'notes', title: 'Notes' })
 
 <template>
   <div ref="host" class="desktop">
-    <section ref="panel">
+    <section v-if="state.windows.notes" ref="panel">
       <header data-wm-drag><span data-wm-title>Notes</span></header>
       <div data-wm-content>{{ state.order.length }} windows</div>
     </section>
@@ -89,16 +89,19 @@ wm.open({ id: 'notes', title: 'Notes' })
 </script>
 
 <div class="desktop" use:dk.desktop>
-  <section use:dk.window={{ id: 'notes' }}>
-    <header data-wm-drag><span data-wm-title>Notes</span></header>
-    <div data-wm-content>{$state.order.length} windows</div>
-  </section>
+  {#if $state.windows.notes}
+    <section use:dk.window={{ id: 'notes' }}>
+      <header data-wm-drag><span data-wm-title>Notes</span></header>
+      <div data-wm-content>{$state.order.length} windows</div>
+    </section>
+  {/if}
 </div>`,
   },
   {
     id: 'solid',
     label: 'solid',
-    code: `import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
+    code: `import { Show } from 'solid-js'
+import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
 
 function Desktop() {
   const wm = useWindowManager()
@@ -109,10 +112,12 @@ function Desktop() {
 
   return (
     <div class="desktop" ref={dk.desktop}>
-      <section ref={dk.window('notes')}>
-        <header data-wm-drag><span data-wm-title>Notes</span></header>
-        <div data-wm-content>{state().order.length} windows</div>
-      </section>
+      <Show when={state().windows.notes}>
+        <section ref={dk.window('notes')}>
+          <header data-wm-drag><span data-wm-title>Notes</span></header>
+          <div data-wm-content>{state().order.length} windows</div>
+        </section>
+      </Show>
     </div>
   )
 }`,
@@ -120,31 +125,56 @@ function Desktop() {
   {
     id: 'angular',
     label: 'angular',
-    code: `import { Component, ElementRef, viewChild, afterNextRender } from '@angular/core'
-import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+    code: `import {
+  Component, DestroyRef, ElementRef, afterNextRender, inject, input, viewChild,
+} from '@angular/core'
+import {
+  type AngularDesktop, createDesktop, useWindowManager, useWmState, useWmWindow,
+} from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-notes',
+  standalone: true,
+  template: \`
+    <section #panel>
+      <header data-wm-drag><span data-wm-title>Notes</span></header>
+      <div data-wm-content><ng-content /></div>
+    </section>\`,
+})
+export class NotesComponent {
+  dk = input.required<AngularDesktop>()
+  private panel = viewChild.required<ElementRef>('panel')
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    afterNextRender(() =>
+      this.dk().window('notes', undefined, this.destroyRef)(this.panel().nativeElement),
+    )
+  }
+}
 
 @Component({
   selector: 'app-desktop',
+  standalone: true,
+  imports: [NotesComponent],
   template: \`
     <div class="desktop" #host>
-      <section #panel>
-        <header data-wm-drag><span data-wm-title>Notes</span></header>
-        <div data-wm-content>{{ state().order.length }} windows</div>
-      </section>
+      @if (notes()) {
+        <app-notes [dk]="dk">{{ state().order.length }} windows</app-notes>
+      }
     </div>\`,
 })
 export class DesktopComponent {
   private host = viewChild.required<ElementRef>('host')
-  private panel = viewChild.required<ElementRef>('panel')
   wm = useWindowManager()
   state = useWmState(this.wm)
+  notes = useWmWindow(this.wm, 'notes')
+  dk = createDesktop(this.wm)
 
   constructor() {
-    const dk = createDesktop(this.wm)
     afterNextRender(() => {
-      dk.desktop(this.host().nativeElement)
+      this.dk.desktop(this.host().nativeElement)
       this.wm.open({ id: 'notes', title: 'Notes' })
-      dk.window('notes')(this.panel().nativeElement)
     })
   }
 }`,
