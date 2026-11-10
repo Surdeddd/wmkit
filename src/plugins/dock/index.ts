@@ -69,6 +69,7 @@ export interface DockOptions {
   minSize?: Size
   keyboard?: boolean
   messages?: Partial<DockMessages>
+  float?: (event: PointerEvent) => boolean
 }
 
 export interface Dock {
@@ -179,6 +180,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       }, floor),
   }
   const edgeDrop = options.edgeDrop ?? 24
+  const floats = options.float ?? ((event: PointerEvent) => event.shiftKey)
   const messages = { ...dockMessages, ...options.messages }
   const sashes = new Map<string, HTMLElement>()
   const painted = new WeakMap<HTMLElement, string>()
@@ -650,7 +652,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   }
 
   const track = (event: PointerEvent) => {
-    floating = event.shiftKey
+    floating = floats(event)
   }
   element.addEventListener('pointermove', track, true)
   const watcher = new MutationObserver(mark)

@@ -6,7 +6,9 @@ import '@surdeddd/wmkit/themes/glass.css'
 const element = document.querySelector('#desktop') as HTMLElement
 const wm = createWindowManager()
 const desktop = attachDesktop(wm, element)
+const hooks = { float: false }
 const dock = createDock(desktop, {
+  float: (event) => event.shiftKey || hooks.float,
   area: (viewport) =>
     viewport.width >= 700
       ? { x: 0, y: 0, width: Math.round(viewport.width * 0.7), height: viewport.height }
@@ -73,4 +75,4 @@ if (wm.getState().order.length === 0) {
 }
 for (const id of wm.getState().order) mount(id)
 
-Object.assign(window, { __dock: { wm, dock, store } })
+Object.assign(window, { __dock: Object.assign(hooks, { wm, dock, store }) })

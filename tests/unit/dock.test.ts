@@ -725,6 +725,19 @@ describe('dropping a window onto the layout', () => {
     expect(measure.mock.calls.length).toBeLessThanOrEqual(1)
     expect(h.wm.get('b')?.bounds.x).toBe(503)
   })
+
+  it('keeps a window floating while the float option says so', () => {
+    let pinned = true
+    const h = setup({ float: () => pinned })
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    drag(h, 'b', [100, 50], [900, 300]).dispatchEvent(pointer('pointerup', 900, 300))
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    pinned = false
+    drag(h, 'b', [900, 300], [905, 300]).dispatchEvent(pointer('pointerup', 905, 300))
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+  })
 })
 
 function bounds(wm: WindowManager, id: string): string {
