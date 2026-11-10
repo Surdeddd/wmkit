@@ -122,6 +122,8 @@ export function createDragStarter(ctx: SessionContext) {
           session.grabDX = session.pendingX - restoredWin.bounds.x
           session.grabDY = session.pendingY - restoredWin.bounds.y
         }
+        session.hasPending = true
+        step()
         return
       }
 

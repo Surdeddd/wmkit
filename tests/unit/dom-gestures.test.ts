@@ -656,3 +656,49 @@ describe('resizing a tab group from the left or top', () => {
     }
   })
 })
+
+describe('a maximized window dragged out in one move', () => {
+  it('drops on the target under the pointer when released before the first frame', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.maximize('a')
+    const drops: string[] = []
+    h.desktop.addDropTarget((x, y, id) =>
+      x >= TRASH.x && y >= TRASH.y ? { preview: TRASH, commit: () => drops.push(id) } : null,
+    )
+
+    a.handle.dispatchEvent(pointerEvent('pointerdown', 150, 10))
+    a.handle.dispatchEvent(pointerEvent('pointermove', 650, 450))
+    a.handle.dispatchEvent(pointerEvent('pointerup', 650, 450))
+
+    expect(drops).toEqual(['a'])
+    expect(h.wm.get('a')).toMatchObject({ stage: 'normal', bounds: { width: 200, height: 150 } })
+  })
+
+  it('shows the drop preview in the frame that restores the window', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.maximize('a')
+    h.desktop.addDropTarget((x, y) =>
+      x >= TRASH.x && y >= TRASH.y ? { preview: TRASH, commit: () => {} } : null,
+    )
+
+    dragTo(h, a.handle, [150, 10], [650, 450])
+
+    expect(h.wm.get('a')?.stage).toBe('normal')
+    const preview = h.element.querySelector<HTMLElement>('[data-wm-drop]')
+    expect(preview?.style.display).toBe('block')
+  })
+
+  it('snaps into the zone under the pointer when released before the first frame', () => {
+    const h = makeHarness({ snap: true })
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.maximize('a')
+
+    a.handle.dispatchEvent(pointerEvent('pointerdown', 400, 10))
+    a.handle.dispatchEvent(pointerEvent('pointermove', 2, 300))
+    a.handle.dispatchEvent(pointerEvent('pointerup', 2, 300))
+
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', snapZone: 'left' })
+  })
+})
