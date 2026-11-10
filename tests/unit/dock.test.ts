@@ -1201,6 +1201,21 @@ describe('a stored layout', () => {
     expect(other.get('b')).toMatchObject({ resizable: true, snappable: true })
     expect(other.get('d')).toMatchObject({ stage: 'snapped', resizable: true })
   })
+
+  it('refuses a second dock on one manager until the first is destroyed', () => {
+    const h = setup()
+    h.add('a')
+    h.dock.dock('a')
+    expect(() => createDock(h.desktop)).toThrow(/already has a dock/)
+    expect(h.element.querySelectorAll('style[data-wm-dock]')).toHaveLength(1)
+    h.dock.destroy()
+    const again = createDock(h.desktop)
+    h.dock.destroy()
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', resizable: false })
+    expect(() => createDock(h.desktop)).toThrow(/already has a dock/)
+    again.destroy()
+    expect(createDock(h.desktop).layout().root).not.toBeNull()
+  })
 })
 
 describe('separators and docked windows while dragging', () => {

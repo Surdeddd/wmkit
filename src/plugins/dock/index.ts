@@ -175,8 +175,17 @@ function* stacks(node: DockNode | null): Generator<DockStack> {
   else if (node) yield node
 }
 
+const docked = new WeakSet<object>()
+
 export function createDock(desktop: DesktopController, options: DockOptions = {}): Dock {
   const { wm, element } = desktop
+  if (docked.has(wm)) {
+    throw new Error(
+      'wmkit: this window manager already has a dock, destroy it before creating another',
+    )
+  }
+  docked.add(wm)
+  let alive = true
   const doc = element.ownerDocument
   const view = doc.defaultView as Window & typeof globalThis
   const coarse = view.matchMedia?.('(pointer: coarse)').matches === true
@@ -699,6 +708,9 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     layout: () => ({ root: read().root }),
     setLayout,
     destroy() {
+      if (!alive) return
+      alive = false
+      docked.delete(wm)
       sliding?.finish(true)
       for (const stop of stops) stop()
       const { flags } = read()
