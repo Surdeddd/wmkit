@@ -405,11 +405,8 @@ export class WmWindowElement extends Base {
     const id = this.getAttribute('window-id') ?? this.windowId
     this.windowId = id
     if (id === null || !wm.get(id)) {
-      const owners = host[OWNERS]
-      const claim = (owners.get(id as string) ?? this) === this
-      const listed = claim && closedIn(wm.getState()).includes(id)
-      if (!reopen && (this.hasAttribute('closed') || listed)) {
-        if (id !== null) owners.set(id, this)
+      if (!reopen && (this.hasAttribute('closed') || closedIn(wm.getState()).includes(id))) {
+        if (id !== null) host[OWNERS].set(id, this)
         this.reflect(() => this.toggleAttribute('closed', true))
         return
       }

@@ -289,7 +289,7 @@ describe('closed panels', () => {
     expect(fresh.dataset.wmWindow).toBe('mail')
   })
 
-  it('open again when a keyed re-render swaps the closed element in one task', async () => {
+  it('stay closed when a re-render replaces the closed element, and the newcomer owns the mark', async () => {
     const desktop = mount(
       '<wm-desktop><wm-window window-id="mail" label="Mail"></wm-window></wm-desktop>',
     )
@@ -298,11 +298,33 @@ describe('closed panels', () => {
     const fresh = document.createElement('wm-window')
     fresh.setAttribute('window-id', 'mail')
     windowOf(desktop, 'mail').replaceWith(fresh)
-    expect(wm?.get('mail')).toBeDefined()
-    expect(fresh.dataset.wmWindow).toBe('mail')
+    expect(wm?.get('mail')).toBeUndefined()
+    expect(fresh.hasAttribute('closed')).toBe(true)
     await flush()
-    expect(wm?.get('mail')).toBeDefined()
+    expect(wm?.get('mail')).toBeUndefined()
+    expect(closedList(desktop)).toEqual(['mail'])
+    fresh.remove()
+    await flush()
     expect(closedList(desktop)).toBeUndefined()
+  })
+
+  it('stay closed after a reload even when a re-render replaces the reloaded element', async () => {
+    const html =
+      '<wm-desktop persist="k"><wm-window window-id="a"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>'
+    const first = mount(html)
+    first.manager?.close('b')
+    await settle()
+    first.parentElement?.remove()
+    await flush()
+    const second = mount(html)
+    expect(windowOf(second, 'b').hasAttribute('closed')).toBe(true)
+    const fresh = document.createElement('wm-window')
+    fresh.setAttribute('window-id', 'b')
+    windowOf(second, 'b').replaceWith(fresh)
+    await flush()
+    expect(second.manager?.get('b')).toBeUndefined()
+    expect(fresh.hasAttribute('closed')).toBe(true)
+    expect(closedList(second)).toEqual(['b'])
   })
 
   it('stay closed when the closed element only moves within the page', async () => {
