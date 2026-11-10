@@ -467,19 +467,26 @@ describe('hidden windows', () => {
     expect(wm.canRedo()).toBe(true)
     wm.setViewport({ width: 900, height: 700 })
     expect(wm.canRedo()).toBe(true)
-    const steps = (() => {
-      let count = 0
-      while (wm.undo()) count += 1
-      return count
-    })()
-    while (wm.redo()) {}
+    expect(wm.redo()).toBe(true)
     expect(wm.getState().focusedId).toBeNull()
-    wm.focus('vb')
-    expect(wm.getState().focusedId).not.toBe('vb')
+  })
+
+  it('refuse the focus, so focusing one cannot fold the hide into a focus run', () => {
+    const a = box('A', { id: 'fa' })
+    const b = box('B', { id: 'fb' })
+    const wm = WinBox.manager(root)
+    a.move(5, 5)
+    b.hide()
+    a.focus()
+    expect(wm.focus('fb')).toBe(false)
+    b.focus()
+    expect(wm.getState().focusedId).toBe('fa')
+
     expect(wm.undo()).toBe(true)
-    let again = 0
-    while (wm.undo()) again += 1
-    expect(again).toBe(steps)
+    expect(wm.get('fa')?.bounds).toMatchObject({ x: 5, y: 5 })
+    expect(b.hasClass('focus')).toBe(false)
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('fa')?.bounds.x).not.toBe(5)
   })
 
   it('leave nothing focused when every window is hidden', () => {

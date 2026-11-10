@@ -207,6 +207,8 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
       }
     }
   }
+  const focus = wm.focus
+  wm.focus = (id) => !hiddenBox(id) && focus(id)
   const gone = new Set<string>()
   let reacting = false
   const stops = [
