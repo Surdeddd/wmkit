@@ -263,7 +263,8 @@
     "prepublishOnly": "pnpm build",
     "verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm size && pnpm publint && pnpm attw && pnpm smoke && pnpm test:e2e",
     "release": "semantic-release",
-    "bench": "vitest bench --run"
+    "bench": "vitest bench --run",
+    "bench:browser": "node scripts/bench-browser.mjs"
   },
   "peerDependencies": {
     "@angular/core": ">=16",
