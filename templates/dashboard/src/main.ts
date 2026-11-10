@@ -4,7 +4,16 @@ import {
   type WmDesktopElement,
   type WmWindowElement,
 } from '@surdeddd/wmkit/elements'
-import { type ThemeName, themeStyle } from '@surdeddd/wmkit/themes'
+import {
+  carbonShadowTheme,
+  carbonTheme,
+  glassShadowTheme,
+  glassTheme,
+  lightShadowTheme,
+  lightTheme,
+  retroShadowTheme,
+  retroTheme,
+} from '@surdeddd/wmkit/themes'
 import { currentLang, saveLang, texts } from './i18n'
 import { appendLog, renderChart, renderKpis, renderOrders } from './panels'
 import './style.css'
@@ -13,12 +22,24 @@ const lang = currentLang()
 const t = texts(lang)
 document.documentElement.lang = lang
 
+const desktop = document.querySelector('wm-desktop') as WmDesktopElement
+
+const THEMES = {
+  glass: [glassTheme, glassShadowTheme],
+  light: [lightTheme, lightShadowTheme],
+  carbon: [carbonTheme, carbonShadowTheme],
+  retro: [retroTheme, retroShadowTheme],
+} as const
+type Theme = keyof typeof THEMES
+
 const THEME_KEY = 'wmkit-dashboard-theme'
 const themeStyleEl = document.createElement('style')
 document.head.append(themeStyleEl)
 const themeSelect = document.querySelector('#theme') as HTMLSelectElement
-function applyTheme(name: ThemeName): void {
-  themeStyleEl.textContent = themeStyle(name)
+function applyTheme(name: Theme): void {
+  const [page, windows] = THEMES[name]
+  themeStyleEl.textContent = page
+  desktop.styles = windows
   themeSelect.value = name
   document.body.dataset.theme = name
   try {
@@ -29,8 +50,8 @@ let savedTheme: string | null = null
 try {
   savedTheme = localStorage.getItem(THEME_KEY)
 } catch {}
-applyTheme((savedTheme as ThemeName | null) ?? 'glass')
-themeSelect.addEventListener('change', () => applyTheme(themeSelect.value as ThemeName))
+applyTheme(savedTheme !== null && savedTheme in THEMES ? (savedTheme as Theme) : 'glass')
+themeSelect.addEventListener('change', () => applyTheme(themeSelect.value as Theme))
 
 for (const node of document.querySelectorAll<HTMLElement>('[data-text]')) {
   const key = node.dataset.text as keyof typeof t
@@ -44,13 +65,19 @@ langButton.addEventListener('click', () => {
   location.reload()
 })
 
+const floatButton = document.querySelector('#float') as HTMLButtonElement
+floatButton.addEventListener('click', () => {
+  const pressed = floatButton.getAttribute('aria-pressed') !== 'true'
+  floatButton.setAttribute('aria-pressed', String(pressed))
+})
+
 defineWmElements()
-const desktop = document.querySelector('wm-desktop') as WmDesktopElement
 for (const id of ['kpis', 'chart', 'orders', 'log'] as const) {
   document.querySelector(`wm-window[window-id="${id}"]`)?.setAttribute('label', t[id])
 }
 const dock = createDock(desktop.controller as NonNullable<WmDesktopElement['controller']>, {
   messages: lang === 'ru' ? dockMessagesRu : dockMessages,
+  float: (event) => event.shiftKey || floatButton.getAttribute('aria-pressed') === 'true',
 })
 
 const DEFAULT: DockLayout = {
@@ -85,10 +112,12 @@ const DEFAULT: DockLayout = {
 }
 
 function reset(): void {
-  for (const node of document.querySelectorAll<WmWindowElement>('wm-window[closed]')) {
-    node.removeAttribute('closed')
-  }
-  dock.setLayout(DEFAULT)
+  desktop.manager?.batch(() => {
+    for (const node of document.querySelectorAll<WmWindowElement>('wm-window[closed]')) {
+      node.removeAttribute('closed')
+    }
+    dock.setLayout(DEFAULT)
+  })
 }
 
 if (!dock.layout().root) {

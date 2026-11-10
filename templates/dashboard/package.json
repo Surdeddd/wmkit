@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@surdeddd/wmkit": "^0.12.0"
+    "@surdeddd/wmkit": "^0.13.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

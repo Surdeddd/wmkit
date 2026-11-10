@@ -56,6 +56,17 @@ body[data-theme="retro"] {
   color: inherit;
 }
 
+.bar button[aria-pressed="true"] {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-color: currentColor;
+}
+
+.bar button:focus-visible,
+.bar select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .hint {
   opacity: 0.7;
   font-size: 13px;
@@ -72,7 +83,6 @@ body[data-theme="retro"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
-  padding: 12px;
 }
 
 .kpi {
@@ -122,9 +132,19 @@ body[data-theme="retro"] {
   border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
 }
 
+.orders th:first-child,
+.orders td:first-child {
+  padding-left: 0;
+}
+
+.orders th:last-child,
+.orders td:last-child {
+  padding-right: 0;
+}
+
 .log {
   margin: 0;
-  padding: 8px 12px;
+  padding: 0;
   list-style: none;
   font:
     12px / 1.6 ui-monospace,
