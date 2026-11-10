@@ -559,10 +559,10 @@ Changing an attribute drives the manager. Changing one of `width` / `height`, `x
 
 The element mirrors the manager on every change: `stage` and `closed` follow undo, redo, `hydrate` and `loadLayout` too. Undo after closing a `<wm-window>` brings the element back, and it fires `wm-open`; redo closes it again. The element is never removed by the library, so the framework that rendered it keeps ownership. Removing the element from the page closes its window; moving it does not. A second element with the same `window-id` stays unbound instead of throwing.
 
-A window the user closes stays closed across reloads only with `persist` and a `window-id`, and only while the page keeps rendering that window's element. The ids of closed elements live in `wm.getState().extensions.elements` (`{ closed: ['log'] }`), which is serialized and part of history but adds no undo step of its own.
+A window the user closes stays closed, and with `persist` and a `window-id` it stays closed across reloads too, as long as the page keeps rendering an element for it. The ids of closed elements live in `wm.getState().extensions.elements` (`{ closed: ['log'] }`), which is serialized and part of history but adds no undo step of its own.
 
-- Within one page session, a **new** `<wm-window>` rendered for a closed id opens its window, so an application that drops the element on `wm-close` and renders a fresh one later gets its window back. Only the element that was closed, or an element that connects right after a reload, stays closed.
-- If the page removes a closed element while the desktop stays, its "closed" mark goes with it: rendering that id again, later or after a reload, opens the window.
+- An element that replaces a closed one under the same `window-id` — a re-render, a route transition, a reload with `persist` — stays closed too.
+- Only when the page removes the closed element and keeps it out of the page does its "closed" mark go away; a `<wm-window>` rendered for that id later, or after a reload, opens its window. That is how an application that drops the element on `wm-close` reopens the window: by rendering the element again.
 - Removing the whole `<wm-desktop>` and adding it again with the same `persist` key, as on a route change, keeps closed windows closed.
 - A `closed` attribute in the markup keeps an element closed, and removing it opens the window. When the restored state already holds the window, the element connects open: saved state wins over markup.
 - Undo after the page has removed a closed element brings the window back in the manager with no element to show it. If your application drops elements on close, render the element again, or listen to the manager.
