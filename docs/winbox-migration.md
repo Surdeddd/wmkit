@@ -48,7 +48,7 @@ The state classes and the callbacks follow the manager rather than the call that
 ## What is different
 
 - **Snapping and keyboard control are on.** Drag a window to an edge to snap it, use the arrow keys on a focused window. Turn either off with `WinBox.configure({ snap: false, keyboard: false })`. Grouping windows into tabs is off by default and comes back with `grouping: true`.
-- **The control buttons work from the keyboard.** They take focus and answer Enter and Space, those added with `addControl` too. A hidden window drops out of the focus cycle, so F6 skips it.
+- **The control buttons work from the keyboard.** They take focus and answer Enter and Space, those added with `addControl` too. A hidden window cannot take the focus, so F6 skips it, and passing the focus on from a window you hide records no undo step, during undo and redo too.
 - **Closing is final.** A closed window never comes back through undo, redo or a restored layout; open a new one instead.
 - **The last window takes its desktop along.** When the last window of a desktop closes, the desktop, its controller and their listeners on the page are removed, and the next `new WinBox()` builds a fresh one. A desktop whose manager you took with `WinBox.manager()` stays, so `persist(WinBox.manager(), …)` keeps working.
 - **Minimized windows** wait in a strip of title buttons along the bottom edge; a click restores them.

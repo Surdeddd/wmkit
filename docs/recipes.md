@@ -113,7 +113,7 @@ store.restore()
 
 Bounds are re-derived against the current viewport during `hydrate`, so a desktop saved on a 27-inch monitor and restored on a laptop comes back on-screen: maximized windows refill, snapped windows re-snap, and normal windows are clamped so their titlebars stay reachable. A window damaged in storage is repaired rather than costing you the whole layout ([what gets repaired](api.md#serializedstate)).
 
-Nothing in the plugin throws: a storage that fails to read or write, a payload that is not JSON and a `migrate` that throws are reported instead. Send them to your own logging with `onError`; without it the first failure goes to `reportError`, which shows it in the console like an uncaught error, and the next ones stay quiet until a save or load succeeds again:
+Nothing in the plugin throws: a storage that fails to read or write, a payload that is not JSON and a `migrate` that throws are reported instead. Send them to your own logging with `onError`; without it the first failure of each kind (load, migration, save) goes to `reportError`, which shows it in the console like an uncaught error, and that kind stays quiet until it succeeds again:
 
 ```js
 persist(wm, {
@@ -385,7 +385,7 @@ What still matters on your side:
 
 ## Build a window from scratch
 
-<span v-pre>`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it. A placeholder may sit only in text or in a quoted value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`; anywhere else `skin()` throws, and so it does for SVG or MathML markup a browser could parse differently ([the full rules](api.md#skinspec--surdedddwmkitchrome)). Only `{{title}}` inside `[data-wm-title]` follows later state changes, every other placeholder is rendered at mount or rebuild, so the `aria-label="Close {{title}}"` below keeps the title the window had when it was mounted.</span>
+`@surdeddd/wmkit/chrome` turns a markup string into a skin. Placeholders are `{{title}}`, `{{id}}`, `{{stage}}`, `{{layer}}`, `{{workspace}}` and `{{variant}}`; every substitution is HTML-escaped, so a window title can never smuggle markup into the chrome around it. A placeholder may sit only in text or in a quoted value of `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label`; anywhere else `skin()` throws, and so it does for SVG or MathML markup a browser could parse differently ([the full rules](api.md#skinspec--surdedddwmkitchrome)). Only `{{title}}` inside `[data-wm-title]` follows later state changes, every other placeholder is rendered at mount or rebuild, so the `aria-label="Close {{title}}"` below keeps the title the window had when it was mounted.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'

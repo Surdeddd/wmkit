@@ -93,7 +93,7 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-group` | window | the id of its tab group, on grouped windows |
 | `data-wm-tab` | window | `active` or `inactive`, on grouped windows |
 | `data-wm-tab-target` | window | present on the window a drag would group with, once the gesture is armed |
-| `data-wm-live` | window | present while the desktop is being resized; see [below](#large-desktops-and-live-resizing) |
+| `data-wm-live` | window | present while the desktop is being resized, and on docked windows while a dock separator is dragged; see [below](#large-desktops-and-live-resizing) |
 | `data-wm-deep` | window | present on visible windows far down the stack; see [below](#large-desktops-and-live-resizing) |
 | `data-wm-docked` | window | present while the window is docked (dock plugin) |
 | `data-wm-skin` | window | the skin name, on windows built by a named skin (chrome plugin) |
@@ -160,7 +160,7 @@ Retuning a shipped theme is a scoped override:
 
 Two attributes keep a theme cheap when the desktop is busy.
 
-`data-wm-live` is on the windows while the desktop element is being resized, and an application may set it during its own live edits. Every shipped theme with a geometry transition stops easing `transform`, `width` and `height` for such a window (`[data-wm-window][data-wm-live]`, or `:host([data-wm-live])` in the shadow flavour), so the windows follow the resize instead of easing after it. A custom theme or skin with its own geometry transition should do the same:
+`data-wm-live` is on the windows while the desktop element is being resized, and on the docked windows while a dock separator is dragged; an application may set it during its own live edits too. Every shipped theme with a geometry transition stops easing `transform`, `width` and `height` for such a window (`[data-wm-window][data-wm-live]`, or `:host([data-wm-live])` in the shadow flavour), so the windows follow the resize instead of easing after it. A custom theme or skin with its own geometry transition should do the same:
 
 ```css
 [data-wm-window][data-wm-live] {
