@@ -1,5 +1,5 @@
 import { expect, type Page, test } from './fixtures'
-import { boxOf, dragBy, openVanilla, spawn, win } from './utils'
+import { boxOf, dragBy, openVanilla, settle, spawn, win } from './utils'
 
 type FrameKind = 'srcdoc' | 'data' | 'sandbox'
 
@@ -48,6 +48,7 @@ for (const kind of ['srcdoc', 'data', 'sandbox'] as const) {
     await page.evaluate(() =>
       window.__wm.restoreTo('fixed', { x: 40, y: 340, width: 240, height: 160 }),
     )
+    await settle(win(page, 'fixed'))
     expect(await focused(page)).toBe('fixed')
 
     await clickInFrame(page, 'a')

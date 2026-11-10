@@ -75,6 +75,8 @@ test('a layout rebuilds every window and keeps what it was showing', async ({ pa
 test('a rebuilt window still answers its own controls', async ({ page }) => {
   const win = page.locator('[data-testid="window-skins"]')
   await win.locator('.skin-layout-button[data-layout="right"]').click()
+  await expect(win.locator('[data-wm-drag]')).toHaveAttribute('data-side', 'right')
+  await settle(win)
   await win.locator('[data-wm-close]').click()
   await expect(page.locator('[data-testid="window-skins"]')).toHaveCount(0)
 })
