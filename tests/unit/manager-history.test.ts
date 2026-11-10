@@ -75,6 +75,25 @@ describe('focus changes share one history entry', () => {
     expect(wm.get('a')?.bounds).toMatchObject({ x: 52, y: 52 })
   })
 
+  it('skips a redo step that a reaction has made identical to the present', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.clearHistory()
+    wm.close('a')
+    wm.on('open', ({ window: win }) => {
+      if (win.id !== 'a') return
+      wm.beginInteraction()
+      wm.close('a')
+      wm.abortInteraction()
+    })
+    expect(wm.undo()).toBe(true)
+    expect(wm.get('a')).toBeUndefined()
+    expect(wm.canRedo()).toBe(true)
+    expect(wm.redo()).toBe(false)
+    expect(wm.canRedo()).toBe(false)
+  })
+
   it('gives the redo back after a returning focus run even when a cancelled gesture came between', () => {
     const cancelled: Array<(wm: WindowManager) => void> = [
       () => {},
