@@ -579,19 +579,22 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       const up = (upEvent: PointerEvent) => {
         if (upEvent.pointerId === event.pointerId) finish(false)
       }
-      const lost = () => finish(true)
+      const lost = (lostEvent: PointerEvent) => {
+        if (lostEvent.pointerId === event.pointerId) finish(true)
+      }
       const onEscape = (keyEvent: KeyboardEvent) => {
         if (keyEvent.key !== 'Escape') return
         keyEvent.preventDefault()
+        keyEvent.stopPropagation()
         finish(true)
       }
       const finish = (cancelled: boolean) => {
         sliding = null
         if (raf !== 0) view.cancelAnimationFrame(raf)
         node.removeEventListener('pointermove', move)
-        node.removeEventListener('pointerup', up)
-        node.removeEventListener('pointercancel', lost)
-        node.removeEventListener('lostpointercapture', lost)
+        doc.removeEventListener('pointerup', up, true)
+        doc.removeEventListener('pointercancel', lost, true)
+        doc.removeEventListener('lostpointercapture', lost, true)
         doc.removeEventListener('keydown', onEscape, true)
         delete node.dataset.wmActive
         for (const el of live) delete el.dataset.wmLive
@@ -605,9 +608,9 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       }
       sliding = { key, finish }
       node.addEventListener('pointermove', move)
-      node.addEventListener('pointerup', up)
-      node.addEventListener('pointercancel', lost)
-      node.addEventListener('lostpointercapture', lost)
+      doc.addEventListener('pointerup', up, true)
+      doc.addEventListener('pointercancel', lost, true)
+      doc.addEventListener('lostpointercapture', lost, true)
       doc.addEventListener('keydown', onEscape, true)
     })
     node.addEventListener('keydown', (event) => {

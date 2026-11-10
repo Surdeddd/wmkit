@@ -467,7 +467,9 @@ describe('separators', () => {
     document.dispatchEvent(key('Escape'))
     expect(h.wm.get('a')?.bounds.width).toBe(497)
     sash.dispatchEvent(pointer('pointerdown', 500, 300))
-    sash.dispatchEvent(new Event('lostpointercapture'))
+    sash.dispatchEvent(pointer('lostpointercapture', 0, 0, 2))
+    expect(sash.hasAttribute('data-wm-active')).toBe(true)
+    sash.dispatchEvent(pointer('lostpointercapture', 0, 0))
     sash.dispatchEvent(key('ArrowRight'))
     expect(h.wm.get('a')?.bounds.width).toBe(513)
     const secondary = new MouseEvent('pointerdown', { bubbles: true, button: 2 })
@@ -478,6 +480,42 @@ describe('separators', () => {
     }
     sash.dispatchEvent(pointer('pointerdown', 500, 300))
     expect(sash.hasAttribute('data-wm-active')).toBe(false)
+  })
+
+  it('ends a drag on the document when something else took the separator out mid drag', () => {
+    const h = twoPanels()
+    h.add('c')
+    h.dock.dock('c', { side: 'bottom' })
+    h.wm.clearHistory()
+    const [first, second] = h.sashes() as [HTMLElement, HTMLElement]
+    first.dispatchEvent(pointer('pointerdown', 500, 300))
+    first.dispatchEvent(pointer('pointermove', 600, 300))
+    h.flush()
+    first.remove()
+    document.dispatchEvent(pointer('pointerup', 600, 300))
+    second.dispatchEvent(pointer('pointerdown', 500, 300))
+    expect(second.hasAttribute('data-wm-active')).toBe(true)
+    second.dispatchEvent(pointer('pointerup', 500, 300))
+    second.dispatchEvent(key('ArrowDown'))
+    const moved = h.wm.get('c')?.bounds.y
+    expect(h.wm.undo()).toBe(true)
+    expect(h.wm.get('c')?.bounds.y).not.toBe(moved)
+    expect(h.wm.undo()).toBe(true)
+    expect(h.wm.canUndo()).toBe(false)
+  })
+
+  it('keeps Escape of a separator drag away from the page', () => {
+    const h = twoPanels()
+    const page = vi.fn()
+    window.addEventListener('keydown', page)
+    const sash = h.sashes()[0] as HTMLElement
+    sash.dispatchEvent(pointer('pointerdown', 500, 300))
+    sash.dispatchEvent(pointer('pointermove', 700, 300))
+    h.flush()
+    document.dispatchEvent(key('Escape'))
+    window.removeEventListener('keydown', page)
+    expect(page).not.toHaveBeenCalled()
+    expect(h.wm.get('a')?.bounds.width).toBe(497)
   })
 
   it('cancels a running drag when its separator goes away', () => {
