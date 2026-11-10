@@ -1,4 +1,5 @@
 import { expect, type Page, test } from './fixtures'
+import { settle } from './utils'
 
 const PREVIEW = '.builder-stage [data-wm-window="preview"]'
 const MARKUP = '.builder-editor:not(.builder-css)'
@@ -158,9 +159,30 @@ test.describe('the designer and the desktop keep their own styles', () => {
     }, selector)
   }
 
+  async function sendToDesktop(page: Page) {
+    await page.locator('.builder-actions .btn-primary').click()
+    const skins = page.locator('[data-wm-window="skins"]')
+    await expect(skins).toBeVisible()
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          let last = Number.NaN
+          let still = 0
+          const tick = () => {
+            still = window.scrollY === last ? still + 1 : 0
+            last = window.scrollY
+            if (still >= 3) resolve()
+            else requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    await settle(skins)
+  }
+
   test('editing the designer leaves the windows already sent alone', async ({ page }) => {
     await openBuilder(page)
-    await page.locator('.builder-actions .btn-primary').click()
+    await sendToDesktop(page)
     await expect(page.locator('[data-wm-window="skins"]')).toHaveAttribute('data-wm-skin', 'custom')
     await expect.poll(() => backgroundOf(page, '[data-wm-window="skins"]')).toBe(MAC_BG)
 
@@ -190,7 +212,7 @@ test.describe('the designer and the desktop keep their own styles', () => {
   test('applying a skin on the desktop leaves the designer dressed', async ({ page }) => {
     await openBuilder(page)
     await expect.poll(() => previewBg(page)).toBe(MAC_BG)
-    await page.locator('.builder-actions .btn-primary').click()
+    await sendToDesktop(page)
     await page.locator('[data-wm-window="skins"] .skin-action', { hasText: 'apply' }).click()
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
     expect(await previewBg(page)).toBe(MAC_BG)

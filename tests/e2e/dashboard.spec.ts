@@ -241,6 +241,7 @@ test('with Float pressed a dragged panel shows no drop preview and stays floatin
   }
 
   await grab()
+  await expect(panel(page, 'chart')).toHaveAttribute('data-wm-dragging', '')
   await expect(preview).toBeVisible()
   await page.keyboard.press('Escape')
   await page.mouse.up()
