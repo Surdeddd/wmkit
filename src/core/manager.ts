@@ -21,6 +21,11 @@ import type {
 } from './types'
 
 type Limits = Pick<WindowState, 'minSize' | 'maxSize' | 'aspectRatio'>
+type Mark = {
+  past: HistoryEntry[]
+  future: HistoryEntry[]
+  dropped: [HistoryEntry, HistoryEntry[]] | undefined
+}
 
 const LAYER_RANK: Record<WindowLayer, number> = { normal: 0, floating: 1, modal: 2 }
 const STAGES: readonly WindowStage[] = ['normal', 'minimized', 'maximized', 'snapped']
@@ -139,7 +144,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let future: HistoryEntry[] = []
   let interactionDepth = 0
   let interactionRecorded = false
-  let interactionMark: { past: HistoryEntry[]; future: HistoryEntry[] } | null = null
+  let interactionMark: Mark | null = null
   let pendingHistory: HistoryEntry | null = null
   let dropped: [HistoryEntry, HistoryEntry[]] | undefined
   const layouts = new Map<string, SerializedState>()
@@ -1224,7 +1229,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     interactionRecorded = false
     openEntry()
     historyDirty = false
-    if (interactionMark) interactionMark = { past: [...past], future }
+    if (interactionMark) interactionMark = mark()
   }
 
   function transact<T>(run: () => T): T {
@@ -1334,15 +1339,20 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     interactionDepth += 1
     if (interactionDepth === 1) {
       interactionRecorded = false
-      interactionMark = { past: [...past], future }
+      interactionMark = mark()
     }
   }
 
+  function mark(): Mark {
+    return { past: [...past], future, dropped }
+  }
+
   function restoreMark(): void {
-    const mark = interactionMark as { past: HistoryEntry[]; future: HistoryEntry[] }
+    const saved = interactionMark as Mark
     past.length = 0
-    past.push(...mark.past)
-    future = mark.future
+    past.push(...saved.past)
+    future = saved.future
+    dropped = saved.dropped
     interactionRecorded = false
   }
 

@@ -75,6 +75,49 @@ describe('focus changes share one history entry', () => {
     expect(wm.get('a')?.bounds).toMatchObject({ x: 52, y: 52 })
   })
 
+  it('gives the redo back after a returning focus run even when a cancelled gesture came between', () => {
+    const cancelled: Array<(wm: WindowManager) => void> = [
+      () => {},
+      (wm) => {
+        wm.beginInteraction()
+        wm.move('a', 50, 50)
+        wm.move('a', 0, 0)
+        wm.abortInteraction()
+      },
+      (wm) => {
+        wm.beginInteraction()
+        wm.move('a', 50, 50)
+        wm.beginInteraction()
+        wm.move('a', 70, 70)
+        wm.abortInteraction()
+        wm.move('a', 0, 0)
+        wm.abortInteraction()
+      },
+      (wm) =>
+        wm.batch(() => {
+          wm.beginInteraction()
+          wm.move('a', 50, 50)
+          wm.move('a', 0, 0)
+          wm.abortInteraction()
+        }),
+    ]
+    for (const gesture of cancelled) {
+      const wm = makeWm()
+      wm.open({ id: 'a', x: 0, y: 0, width: 200, height: 150 })
+      wm.open({ id: 'b', x: 0, y: 0, width: 200, height: 150 })
+      wm.clearHistory()
+      wm.move('a', 10, 10)
+      wm.undo()
+      wm.focus('a')
+      gesture(wm)
+      wm.focus('b')
+      expect(wm.canRedo()).toBe(true)
+      expect(wm.canUndo()).toBe(false)
+      wm.redo()
+      expect(wm.get('a')?.bounds).toMatchObject({ x: 10, y: 10 })
+    }
+  })
+
   it('starts a new entry for focus changes that follow a real change', () => {
     const wm = makeWm()
     wm.open({ id: 'a', x: 0, y: 0, width: 200, height: 150 })

@@ -442,9 +442,57 @@ function forced(a: ManagerState, b: ManagerState): boolean {
   })
 }
 
+const READS = new Set(['on', 'subscribe', 'getState', 'get', 'canUndo', 'canRedo', 'minimized'])
+
+function mirror(real: WindowManager, twin: WindowManager, mismatch: (name: string) => void) {
+  return new Proxy(real, {
+    get(target, name: string) {
+      const value = (target as unknown as Record<string, unknown>)[name]
+      if (typeof value !== 'function' || READS.has(name)) return value
+      if (name === 'batch') return (run: () => void) => real.batch(() => twin.batch(run))
+      return (...args: unknown[]) => {
+        const result = (value as (...a: unknown[]) => unknown).apply(target, args)
+        const echo = (twin as unknown as Record<string, (...a: unknown[]) => unknown>)[name]
+        const other = echo?.apply(twin, args)
+        if (typeof result === 'boolean' && result !== other) mismatch(name)
+        return result
+      }
+    },
+  })
+}
+
+function cancelledGesture(
+  wm: WindowManager,
+  id: string,
+  pick: <T>(items: readonly T[]) => T,
+): void {
+  const win = wm.get(id)
+  if (win?.stage !== 'normal') return
+  const { x, y } = win.bounds
+  const gesture = () => {
+    wm.beginInteraction()
+    wm.move(id, x + 37, y + 23)
+    if (pick([false, true])) {
+      wm.beginInteraction()
+      wm.move(id, x - 41, y + 5)
+      wm.abortInteraction()
+    }
+    wm.move(id, x, y)
+    wm.abortInteraction()
+  }
+  if (pick([false, true])) wm.batch(gesture)
+  else gesture()
+}
+
 function audit(seed: number, steps: number, report: string[]): void {
   const random = rng(seed)
-  const wm = createWindowManager({ viewport: { width: 1280, height: 800 }, historyLimit: 30 })
+  const options = { viewport: { width: 1280, height: 800 }, historyLimit: 30 }
+  const real = createWindowManager(options)
+  const twin = createWindowManager(options)
+  let label = `seed ${seed} start`
+  const wm = mirror(real, twin, (name) =>
+    report.push(`${label}: ${name}() differs after a cancelled gesture`),
+  )
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
   const anyId = (): string | null => {
     const ids = wm.getState().order
@@ -493,8 +541,23 @@ function audit(seed: number, steps: number, report: string[]): void {
       'restoreAll',
       'closeAll',
       'hostile',
+      'roundTrip',
+      'roundTrip',
     ] as const)
     switch (name) {
+      case 'roundTrip': {
+        const state = wm.getState()
+        const { order, focusedId } = state
+        const below = order.at(-2)
+        const win = below ? state.windows[below] : undefined
+        const hidden = win?.groupId && state.groups[win.groupId]?.activeId !== below
+        if (!below || !win || focusedId !== order.at(-1) || hidden) break
+        if (win.stage === 'minimized' || win.workspace !== state.workspace) break
+        wm.focus(below)
+        if (random() < 0.5) cancelledGesture(real, below, pick)
+        wm.focus(focusedId)
+        break
+      }
       case 'open':
         wm.open({
           width: 120 + Math.floor(random() * 400),
@@ -591,8 +654,20 @@ function audit(seed: number, steps: number, report: string[]): void {
     return name
   }
 
-  let chain: Picture | null = null
+  const compare = () => {
+    if (
+      !same(picture(real.getState()), picture(twin.getState())) ||
+      real.canUndo() !== twin.canUndo() ||
+      real.canRedo() !== twin.canRedo()
+    ) {
+      report.push(`${label}: a cancelled gesture changed the state or the history`)
+    }
+  }
+  let chain: Picture | 'unknown' | null = null
   for (let step = 0; step < steps; step += 1) {
+    compare()
+    const gestureId = random() < 0.15 ? anyId() : null
+    if (gestureId) cancelledGesture(real, gestureId, pick)
     const stateBefore = wm.getState()
     const before = picture(stateBefore)
     const changesBefore = changes
@@ -630,7 +705,7 @@ function audit(seed: number, steps: number, report: string[]): void {
     } else {
       names.push(act())
     }
-    const label = `seed ${seed} step ${step} [${names.join(',')}]`
+    label = `seed ${seed} step ${step} [${names.join(',')}]`
     const stateAfter = wm.getState()
     const after = picture(stateAfter)
 
@@ -645,7 +720,14 @@ function audit(seed: number, steps: number, report: string[]): void {
       const next = stateAfter.windows[id] as WindowState
       const prev = stateBefore.windows[id]
       const owned = prev && forced({ ...stateBefore, windows: { [id]: prev } }, stateAfter)
-      if (names.length === 1 && prev && prev !== next && same(prev, next) && !owned) {
+      if (
+        names.length === 1 &&
+        names[0] !== 'roundTrip' &&
+        prev &&
+        prev !== next &&
+        same(prev, next) &&
+        !owned
+      ) {
         report.push(`${label}: ${id} was replaced by an equal object`)
       }
       if (next.stage === 'snapped' && next.snapZone === null && next.snapRect === null) {
@@ -665,7 +747,8 @@ function audit(seed: number, steps: number, report: string[]): void {
     let target: Picture | undefined
     if (recorded && (owned || !same(before, after))) {
       const merged = merges && chain !== null && focusOnly(before, after)
-      target = !merged ? before : same(chain, after) ? undefined : (chain ?? undefined)
+      const known = merged && chain !== 'unknown' && !same(chain, after)
+      target = !merged ? before : known ? (chain as Picture) : undefined
       if (target && !wm.canUndo()) report.push(`${label}: the state changed but canUndo() is false`)
     }
     chain = null
@@ -677,10 +760,15 @@ function audit(seed: number, steps: number, report: string[]): void {
       report.push(`${label}: undo returned true but changed nothing`)
     }
     if (target && !same(undone, target)) report.push(`${label}: undo missed its target`)
+    if (random() < 0.2) {
+      chain = 'unknown'
+      continue
+    }
     wm.redo()
     if (!same(picture(wm.getState()), after)) report.push(`${label}: redo missed its target`)
     chain = focusOnly(undone, after) ? undone : null
   }
+  compare()
 }
 
 describe('random operation sequences keep the state machine honest', () => {
@@ -707,6 +795,7 @@ describe('random operation sequences keep the state machine honest', () => {
   it('keeps history, events and persistence truthful over long random runs', () => {
     const report: string[] = []
     for (let seed = 1; seed <= 24; seed += 1) audit(seed, 200, report)
+    for (const seed of [59, 127, 185]) audit(seed, 250, report)
     expect(report.slice(0, 6)).toEqual([])
   }, 120_000)
 
