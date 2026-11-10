@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createWindowManager } from '../../src/core/manager'
 import { createDock, dockLayout } from '../../src/plugins/dock'
 import {
   defineWmElements,
@@ -355,5 +356,66 @@ describe('closed panels', () => {
     expect(desktop.manager?.get('b')).toBeUndefined()
     expect(windowOf(desktop, 'b').hasAttribute('closed')).toBe(true)
     expect(closedList(desktop)).toEqual(['b'])
+  })
+
+  it('do not come back with an undo once the page has dropped the closed element', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="mail"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
+    )
+    const wm = desktop.manager
+    wm?.close('mail')
+    wm?.move('b', 70, 80)
+    windowOf(desktop, 'mail').remove()
+    await flush()
+    expect(closedList(desktop)).toBeUndefined()
+    expect(wm?.undo()).toBe(true)
+    expect(wm?.get('b')?.bounds).not.toMatchObject({ x: 70, y: 80 })
+    expect(closedList(desktop)).toBeUndefined()
+    const fresh = document.createElement('wm-window')
+    fresh.setAttribute('window-id', 'mail')
+    desktop.append(fresh)
+    expect(wm?.get('mail')).toBeDefined()
+    expect(fresh.dataset.wmWindow).toBe('mail')
+  })
+
+  it('survive an undo to an entry recorded before the mark, and follow an undo of a close', () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="mail" closed></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
+    )
+    const wm = desktop.manager
+    const mail = windowOf(desktop, 'mail')
+    expect(closedList(desktop)).toEqual(['mail'])
+    wm?.move('b', 70, 80)
+    wm?.undo()
+    expect(closedList(desktop)).toEqual(['mail'])
+    wm?.undo()
+    expect(wm?.get('b')).toBeUndefined()
+    expect(mail.hasAttribute('closed')).toBe(true)
+    expect(closedList(desktop)).toEqual(['mail', 'b'])
+    wm?.redo()
+    expect(closedList(desktop)).toEqual(['mail'])
+    wm?.close('b')
+    expect(closedList(desktop)).toEqual(['mail', 'b'])
+    wm?.undo()
+    expect(windowOf(desktop, 'b').dataset.wmWindow).toBe('b')
+    expect(closedList(desktop)).toEqual(['mail'])
+  })
+
+  it('describe the page after a hydrate of a snapshot from another session', () => {
+    const desktop = mount(`<wm-desktop>
+      <wm-window window-id="a"></wm-window>
+      <wm-window window-id="b"></wm-window>
+      <wm-window window-id="c" closed></wm-window>
+    </wm-desktop>`)
+    const wm = desktop.manager as NonNullable<WmDesktopElement['manager']>
+    const other = createWindowManager()
+    other.open({ id: 'b' })
+    other.open({ id: 'c' })
+    other.setExtension('elements', { closed: ['a', 'gone'] })
+    expect(wm.hydrate(other.serialize())).toBe(true)
+    expect(windowOf(desktop, 'a').hasAttribute('closed')).toBe(true)
+    expect(windowOf(desktop, 'b').dataset.wmWindow).toBe('b')
+    expect(windowOf(desktop, 'c').dataset.wmWindow).toBe('c')
+    expect(closedList(desktop)).toEqual(['a'])
   })
 })

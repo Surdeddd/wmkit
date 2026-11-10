@@ -115,7 +115,10 @@ function closedIn(state: ManagerState): unknown[] {
   return Array.isArray(closed) ? closed : []
 }
 
-function writeClosed(wm: WindowManager, closed: unknown[]): void {
+function store(wm: WindowManager, record: Map<string, unknown>): void {
+  const closed = [...record.keys()]
+  const stored = closedIn(wm.getState())
+  if (closed.length === stored.length && closed.every((id, at) => id === stored[at])) return
   wm.beginInteraction()
   wm.setExtension(KEY, closed.length > 0 ? { closed } : undefined)
   wm.abortInteraction()
@@ -128,7 +131,7 @@ export class WmDesktopElement extends Base {
   declare messages: ElementsMessages | null
   readonly windows = new Map<string, WmWindowElement>()
   readonly [MEMBERS] = new Set<WmWindowElement>()
-  readonly [OWNERS] = new Map<string, WmWindowElement>();
+  readonly [OWNERS] = new Map<string, WmWindowElement | null>();
   [SHEETS]: CSSStyleSheet[] = []
   private css: WmDesktopStyles | null = null
   private store: PersistController | null = null
@@ -167,7 +170,6 @@ export class WmDesktopElement extends Base {
     const on = (name: string) => this.getAttribute(name) !== 'false'
     const wm = createWindowManager(this.options)
     this.manager = wm
-    this[OWNERS].clear()
     this.controller = attachDesktop(wm, this, {
       snap: on('snap'),
       keyboard: on('keyboard'),
@@ -180,6 +182,12 @@ export class WmDesktopElement extends Base {
       },
       ...this.options,
     })
+    const key = this.getAttribute('persist')
+    if (key) this.store = persist(wm, { key })
+    this[OWNERS].clear()
+    for (const id of closedIn(wm.getState())) {
+      if (typeof id === 'string') this[OWNERS].set(id, null)
+    }
     this.stops = [
       wm.subscribe((state) => this.follow(state)),
       ...(['move', 'resize', 'stage', 'focus', 'close'] as const).map((type) =>
@@ -191,8 +199,6 @@ export class WmDesktopElement extends Base {
         }),
       ),
     ]
-    const key = this.getAttribute('persist')
-    if (key) this.store = persist(wm, { key })
     for (const node of this.querySelectorAll('*')) {
       if (node instanceof WmWindowElement) node[OPEN]()
     }
@@ -213,19 +219,14 @@ export class WmDesktopElement extends Base {
   }
 
   private follow(state: ManagerState): void {
-    const stored = closedIn(state)
-    const closed = stored.filter((id) => !state.windows[id as string])
-    let changed = closed.length !== stored.length
+    const record = this[OWNERS]
     for (const element of this[MEMBERS]) {
       element[SYNC](state)
       const id = element.windowId
-      if (id !== null && !state.windows[id] && !closed.includes(id)) {
-        closed.push(id)
-        this[OWNERS].set(id, element)
-        changed = true
-      }
+      if (id !== null && !state.windows[id] && !record.has(id)) record.set(id, element)
     }
-    if (changed) writeClosed(this.manager as WindowManager, closed)
+    for (const id of record.keys()) if (state.windows[id]) record.delete(id)
+    store(this.manager as WindowManager, record)
   }
 }
 
@@ -270,13 +271,7 @@ export class WmWindowElement extends Base {
       const id = this.windowId as string
       if (!host?.isConnected || host[OWNERS].get(id) !== this) return
       host[OWNERS].delete(id)
-      const wm = host.manager as WindowManager
-      const closed = closedIn(wm.getState())
-      if (closed.includes(id))
-        writeClosed(
-          wm,
-          closed.filter((entry) => entry !== id),
-        )
+      store(host.manager as WindowManager, host[OWNERS])
     })
   }
 
@@ -405,7 +400,7 @@ export class WmWindowElement extends Base {
     const id = this.getAttribute('window-id') ?? this.windowId
     this.windowId = id
     if (id === null || !wm.get(id)) {
-      if (!reopen && (this.hasAttribute('closed') || closedIn(wm.getState()).includes(id))) {
+      if (!reopen && (this.hasAttribute('closed') || host[OWNERS].has(id as string))) {
         if (id !== null) host[OWNERS].set(id, this)
         this.reflect(() => this.toggleAttribute('closed', true))
         return
