@@ -613,6 +613,21 @@ describe('dropping a window onto the layout', () => {
     handle.dispatchEvent(pointer('pointerup', 600, 300))
   })
 
+  it('puts a maximized panel back on Escape, ready to return to its panel', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.maximize('b')
+    drag(h, 'b', [500, 10], [400, 200])
+    document.dispatchEvent(key('Escape'))
+    expect(h.wm.get('b')).toMatchObject({ stage: 'maximized', resizable: false })
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+    h.wm.restore('b')
+    expect(h.wm.get('b')).toMatchObject({ stage: 'snapped', bounds: { x: 503 } })
+  })
+
   it('lets floating-layer windows and other workspaces drift over the layout', () => {
     const h = setup()
     h.add('a')
@@ -682,5 +697,192 @@ describe('dropping a window onto the layout', () => {
     expect(h.element.querySelector('style[data-wm-dock]')).toBeNull()
     h.wm.close('b')
     expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+  })
+})
+
+function bounds(wm: WindowManager, id: string): string {
+  const b = wm.get(id)?.bounds
+  return b ? `${b.x},${b.y} ${b.width}x${b.height}` : 'gone'
+}
+
+function activeOf(wm: WindowManager, id: string): string | undefined {
+  return wm.getState().groups[wm.get(id)?.groupId as string]?.activeId
+}
+
+describe('every docked window in its own panel', () => {
+  it('moving a tab out of its stack puts both windows where their panels are', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    h.dock.dock('b', { side: 'bottom' })
+    expect({ a: bounds(h.wm, 'a'), b: bounds(h.wm, 'b') }).toEqual({
+      a: '0,0 1000x297',
+      b: '0,303 1000x297',
+    })
+    expect(h.wm.get('a')?.groupId).toBeNull()
+    expect(h.wm.get('b')?.groupId).toBeNull()
+  })
+
+  it('a layout that splits a stack apart places each window at once', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    h.dock.setLayout({
+      root: {
+        kind: 'split',
+        id: 'r',
+        axis: 'row',
+        sizes: [0.5, 0.5],
+        children: [
+          { kind: 'stack', id: 's1', windows: ['a'], active: 'a' },
+          { kind: 'stack', id: 's2', windows: ['b'], active: 'b' },
+        ],
+      },
+    })
+    expect({ a: bounds(h.wm, 'a'), b: bounds(h.wm, 'b') }).toEqual({
+      a: '0,0 497x600',
+      b: '503,0 497x600',
+    })
+  })
+})
+
+describe('the active tab follows the manager', () => {
+  function stacked() {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('c')
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    h.dock.dock('c', { side: 'right' })
+    return h
+  }
+
+  it('docking into a stack shows the docked window, and a picked tab survives a resize', () => {
+    const h = stacked()
+    expect(activeOf(h.wm, 'a')).toBe('b')
+    h.wm.activateTab('a')
+    expect(dockLayout.stackOf(h.dock.layout(), 'a')?.active).toBe('a')
+    h.wm.setViewport({ width: 900, height: 600 })
+    expect(activeOf(h.wm, 'a')).toBe('a')
+  })
+
+  it('a picked tab survives a separator step and docking another window', () => {
+    const h = stacked()
+    h.add('d')
+    h.wm.focus('a')
+    h.sashes()[0]?.dispatchEvent(key('ArrowRight'))
+    expect(activeOf(h.wm, 'a')).toBe('a')
+    h.dock.dock('d', { side: 'bottom' })
+    expect(activeOf(h.wm, 'a')).toBe('a')
+  })
+
+  it('maximizing a hidden tab shows it and keeps it shown after the restore', () => {
+    const h = stacked()
+    h.wm.maximize('a')
+    h.wm.restore('a')
+    expect(h.wm.get('a')?.stage).toBe('snapped')
+    expect(activeOf(h.wm, 'a')).toBe('a')
+    expect(dockLayout.stackOf(h.dock.layout(), 'b')?.active).toBe('a')
+  })
+
+  it('a tab moved out of a stack leaves the tab the manager shows next in the tree', () => {
+    const h = setup()
+    for (const id of ['a', 'b', 'c']) h.add(id)
+    h.dock.dock('a')
+    const stack = (h.dock.layout().root as DockStack).id
+    h.dock.dock('b', { stackId: stack })
+    h.dock.dock('c', { stackId: stack })
+    h.wm.activateTab('a')
+    h.dock.dock('a', { side: 'top' })
+    const rest = dockLayout.stackOf(h.dock.layout(), 'b') as DockStack
+    expect(rest.windows).toEqual(['b', 'c'])
+    expect(activeOf(h.wm, 'b')).toBe('c')
+    expect(rest.active).toBe('c')
+  })
+
+  it('a layout that names the active tab shows it', () => {
+    const h = stacked()
+    h.wm.activateTab('a')
+    const layout = h.dock.layout()
+    const stack = dockLayout.stackOf(layout, 'a') as DockStack
+    h.dock.setLayout(dockLayout.activate(layout, 'b'))
+    expect(activeOf(h.wm, 'a')).toBe('b')
+    expect(dockLayout.stackOf(h.dock.layout(), 'a')?.id).toBe(stack.id)
+  })
+})
+
+describe('following changes made around the dock', () => {
+  it('arrange and minimizeAll leave the docked panels in place', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('f')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.arrange('tile')
+    h.wm.arrange('cascade')
+    h.wm.minimizeAll()
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', resizable: false })
+    expect(h.wm.get('b')?.stage).toBe('snapped')
+  })
+
+  it('a reaction inside an application interaction stays in its single undo step', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('f', { x: 700, y: 400 })
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.clearHistory()
+    h.wm.beginInteraction()
+    h.wm.move('f', 600, 300)
+    h.wm.close('b')
+    h.wm.move('f', 500, 200)
+    h.wm.endInteraction()
+    h.wm.undo()
+    expect({ f: h.wm.get('f')?.bounds.x, b: h.wm.get('b') !== undefined }).toEqual({
+      f: 700,
+      b: true,
+    })
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+  })
+
+  it('closing a docked window and docking another in one batch places both', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('c')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.batch(() => {
+      h.wm.close('a')
+      h.dock.dock('c', { side: 'bottom' })
+    })
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['b', 'c'])
+    expect({ b: bounds(h.wm, 'b'), c: bounds(h.wm, 'c') }).toEqual({
+      b: '0,0 1000x297',
+      c: '0,303 1000x297',
+    })
+  })
+
+  it('a window restored in the same batch as a dock call is not docked again', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.add('c')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.wm.batch(() => {
+      h.wm.restore('b')
+      h.dock.undock('a')
+    })
+    expect(h.dock.layout().root).toBeNull()
+    expect(h.wm.get('b')).toMatchObject({ stage: 'normal', resizable: true })
   })
 })
