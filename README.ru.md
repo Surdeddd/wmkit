@@ -115,19 +115,20 @@ function Win({ binder, win }) {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useWindowManager, useDesktop, useWmWindowEl } from '@surdeddd/wmkit/vue'
+import { useWindowManager, useDesktop, useWmWindow, useWmWindowEl } from '@surdeddd/wmkit/vue'
 
 const host = ref<HTMLElement>()
 const panel = ref<HTMLElement>()
 const wm = useWindowManager()
 const binder = useDesktop(wm, host)
 useWmWindowEl(binder, 'notes', panel)
+const notes = useWmWindow(wm, 'notes')
 wm.open({ id: 'notes', title: 'Заметки' })
 </script>
 
 <template>
   <div ref="host" style="position: relative; height: 100vh">
-    <section ref="panel">
+    <section v-if="notes" ref="panel">
       <header data-wm-drag><span data-wm-title>Заметки</span></header>
       <div data-wm-content>композаблы</div>
     </section>
@@ -148,16 +149,19 @@ wm.open({ id: 'notes', title: 'Заметки' })
 </script>
 
 <div use:dk.desktop style="position: relative; height: 100vh">
-  <section use:dk.window={{ id: 'notes' }}>
-    <header data-wm-drag><span data-wm-title>{$notes?.title}</span></header>
-    <div data-wm-content>сторы и экшены</div>
-  </section>
+  {#if $notes}
+    <section use:dk.window={{ id: 'notes' }}>
+      <header data-wm-drag><span data-wm-title>{$notes.title}</span></header>
+      <div data-wm-content>сторы и экшены</div>
+    </section>
+  {/if}
 </div>
 ```
 
 ### Solid
 
 ```tsx
+import { Show } from 'solid-js'
 import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/solid'
 
 function Desktop() {
@@ -168,10 +172,12 @@ function Desktop() {
 
   return (
     <div ref={dk.desktop} style={{ position: 'relative', height: '100vh' }}>
-      <section ref={dk.window('notes')}>
-        <header data-wm-drag><span data-wm-title>Заметки</span></header>
-        <div data-wm-content>{state().order.length} окон</div>
-      </section>
+      <Show when={state().windows.notes}>
+        <section ref={dk.window('notes')}>
+          <header data-wm-drag><span data-wm-title>Заметки</span></header>
+          <div data-wm-content>{state().order.length} окон</div>
+        </section>
+      </Show>
     </div>
   )
 }
@@ -180,37 +186,62 @@ function Desktop() {
 ### Angular
 
 ```ts
-import { Component, ElementRef, afterNextRender, viewChild } from '@angular/core'
-import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, inject, input, viewChild,
+} from '@angular/core'
+import {
+  type AngularDesktop, createDesktop, useWindowManager, useWmState, useWmWindow,
+} from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-notes',
+  standalone: true,
+  template: `
+    <section #panel>
+      <header data-wm-drag><span data-wm-title>Заметки</span></header>
+      <div data-wm-content><ng-content /></div>
+    </section>`,
+})
+export class NotesComponent {
+  dk = input.required<AngularDesktop>()
+  private panel = viewChild.required<ElementRef>('panel')
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    afterNextRender(() =>
+      this.dk().window('notes', undefined, this.destroyRef)(this.panel().nativeElement),
+    )
+  }
+}
 
 @Component({
   selector: 'app-desktop',
+  standalone: true,
+  imports: [NotesComponent],
   template: `
     <div #host style="position: relative; height: 100vh">
-      <section #panel>
-        <header data-wm-drag><span data-wm-title>Заметки</span></header>
-        <div data-wm-content>{{ state().order.length }} окон</div>
-      </section>
+      @if (notes()) {
+        <app-notes [dk]="dk">{{ state().order.length }} окон</app-notes>
+      }
     </div>`,
 })
 export class DesktopComponent {
   private host = viewChild.required<ElementRef>('host')
-  private panel = viewChild.required<ElementRef>('panel')
   wm = useWindowManager()
   state = useWmState(this.wm)
+  notes = useWmWindow(this.wm, 'notes')
+  dk = createDesktop(this.wm)
 
   constructor() {
-    const dk = createDesktop(this.wm)
     afterNextRender(() => {
-      dk.desktop(this.host().nativeElement)
+      this.dk.desktop(this.host().nativeElement)
       this.wm.open({ id: 'notes', title: 'Заметки' })
-      dk.window('notes')(this.panel().nativeElement)
     })
   }
 }
 ```
 
-Полные примеры с таскбаром, модалками и сигнатурами всех хуков — в [docs/adapters.ru.md](./docs/adapters.ru.md).
+Во всех примерах окно рендерится, только пока оно существует (`v-if`, `{#if}`, `<Show>`, `@if`): когда окно закрывается, фреймворк убирает узел, а когда отмена возвращает окно, рендерит его снова. Полные примеры с таскбаром, модалками и сигнатурами всех хуков — в [docs/adapters.ru.md](./docs/adapters.ru.md).
 
 ## API ядра — кратко
 
@@ -276,7 +307,7 @@ dock.dock('editor')
 dock.dock('files', { side: 'left' })
 ```
 
-Раскладывает окна по панелям. Бросьте окно к краю панели — она разделится, в центр — окно станет вкладкой, к краю рабочего стола — встанет рядом со всеми. Разделители двигаются мышью и стрелками. Закреплённое окно, оторванное за заголовок, снова плавает. Каждая операция — один шаг отмены, а `persist` сохраняет раскладку между перезагрузками.
+Раскладывает окна по панелям. Бросьте окно к краю панели — она разделится, в центр — окно станет вкладкой, к краю рабочего стола — встанет рядом со всеми. Разделители двигаются мышью и стрелками. Закреплённое окно, оторванное за заголовок, снова плавает. Чтобы окно осталось плавать, держите Shift во время перетаскивания, а на сенсорном экране подключите опцию `float` к своему переключателю. Каждая операция — один шаг отмены, а `persist` сохраняет раскладку между перезагрузками.
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 

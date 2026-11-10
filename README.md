@@ -140,8 +140,8 @@ wm.open({ id: 'note', title: 'Note' })
 
 <template>
   <div ref="desktopEl" style="position: relative; height: 100vh">
-    <section ref="noteEl">
-      <header data-wm-drag><span data-wm-title>{{ state.windows.note?.title }}</span></header>
+    <section v-if="state.windows.note" ref="noteEl">
+      <header data-wm-drag><span data-wm-title>{{ state.windows.note.title }}</span></header>
       <div data-wm-content>composables all the way down</div>
     </section>
   </div>
@@ -162,10 +162,12 @@ wm.open({ id: 'note', title: 'Note' })
 </script>
 
 <div use:dk.desktop style="position: relative; height: 100vh">
-  <section use:dk.window={{ id: 'main' }}>
-    <header data-wm-drag><span data-wm-title>{$main?.title}</span></header>
-    <div data-wm-content>stores and actions, no wrapper components</div>
-  </section>
+  {#if $main}
+    <section use:dk.window={{ id: 'main' }}>
+      <header data-wm-drag><span data-wm-title>{$main.title}</span></header>
+      <div data-wm-content>stores and actions, no wrapper components</div>
+    </section>
+  {/if}
 </div>
 ```
 
@@ -201,37 +203,63 @@ function Desktop() {
 ## Angular
 
 ```ts
-import { AfterViewInit, Component, ElementRef, ViewChild } from '@angular/core'
-import { useWindowManager, createDesktop, useWmState } from '@surdeddd/wmkit/angular'
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, inject, input, viewChild,
+} from '@angular/core'
+import {
+  type AngularDesktop, createDesktop, useWindowManager, useWmWindow,
+} from '@surdeddd/wmkit/angular'
+
+@Component({
+  selector: 'app-hello',
+  standalone: true,
+  template: `
+    <section #panel>
+      <header data-wm-drag><span data-wm-title>Hello</span></header>
+      <div data-wm-content>signals inside</div>
+    </section>
+  `,
+})
+export class HelloComponent {
+  dk = input.required<AngularDesktop>()
+  private panel = viewChild.required<ElementRef<HTMLElement>>('panel')
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    afterNextRender(() => {
+      this.dk().window('hello', undefined, this.destroyRef)(this.panel().nativeElement)
+    })
+  }
+}
 
 @Component({
   selector: 'app-desktop',
   standalone: true,
+  imports: [HelloComponent],
   template: `
     <div #desktop style="position: relative; height: 100vh">
-      <section #hello>
-        <header data-wm-drag><span data-wm-title>Hello</span></header>
-        <div data-wm-content>signals inside</div>
-      </section>
+      @if (hello()) {
+        <app-hello [dk]="dk" />
+      }
     </div>
   `,
 })
-export class DesktopComponent implements AfterViewInit {
+export class DesktopComponent {
+  private desktop = viewChild.required<ElementRef<HTMLElement>>('desktop')
   wm = useWindowManager()
   dk = createDesktop(this.wm)
-  state = useWmState(this.wm)
-  @ViewChild('desktop') desktopRef!: ElementRef<HTMLElement>
-  @ViewChild('hello') helloRef!: ElementRef<HTMLElement>
+  hello = useWmWindow(this.wm, 'hello')
 
-  ngAfterViewInit(): void {
-    this.wm.open({ id: 'hello', title: 'Hello' })
-    this.dk.desktop(this.desktopRef.nativeElement)
-    this.dk.window('hello')(this.helloRef.nativeElement)
+  constructor() {
+    afterNextRender(() => {
+      this.dk.desktop(this.desktop().nativeElement)
+      this.wm.open({ id: 'hello', title: 'Hello' })
+    })
   }
 }
 ```
 
-`useWmState` returns a read-only `Signal<ManagerState>` and `useWmWindow(wm, id)` a computed per-window signal, so templates track updates fine-grained. Hooks called in an injection context clean up through `DestroyRef` automatically; outside one they simply skip auto-cleanup. `dk.desktop(el)` and `dk.window(id)(el)` return a function that releases the binding, and take a `DestroyRef` or `Injector` as their last argument when you bind outside an injection context.
+`useWmState` returns a read-only `Signal<ManagerState>` and `useWmWindow(wm, id)` a computed per-window signal, so templates track updates fine-grained. Hooks called in an injection context clean up through `DestroyRef` automatically; outside one they simply skip auto-cleanup. `dk.desktop(el)` and `dk.window(id)(el)` return a function that releases the binding, and take a `DestroyRef` or `Injector` as their last argument when you bind outside an injection context. Every example here renders a window only while it exists (`v-if`, `{#if}`, `<For>`, `@if`), so the framework removes the node when the window closes and renders it again when undo brings it back.
 
 ## Snap zones in action
 
@@ -335,7 +363,7 @@ button.onclick = () => popout(wm, 'docs', contentElement, { target: 'window', sc
 
 ### `createDock(desktop, options?)` — `@surdeddd/wmkit/dock`
 
-Docks windows into a layout of split panels. Drag a window onto a panel edge to split it, onto its centre to add a tab, or onto an edge of the desktop to dock beside everything. Separators resize with the pointer or the arrow keys. A docked window torn out by its titlebar floats again. Every dock operation is one undo step, and `persist` keeps the layout across reloads.
+Docks windows into a layout of split panels. Drag a window onto a panel edge to split it, onto its centre to add a tab, or onto an edge of the desktop to dock beside everything. Separators resize with the pointer or the arrow keys. A docked window torn out by its titlebar floats again. Hold Shift while dragging to keep a window floating; on a touch screen, wire the `float` option to a toggle of your own. Every dock operation is one undo step, and `persist` keeps the layout across reloads.
 
 ```js
 import { createDock } from '@surdeddd/wmkit/dock'
