@@ -27,6 +27,16 @@ test('every English page renders with a canonical link and a Russian twin', asyn
   }
 })
 
+test('a docs address without .html opens the page', async ({ page }) => {
+  for (const path of ['docs/api', 'docs/ru/api', 'docs/guides/react-draggable-resizable-window']) {
+    const response = await page.goto(path)
+    expect(response?.status(), path).toBe(200)
+    await expect(page.locator('.vp-doc h1').first(), path).toBeVisible()
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute('href')
+    expect(canonical, path).toBe(`https://wmkit.vercel.app/${path}.html`)
+  }
+})
+
 test('the sidebar navigates and the language menu switches to Russian', async ({
   page,
   isMobile,
