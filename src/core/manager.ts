@@ -86,12 +86,19 @@ function equal(a: unknown, b: unknown, depth: number, strict?: boolean): boolean
   return size === Object.keys(y).length
 }
 
+function span(start: number, size: number): [number, number] {
+  const from = Math.max(0, start)
+  return [from, start >= 0 && start + size <= 1 ? size : Math.min(1, start + size) - from]
+}
+
 function unitRect(rect: Bounds): Bounds | null {
-  const { x, y, width, height } = rect
-  if (!finite(x, y, width, height) || Math.min(x, y, width, height) < 0 || Math.max(x, y) > 1) {
+  if (!finite(rect.x, rect.y, rect.width, rect.height) || Math.min(rect.width, rect.height) < 0) {
     return null
   }
-  return { x, y, width: x + width <= 1 ? width : 1 - x, height: y + height <= 1 ? height : 1 - y }
+  const [x, width] = span(rect.x, rect.width)
+  const [y, height] = span(rect.y, rect.height)
+  const inside = Math.min(rect.x, rect.y) >= 0 && Math.max(rect.x, rect.y) <= 1
+  return inside || (width > 0 && height > 0) ? { x, y, width, height } : null
 }
 
 export function createWindowManager(options: ManagerOptions = {}): WindowManager {

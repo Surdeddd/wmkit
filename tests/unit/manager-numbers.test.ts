@@ -96,16 +96,25 @@ describe('non-finite numbers never enter the state', () => {
     expect(wm.get('a')).toBe(before)
   })
 
-  it('clamps a snapTo rectangle into the viewport and refuses one that starts outside it', () => {
+  it('clamps a snapTo rectangle to the part inside the viewport and refuses one without overlap', () => {
     const wm = makeWm()
     expect(wm.snapTo('a', { x: 2, y: 2, width: 3, height: 3 })).toBe(false)
-    expect(wm.snapTo('a', { x: -1, y: 0.5, width: 3, height: 3 })).toBe(false)
+    expect(wm.snapTo('a', { x: 1.5, y: 0, width: 0.5, height: 1 })).toBe(false)
+    expect(wm.snapTo('a', { x: -0.5, y: 0, width: 0.25, height: 1 })).toBe(false)
+    expect(wm.snapTo('a', { x: -0.5, y: 0, width: 0.5, height: 1 })).toBe(false)
     expect(wm.snapTo('a', { x: 0.5, y: 0, width: -0.25, height: 1 })).toBe(false)
     expect(wm.get('a')?.stage).toBe('normal')
     expect(wm.snapTo('a', { x: 0, y: 0.5, width: 3, height: 3 })).toBe(true)
     expect(wm.get('a')).toMatchObject({
       snapRect: { x: 0, y: 0.5, width: 1, height: 0.5 },
       bounds: { x: 0, y: 300, width: 800, height: 300 },
+    })
+    expect(wm.snapTo('a', { x: -1, y: 0.5, width: 3, height: 3 })).toBe(true)
+    expect(wm.get('a')?.snapRect).toEqual({ x: 0, y: 0.5, width: 1, height: 0.5 })
+    expect(wm.snapTo('a', { x: -0.25, y: 0, width: 0.5, height: 1 })).toBe(true)
+    expect(wm.get('a')).toMatchObject({
+      snapRect: { x: 0, y: 0, width: 0.25, height: 1 },
+      bounds: { x: 0, y: 0, width: 200, height: 600 },
     })
   })
 
@@ -294,6 +303,18 @@ describe('hydrate repairs a window instead of rejecting the snapshot', () => {
     const c = wm.open({ id: 'c' })
     expect(wm.get('a')?.openedSeq).toBe(1)
     expect([b.openedSeq, c.openedSeq]).toEqual([2, 3])
+  })
+
+  it('clamps a stored snap rectangle that overlaps the viewport and drops one that does not', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.hydrate(snapshot({ stage: 'snapped', snapRect: { x: -0.25, y: 0, width: 0.5, height: 1 } }))
+    expect(wm.get('a')).toMatchObject({
+      stage: 'snapped',
+      snapRect: { x: 0, y: 0, width: 0.25, height: 1 },
+      bounds: { x: 0, y: 0, width: 200, height: 600 },
+    })
+    wm.hydrate(snapshot({ stage: 'snapped', snapRect: { x: 2, y: 0, width: 0.5, height: 1 } }))
+    expect(wm.get('a')).toMatchObject({ stage: 'normal', snapRect: null })
   })
 
   it('turns a window snapped to nothing into a normal one', () => {
