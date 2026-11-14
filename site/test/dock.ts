@@ -75,4 +75,11 @@ if (wm.getState().order.length === 0) {
 }
 for (const id of wm.getState().order) mount(id)
 
+const own = new Set(defaults.map((init) => init.id))
+wm.subscribe((state) => {
+  for (const id of state.order) {
+    if (own.has(id) && !element.querySelector(`[data-wm-window="${id}"]`)) mount(id)
+  }
+})
+
 Object.assign(window, { __dock: Object.assign(hooks, { wm, dock, store }) })
