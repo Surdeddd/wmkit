@@ -6,7 +6,7 @@ import type {
   WindowState,
   WindowUpdate,
 } from '../../core/types'
-import type { DesktopController, DropHit, Point } from '../../dom/shared'
+import { type DesktopController, type DropHit, lostRelease, type Point } from '../../dom/shared'
 import {
   activate,
   type DockGeometry,
@@ -592,6 +592,9 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       const lost = (lostEvent: PointerEvent) => {
         if (lostEvent.pointerId === event.pointerId) finish(true)
       }
+      const stray = (strayEvent: PointerEvent) => {
+        if (lostRelease(strayEvent, event)) finish(false)
+      }
       const onEscape = (keyEvent: KeyboardEvent) => {
         if (keyEvent.key !== 'Escape') return
         keyEvent.preventDefault()
@@ -602,6 +605,8 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
         sliding = null
         if (raf !== 0) view.cancelAnimationFrame(raf)
         node.removeEventListener('pointermove', move)
+        doc.removeEventListener('pointerdown', stray, true)
+        doc.removeEventListener('pointermove', stray, true)
         doc.removeEventListener('pointerup', up, true)
         doc.removeEventListener('pointercancel', lost, true)
         doc.removeEventListener('lostpointercapture', lost, true)
@@ -618,6 +623,8 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
       }
       sliding = { key, finish }
       node.addEventListener('pointermove', move)
+      doc.addEventListener('pointerdown', stray, true)
+      doc.addEventListener('pointermove', stray, true)
       doc.addEventListener('pointerup', up, true)
       doc.addEventListener('pointercancel', lost, true)
       doc.addEventListener('lostpointercapture', lost, true)

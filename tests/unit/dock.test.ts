@@ -514,6 +514,29 @@ describe('separators', () => {
     expect(h.wm.get('a')?.bounds.width).toBe(497)
   })
 
+  it('ends a drag whose release was never heard when the same pointer presses again', () => {
+    const h = twoPanels()
+    h.wm.clearHistory()
+    const sash = h.sashes()[0] as HTMLElement
+    sash.dispatchEvent(pointer('pointerdown', 500, 300))
+    sash.dispatchEvent(pointer('pointermove', 560, 300))
+    h.flush()
+    expect(h.wm.get('a')?.bounds.width).toBe(557)
+    document.body.dispatchEvent(pointer('pointerdown', 20, 20, 2))
+    expect(sash.hasAttribute('data-wm-active')).toBe(true)
+    document.body.dispatchEvent(pointer('pointerdown', 20, 20))
+    expect(sash.hasAttribute('data-wm-active')).toBe(false)
+    expect(h.wm.get('a')?.bounds.width).toBe(557)
+
+    sash.dispatchEvent(pointer('pointerdown', 560, 300))
+    sash.dispatchEvent(pointer('pointermove', 600, 300))
+    h.flush()
+    sash.dispatchEvent(pointer('pointerup', 600, 300))
+    expect(h.wm.get('a')?.bounds.width).toBe(597)
+    expect(h.wm.undo()).toBe(true)
+    expect(h.wm.get('a')?.bounds.width).toBe(557)
+  })
+
   it('cancels a drag on Escape or a lost capture, and ignores other buttons', () => {
     const h = twoPanels()
     const sash = h.sashes()[0] as HTMLElement
