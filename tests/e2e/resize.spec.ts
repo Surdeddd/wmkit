@@ -111,3 +111,42 @@ test('a resize released outside the page is over by the next mouse move, and the
   expect(Math.abs(after.x - before.x - 90)).toBeLessThanOrEqual(2)
   expect(Math.abs(after.y - before.y - 70)).toBeLessThanOrEqual(2)
 })
+
+test('a right click in the middle of a resize opens no menu and the resize ends at its release', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'a second mouse button needs a desktop pointer')
+  const target = await freshWindow(page)
+  const before = await boxOf(target)
+  const grip = await boxOf(target.locator('[data-wm-resize="se"]'))
+  const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
+  await page.evaluate(() => {
+    const seen: string[] = []
+    Object.assign(globalThis, { __menus: seen })
+    document.body.addEventListener('contextmenu', (event) => {
+      seen.push(event.defaultPrevented ? 'prevented' : 'open')
+    })
+  })
+
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 30, from.y + 20, { steps: 3 })
+  await page.mouse.down({ button: 'right' })
+  await page.mouse.up({ button: 'right' })
+  await page.mouse.move(from.x + 70, from.y + 50, { steps: 3 })
+  await page.mouse.up()
+
+  const after = await boxOf(target)
+  expect(
+    Math.abs(after.width - before.width - 70),
+    'the resize stopped at the right click',
+  ).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.height - before.height - 50)).toBeLessThanOrEqual(2)
+  await expect
+    .poll(() => target.evaluate((node: HTMLElement) => node.dataset.wmResizing ?? null))
+    .toBeNull()
+  expect(
+    await page.evaluate(() => (globalThis as unknown as { __menus: string[] }).__menus),
+  ).toEqual([])
+})

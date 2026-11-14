@@ -173,6 +173,21 @@ export function lostRelease(event: PointerEvent, press: PointerEvent): boolean {
   )
 }
 
+export function regained(event: PointerEvent, holder: HTMLElement): boolean {
+  if (event.type !== 'lostpointercapture' || !(event.buttons & 1)) return false
+  try {
+    holder.setPointerCapture(event.pointerId)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function muteMenu(event: Event): void {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
 export function windowOf(element: HTMLElement): Window & typeof globalThis {
   const view = element.ownerDocument.defaultView
   if (!view) throw new Error('wmkit: desktop element is not attached to a document')

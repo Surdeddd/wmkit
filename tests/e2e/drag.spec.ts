@@ -259,3 +259,41 @@ test('a window closed in the middle of its drag comes back where the drag began'
   expect(await page.evaluate(() => window.__wm.undo())).toBe(true)
   expect(await page.evaluate(() => window.__wm.get('fixed'))).toEqual(before)
 })
+
+test('a right click in the middle of a drag opens no menu and the drag ends at its release', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'a second mouse button needs a desktop pointer')
+  await spawn(page, 'fixed')
+  const window = win(page, 'fixed')
+  const before = await boxOf(window)
+  const grip = await boxOf(handle(page, 'fixed'))
+  const from = { x: grip.x + 40, y: grip.y + grip.height / 2 }
+  await page.evaluate(() => {
+    const seen: string[] = []
+    Object.assign(globalThis, { __menus: seen })
+    document.body.addEventListener('contextmenu', (event) => {
+      seen.push(event.defaultPrevented ? 'prevented' : 'open')
+    })
+  })
+
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 60, from.y + 40, { steps: 4 })
+  await page.mouse.down({ button: 'right' })
+  await page.mouse.up({ button: 'right' })
+  await page.mouse.move(from.x + 120, from.y + 80, { steps: 4 })
+  await page.mouse.up()
+
+  const after = await boxOf(window)
+  expect(
+    Math.abs(after.x - before.x - 120),
+    'the drag stopped at the right click',
+  ).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.y - before.y - 80)).toBeLessThanOrEqual(2)
+  await expect(window).not.toHaveAttribute('data-wm-dragging', '')
+  expect(
+    await page.evaluate(() => (globalThis as unknown as { __menus: string[] }).__menus),
+  ).toEqual([])
+})

@@ -4,7 +4,9 @@ import {
   type ActiveDrag,
   type DropHit,
   lostRelease,
+  muteMenu,
   type Point,
+  regained,
   type SessionContext,
 } from './shared'
 
@@ -234,7 +236,7 @@ export function createDragStarter(ctx: SessionContext) {
     }
 
     function onCancel(cancelEvent: PointerEvent): void {
-      if (cancelEvent.pointerId !== session.pointerId) return
+      if (cancelEvent.pointerId !== session.pointerId || regained(cancelEvent, handle)) return
       finish(true)
     }
 
@@ -276,9 +278,10 @@ export function createDragStarter(ctx: SessionContext) {
         }
       } finally {
         releaseRect()
-        handle.removeEventListener('pointermove', onMove)
         doc.removeEventListener('pointerdown', onStray, true)
         doc.removeEventListener('pointermove', onStray, true)
+        doc.removeEventListener('pointermove', onMove, true)
+        doc.removeEventListener('contextmenu', onMenu, true)
         doc.removeEventListener('pointerup', onUp, true)
         doc.removeEventListener('pointercancel', onCancel, true)
         doc.removeEventListener('lostpointercapture', onCancel, true)
@@ -302,11 +305,16 @@ export function createDragStarter(ctx: SessionContext) {
       if (lostRelease(strayEvent, event)) finish(false)
     }
 
+    function onMenu(menuEvent: Event): void {
+      if (session.moved) muteMenu(menuEvent)
+    }
+
     wm.beginInteraction()
     ctx.claimDrag(session)
-    handle.addEventListener('pointermove', onMove)
     doc.addEventListener('pointerdown', onStray, true)
     doc.addEventListener('pointermove', onStray, true)
+    doc.addEventListener('pointermove', onMove, true)
+    doc.addEventListener('contextmenu', onMenu, true)
     doc.addEventListener('pointerup', onUp, true)
     doc.addEventListener('pointercancel', onCancel, true)
     doc.addEventListener('lostpointercapture', onCancel, true)

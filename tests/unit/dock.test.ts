@@ -15,6 +15,7 @@ import {
 
 const VIEWPORT = { width: 1000, height: 600 }
 const frames: Array<() => void> = []
+const made: Array<{ destroy(): void }> = []
 
 function pointer(type: string, x: number, y: number, pointerId = 1): PointerEvent {
   const event = new MouseEvent(type, {
@@ -50,7 +51,9 @@ function setup(
   const element = document.createElement('div')
   document.body.append(element)
   const desktop = attachDesktop(wm, element, { autoViewport: false, magnetism: false })
+  made.push(desktop)
   const dock = createDock(desktop, options)
+  made.push(dock)
   return {
     wm,
     desktop,
@@ -87,6 +90,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.stubGlobal('cancelAnimationFrame', () => {})
+  for (const item of made.splice(0).reverse()) item.destroy()
   frames.length = 0
   vi.unstubAllGlobals()
   document.body.replaceChildren()
@@ -1547,5 +1552,89 @@ describe('a step back to a state the dock saw before its own change', () => {
     expect(h.sashes()).toHaveLength(0)
     h.wm.undo()
     expect(h.sashes().map((sash) => `${sash.style.left} ${sash.style.top}`)).toEqual(before)
+  })
+})
+
+describe('a context menu asked for while a separator is dragged', () => {
+  it('is swallowed until the release, then opens as usual', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    const sash = h.sashes()[0] as HTMLElement
+    const heard = vi.fn()
+    document.body.addEventListener('contextmenu', heard)
+    const menu = () => new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+
+    sash.dispatchEvent(pointer('pointerdown', 500, 300))
+    const during = menu()
+    sash.dispatchEvent(during)
+    expect(during.defaultPrevented).toBe(true)
+    expect(heard).not.toHaveBeenCalled()
+
+    sash.dispatchEvent(pointer('pointermove', 560, 300))
+    h.flush()
+    sash.dispatchEvent(pointer('pointerup', 560, 300))
+    expect(h.wm.get('a')?.bounds.width).toBe(557)
+
+    const after = menu()
+    sash.dispatchEvent(after)
+    expect(after.defaultPrevented).toBe(false)
+    expect(heard).toHaveBeenCalledTimes(1)
+    document.body.removeEventListener('contextmenu', heard)
+  })
+})
+
+describe('the capture taken from a separator while the button is still held', () => {
+  it('is taken back, and the separator goes on to its release', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    const sash = h.sashes()[0] as HTMLElement
+    const held = (type: string, x: number) => {
+      const event = pointer(type, x, 300)
+      Object.defineProperty(event, 'buttons', { value: 1 })
+      return event
+    }
+    sash.dispatchEvent(held('pointerdown', 500))
+    sash.dispatchEvent(held('pointermove', 530))
+    h.flush()
+    const capture = vi.fn()
+    Element.prototype.setPointerCapture = capture
+
+    sash.dispatchEvent(held('lostpointercapture', 530))
+    expect(capture).toHaveBeenCalledWith(1)
+    expect(sash.hasAttribute('data-wm-active'), 'the separator drag was cancelled').toBe(true)
+
+    document.body.dispatchEvent(held('pointermove', 560))
+    h.flush()
+    document.body.dispatchEvent(pointer('pointerup', 560, 300))
+    expect(
+      h.wm.get('a')?.bounds.width,
+      'moves that no longer reach the separator were not followed',
+    ).toBe(557)
+  })
+
+  it('cancels the separator drag when it cannot be taken back', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    const sash = h.sashes()[0] as HTMLElement
+    sash.dispatchEvent(pointer('pointerdown', 500, 300))
+    sash.dispatchEvent(pointer('pointermove', 530, 300))
+    h.flush()
+    Element.prototype.setPointerCapture = () => {
+      throw new DOMException('gone', 'InvalidStateError')
+    }
+    const event = pointer('lostpointercapture', 530, 300)
+    Object.defineProperty(event, 'buttons', { value: 1 })
+    sash.dispatchEvent(event)
+    expect(sash.hasAttribute('data-wm-active')).toBe(false)
+    expect(h.wm.get('a')?.bounds.width).toBe(497)
   })
 })

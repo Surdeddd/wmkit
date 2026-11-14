@@ -48,6 +48,7 @@ interface Harness {
 }
 
 const frames: Array<() => void> = []
+const desktops: DesktopController[] = []
 
 function makeHarness(options: DesktopOptions = {}): Harness {
   stubPointerCapture()
@@ -61,6 +62,7 @@ function makeHarness(options: DesktopOptions = {}): Harness {
   document.body.append(element)
   const wm = createWindowManager({ viewport: VIEWPORT })
   const desktop = attachDesktop(wm, element, { autoViewport: false, announce: false, ...options })
+  desktops.push(desktop)
 
   return {
     wm,
@@ -112,6 +114,8 @@ function placeTitlebar(handle: Element, left: number, top: number, width = 200, 
 }
 
 afterEach(() => {
+  vi.stubGlobal('cancelAnimationFrame', () => {})
+  for (const desktop of desktops.splice(0)) desktop.destroy()
   frames.length = 0
   vi.unstubAllGlobals()
   document.body.replaceChildren()
