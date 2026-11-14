@@ -344,6 +344,17 @@ desktop.mountWindow('notes', 'mine').content.append(myApp)
 
 `data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` и `data-wm-to-workspace="2"` читаются прямо из вашей разметки. Каждая подстановка `{{...}}` экранируется и может стоять только в тексте или в атрибуте `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` или `label` в кавычках; в любом другом месте `skin()` бросает ошибку. За дальнейшими изменениями следует только `{{title}}` внутри `[data-wm-title]`. `shadow: true` запечатывает обвязку в открытом теневом корне, не теряя ни группировку, ни ловушку фокуса, ни доступное имя — подробности в [docs/recipes.ru.md](docs/recipes.ru.md).
 
+### `createLayoutPicker(desktop, options?)`, `linkSnapped(desktop, options?)` — `@surdeddd/wmkit/layouts`
+
+Меню раскладок, которое открывается, когда мышь задержалась на кнопке развёртывания, из её контекстного меню или по долгому нажатию и по `Ctrl/Cmd+Alt+L`: выберите область — и окно встанет туда. `linkSnapped` кладёт разделитель на общую границу прилипших соседей, так что оба меняют размер вместе, указателем или с клавиатуры, одним шагом undo.
+
+```js
+import { createLayoutPicker, layoutMessagesRu, linkSnapped } from '@surdeddd/wmkit/layouts'
+
+const picker = createLayoutPicker(desktop, { messages: layoutMessagesRu })
+const link = linkSnapped(desktop, { messages: layoutMessagesRu })
+```
+
 ### `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 Готовая панель задач: по кнопке на окно в порядке открытия, одна кнопка на группу вкладок, клик фокусирует, возвращает или сворачивает окно, средняя кнопка просит его закрыться, а по самой панели ходят стрелками — это одна остановка Tab. Панель следует за менеджером, а не за DOM, и не приносит стилей.

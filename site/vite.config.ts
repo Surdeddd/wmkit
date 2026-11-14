@@ -96,6 +96,9 @@ export default defineConfig({
       '@surdeddd/wmkit/taskbar': fileURLToPath(
         new URL('../src/plugins/taskbar/index.ts', import.meta.url),
       ),
+      '@surdeddd/wmkit/layouts': fileURLToPath(
+        new URL('../src/plugins/layouts/index.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },

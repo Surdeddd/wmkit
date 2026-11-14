@@ -986,6 +986,81 @@ To remove docking for good while the manager lives on, call `dock.setLayout({ ro
 
 A change that does not concern the dock costs it nothing. `area` is called again only when the viewport, the layout, the workspace or a docked window changes; if your `area` depends on state of your own, call `dock.setLayout(dock.layout())` to make the dock read it again.
 
+## `createLayoutPicker(desktop, options?)`, `linkSnapped(desktop, options?)` — `@surdeddd/wmkit/layouts`
+
+```ts
+type SnapLayout = readonly Bounds[]   // areas in viewport fractions, like the rectangle of snapTo
+
+const snapLayouts: {
+  halves: readonly [Bounds, Bounds]
+  wide: readonly [Bounds, Bounds]              // two thirds and one third
+  thirds: readonly [Bounds, Bounds, Bounds]
+  quarters: readonly [Bounds, Bounds, Bounds, Bounds]
+}
+
+interface LayoutPickerOptions {
+  layouts?: readonly SnapLayout[]     // the four above
+  messages?: Partial<LayoutMessages>
+  hover?: number | false              // 400 — ms a mouse rests on a maximize button; false turns hover off
+  shortcut?: boolean                  // true — Ctrl/Cmd+Alt+L
+}
+
+interface LayoutPicker {
+  element: HTMLElement
+  open(id: string): boolean
+  close(): void
+  destroy(): void
+}
+
+interface SeamOptions {
+  size?: number                       // 8, or 16 on coarse pointers — thickness of a separator in px
+  step?: number                       // 16 — px one arrow key moves it
+  messages?: Partial<LayoutMessages>
+}
+
+interface LayoutMessages {
+  label: string                                             // 'Snap layouts'
+  cell(layout: number, area: number, areas: number): string // 'Layout 2, area 1 of 3'
+  seam: string                                              // 'Resize the windows on both sides'
+}
+
+const layoutMessages: LayoutMessages     // the English catalogue
+const layoutMessagesRu: LayoutMessages   // the Russian one
+```
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createLayoutPicker, linkSnapped, snapLayouts } from '@surdeddd/wmkit/layouts'
+
+const wm = createWindowManager()
+const desktop = attachDesktop(wm, document.querySelector('#desktop'))
+
+const picker = createLayoutPicker(desktop, {
+  layouts: [
+    snapLayouts.halves,
+    [
+      { x: 0, y: 0, width: 0.6, height: 1 },
+      { x: 0.6, y: 0, width: 0.4, height: 0.5 },
+      { x: 0.6, y: 0.5, width: 0.4, height: 0.5 },
+    ],
+  ],
+})
+const link = linkSnapped(desktop)
+```
+
+`createLayoutPicker` adds a small menu of layouts to the desktop: each layout is drawn as a thumbnail, and each of its areas is a button that sends the window there with `wm.snapTo(id, area)` and focuses it, in one undo step. The menu opens for one window at a time:
+
+- a mouse that rests on a `data-wm-maximize` button for `hover` milliseconds opens it under that button, and it closes shortly after the pointer has left both the button and the menu;
+- the context menu of a maximize button opens it too — a right click, a long press on a touch screen, or the menu key while the button has the focus;
+- `Ctrl/Cmd+Alt+L` opens it for the focused window;
+- `picker.open(id)` opens it from your own code and returns `false` for a window that is missing, minimized or not `snappable`, and when there is no layout to show.
+
+Opened from the keyboard or the context menu, the menu takes the focus on its first area. The arrow keys walk the areas across all layouts and wrap, Home and End jump to the ends, Enter and Space choose, and Escape or Tab close it and return the focus to the window. A press outside, focus leaving the menu, or the window closing, minimizing or losing `snappable` close it as well. The element is `[data-wm-layouts][role=menu]` with a `[data-wm-layout][role=group]` per layout and a `button[data-wm-layout-cell][role=menuitem]` per area, named by `messages.cell`; the maximize button it hangs from carries `aria-expanded="true"` while it is open. An area that is not a finite rectangle inside the unit square is left out, and so is a layout with no area left.
+
+`linkSnapped` links snapped windows that share an edge. Wherever one window ends on a line and another begins on it, side by side or one above the other, a `div[data-wm-seam][role=separator]` lies on that line; dragging it, or focusing it and pressing the arrow keys, Home or End, moves the line and resizes every window that touches it — a tall window and the two stacked beside it move together. One drag is one undo step, Escape puts everything back, and the line stops where the `minSize` or `maxSize` of a window on either side says. A drag whose release the page never heard ends, keeping what it moved, with the next press or the next mouse move without a button. Windows snapped by zone take part and become `snapTo` windows on the first movement. Windows that are not `resizable` are left out, which keeps docked panels to the dock's own separators. While a separator is dragged it carries `data-wm-active` and its windows `data-wm-live`, so themes drop the geometry transition.
+
+Both inject one small stylesheet each, shared between instances and removed with the last one; it reads the theme tokens of the desktop and falls back to neutral colours. `destroy()` removes what was added and may be called more than once.
+
 ## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 ```ts

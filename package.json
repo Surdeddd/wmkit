@@ -258,6 +258,16 @@
         "default": "./dist/taskbar/define.cjs"
       }
     },
+    "./layouts": {
+      "import": {
+        "types": "./dist/layouts.d.ts",
+        "default": "./dist/layouts.js"
+      },
+      "require": {
+        "types": "./dist/layouts.d.cts",
+        "default": "./dist/layouts.cjs"
+      }
+    },
     "./themes": {
       "import": {
         "types": "./dist/themes.d.ts",
@@ -496,6 +506,11 @@
       "limit": "2 kB"
     },
     {
+      "name": "layouts plugin",
+      "path": "dist/layouts.js",
+      "limit": "2.5 kB"
+    },
+    {
       "name": "themes as text",
       "path": "dist/themes.js",
       "limit": "8 kB"
@@ -565,6 +580,9 @@
       ],
       "taskbar/define": [
         "./dist/taskbar/define.d.ts"
+      ],
+      "layouts": [
+        "./dist/layouts.d.ts"
       ]
     }
   },

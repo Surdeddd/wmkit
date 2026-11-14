@@ -986,6 +986,81 @@ createDock(desktop, {
 
 Изменение, которое не касается дока, ему ничего не стоит. `area` вызывается снова, только когда меняется вьюпорт, раскладка, рабочий стол или закреплённое окно; если ваш `area` зависит от вашего собственного состояния, вызовите `dock.setLayout(dock.layout())`, чтобы док перечитал его.
 
+## `createLayoutPicker(desktop, options?)`, `linkSnapped(desktop, options?)` — `@surdeddd/wmkit/layouts`
+
+```ts
+type SnapLayout = readonly Bounds[]   // areas in viewport fractions, like the rectangle of snapTo
+
+const snapLayouts: {
+  halves: readonly [Bounds, Bounds]
+  wide: readonly [Bounds, Bounds]              // two thirds and one third
+  thirds: readonly [Bounds, Bounds, Bounds]
+  quarters: readonly [Bounds, Bounds, Bounds, Bounds]
+}
+
+interface LayoutPickerOptions {
+  layouts?: readonly SnapLayout[]     // the four above
+  messages?: Partial<LayoutMessages>
+  hover?: number | false              // 400 — ms a mouse rests on a maximize button; false turns hover off
+  shortcut?: boolean                  // true — Ctrl/Cmd+Alt+L
+}
+
+interface LayoutPicker {
+  element: HTMLElement
+  open(id: string): boolean
+  close(): void
+  destroy(): void
+}
+
+interface SeamOptions {
+  size?: number                       // 8, or 16 on coarse pointers — thickness of a separator in px
+  step?: number                       // 16 — px one arrow key moves it
+  messages?: Partial<LayoutMessages>
+}
+
+interface LayoutMessages {
+  label: string                                             // 'Snap layouts'
+  cell(layout: number, area: number, areas: number): string // 'Layout 2, area 1 of 3'
+  seam: string                                              // 'Resize the windows on both sides'
+}
+
+const layoutMessages: LayoutMessages     // the English catalogue
+const layoutMessagesRu: LayoutMessages   // the Russian one
+```
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createLayoutPicker, linkSnapped, snapLayouts } from '@surdeddd/wmkit/layouts'
+
+const wm = createWindowManager()
+const desktop = attachDesktop(wm, document.querySelector('#desktop'))
+
+const picker = createLayoutPicker(desktop, {
+  layouts: [
+    snapLayouts.halves,
+    [
+      { x: 0, y: 0, width: 0.6, height: 1 },
+      { x: 0.6, y: 0, width: 0.4, height: 0.5 },
+      { x: 0.6, y: 0.5, width: 0.4, height: 0.5 },
+    ],
+  ],
+})
+const link = linkSnapped(desktop)
+```
+
+`createLayoutPicker` добавляет на рабочий стол небольшое меню раскладок: каждая раскладка нарисована миниатюрой, а каждая её область — кнопка, которая отправляет окно туда через `wm.snapTo(id, area)` и фокусирует его, одним шагом undo. Меню открывается для одного окна за раз:
+
+- мышь, задержавшаяся на кнопке `data-wm-maximize` на `hover` миллисекунд, открывает его под этой кнопкой, а закрывается оно вскоре после того, как указатель ушёл и с кнопки, и с меню;
+- контекстное меню кнопки развёртывания тоже его открывает — правый клик, долгое нажатие на тач-экране или клавиша меню, пока кнопка в фокусе;
+- `Ctrl/Cmd+Alt+L` открывает его для окна в фокусе;
+- `picker.open(id)` открывает его из вашего кода и возвращает `false` для окна, которого нет, которое свёрнуто или не `snappable`, и когда показывать нечего.
+
+Открытое с клавиатуры или из контекстного меню, оно забирает фокус на первую область. Стрелки ходят по областям всех раскладок по кругу, Home и End прыгают к краям, Enter и пробел выбирают, а Escape и Tab закрывают меню и возвращают фокус окну. Нажатие снаружи, уход фокуса из меню, закрытие окна, его сворачивание или потеря `snappable` тоже его закрывают. Элемент — `[data-wm-layouts][role=menu]`, в нём `[data-wm-layout][role=group]` на раскладку и `button[data-wm-layout-cell][role=menuitem]` на область с именем из `messages.cell`; кнопка развёртывания, под которой висит меню, несёт `aria-expanded="true"`, пока оно открыто. Область, которая не является конечным прямоугольником внутри единичного квадрата, пропускается, как и раскладка, в которой не осталось областей.
+
+`linkSnapped` связывает прилипшие окна с общей границей. Везде, где одно окно кончается на линии, а другое на ней начинается, бок о бок или одно над другим, на этой линии лежит `div[data-wm-seam][role=separator]`; если его тащить или сфокусировать и нажимать стрелки, Home или End, линия сдвигается и меняет размер всех окон, которые её касаются, — высокое окно и два, стоящие рядом друг над другом, двигаются вместе. Одно перетаскивание — один шаг undo, Escape возвращает всё назад, а линия останавливается там, где велят `minSize` или `maxSize` окна по любую сторону. Перетаскивание, отпускание которого страница не услышала, завершается, сохраняя сдвиг, со следующим нажатием или движением мыши без кнопки. Окна, прилипшие к зоне, участвуют и с первым движением становятся окнами `snapTo`. Окна, которые не `resizable`, не участвуют, поэтому панели дока остаются при своих разделителях. Пока разделитель тащат, он несёт `data-wm-active`, а его окна — `data-wm-live`, так что темы отключают переход геометрии.
+
+Оба добавляют по одной небольшой таблице стилей, общей для всех экземпляров; она уходит вместе с последним, читает токены темы рабочего стола и подставляет нейтральные цвета, если их нет. `destroy()` убирает всё добавленное, вызывать его можно не один раз.
+
 ## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 ```ts

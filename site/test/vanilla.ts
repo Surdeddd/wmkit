@@ -5,6 +5,7 @@ import {
   type WindowState,
 } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
+import { createLayoutPicker, linkSnapped } from '@surdeddd/wmkit/layouts'
 import { persist } from '@surdeddd/wmkit/persist'
 import { popout } from '@surdeddd/wmkit/popout'
 import { createTaskbar } from '@surdeddd/wmkit/taskbar'
@@ -197,6 +198,8 @@ declare global {
       attachDesktop: typeof attachDesktop
       createWindowManager: typeof createWindowManager
       createTaskbar: typeof createTaskbar
+      createLayoutPicker: typeof createLayoutPicker
+      linkSnapped: typeof linkSnapped
     }
   }
 }
@@ -204,4 +207,10 @@ window.__wm = wm
 window.__spawn = spawn
 window.__desktop = desktop
 window.__popout = popout
-window.__wmkit = { attachDesktop, createWindowManager, createTaskbar }
+window.__wmkit = {
+  attachDesktop,
+  createWindowManager,
+  createTaskbar,
+  createLayoutPicker,
+  linkSnapped,
+}

@@ -239,7 +239,7 @@ wm.update('player', { aspectRatio: null })   // снять фиксацию
 
 ## Свои раскладки снэпа
 
-`zoneBounds` и `detectSnapZone` экспортируются, так что выбор раскладки можно собрать, не трогая код перетаскивания.
+В пакете есть готовый выбор раскладки: [`createLayoutPicker`](./api.ru.md#createlayoutpickerdesktop-options-linksnappeddesktop-options--surdedddwmkitlayouts) вешает меню раскладок на кнопку развёртывания и принимает ваши раскладки, а `linkSnapped` даёт менять размер соседей за общую границу. Чтобы собрать свой, возьмите `zoneBounds` и `detectSnapZone`: они экспортируются, и код перетаскивания трогать не придётся.
 
 ```js
 import { zoneBounds } from '@surdeddd/wmkit'

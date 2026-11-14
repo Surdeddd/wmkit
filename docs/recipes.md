@@ -239,7 +239,7 @@ The ratio is enforced on open, on `resize` and on `update`. During a pointer res
 
 ## Custom snap layouts
 
-`zoneBounds` and `detectSnapZone` are exported, so you can build a layout picker without touching the drag code.
+The package has a picker ready: [`createLayoutPicker`](./api.md#createlayoutpickerdesktop-options-linksnappeddesktop-options--surdedddwmkitlayouts) hangs a menu of layouts on the maximize button and takes your own layouts, and `linkSnapped` lets neighbours be resized by their shared edge. To build one yourself, `zoneBounds` and `detectSnapZone` are exported, so you can do it without touching the drag code.
 
 ```js
 import { zoneBounds } from '@surdeddd/wmkit'

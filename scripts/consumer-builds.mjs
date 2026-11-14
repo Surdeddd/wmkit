@@ -43,6 +43,7 @@ import { createDock, type DockOptions } from '@surdeddd/wmkit/dock'
 import { defineWmElements, type WmDesktopElement } from '@surdeddd/wmkit/elements'
 import '@surdeddd/wmkit/elements/define'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
+import { createLayoutPicker, type SnapLayout, snapLayouts } from '@surdeddd/wmkit/layouts'
 import { WmStateController, wmDesktop, wmWindow } from '@surdeddd/wmkit/lit'
 import { type PersistOptions, persist } from '@surdeddd/wmkit/persist'
 import { isPopoutSupported, type PopoutOptions, popout } from '@surdeddd/wmkit/popout'
@@ -70,6 +71,7 @@ const desk: DesktopOptions = {
 }
 const docking: DockOptions = { sash: 8 }
 const tasks: TaskbarOptions = { show: 'minimized', workspace: 'all' }
+const columns: SnapLayout = [snapLayouts.halves[0], { x: 0.5, y: 0, width: 0.5, height: 1 }]
 const saving: PersistOptions = { key: 'app' }
 const out: PopoutOptions = { width: 400 }
 const box: WinBoxOptions = { title: 'Box' }
@@ -97,6 +99,7 @@ export function run(element: HTMLElement): unknown[] {
     isPopoutSupported(),
     createDevtools(wm),
     createTaskbar(wm, element, tasks).targetOf(win),
+    createLayoutPicker(desktop, { layouts: [columns], hover: false }).open(win.id),
     touchGestures({ pinch: { threshold: 12 } }),
     skin({ template: '<section><div data-wm-content></div></section>' }),
     windowChrome(),
