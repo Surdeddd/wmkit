@@ -520,3 +520,20 @@ describe('closed panels', () => {
     expect(closedList(desktop)).toEqual(['a'])
   })
 })
+
+describe('a page whose HTMLElement is missing when the module loads', () => {
+  it('gets plain classes and defines nothing', async () => {
+    vi.resetModules()
+    vi.stubGlobal('HTMLElement', undefined)
+    vi.stubGlobal('customElements', undefined)
+    try {
+      const elements = await import('../../src/plugins/elements')
+      expect(Object.getPrototypeOf(elements.WmDesktopElement)).toBe(Object)
+      expect(() => elements.defineWmElements({ prefix: 'bare' })).not.toThrow()
+      expect(new elements.WmWindowElement().windowId).toBeNull()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
+})

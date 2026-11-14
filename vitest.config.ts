@@ -30,15 +30,9 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/plugins/**', 'src/dom/**', 'src/adapters/**'],
+      include: ['src/**/*.ts'],
       exclude: ['src/adapters/qwik.ts'],
-      thresholds: {
-        'src/core/**': { statements: 100, lines: 100, functions: 100, branches: 100 },
-        'src/dom/**': { statements: 100, lines: 100, functions: 100, branches: 90 },
-        'src/adapters/**': { statements: 100, lines: 100, functions: 100, branches: 98 },
-        'src/plugins/**': { statements: 100, lines: 100, functions: 100, branches: 97 },
-        'src/plugins/persist.ts': { statements: 100, lines: 100, functions: 100, branches: 100 },
-      },
+      thresholds: { statements: 100, lines: 100, functions: 100, branches: 100 },
       reporter: ['text', 'html'],
     },
   },

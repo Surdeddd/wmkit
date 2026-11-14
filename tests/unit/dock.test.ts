@@ -1558,6 +1558,32 @@ describe('a step back to a state the dock saw before its own change', () => {
   })
 })
 
+describe('a docked window that closes while a separator is dragged', () => {
+  it('no longer counts toward the limits, and the drag goes on between the panels left', () => {
+    const h = setup()
+    for (const id of ['a', 'b', 'c']) h.add(id)
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    h.dock.dock('c', { side: 'right' })
+    expect(h.sashes()).toHaveLength(2)
+    const sash = h.sashes()[0] as HTMLElement
+    const at = Number.parseFloat(sash.style.left)
+
+    sash.dispatchEvent(pointer('pointerdown', at + 3, 300))
+    h.wm.close('c')
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+    const before = h.wm.get('a')?.bounds.width as number
+    expect(() => {
+      sash.dispatchEvent(pointer('pointermove', at + 43, 300))
+      h.flush()
+      sash.dispatchEvent(pointer('pointerup', at + 43, 300))
+    }).not.toThrow()
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a', 'b'])
+    expect(h.wm.get('a')?.bounds.width).toBeGreaterThan(before - 1)
+    expect(h.sashes()).toHaveLength(1)
+  })
+})
+
 describe('a context menu asked for while a separator is dragged', () => {
   it('is swallowed until the release, then opens as usual', () => {
     const h = setup()

@@ -87,6 +87,18 @@ describe('restack', () => {
     expect(stack.values[0]).toBeGreaterThan(0)
   })
 
+  it('puts a window sent to the back one gap under the lowest when there is room', () => {
+    const stack = target([500, 100, 200, 300])
+    expect(restack(stack, { base: 0, gap: 32 })).toBe(1)
+    expect(stack.values).toEqual([68, 100, 200, 300])
+  })
+
+  it('renormalizes when nothing fits between the base and the lowest window', () => {
+    const stack = target([96, 1, 64, 128])
+    restack(stack, { base: 0, gap: 32 })
+    expect(stack.values).toEqual([32, 64, 96, 128])
+  })
+
   it('is a no-op for an empty stack', () => {
     expect(restack(target([]))).toBe(0)
   })
