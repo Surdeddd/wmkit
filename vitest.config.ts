@@ -23,6 +23,10 @@ export default defineConfig({
       '@surdeddd/wmkit/svelte': new URL('./src/adapters/svelte.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/solid': new URL('./src/adapters/solid.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/ru': new URL('./src/locales/ru.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/taskbar/define': new URL('./src/plugins/taskbar/define.ts', import.meta.url)
+        .pathname,
+      '@surdeddd/wmkit/taskbar': new URL('./src/plugins/taskbar/index.ts', import.meta.url)
+        .pathname,
       '@surdeddd/wmkit': new URL('./src/index.ts', import.meta.url).pathname,
     },
   },

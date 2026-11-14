@@ -986,6 +986,86 @@ createDock(desktop, {
 
 Изменение, которое не касается дока, ему ничего не стоит. `area` вызывается снова, только когда меняется вьюпорт, раскладка, рабочий стол или закреплённое окно; если ваш `area` зависит от вашего собственного состояния, вызовите `dock.setLayout(dock.layout())`, чтобы док перечитал его.
 
+## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
+
+```ts
+interface TaskbarOptions {
+  show?: 'all' | 'minimized'        // 'all'
+  workspace?: 'current' | 'all'     // 'current'
+  messages?: Partial<TaskbarMessages>
+}
+
+interface TaskbarController {
+  element: HTMLElement
+  targetOf(window: WindowState): HTMLElement | null
+  destroy(): void
+}
+
+interface TaskbarMessages {
+  label: string                                 // 'Windows', the name of the toolbar
+  tabs(title: string, count: number): string    // 'Notes, 3 tabs', the name of a group button
+}
+
+const taskbarMessages: TaskbarMessages     // the English catalogue
+const taskbarMessagesRu: TaskbarMessages   // the Russian one
+```
+
+Наполняет `element` кнопками `<button type="button">`, по одной на окно, и держит их в соответствии с менеджером. Панель следует за менеджером, а не за DOM, поэтому работает с любым адаптером и без него, и не приносит стилей: как выглядят кнопки, решаете вы.
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
+
+const wm = createWindowManager()
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'))
+attachDesktop(wm, document.querySelector('#desktop'), {
+  minimizeTarget: (win) => taskbar.targetOf(win),
+})
+```
+
+Кнопки стоят в порядке открытия окон, как бы окна ни лежали в стопке, так что кнопка не сдвигается, когда её окно выходит вперёд. Группа вкладок — это одна кнопка: она показывает активную вкладку и стоит там, где стояла самая старая вкладка группы. `show: 'minimized'` показывает только свёрнутые окна, `workspace: 'all'` — окна всех рабочих столов, а не только активного.
+
+Клик по кнопке фокусирует её окно: свёрнутое возвращается таким, каким было до сворачивания, а окно с другого рабочего стола переносит вас туда. Клик по кнопке окна, которое уже в фокусе, сворачивает его, если оно `minimizable`. Клик средней кнопкой просит окно закрыться через [`wm.requestClose`](#спросить-прежде-чем-окно-закроется), если оно `closable`, — то есть охранников спросят.
+
+Элемент получает `role="toolbar"` и имя из `messages.label`, если у него ещё нет `aria-label` или `aria-labelledby`. Это одна остановка Tab: Tab входит на кнопку окна в фокусе или туда, где вы остановились; стрелки ходят по кнопкам по кругу, зеркально, если панель читается справа налево; Home и End прыгают к краям; Enter и пробел работают как клик. Движение по панели не меняет окно в фокусе.
+
+| На кнопке | Что значит |
+| --- | --- |
+| `data-wm-task` | id её окна, для группы — активной вкладки |
+| `data-wm-stage` | стадия этого окна: `normal`, `minimized`, `maximized`, `snapped` |
+| `data-wm-focused` | присутствует на кнопке окна в фокусе, у неё же `aria-pressed="true"` |
+| `[data-wm-task-title]` | `<span>` с заголовком |
+| `[data-wm-task-count]` | `<span>` с числом вкладок, только на кнопке группы; имя такой кнопке даёт `messages.tabs` |
+
+```css
+#taskbar {
+  display: flex;
+  gap: 6px;
+}
+
+[data-wm-task][data-wm-focused] {
+  border-color: var(--wm-accent, #d3ff4e);
+}
+
+[data-wm-task][data-wm-stage='minimized'] {
+  opacity: 0.6;
+}
+```
+
+Элемент кнопки живёт столько же, сколько её окно или группа, и в него пишут, только когда меняется то, что он показывает, поэтому фокус и ваши слушатели на нём сохраняются. Детей `element`, которых создала не панель, она не трогает. `targetOf(window)` даёт кнопку, которая стоит за окном, — любая вкладка группы даёт кнопку группы — или `null`, если панель его не показывает; ответ актуален даже внутри слушателя события, а именно это нужно для `minimizeTarget`. `destroy()` убирает кнопки, слушателей, а также роль и имя, которые поставила панель; вызывать его можно не один раз.
+
+`defineWmTaskbar({ prefix? })` регистрирует `<wm-taskbar>`, а импорт `@surdeddd/wmkit/taskbar/define` делает это с префиксом по умолчанию. Элемент сам и есть панель, кнопки он рисует в обычном DOM. `for` называет id элемента со свойством `manager`, например `<wm-desktop>`; рабочий стол, который определят позже, панель дождётся. Без `for` задайте свойство `manager`. Атрибуты `show` и `workspace` и свойство `messages` — это опции, а `targetOf(window)` — метод элемента.
+
+```html
+<wm-desktop id="desk">…</wm-desktop>
+<wm-taskbar for="desk" show="minimized"></wm-taskbar>
+
+<script type="module">
+  import '@surdeddd/wmkit/elements/define'
+  import '@surdeddd/wmkit/taskbar/define'
+</script>
+```
+
 ## `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 ```ts

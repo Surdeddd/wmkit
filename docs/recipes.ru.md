@@ -26,7 +26,15 @@ description: Рабочие паттерны wmkit — таскбар и сво�
 
 ## Таскбар
 
-`minimized()` возвращает свёрнутые окна активного рабочего стола в порядке открытия — ровно в том порядке, в каком они стоят в таскбаре.
+В пакете есть готовый: [`createTaskbar`](./api.ru.md#createtaskbarwm-element-options--surdedddwmkittaskbar) держит по кнопке на окно в порядке открытия, обрабатывает клики и клавиатуру и отдаёт `minimizeTarget` кнопку, в которую окну лететь.
+
+```js
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
+
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'), { show: 'minimized' })
+```
+
+Чтобы нарисовать свой, возьмите `minimized()`: он возвращает свёрнутые окна активного рабочего стола в порядке открытия — ровно в том порядке, в каком они стоят в таскбаре.
 
 ```js
 function renderTaskbar() {
@@ -57,6 +65,8 @@ attachDesktop(wm, desktopEl, {
   minimizeTarget: (win) => taskbar.querySelector(`[data-task="${win.id}"]`) ?? taskbar,
 })
 ```
+
+С таскбаром из пакета это `minimizeTarget: (win) => taskbar.targetOf(win)`.
 
 Контроллер запускает `flipToTarget` при сворачивании и `flipFromTarget` при восстановлении. Анимируется одноразовый призрак, так что ваш контент не переносится и не перерендеривается. При reduced motion обе функции ничего не делают.
 

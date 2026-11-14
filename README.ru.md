@@ -344,6 +344,22 @@ desktop.mountWindow('notes', 'mine').content.append(myApp)
 
 `data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` и `data-wm-to-workspace="2"` читаются прямо из вашей разметки. Каждая подстановка `{{...}}` экранируется и может стоять только в тексте или в атрибуте `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` или `label` в кавычках; в любом другом месте `skin()` бросает ошибку. За дальнейшими изменениями следует только `{{title}}` внутри `[data-wm-title]`. `shadow: true` запечатывает обвязку в открытом теневом корне, не теряя ни группировку, ни ловушку фокуса, ни доступное имя — подробности в [docs/recipes.ru.md](docs/recipes.ru.md).
 
+### `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
+
+Готовая панель задач: по кнопке на окно в порядке открытия, одна кнопка на группу вкладок, клик фокусирует, возвращает или сворачивает окно, средняя кнопка просит его закрыться, а по самой панели ходят стрелками — это одна остановка Tab. Панель следует за менеджером, а не за DOM, и не приносит стилей.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { createTaskbar, taskbarMessagesRu } from '@surdeddd/wmkit/taskbar'
+
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'), {
+  messages: taskbarMessagesRu,
+})
+attachDesktop(wm, root, { minimizeTarget: (win) => taskbar.targetOf(win) })
+```
+
+`show: 'minimized'` показывает только свёрнутые окна, `workspace: 'all'` — все рабочие столы. `<wm-taskbar for="desk">` из `@surdeddd/wmkit/taskbar/define` — то же самое в виде элемента.
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 Панель, которую подключают по желанию: живая таблица окон, журнал событий и управление менеджером — чтобы видеть, что делает машина состояний, без отладчика. Она следит за менеджером, а не за DOM, поэтому работает с любым адаптером и без него.

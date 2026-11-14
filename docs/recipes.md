@@ -26,7 +26,15 @@ Working patterns for the things people build with a window manager. Every snippe
 
 ## Taskbar
 
-`minimized()` returns the minimized windows of the active workspace, ordered by open time — that is exactly taskbar order.
+The package has one ready: [`createTaskbar`](./api.md#createtaskbarwm-element-options--surdedddwmkittaskbar) keeps a button per window in opening order, handles clicks and the keyboard, and gives `minimizeTarget` the button to fly into.
+
+```js
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
+
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'), { show: 'minimized' })
+```
+
+To draw your own, `minimized()` returns the minimized windows of the active workspace, ordered by open time — that is exactly taskbar order.
 
 ```js
 function renderTaskbar() {
@@ -57,6 +65,8 @@ attachDesktop(wm, desktopEl, {
   minimizeTarget: (win) => taskbar.querySelector(`[data-task="${win.id}"]`) ?? taskbar,
 })
 ```
+
+With the taskbar from the package it is `minimizeTarget: (win) => taskbar.targetOf(win)`.
 
 The controller runs `flipToTarget` on minimize and `flipFromTarget` on restore, using a throwaway ghost so your content is never re-parented or re-rendered. Both no-op under reduced motion.
 

@@ -36,6 +36,8 @@
       "@surdeddd/wmkit/elements": ["./src/plugins/elements/index.ts"],
       "@surdeddd/wmkit/elements/define": ["./src/plugins/elements/define.ts"],
       "@surdeddd/wmkit/ru": ["./src/locales/ru.ts"],
+      "@surdeddd/wmkit/taskbar/define": ["./src/plugins/taskbar/define.ts"],
+      "@surdeddd/wmkit/taskbar": ["./src/plugins/taskbar/index.ts"],
       "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"],
       "@surdeddd/wmkit/preact": ["./src/adapters/preact.ts"],

@@ -34,7 +34,7 @@ test('minimized stage survives a reload', async ({ page }) => {
   await waitPersisted(page)
   await page.reload()
   await expect(win(page, 'fixed')).toBeHidden()
-  await expect(page.locator('#taskbar [data-task="fixed"]')).toBeVisible()
+  await expect(page.locator('#taskbar [data-wm-task="fixed"]')).toBeVisible()
 })
 
 test('clear wipes the stored layout', async ({ page }) => {

@@ -208,6 +208,17 @@ exports[`exports exactly the recorded names from every entry point 1`] = `
     "wmStore: value",
     "wmWindowStore: value",
   ],
+  "./taskbar": [
+    "TaskbarController: type",
+    "TaskbarMessages: type",
+    "TaskbarOptions: type",
+    "WmTaskbarElement: type",
+    "createTaskbar: value",
+    "defineWmTaskbar: value",
+    "taskbarMessages: value",
+    "taskbarMessagesRu: value",
+  ],
+  "./taskbar/define": [],
   "./themes": [
     "ThemeName: type",
     "ThemeStyleOptions: type",

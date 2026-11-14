@@ -986,6 +986,86 @@ To remove docking for good while the manager lives on, call `dock.setLayout({ ro
 
 A change that does not concern the dock costs it nothing. `area` is called again only when the viewport, the layout, the workspace or a docked window changes; if your `area` depends on state of your own, call `dock.setLayout(dock.layout())` to make the dock read it again.
 
+## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
+
+```ts
+interface TaskbarOptions {
+  show?: 'all' | 'minimized'        // 'all'
+  workspace?: 'current' | 'all'     // 'current'
+  messages?: Partial<TaskbarMessages>
+}
+
+interface TaskbarController {
+  element: HTMLElement
+  targetOf(window: WindowState): HTMLElement | null
+  destroy(): void
+}
+
+interface TaskbarMessages {
+  label: string                                 // 'Windows', the name of the toolbar
+  tabs(title: string, count: number): string    // 'Notes, 3 tabs', the name of a group button
+}
+
+const taskbarMessages: TaskbarMessages     // the English catalogue
+const taskbarMessagesRu: TaskbarMessages   // the Russian one
+```
+
+Fills `element` with one `<button type="button">` per window and keeps it in step with the manager. It follows the manager, never the DOM, so it works with any adapter or none, and it brings no styles: the buttons are yours to dress.
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
+
+const wm = createWindowManager()
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'))
+attachDesktop(wm, document.querySelector('#desktop'), {
+  minimizeTarget: (win) => taskbar.targetOf(win),
+})
+```
+
+The buttons stand in the order the windows were opened, whatever their stacking, so a button never moves when its window comes to the front. A tab group is one button: it shows the active tab and sits where the oldest tab of the group stood. `show: 'minimized'` lists only minimized windows, `workspace: 'all'` lists the windows of every workspace instead of the active one.
+
+A click on a button focuses its window: a minimized one comes back as it was before, and one on another workspace takes you there. A click on the button of the window that already has the focus minimizes it, when it is `minimizable`. A middle click asks the window to close through [`wm.requestClose`](#asking-before-a-window-closes), when it is `closable`, so the guards are asked.
+
+The element becomes a `role="toolbar"`, named by `messages.label` unless it already carries `aria-label` or `aria-labelledby`. It is one tab stop: Tab enters on the button of the focused window, or where you left it; the arrow keys walk the buttons and wrap, mirrored when the bar reads right to left; Home and End jump to the ends; Enter and Space act as a click. Moving along the bar does not change the focused window.
+
+| On a button | Means |
+| --- | --- |
+| `data-wm-task` | the id of its window, the active tab for a group |
+| `data-wm-stage` | the stage of that window: `normal`, `minimized`, `maximized`, `snapped` |
+| `data-wm-focused` | present on the button of the focused window, which also has `aria-pressed="true"` |
+| `[data-wm-task-title]` | the `<span>` with the title |
+| `[data-wm-task-count]` | the `<span>` with the number of tabs, on a group button only; the button is then named by `messages.tabs` |
+
+```css
+#taskbar {
+  display: flex;
+  gap: 6px;
+}
+
+[data-wm-task][data-wm-focused] {
+  border-color: var(--wm-accent, #d3ff4e);
+}
+
+[data-wm-task][data-wm-stage='minimized'] {
+  opacity: 0.6;
+}
+```
+
+A button element lives as long as its window or group does and is only written to when something it shows changes, so focus and your own listeners on it survive. Children of `element` that the taskbar did not create are left alone. `targetOf(window)` gives the button that stands for a window — any tab of a group gives the group button — or `null` when the taskbar does not show it; it is up to date even inside an event listener, which is what `minimizeTarget` needs. `destroy()` removes the buttons, the listeners, and the role and label it set; it may be called more than once.
+
+`defineWmTaskbar({ prefix? })` registers `<wm-taskbar>`, and importing `@surdeddd/wmkit/taskbar/define` does it with the default prefix. The element is its own toolbar and renders the buttons in the light DOM. `for` names the id of an element with a `manager` property, a `<wm-desktop>` for one; a desktop that is defined later is waited for. Without `for`, set the `manager` property. The `show` and `workspace` attributes and the `messages` property are the options, and `targetOf(window)` is a method of the element.
+
+```html
+<wm-desktop id="desk">…</wm-desktop>
+<wm-taskbar for="desk" show="minimized"></wm-taskbar>
+
+<script type="module">
+  import '@surdeddd/wmkit/elements/define'
+  import '@surdeddd/wmkit/taskbar/define'
+</script>
+```
+
 ## `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 ```ts

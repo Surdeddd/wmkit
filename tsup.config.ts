@@ -21,6 +21,8 @@ export default defineConfig({
     elements: 'src/plugins/elements/index.ts',
     'elements/define': 'src/plugins/elements/define.ts',
     ru: 'src/locales/ru.ts',
+    'taskbar/define': 'src/plugins/taskbar/define.ts',
+    taskbar: 'src/plugins/taskbar/index.ts',
     themes: 'src/themes/index.ts',
   },
   format: ['esm', 'cjs'],

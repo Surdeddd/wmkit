@@ -7,6 +7,7 @@ import {
 import { skin } from '@surdeddd/wmkit/chrome'
 import { persist } from '@surdeddd/wmkit/persist'
 import { popout } from '@surdeddd/wmkit/popout'
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
 import '@surdeddd/wmkit/themes/glass.css'
 
 function must<T>(value: T | null): T {
@@ -19,8 +20,9 @@ const taskbarEl = must(document.querySelector<HTMLElement>('#taskbar'))
 const countEl = must(document.querySelector<HTMLElement>('#window-count'))
 
 const wm = createWindowManager()
+const taskbar = createTaskbar(wm, taskbarEl, { show: 'minimized' })
 const desktop = attachDesktop(wm, desktopEl, {
-  minimizeTarget: (win) => taskbarEl.querySelector(`[data-task="${win.id}"]`),
+  minimizeTarget: (win) => taskbar.targetOf(win),
   grid: Number(new URLSearchParams(location.search).get('grid')),
 })
 const store = persist(wm, { key: 'wmkit-e2e' })
@@ -79,25 +81,10 @@ function spawn(init: WindowInit, content?: (body: HTMLElement) => void): WindowS
   return win
 }
 
-function renderTaskbar(): void {
-  taskbarEl.replaceChildren(
-    ...wm.minimized().map((win) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.dataset.task = win.id
-      button.textContent = win.title
-      button.addEventListener('click', () => wm.focus(win.id))
-      return button
-    }),
-  )
-}
-
 wm.subscribe((state) => {
   mountMissing()
-  renderTaskbar()
   countEl.textContent = String(state.order.length)
 })
-renderTaskbar()
 countEl.textContent = String(wm.getState().order.length)
 
 let counter = 0
@@ -209,6 +196,7 @@ declare global {
     __wmkit: {
       attachDesktop: typeof attachDesktop
       createWindowManager: typeof createWindowManager
+      createTaskbar: typeof createTaskbar
     }
   }
 }
@@ -216,4 +204,4 @@ window.__wm = wm
 window.__spawn = spawn
 window.__desktop = desktop
 window.__popout = popout
-window.__wmkit = { attachDesktop, createWindowManager }
+window.__wmkit = { attachDesktop, createWindowManager, createTaskbar }

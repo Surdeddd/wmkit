@@ -28,6 +28,7 @@ const FOREIGN = {
 
 const types = `import {
   attachDesktop,
+  type CloseGuard,
   createDesktopBinder,
   createWindowManager,
   type DesktopOptions,
@@ -51,6 +52,8 @@ import { useWmState as reactState } from '@surdeddd/wmkit/react'
 import { announcerMessagesRu } from '@surdeddd/wmkit/ru'
 import { useWmState as solidState } from '@surdeddd/wmkit/solid'
 import { wmStore } from '@surdeddd/wmkit/svelte'
+import { createTaskbar, type TaskbarOptions } from '@surdeddd/wmkit/taskbar'
+import '@surdeddd/wmkit/taskbar/define'
 import { type ThemeName, themeStyle } from '@surdeddd/wmkit/themes'
 import { useWmState as vueState } from '@surdeddd/wmkit/vue'
 import WinBox, { type WinBoxOptions } from '@surdeddd/wmkit/winbox'
@@ -62,9 +65,11 @@ const desk: DesktopOptions = {
   snap: { threshold: 10 },
   keyboard: { moveStep: 8 },
   magnetism: false,
+  grid: { x: 24 },
   announce: announcerMessagesRu,
 }
 const docking: DockOptions = { sash: 8 }
+const tasks: TaskbarOptions = { show: 'minimized', workspace: 'all' }
 const saving: PersistOptions = { key: 'app' }
 const out: PopoutOptions = { width: 400 }
 const box: WinBoxOptions = { title: 'Box' }
@@ -74,6 +79,9 @@ export function run(element: HTMLElement): unknown[] {
   const wm = createWindowManager(manager)
   const win = wm.open(init)
   wm.update(win.id, patch)
+  const guard: CloseGuard = async (asked) => asked.id !== win.id
+  wm.onBeforeClose(guard)
+  void wm.requestClose(win.id)
   const desktop = attachDesktop(wm, element, desk)
   const binder = createDesktopBinder(wm, desk)
   const dock = createDock(desktop, docking)
@@ -88,6 +96,7 @@ export function run(element: HTMLElement): unknown[] {
     popout(wm, win.id, element, out),
     isPopoutSupported(),
     createDevtools(wm),
+    createTaskbar(wm, element, tasks).targetOf(win),
     touchGestures({ pinch: { threshold: 12 } }),
     skin({ template: '<section><div data-wm-content></div></section>' }),
     windowChrome(),

@@ -69,7 +69,7 @@ test.describe('axe through the states of a window', () => {
       window.__wm.restore('fixed')
       window.__wm.minimize('fixed')
     })
-    await expect(page.locator('[data-task="fixed"]')).toBeVisible()
+    await expect(page.locator('[data-wm-task="fixed"]')).toBeVisible()
     expect(await grave(page), 'one minimized into the taskbar').toEqual([])
 
     await page.evaluate(() => window.__wm.group(['t1', 't2']))

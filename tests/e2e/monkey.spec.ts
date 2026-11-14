@@ -51,6 +51,7 @@ const STAGES: Stage[] = [
     desktop: 'wm-desktop',
     manager: 'element',
     reloads: true,
+    tasks: true,
   },
   {
     ...PLAIN,
@@ -176,7 +177,7 @@ function look(stage: Stage): Scene {
   return {
     desktop: box(desktop),
     windows,
-    tasks: [...document.querySelectorAll('[data-task]')].filter(seen).map(box),
+    tasks: [...document.querySelectorAll('[data-task], [data-wm-task]')].filter(seen).map(box),
     sashes: [...desktop.querySelectorAll('[data-wm-sash]')].map(box),
     openers: openers
       .filter(seen)
@@ -336,7 +337,7 @@ function inspect(stage: Stage): string[] {
     found.push('a separator is still marked active')
   }
   if (stage.tasks) {
-    const tasks = document.querySelectorAll('[data-task]').length
+    const tasks = document.querySelectorAll('[data-task], [data-wm-task]').length
     if (tasks !== wm.minimized().length) {
       found.push(`${tasks} taskbar buttons for ${wm.minimized().length} minimized windows`)
     }

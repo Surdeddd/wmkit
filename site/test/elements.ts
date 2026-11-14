@@ -1,5 +1,6 @@
 import '@surdeddd/wmkit/themes/glass.css'
 import { defineWmElements } from '@surdeddd/wmkit/elements'
+import '@surdeddd/wmkit/taskbar/define'
 import { retroShadowTheme } from '@surdeddd/wmkit/themes'
 
 const persistKey = new URLSearchParams(location.search).get('persist')

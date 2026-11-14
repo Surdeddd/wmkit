@@ -407,6 +407,20 @@ desktop.mountWindow('notes', 'mine').content.append(myApp)
 
 `data-wm-close`, `data-wm-minimize`, `data-wm-maximize`, `data-wm-restore`, `data-wm-center`, `data-wm-send-back`, `data-wm-snap="left"` and `data-wm-to-workspace="2"` are read straight off your markup. Every `{{placeholder}}` is HTML-escaped and may sit only in text or in a quoted `aria-*`, `data-*`, `title`, `alt`, `class`, `id`, `role`, `lang`, `dir`, `for`, `value`, `placeholder` or `label` attribute; anywhere else `skin()` throws. Only `{{title}}` inside `[data-wm-title]` follows later changes. `shadow: true` seals the chrome inside an open shadow root without losing grouping, focus trapping or the accessible name — see [docs/recipes.md](docs/recipes.md).
 
+### `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
+
+A ready taskbar: one button per window in opening order, one per tab group, a click to focus, restore or minimize, a middle click to ask the window to close, and a single tab stop that the arrow keys walk. It follows the manager, never the DOM, and brings no styles.
+
+```js
+import { attachDesktop } from '@surdeddd/wmkit'
+import { createTaskbar } from '@surdeddd/wmkit/taskbar'
+
+const taskbar = createTaskbar(wm, document.querySelector('#taskbar'))
+attachDesktop(wm, root, { minimizeTarget: (win) => taskbar.targetOf(win) })
+```
+
+`show: 'minimized'` lists only minimized windows, `workspace: 'all'` every workspace, `messages: taskbarMessagesRu` speaks Russian. `<wm-taskbar for="desk">` from `@surdeddd/wmkit/taskbar/define` is the same thing as an element.
+
 ### `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 An opt-in panel that shows the live window table, an event log and the manager controls, so you can see what the state machine is doing without a debugger. It follows the manager, never the DOM, so it works with any adapter or none.

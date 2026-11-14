@@ -33,7 +33,9 @@
   "sideEffects": [
     "**/*.css",
     "./dist/elements/define.js",
-    "./dist/elements/define.cjs"
+    "./dist/elements/define.cjs",
+    "./dist/taskbar/define.js",
+    "./dist/taskbar/define.cjs"
   ],
   "engines": {
     "node": ">=20"
@@ -234,6 +236,26 @@
       "require": {
         "types": "./dist/ru.d.cts",
         "default": "./dist/ru.cjs"
+      }
+    },
+    "./taskbar": {
+      "import": {
+        "types": "./dist/taskbar.d.ts",
+        "default": "./dist/taskbar.js"
+      },
+      "require": {
+        "types": "./dist/taskbar.d.cts",
+        "default": "./dist/taskbar.cjs"
+      }
+    },
+    "./taskbar/define": {
+      "import": {
+        "types": "./dist/taskbar/define.d.ts",
+        "default": "./dist/taskbar/define.js"
+      },
+      "require": {
+        "types": "./dist/taskbar/define.d.cts",
+        "default": "./dist/taskbar/define.cjs"
       }
     },
     "./themes": {
@@ -469,6 +491,11 @@
       "limit": "600 B"
     },
     {
+      "name": "taskbar plugin",
+      "path": "dist/taskbar.js",
+      "limit": "2 kB"
+    },
+    {
       "name": "themes as text",
       "path": "dist/themes.js",
       "limit": "8 kB"
@@ -532,6 +559,12 @@
       ],
       "ru": [
         "./dist/ru.d.ts"
+      ],
+      "taskbar": [
+        "./dist/taskbar.d.ts"
+      ],
+      "taskbar/define": [
+        "./dist/taskbar/define.d.ts"
       ]
     }
   },

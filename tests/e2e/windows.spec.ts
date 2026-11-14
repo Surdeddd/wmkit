@@ -77,12 +77,12 @@ test('minimize hides the window into the taskbar and restores from it', async ({
   const window = win(page, 't1')
   await window.locator('[data-wm-minimize]').click()
   await expect(window).toBeHidden()
-  const task = page.locator('#taskbar [data-task="t1"]')
+  const task = page.locator('#taskbar [data-wm-task="t1"]')
   await expect(task).toHaveText('Test 1')
   await task.click()
   await expect(window).toBeVisible()
   await expect(window).toHaveAttribute('data-wm-focused', '')
-  await expect(page.locator('#taskbar [data-task]')).toHaveCount(0)
+  await expect(page.locator('#taskbar [data-wm-task]')).toHaveCount(0)
 })
 
 test('maximize fills the desktop and restore returns the old bounds', async ({ page }) => {
@@ -148,7 +148,7 @@ test('screen reader announcements follow window lifecycle', async ({ page }) => 
   await expect(announcer).toHaveText(/Test 1 window opened/)
   await win(page, 't1').locator('[data-wm-minimize]').click()
   await expect(announcer).toHaveText(/Test 1 minimized/)
-  await page.locator('#taskbar [data-task="t1"]').click()
+  await page.locator('#taskbar [data-wm-task="t1"]').click()
   await expect(announcer).toHaveText(/Test 1 restored/)
 })
 

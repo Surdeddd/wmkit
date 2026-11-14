@@ -15,9 +15,16 @@ async function footprint(cdp: CDPSession): Promise<Footprint> {
 }
 
 async function settle(page: Page): Promise<void> {
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  )
+  await page.evaluate(async () => {
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+    await frame()
+    const ending = document
+      .getAnimations()
+      .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+    await Promise.all(ending.map((animation) => animation.finished.catch(() => undefined)))
+    await frame()
+    await frame()
+  })
 }
 
 function grown(before: Footprint, after: Footprint): Record<keyof Footprint, number> {

@@ -16,10 +16,24 @@
         display: block;
         height: 100%;
       }
+      wm-taskbar {
+        position: fixed;
+        right: 8px;
+        bottom: 8px;
+        display: flex;
+        gap: 6px;
+      }
+      wm-taskbar button {
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid #556;
+        background: #232838;
+        color: #eef;
+      }
     </style>
   </head>
   <body>
-    <wm-desktop>
+    <wm-desktop id="desk">
       <wm-window window-id="notes" label="Notes" x="20" y="20" width="260" height="180">
         <textarea id="notes-field" aria-label="Notes text">hello</textarea>
       </wm-window>
@@ -31,6 +45,7 @@
         <p>opened later</p>
       </wm-window>
     </wm-desktop>
+    <wm-taskbar for="desk" show="minimized"></wm-taskbar>
     <script type="module" src="./elements.ts"></script>
   </body>
 </html>
