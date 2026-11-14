@@ -33,6 +33,11 @@ export interface MagnetismOptions {
   threshold?: number
 }
 
+export interface GridOptions {
+  x?: number
+  y?: number
+}
+
 export interface GroupingOptions {
   dwell?: number
 }
@@ -52,6 +57,7 @@ export interface DesktopOptions {
   autoViewport?: boolean
   hitAreas?: HitAreaOptions
   magnetism?: boolean | MagnetismOptions
+  grid?: number | GridOptions
   stacking?: StackingOptions
   animation?: boolean | AnimationOptions
   gestures?: readonly DesktopGesture[]
@@ -156,6 +162,8 @@ export interface SessionContext {
   hitCorner: number
   interactiveSelector: string
   magnetThreshold: number
+  gridX: number
+  gridY: number
   groupDwell: number
   groupTarget(clientX: number, clientY: number, selfId: string, local: Point): string | null
   dropAt(clientX: number, clientY: number, id: string, local: Point): DropHit | null
@@ -181,6 +189,10 @@ export function regained(event: PointerEvent, holder: HTMLElement): boolean {
   } catch {
     return false
   }
+}
+
+export function toGrid(value: number, step: number): number {
+  return step > 0 ? Math.round(value / step) * step || 0 : value
 }
 
 export function muteMenu(event: Event): void {

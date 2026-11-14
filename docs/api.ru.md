@@ -401,6 +401,7 @@ interface DesktopOptions {
   autoViewport?: boolean      // true — ResizeObserver drives setViewport
   hitAreas?: { edge?: number; corner?: number }  // 8/12, or 16/24 on coarse pointers
   magnetism?: boolean | { threshold?: number }   // 8, or 12 on coarse pointers
+  grid?: number | { x?: number; y?: number }     // off; the step in px a dragged window or edge lands on
   stacking?: {
     base?: number      // 0 — z-index of the desktop floor
     gap?: number       // 32 — room left between neighbours for cheap reordering
@@ -421,7 +422,7 @@ interface DesktopOptions {
 }
 ```
 
-Вложенные объекты опций экспортируются как типы: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `StackingOptions` и `AnimationOptions`.
+Вложенные объекты опций экспортируются как типы: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `GridOptions`, `StackingOptions` и `AnimationOptions`.
 
 `beforeClose` спрашивает всё, что закрывает окно от имени пользователя: кнопка `data-wm-close`, действие закрытия, которое получает скин, и `desktop.actions(id).close()`. Верните `false`, чтобы окно осталось открытым. `wm.close(id)` ничего не спрашивает и закрывает окно всегда, так что вызывайте его, чтобы довести дело до конца после собственного подтверждения:
 
@@ -436,6 +437,12 @@ attachDesktop(wm, root, {
 ```
 
 Если `ResizeObserver` нет, `autoViewport` измеряет элемент один раз при привязке и дальше за ним не следит.
+
+`grid` ставит жесты указателя на сетку. Число — это шаг по обеим осям, `{ x, y }` задаёт каждой оси свой, а у оси, шаг которой не задан, равен нулю, отрицателен или не конечен, сетки нет. Окно, которое тащат, встаёт в ближайшую к указателю позицию, где `x` и `y` кратны шагу, поэтому окно, стоявшее мимо сетки, оказывается на ней с первым же движением. Ресайз округляет край, за который тянут, в координатах рабочего стола, и оставляет противоположный край на месте. Три вещи сильнее сетки: край, который поймал `magnetism`, остаётся вплотную к тому, что его поймало, по этой оси; `minSize`, `maxSize` и `aspectRatio` по-прежнему ограничивают размер; рабочий стол по-прежнему не даёт окну уйти из досягаемости. Пока при движении указателя зажат Alt, окно следует за ним точно, а Escape возвращает окно туда, где его застал жест, на сетке оно стояло или нет. Стрелки по-прежнему двигают на `keyboard.moveStep`; задайте ему то же число, чтобы ходить по сетке с клавиатуры:
+
+```js
+attachDesktop(wm, root, { grid: 24, keyboard: { moveStep: 24 } })
+```
 
 ### Жесты
 

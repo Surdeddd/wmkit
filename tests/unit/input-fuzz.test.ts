@@ -4,7 +4,7 @@ import { afterEach, describe, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowFlags, WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
-import type { DesktopController } from '../../src/dom/shared'
+import type { DesktopController, DesktopOptions } from '../../src/dom/shared'
 import { touchGestures } from '../../src/plugins/gestures'
 import { domDrift, gestureResidue, stateDrift } from './support/dom-state'
 import { type Frames, stubFrames } from './support/frames'
@@ -103,7 +103,7 @@ function outer(resources: Resources): string {
     .join('\n')
 }
 
-function build(): Harness {
+function build(grid: DesktopOptions['grid']): Harness {
   const frames = stubFrames()
   const captured = new Map<number, Element>()
   Element.prototype.setPointerCapture = function setPointerCapture(id: number) {
@@ -149,6 +149,7 @@ function build(): Harness {
     autoViewport: false,
     announce: false,
     gestures: [touchGestures()],
+    grid,
   })
   wm.on('close', ({ window: win }) => {
     element.querySelector(`[data-testid="${win.id}"]`)?.remove()
@@ -502,8 +503,9 @@ describe('raw pointer, touch, pen and key events in any order', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.array(action, { minLength: 1, maxLength: 120, size: 'max' }),
-          async (actions) => {
-            const harness = build()
+          fc.constantFrom<DesktopOptions['grid']>(undefined, 24, { x: 7, y: 50 }, { y: 0.5 }),
+          async (actions, grid) => {
+            const harness = build(grid)
             let torn = false
             const tear = () => {
               if (torn) return

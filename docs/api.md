@@ -401,6 +401,7 @@ interface DesktopOptions {
   autoViewport?: boolean      // true — ResizeObserver drives setViewport
   hitAreas?: { edge?: number; corner?: number }  // 8/12, or 16/24 on coarse pointers
   magnetism?: boolean | { threshold?: number }   // 8, or 12 on coarse pointers
+  grid?: number | { x?: number; y?: number }     // off; the step in px a dragged window or edge lands on
   stacking?: {
     base?: number      // 0 — z-index of the desktop floor
     gap?: number       // 32 — room left between neighbours for cheap reordering
@@ -421,7 +422,7 @@ interface DesktopOptions {
 }
 ```
 
-The nested option objects are exported as types: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `StackingOptions` and `AnimationOptions`.
+The nested option objects are exported as types: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `GridOptions`, `StackingOptions` and `AnimationOptions`.
 
 `beforeClose` is asked by everything that closes a window on the user's behalf: a `data-wm-close` button, the close action a skin receives and `desktop.actions(id).close()`. Return `false` to keep the window open. `wm.close(id)` never asks and always closes, so call it to finish after a confirmation of your own:
 
@@ -436,6 +437,12 @@ attachDesktop(wm, root, {
 ```
 
 Where `ResizeObserver` is missing, `autoViewport` measures the element once at attach and does not follow it afterwards.
+
+`grid` makes pointer gestures land on a grid. A number is the step of both axes, `{ x, y }` gives each axis its own, and an axis whose step is missing, zero, negative or not finite has no grid. A dragged window takes the position nearest to the pointer whose `x` and `y` are multiples of the step, so a window that stood off the grid is on it after the first movement. A resize rounds the edge being pulled, in desktop coordinates, and leaves the opposite edge where it was. Three things are stronger than the grid: an edge that `magnetism` caught stays flush with what it caught on that axis, `minSize`, `maxSize` and `aspectRatio` still bound the size, and the desktop still keeps a window reachable. Holding Alt while the pointer moves lets the window follow it exactly, and Escape returns the window to where the gesture found it, on the grid or not. The arrow keys keep moving by `keyboard.moveStep`; give it the same number to walk the grid from the keyboard:
+
+```js
+attachDesktop(wm, root, { grid: 24, keyboard: { moveStep: 24 } })
+```
 
 ### Gestures
 

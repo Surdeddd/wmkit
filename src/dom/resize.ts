@@ -1,6 +1,13 @@
 import { applyAspect, clampSize } from '../core/geometry'
 import type { Bounds, SnapZone } from '../core/types'
-import { type ActiveDrag, lostRelease, muteMenu, regained, type SessionContext } from './shared'
+import {
+  type ActiveDrag,
+  lostRelease,
+  muteMenu,
+  regained,
+  type SessionContext,
+  toGrid,
+} from './shared'
 
 export const RESIZE_DIRECTIONS = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const
 export type ResizeDirection = (typeof RESIZE_DIRECTIONS)[number]
@@ -62,6 +69,9 @@ export function createResizeStarter(ctx: SessionContext) {
     let pendingY = 0
     let hasPending = false
     let applied = false
+    let free = false
+    const edgeX = direction.includes('e') ? start.x + start.width : start.x
+    const edgeY = direction.includes('s') ? start.y + start.height : start.y
     const el = ctx.windowElement(id)
     if (el) el.dataset.wmResizing = direction
 
@@ -69,8 +79,12 @@ export function createResizeStarter(ctx: SessionContext) {
       if (!hasPending) return
       hasPending = false
       raf = 0
-      const dx = pendingX - startPoint.x
-      const dy = pendingY - startPoint.y
+      let dx = pendingX - startPoint.x
+      let dy = pendingY - startPoint.y
+      if (!free) {
+        if (ctx.gridX > 0) dx = toGrid(edgeX + dx, ctx.gridX) - edgeX
+        if (ctx.gridY > 0) dy = toGrid(edgeY + dy, ctx.gridY) - edgeY
+      }
       const floor = Math.min(0, start.y)
       const top = direction.includes('n') ? Math.max(floor, start.y + dy) : start.y
       const raw = {
@@ -113,6 +127,7 @@ export function createResizeStarter(ctx: SessionContext) {
       const movePoint = ctx.toLocal(moveEvent)
       pendingX = movePoint.x
       pendingY = movePoint.y
+      free = moveEvent.altKey
       hasPending = true
       if (raf === 0) raf = view.requestAnimationFrame(flush)
     }

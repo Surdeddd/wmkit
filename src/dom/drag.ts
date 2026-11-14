@@ -8,6 +8,7 @@ import {
   type Point,
   regained,
   type SessionContext,
+  toGrid,
 } from './shared'
 
 interface DragSession extends ActiveDrag {
@@ -22,6 +23,7 @@ interface DragSession extends ActiveDrag {
   startRestoreBounds: Bounds | null
   restored: boolean
   moved: boolean
+  free: boolean
   zone: SnapZone | 'maximize' | null
   groupTarget: string | null
   drop: DropHit | null
@@ -67,6 +69,7 @@ export function createDragStarter(ctx: SessionContext) {
       startRestoreBounds: win.restoreBounds,
       restored: win.stage === 'normal',
       moved: false,
+      free: false,
       zone: null,
       groupTarget: null,
       drop: null,
@@ -137,6 +140,8 @@ export function createDragStarter(ctx: SessionContext) {
 
       let nextX = session.pendingX - session.grabDX
       let nextY = session.pendingY - session.grabDY
+      let stepX = session.free ? 0 : ctx.gridX
+      let stepY = session.free ? 0 : ctx.gridY
       if (ctx.magnetThreshold > 0) {
         const state = wm.getState()
         frame.width = state.viewport.width
@@ -156,7 +161,11 @@ export function createDragStarter(ctx: SessionContext) {
         const magnet = magnetize(probe, targets, ctx.magnetThreshold)
         nextX = magnet.x
         nextY = magnet.y
+        if (magnet.snappedX) stepX = 0
+        if (magnet.snappedY) stepY = 0
       }
+      nextX = toGrid(nextX, stepX)
+      nextY = toGrid(nextY, stepY)
       const { clientX, clientY, local } = session
       const drop = ctx.dropAt(clientX, clientY, id, local)
       const candidate = drop ? null : ctx.groupTarget(clientX, clientY, id, local)
@@ -226,6 +235,7 @@ export function createDragStarter(ctx: SessionContext) {
       session.local = movePoint
       session.clientX = moveEvent.clientX
       session.clientY = moveEvent.clientY
+      session.free = moveEvent.altKey
       session.hasPending = true
       if (session.raf === 0) session.raf = view.requestAnimationFrame(flush)
     }

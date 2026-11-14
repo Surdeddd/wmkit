@@ -208,6 +208,10 @@ export function attachDesktop(
       ? 0
       : ((typeof options.magnetism === 'object' ? options.magnetism.threshold : undefined) ??
         (coarsePointer ? 12 : 8))
+  const grid =
+    typeof options.grid === 'number' ? { x: options.grid, y: options.grid } : options.grid
+  const gridStep = (step: unknown) =>
+    typeof step === 'number' && Number.isFinite(step) && step > 0 ? step : 0
   const zIndexBase = options.stacking?.base ?? 0
   const zIndexGap = options.stacking?.gap ?? 32
   const deepLimit = options.stacking?.deep ?? 12
@@ -334,6 +338,8 @@ export function attachDesktop(
     hitCorner,
     interactiveSelector,
     magnetThreshold,
+    gridX: gridStep(grid?.x),
+    gridY: gridStep(grid?.y),
     groupDwell,
     groupTarget(clientX, clientY, selfId, local) {
       const state = wm.getState()

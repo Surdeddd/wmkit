@@ -52,6 +52,7 @@ export type {
   DropHit,
   DropTarget,
   GestureContext,
+  GridOptions,
   GroupingOptions,
   HitAreaOptions,
   MagnetismOptions,

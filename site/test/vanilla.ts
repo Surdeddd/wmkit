@@ -21,6 +21,7 @@ const countEl = must(document.querySelector<HTMLElement>('#window-count'))
 const wm = createWindowManager()
 const desktop = attachDesktop(wm, desktopEl, {
   minimizeTarget: (win) => taskbarEl.querySelector(`[data-task="${win.id}"]`),
+  grid: Number(new URLSearchParams(location.search).get('grid')),
 })
 const store = persist(wm, { key: 'wmkit-e2e' })
 
