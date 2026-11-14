@@ -1,5 +1,6 @@
 import { zoneBounds } from '../../core/geometry'
 import type { Bounds, SnapZone, WindowState } from '../../core/types'
+import { nonced } from '../../dom/nonce'
 import { type DesktopController, lostRelease, muteMenu, regained } from '../../dom/shared'
 import { type LayoutMessages, layoutMessages } from './messages'
 
@@ -103,7 +104,7 @@ export function linkSnapped(desktop: DesktopController, options: SeamOptions = {
 
   let sheet = styled.get(doc)
   if (!sheet) {
-    sheet = { node: doc.createElement('style'), users: 0 }
+    sheet = { node: nonced(doc.createElement('style')), users: 0 }
     sheet.node.dataset.wmSeamStyle = ''
     sheet.node.textContent = CSS
     doc.head.append(sheet.node)

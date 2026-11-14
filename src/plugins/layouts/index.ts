@@ -1,4 +1,5 @@
 import type { Bounds } from '../../core/types'
+import { nonced } from '../../dom/nonce'
 import type { DesktopController } from '../../dom/shared'
 import { type LayoutMessages, layoutMessages } from './messages'
 
@@ -92,7 +93,7 @@ export function createLayoutPicker(
 
   let sheet = styled.get(doc)
   if (!sheet) {
-    sheet = { node: doc.createElement('style'), users: 0 }
+    sheet = { node: nonced(doc.createElement('style')), users: 0 }
     sheet.node.dataset.wmLayoutsStyle = ''
     sheet.node.textContent = CSS
     doc.head.append(sheet.node)

@@ -42,6 +42,7 @@ export { createAnnouncer, defaultMessages } from './dom/announcer'
 export type { DesktopBinder } from './dom/binder'
 export { createDesktopBinder } from './dom/binder'
 export { attachDesktop } from './dom/controller'
+export { setStyleNonce } from './dom/nonce'
 export type {
   ActiveGesture,
   AnimationOptions,

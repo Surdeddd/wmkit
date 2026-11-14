@@ -699,6 +699,22 @@ interface SnapDetectOptions { threshold?: number; cornerSize?: number }
 
 `zoneBounds` делит без остатка: половины, четверти и трети в сумме дают вьюпорт без зазоров и наложений даже при нечётных размерах. `clampToViewport` оставляет досягаемыми `minVisible` пикселей и никогда не выталкивает окно уже этого значения за оба края. `magnetize` возвращает `{ x, y, snappedX, snappedY }` и выравнивает любую пару краёв в пределах `threshold`.
 
+## Content Security Policy
+
+```ts
+setStyleNonce(nonce: string | null): void
+```
+
+Библиотека работает под строгой политикой. Геометрия пишется через CSSOM, а не атрибутами `style`, а таблицы стилей веб-компонентов конструируются, так что ни тому, ни другому исключения не нужны. Политике остаётся назвать две вещи.
+
+**Nonce для `style-src`.** Элементы `<style>`, которые добавляют плагины, — док, devtools, скин со `styles`, раскладки, переключатель, WinBox, стили, которые копирует `popout`, и запасной вариант внутри shadow root там, где таблицы стилей нельзя сконструировать, — несут nonce страницы. Он находится сам: из `<meta property="csp-nonce" nonce="…">` (так пишет Vite), из `<meta name="csp-nonce" content="…">` или из первого `<script nonce>` либо `<style nonce>` документа. `setStyleNonce(nonce)` задаёт его вручную и сильнее всего, что говорит страница; `setStyleNonce(null)` возвращает поиск.
+
+**Политика для Trusted Types.** HTML пишется в двух местах: скин из `@surdeddd/wmkit/chrome` превращает свой шаблон в элементы, а WinBox принимает опцию `html`. Оба идут через одну политику с именем `wmkit`, которая создаётся при первой надобности, поэтому `require-trusted-types-for 'script'` работает вместе с `trusted-types wmkit`. Страница, которая не разрешает это имя, получает обычную строку, и браузер её отклоняет. Политика пропускает текст без изменений: скин сам экранирует каждую подстановку, а за `html`, который вы отдаёте WinBox, отвечаете вы.
+
+```http
+Content-Security-Policy: default-src 'self'; style-src 'self' 'nonce-…'; require-trusted-types-for 'script'; trusted-types wmkit
+```
+
 ## Хелперы анимации
 
 ```ts

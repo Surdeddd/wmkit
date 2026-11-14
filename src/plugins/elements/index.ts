@@ -10,6 +10,7 @@ import type {
   WindowUpdate,
 } from '../../core/types'
 import { attachDesktop, FOCUSABLE_SELECTOR } from '../../dom/controller'
+import { nonced } from '../../dom/nonce'
 import type { DesktopController, DesktopOptions } from '../../dom/shared'
 import { type PersistController, persist } from '../persist'
 
@@ -449,7 +450,7 @@ export class WmWindowElement extends Base {
     if (this.shadowRoot) return
     const root = this.attachShadow({ mode: 'open' })
     const doc = this.ownerDocument
-    const style = doc.createElement('style')
+    const style = nonced(doc.createElement('style'))
     style.textContent = CHROME_CSS
     const bar = part(doc, 'header', 'titlebar')
     bar.dataset.wmDrag = ''

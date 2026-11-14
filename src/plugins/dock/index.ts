@@ -6,6 +6,7 @@ import type {
   WindowState,
   WindowUpdate,
 } from '../../core/types'
+import { nonced } from '../../dom/nonce'
 import {
   type DesktopController,
   type DropHit,
@@ -213,7 +214,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
   const messages = { ...dockMessages, ...options.messages }
   const sashes = new Map<string, HTMLElement>()
   const painted = new WeakMap<HTMLElement, string>()
-  const style = doc.createElement('style')
+  const style = nonced(doc.createElement('style'))
   style.dataset.wmDock = ''
   style.textContent = CSS
   let applying = 0

@@ -1,12 +1,14 @@
 import { createWindowManager } from '../../core/manager'
 import type { WindowManager, WindowState } from '../../core/types'
 import { attachDesktop } from '../../dom/controller'
+import { nonced } from '../../dom/nonce'
 import {
   type DesktopController,
   type DesktopOptions,
   INTERACTIVE_SELECTOR,
   type SkinContext,
 } from '../../dom/shared'
+import { trustedHtml } from '../../dom/trusted'
 import { type Length, resolveLength, resolvePosition } from './parse'
 import { WINBOX_CSS } from './styles'
 
@@ -153,7 +155,7 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
 
   const doc = root.ownerDocument
   if (config.styles !== false && !doc.querySelector('style[data-wmkit-winbox]')) {
-    const style = doc.createElement('style')
+    const style = nonced(doc.createElement('style'))
     style.dataset.wmkitWinbox = ''
     style.textContent = WINBOX_CSS
     doc.head.append(style)
@@ -512,8 +514,9 @@ export class WinBox {
     }
     if (settings.icon) this.setIcon(settings.icon)
     if (settings.mount) this.mount(settings.mount)
-    else if (settings.html !== undefined) this.body.innerHTML = settings.html
-    else if (settings.url) this.setUrl(settings.url)
+    else if (settings.html !== undefined) {
+      this.body.innerHTML = trustedHtml(this.body.ownerDocument.defaultView, settings.html)
+    } else if (settings.url) this.setUrl(settings.url)
 
     boxes.set(id, this)
     history.push(this)

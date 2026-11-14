@@ -475,6 +475,10 @@ panel.destroy()
 
 Rows are patched in place rather than re-rendered, so keyboard focus inside the panel survives while windows move. It injects one scoped stylesheet, shared between panels and removed with the last one.
 
+### Content Security Policy
+
+A strict policy needs no exception for the library: geometry goes through the CSSOM, the `<style>` elements that plugins add carry the nonce of the page (found on its own, or named with `setStyleNonce`), and the two places that write HTML go through a Trusted Types policy named `wmkit`. See [the API reference](./docs/api.md#content-security-policy).
+
 ## Theming
 
 `@surdeddd/wmkit/themes/glass.css` styles the `data-wm-*` attributes and exposes CSS variables:

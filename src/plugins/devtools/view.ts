@@ -1,4 +1,5 @@
 import type { ManagerState, WindowState } from '../../core/types'
+import { nonced } from '../../dom/nonce'
 import type { DevtoolsMessages } from './messages'
 
 export type DevtoolsAction = 'focus' | 'minimize' | 'maximize' | 'close'
@@ -55,7 +56,7 @@ function acquireStyle(doc: Document): HTMLStyleElement {
     existing.dataset.owners = String(Number(existing.dataset.owners) + 1)
     return existing
   }
-  const style = doc.createElement('style')
+  const style = nonced(doc.createElement('style'))
   style.id = STYLE_ID
   style.dataset.owners = '1'
   style.textContent = CSS

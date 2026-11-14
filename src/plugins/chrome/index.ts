@@ -1,5 +1,7 @@
 import type { WindowState } from '../../core/types'
+import { nonced } from '../../dom/nonce'
 import type { SkinMount, WindowSkin } from '../../dom/shared'
+import { trustedHtml } from '../../dom/trusted'
 import { type ChromeMessages, chromeMessages } from './messages'
 import { compile, escapeHtml } from './template'
 
@@ -45,7 +47,7 @@ export function skin(spec: SkinSpec): WindowSkin {
   function wear(doc: Document): () => void {
     let held = worn.get(doc)
     if (!held) {
-      const tag = doc.createElement('style')
+      const tag = nonced(doc.createElement('style'))
       tag.dataset.wmSkinStyles = spec.name
       tag.textContent = spec.styles as string
       doc.head.append(tag)
@@ -67,7 +69,7 @@ export function skin(spec: SkinSpec): WindowSkin {
 
   function adopt(root: ShadowRoot, doc: Document, css: string): void {
     if (typeof CSSStyleSheet.prototype.replaceSync !== 'function') {
-      const tag = doc.createElement('style')
+      const tag = nonced(doc.createElement('style'))
       tag.textContent = css
       root.prepend(tag)
       return
@@ -83,7 +85,7 @@ export function skin(spec: SkinSpec): WindowSkin {
 
   return ({ doc, window: win }): SkinMount => {
     const holder = doc.createElement('template')
-    holder.innerHTML = render(valuesOf(win))
+    holder.innerHTML = trustedHtml(doc.defaultView, render(valuesOf(win)))
     const built = holder.content.firstElementChild as HTMLElement
     const slot =
       holder.content.childElementCount !== 1

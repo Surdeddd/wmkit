@@ -1,5 +1,6 @@
 import type { Bounds, WindowState } from '../../core/types'
 import { prefersReducedMotion } from '../../dom/animate'
+import { nonced } from '../../dom/nonce'
 import type { DesktopController } from '../../dom/shared'
 import { type SwitcherMessages, switcherMessages } from './messages'
 
@@ -73,7 +74,7 @@ export function createSwitcher(
 
   let sheet = styled.get(doc)
   if (!sheet) {
-    sheet = { node: doc.createElement('style'), users: 0 }
+    sheet = { node: nonced(doc.createElement('style')), users: 0 }
     sheet.node.dataset.wmSwitcherStyle = ''
     sheet.node.textContent = CSS
     doc.head.append(sheet.node)

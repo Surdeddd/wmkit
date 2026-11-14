@@ -699,6 +699,22 @@ interface SnapDetectOptions { threshold?: number; cornerSize?: number }
 
 `zoneBounds` tiles exactly: halves, quarters and thirds add back up to the viewport with no gap or overlap on odd sizes. `clampToViewport` keeps `minVisible` pixels reachable and never pushes a window narrower than that off both edges. `magnetize` returns `{ x, y, snappedX, snappedY }` and aligns any edge pair within `threshold`.
 
+## Content Security Policy
+
+```ts
+setStyleNonce(nonce: string | null): void
+```
+
+The library runs under a strict policy. Geometry is written through the CSSOM, never as `style` attributes, and the stylesheets of the web components are constructed, so neither needs an exception. Two things are left for the policy to name.
+
+**A nonce for `style-src`.** The `<style>` elements that plugins add — the dock, the devtools, a skin with `styles`, the layouts, the switcher, WinBox, the styles `popout` copies, and the fallback inside a shadow root where stylesheets cannot be constructed — carry the nonce of the page. It is found on its own: from `<meta property="csp-nonce" nonce="…">` (what Vite writes), from `<meta name="csp-nonce" content="…">`, or from the first `<script nonce>` or `<style nonce>` of the document. `setStyleNonce(nonce)` names it by hand and comes before anything the page says; `setStyleNonce(null)` goes back to looking.
+
+**A policy for Trusted Types.** HTML is written in two places: a skin from `@surdeddd/wmkit/chrome` turns its template into elements, and WinBox takes its `html` option. Both go through one policy named `wmkit`, created the first time it is needed, so `require-trusted-types-for 'script'` works with `trusted-types wmkit`. A page that does not allow that name gets the plain string, which the browser then refuses. The policy passes text through unchanged: a skin escapes every placeholder itself, and the `html` you hand WinBox is yours to vouch for.
+
+```http
+Content-Security-Policy: default-src 'self'; style-src 'self' 'nonce-…'; require-trusted-types-for 'script'; trusted-types wmkit
+```
+
 ## Animation helpers
 
 ```ts

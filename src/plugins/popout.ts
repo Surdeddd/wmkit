@@ -1,4 +1,5 @@
 import type { WindowManager } from '../core/types'
+import { nonced } from '../dom/nonce'
 
 interface DocumentPictureInPictureApi {
   readonly window?: Window | null
@@ -90,12 +91,12 @@ function copyStylesInto(target: Document, source: Document): void {
     if (sheet.disabled) continue
     let node: HTMLStyleElement | HTMLLinkElement
     try {
-      node = target.createElement('style')
+      node = nonced(target.createElement('style'), source)
       node.textContent = Array.from(sheet.cssRules, (rule) => rule.cssText).join('\n')
     } catch {
       const owner = sheet.ownerNode
       if (!(owner instanceof HTMLLinkElement) || !owner.href) continue
-      const link = target.createElement('link')
+      const link = nonced(target.createElement('link'), source)
       link.rel = 'stylesheet'
       link.href = owner.href
       node = link
