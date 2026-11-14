@@ -289,6 +289,16 @@ persist(wm, {                       // версия контракта + миг�
 
 Сохранение идёт с задержкой, но при непрерывных изменениях — не реже чем раз в `maxWait` мс; сбои чтения, миграции и записи уходят в `onError`, а не вылетают исключением. Хранилище может отвечать промисами: `persist(wm, { storage: idbStorage() })` с `idbStorage` из `@surdeddd/wmkit/persist/idb` держит рабочий стол в IndexedDB, а `await store.ready` говорит, был ли он восстановлен.
 
+### `sync(wm, options?)` — `@surdeddd/wmkit/sync`
+
+Один рабочий стол на все вкладки: каждое изменение идёт через `BroadcastChannel` (или ваш собственный канал), и везде побеждает более позднее. Новая вкладка присоединяется к рабочему столу, который уже есть, а не заменяет его своим.
+
+```js
+import { sync } from '@surdeddd/wmkit/sync'
+
+const link = sync(wm, { channel: 'my-desktop' })
+```
+
 ### Popout
 
 ```js

@@ -879,6 +879,45 @@ if (!(await store.ready)) openDefaultWindows()
 
 `idbStorage({ database?, store? })` из `@surdeddd/wmkit/persist/idb` — такое хранилище на IndexedDB: по умолчанию база `wmkit` с одним хранилищем объектов `state`, открывается при первом обращении. Там, где IndexedDB нет или она не открывается, его методы отклоняют промис, о чём `persist` сообщает как о `'load'` и `'save'`, а следующий вызов пробует открыть базу снова.
 
+## `sync(wm, options?)` — `@surdeddd/wmkit/sync`
+
+```ts
+interface SyncOptions {
+  channel?: string | SyncChannel   // 'wmkit' — the name of a BroadcastChannel, or a channel of your own
+  wait?: number                    // 300 — ms to wait for a desktop that is already there
+  onError?: (error: unknown) => void   // globalThis.reportError
+}
+
+interface SyncChannel {   // what BroadcastChannel, a MessagePort or your own transport looks like
+  postMessage(message: unknown): void
+  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void
+  removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void
+  close?(): void
+}
+
+interface SyncController {
+  readonly ready: Promise<boolean>   // true when it joined desktops that were already there
+  destroy(): void
+}
+```
+
+```js
+import { createWindowManager } from '@surdeddd/wmkit'
+import { sync } from '@surdeddd/wmkit/sync'
+
+const wm = createWindowManager()
+const link = sync(wm, { channel: 'my-desktop' })
+if (!(await link.ready)) openDefaultWindows()
+```
+
+Держит менеджеры нескольких страниц на одном рабочем столе: вкладки одного сайта, всплывающее окно, которое открыло приложение, iframe того же источника. Каждое изменение отправляется как сериализованное состояние целиком, а пришедшее состояние применяется так же, как его применяет `hydrate`: под вьюпорт получателя, без отправки обратно, и история получателя начинается заново.
+
+Когда две страницы меняют рабочий стол одновременно, на всех побеждает более позднее изменение. Позднее — по счёту, а не по часам: каждое состояние несёт счётчик, который больше любого счётчика, виденного отправителем, а равные счётчики разрешает id отправителя, поэтому все страницы выбирают одного победителя, в каком бы порядке ни пришли сообщения.
+
+Страница, которая только запустилась, не навязывает остальным свой рабочий стол. Сначала она спрашивает, кто здесь, и `wait` миллисекунд держит при себе то, что открывает; первый ответ заменяет её рабочий стол общим, и `ready` даёт `true`. Без ответа она одна: `ready` даёт `false`, и тогда же объявляется то, что она изменила, пока ждала. Поэтому дождитесь `ready`, прежде чем открывать окна по умолчанию, — как и с хранилищем, которое отвечает позже.
+
+По имени канал — это `BroadcastChannel`, и открывается он только там, где есть документ, так что вызов `sync` на сервере ничего не делает. Там, где в браузере нет `BroadcastChannel`, то же имя идёт через события `storage` из `localStorage`. Объект с `postMessage` и слушателями `message` используется как есть — так рабочий стол можно передавать через `MessagePort`, WebSocket или воркер; за вас его не закрывают. Чужие сообщения игнорируются, состояние, которое отклонил `hydrate`, ничего не меняет, а транспорт, бросивший исключение, уходит в `onError`. `destroy()` останавливает оба направления.
+
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 
 ```ts

@@ -55,6 +55,7 @@ import { announcerMessagesRu } from '@surdeddd/wmkit/ru'
 import { useWmState as solidState } from '@surdeddd/wmkit/solid'
 import { wmStore } from '@surdeddd/wmkit/svelte'
 import { createSwitcher, type SwitcherOptions } from '@surdeddd/wmkit/switcher'
+import { type SyncOptions, sync } from '@surdeddd/wmkit/sync'
 import { createTaskbar, type TaskbarOptions } from '@surdeddd/wmkit/taskbar'
 import '@surdeddd/wmkit/taskbar/define'
 import { type ThemeName, themeStyle } from '@surdeddd/wmkit/themes'
@@ -73,6 +74,7 @@ const desk: DesktopOptions = {
 }
 const docking: DockOptions = { sash: 8 }
 const tasks: TaskbarOptions = { show: 'minimized', workspace: 'all' }
+const linking: SyncOptions = { channel: 'app', wait: 100 }
 const switching: SwitcherOptions = { shortcut: { code: 'KeyK', modifier: 'ctrl' }, animation: false }
 const columns: SnapLayout = [snapLayouts.halves[0], { x: 0.5, y: 0, width: 0.5, height: 1 }]
 const saving: PersistOptions = { key: 'app', storage: idbStorage({ database: 'app' }) }
@@ -103,6 +105,7 @@ export function run(element: HTMLElement): unknown[] {
     isPopoutSupported(),
     createDevtools(wm),
     createTaskbar(wm, element, tasks).targetOf(win),
+    sync(wm, linking).ready,
     createSwitcher(desktop, switching).overview(),
     createLayoutPicker(desktop, { layouts: [columns], hover: false }).open(win.id),
     touchGestures({ pinch: { threshold: 12 } }),

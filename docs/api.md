@@ -879,6 +879,45 @@ Writes never overlap: while one is in flight the next waits, and when several pi
 
 `idbStorage({ database?, store? })` from `@surdeddd/wmkit/persist/idb` is such a storage on IndexedDB: a database named `wmkit` with one object store named `state` by default, opened on first use. Where IndexedDB is missing or refuses to open, its methods reject, which `persist` reports as `'load'` and `'save'`, and the next call tries to open again.
 
+## `sync(wm, options?)` — `@surdeddd/wmkit/sync`
+
+```ts
+interface SyncOptions {
+  channel?: string | SyncChannel   // 'wmkit' — the name of a BroadcastChannel, or a channel of your own
+  wait?: number                    // 300 — ms to wait for a desktop that is already there
+  onError?: (error: unknown) => void   // globalThis.reportError
+}
+
+interface SyncChannel {   // what BroadcastChannel, a MessagePort or your own transport looks like
+  postMessage(message: unknown): void
+  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void
+  removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void
+  close?(): void
+}
+
+interface SyncController {
+  readonly ready: Promise<boolean>   // true when it joined desktops that were already there
+  destroy(): void
+}
+```
+
+```js
+import { createWindowManager } from '@surdeddd/wmkit'
+import { sync } from '@surdeddd/wmkit/sync'
+
+const wm = createWindowManager()
+const link = sync(wm, { channel: 'my-desktop' })
+if (!(await link.ready)) openDefaultWindows()
+```
+
+Keeps the managers of several pages on one desktop: tabs of the same site, a popup the app opened, an iframe of the same origin. Every change is sent as the whole serialized state, and a state that arrives is applied the way `hydrate` applies one: against the receiver's own viewport, without being sent back, and with the receiver's history starting over.
+
+When two pages change the desktop at the same moment, the later change wins on all of them. Later is counted, not timed: each state carries a counter that grows past every counter its sender has seen, and equal counters are settled by the sender's id, so every page picks the same winner whatever order the messages arrive in.
+
+A page that starts does not push its own desktop onto the others. It first asks who is there and, for `wait` milliseconds, keeps to itself what it opens; the first answer replaces its desktop with the one the others share, and `ready` gives `true`. With no answer it is alone: `ready` gives `false`, and what it changed while it waited is announced then. So wait for `ready` before opening defaults, as with a storage that answers later.
+
+By name, the channel is a `BroadcastChannel`, opened only where there is a document, so calling `sync` on a server does nothing. Where the browser has no `BroadcastChannel`, the same name travels through `storage` events of `localStorage`. An object with `postMessage` and `message` listeners is used as it is, which carries the desktop over a `MessagePort`, a WebSocket or a worker; it is not closed for you. Messages that are not its own are ignored, a state that `hydrate` refuses changes nothing, and a transport that throws is reported to `onError`. `destroy()` stops both directions.
+
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 
 ```ts

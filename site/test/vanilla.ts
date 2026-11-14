@@ -10,6 +10,7 @@ import { persist } from '@surdeddd/wmkit/persist'
 import { idbStorage } from '@surdeddd/wmkit/persist/idb'
 import { popout } from '@surdeddd/wmkit/popout'
 import { createSwitcher } from '@surdeddd/wmkit/switcher'
+import { sync } from '@surdeddd/wmkit/sync'
 import { createTaskbar } from '@surdeddd/wmkit/taskbar'
 import '@surdeddd/wmkit/themes/glass.css'
 
@@ -205,6 +206,7 @@ declare global {
       createSwitcher: typeof createSwitcher
       persist: typeof persist
       idbStorage: typeof idbStorage
+      sync: typeof sync
     }
   }
 }
@@ -221,4 +223,5 @@ window.__wmkit = {
   createSwitcher,
   persist,
   idbStorage,
+  sync,
 }

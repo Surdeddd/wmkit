@@ -41,6 +41,7 @@
       "@surdeddd/wmkit/taskbar": ["./src/plugins/taskbar/index.ts"],
       "@surdeddd/wmkit/layouts": ["./src/plugins/layouts/index.ts"],
       "@surdeddd/wmkit/switcher": ["./src/plugins/switcher/index.ts"],
+      "@surdeddd/wmkit/sync": ["./src/plugins/sync.ts"],
       "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"],
       "@surdeddd/wmkit/preact": ["./src/adapters/preact.ts"],

@@ -28,6 +28,7 @@ export const ENTRIES: Record<string, string> = {
   './taskbar': 'src/plugins/taskbar/index.ts',
   './layouts': 'src/plugins/layouts/index.ts',
   './switcher': 'src/plugins/switcher/index.ts',
+  './sync': 'src/plugins/sync.ts',
   './themes': 'src/themes/index.ts',
 }
 

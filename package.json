@@ -288,6 +288,16 @@
         "default": "./dist/switcher.cjs"
       }
     },
+    "./sync": {
+      "import": {
+        "types": "./dist/sync.d.ts",
+        "default": "./dist/sync.js"
+      },
+      "require": {
+        "types": "./dist/sync.d.cts",
+        "default": "./dist/sync.cjs"
+      }
+    },
     "./themes": {
       "import": {
         "types": "./dist/themes.d.ts",
@@ -541,6 +551,11 @@
       "limit": "3 kB"
     },
     {
+      "name": "sync plugin",
+      "path": "dist/sync.js",
+      "limit": "1.2 kB"
+    },
+    {
       "name": "themes as text",
       "path": "dist/themes.js",
       "limit": "8 kB"
@@ -619,6 +634,9 @@
       ],
       "persist/idb": [
         "./dist/persist/idb.d.ts"
+      ],
+      "sync": [
+        "./dist/sync.d.ts"
       ]
     }
   },

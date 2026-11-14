@@ -234,6 +234,12 @@ exports[`exports exactly the recorded names from every entry point 1`] = `
     "switcherMessages: value",
     "switcherMessagesRu: value",
   ],
+  "./sync": [
+    "SyncChannel: type",
+    "SyncController: type",
+    "SyncOptions: type",
+    "sync: value",
+  ],
   "./taskbar": [
     "TaskbarController: type",
     "TaskbarMessages: type",
