@@ -412,6 +412,18 @@ panel.destroy()
 
 Строки обновляются точечно, а не перерисовываются целиком, поэтому фокус клавиатуры внутри панели переживает перемещение окон. Панель добавляет один изолированный стиль — общий для всех панелей и удаляемый вместе с последней.
 
+### Помощники для ваших тестов — `@surdeddd/wmkit/testing`
+
+Помощники, которыми написаны DOM-тесты самой библиотеки: `stubFrames` и `stubPointerCapture` дают то, чего нет в jsdom, а `drag`, `resize`, `press` и `pointer` отправляют события жеста. Тестовый раннер может быть любым.
+
+```js
+import { drag, stubFrames, stubPointerCapture } from '@surdeddd/wmkit/testing'
+
+const frames = stubFrames()
+const release = stubPointerCapture()
+drag(titlebar, { x: 120, y: 80 }, { frames })
+```
+
 ### Content Security Policy
 
 Строгой политике не нужны исключения для библиотеки: геометрия идёт через CSSOM, элементы `<style>`, которые добавляют плагины, несут nonce страницы (он находится сам или задаётся через `setStyleNonce`), а два места, где пишется HTML, идут через политику Trusted Types с именем `wmkit`. Подробности — в [справочнике API](./docs/api.ru.md#content-security-policy).

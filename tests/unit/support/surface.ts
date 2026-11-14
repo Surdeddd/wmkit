@@ -29,6 +29,7 @@ export const ENTRIES: Record<string, string> = {
   './layouts': 'src/plugins/layouts/index.ts',
   './switcher': 'src/plugins/switcher/index.ts',
   './sync': 'src/plugins/sync.ts',
+  './testing': 'src/testing/index.ts',
   './themes': 'src/themes/index.ts',
 }
 

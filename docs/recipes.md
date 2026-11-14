@@ -370,7 +370,9 @@ expect(wm.get(win.id).bounds).toEqual({ x: 0, y: 0, width: 500, height: 800 })
 
 jsdom reports `clientWidth` and `clientHeight` as 0, so with `autoViewport` on the viewport set at mount is ignored and the constructor one stays: pass `viewport` to `createWindowManager` in jsdom tests. Plain jsdom has no `ResizeObserver` either; the controller then measures the desktop once and carries on.
 
-For DOM behaviour, drive real pointer events — the library uses pointer capture, so synthetic mouse events will not do. In Playwright:
+For DOM behaviour in jsdom, [`@surdeddd/wmkit/testing`](./api.md#helpers-for-your-tests--surdedddwmkittesting) has the helpers the library's own tests use: `stubFrames` and `stubPointerCapture` supply what jsdom lacks, and `drag`, `resize` and `press` send the events of a whole gesture.
+
+In a browser, drive real pointer events — the library uses pointer capture, so synthetic mouse events will not do. In Playwright:
 
 ```js
 const box = await handle.boundingBox()

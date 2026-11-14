@@ -34,6 +34,7 @@ export default defineConfig({
       '@surdeddd/wmkit/switcher': new URL('./src/plugins/switcher/index.ts', import.meta.url)
         .pathname,
       '@surdeddd/wmkit/sync': new URL('./src/plugins/sync.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/testing': new URL('./src/testing/index.ts', import.meta.url).pathname,
       '@surdeddd/wmkit': new URL('./src/index.ts', import.meta.url).pathname,
     },
   },

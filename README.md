@@ -475,6 +475,18 @@ panel.destroy()
 
 Rows are patched in place rather than re-rendered, so keyboard focus inside the panel survives while windows move. It injects one scoped stylesheet, shared between panels and removed with the last one.
 
+### Helpers for your tests — `@surdeddd/wmkit/testing`
+
+The helpers the library's own DOM tests are written with: `stubFrames` and `stubPointerCapture` supply what jsdom lacks, and `drag`, `resize`, `press` and `pointer` send the events of a gesture. No test runner is assumed.
+
+```js
+import { drag, stubFrames, stubPointerCapture } from '@surdeddd/wmkit/testing'
+
+const frames = stubFrames()
+const release = stubPointerCapture()
+drag(titlebar, { x: 120, y: 80 }, { frames })
+```
+
 ### Content Security Policy
 
 A strict policy needs no exception for the library: geometry goes through the CSSOM, the `<style>` elements that plugins add carry the nonce of the page (found on its own, or named with `setStyleNonce`), and the two places that write HTML go through a Trusted Types policy named `wmkit`. See [the API reference](./docs/api.md#content-security-policy).

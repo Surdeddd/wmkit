@@ -107,6 +107,7 @@ export default defineConfig({
         new URL('../src/plugins/switcher/index.ts', import.meta.url),
       ),
       '@surdeddd/wmkit/sync': fileURLToPath(new URL('../src/plugins/sync.ts', import.meta.url)),
+      '@surdeddd/wmkit/testing': fileURLToPath(new URL('../src/testing/index.ts', import.meta.url)),
       '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },

@@ -298,6 +298,16 @@
         "default": "./dist/sync.cjs"
       }
     },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    },
     "./themes": {
       "import": {
         "types": "./dist/themes.d.ts",
@@ -556,6 +566,11 @@
       "limit": "1.2 kB"
     },
     {
+      "name": "testing helpers",
+      "path": "dist/testing.js",
+      "limit": "900 B"
+    },
+    {
       "name": "themes as text",
       "path": "dist/themes.js",
       "limit": "8 kB"
@@ -637,6 +652,9 @@
       ],
       "sync": [
         "./dist/sync.d.ts"
+      ],
+      "testing": [
+        "./dist/testing.d.ts"
       ]
     }
   },

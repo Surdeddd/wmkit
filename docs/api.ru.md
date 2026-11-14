@@ -1264,6 +1264,76 @@ attachDesktop(wm, document.querySelector('#desktop'), {
 </script>
 ```
 
+## Помощники для ваших тестов — `@surdeddd/wmkit/testing`
+
+```ts
+stubFrames(view?: Window): Frames                 // requestAnimationFrame turned by hand
+stubPointerCapture(view?: Window): () => void     // setPointerCapture and friends where jsdom has none
+
+pointer(target: Element, type: string, x: number, y: number, details?: PointerDetails): PointerEvent
+drag(handle: Element, by: Point, options?: GestureOptions): void
+resize(windowElement: Element, edge: ResizeEdge, by: Point, options?: GestureOptions): void
+press(target: Element, key: string, init?: KeyboardEventInit): KeyboardEvent
+
+interface Frames {
+  flush(passes?: number): void   // run what is waiting; a callback that asks again waits for the next pass
+  waiting(): number
+  restore(): void
+}
+
+interface PointerDetails {
+  button?: number                         // 0
+  buttons?: number                        // 1, or 0 for pointerup and pointercancel
+  pointerId?: number                      // 1
+  pointerType?: 'mouse' | 'touch' | 'pen' // 'mouse'
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+  shiftKey?: boolean
+}
+
+interface GestureOptions extends PointerDetails {
+  from?: Point        // where the pointer goes down; the centre of the handle by default
+  steps?: number      // 4 — pointermove events on the way
+  frames?: Frames     // flushed after every move
+  release?: boolean   // true — false leaves the pointer down
+}
+
+type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+```
+
+То, чем написаны DOM-тесты самой библиотеки, — для тестов приложения, которое ею пользуется. Помощники не зависят ни от какого тестового раннера и ни от чего в библиотеке: они отправляют события на элементы, которые вы им даёте.
+
+Перетаскивание и ресайз применяют геометрию в кадре анимации, а в jsdom нет ни кадра, которого можно точно дождаться, ни захвата указателя. `stubFrames()` заменяет `requestAnimationFrame` и `cancelAnimationFrame` очередью, которую выполняет `flush()`, а `stubPointerCapture()` даёт элементам `setPointerCapture`, `releasePointerCapture` и `hasPointerCapture`, которые помнят, кто держит указатель; вызовите оба до `attachDesktop`, а `restore()` и возвращённую функцию — когда тест закончился.
+
+`pointer` отправляет одно событие: `PointerEvent` там, где у страницы есть такой класс, иначе `MouseEvent` с `pointerId`, `pointerType` и `isPrimary`. `drag` нажимает на ручку, сдвигает указатель на `by` за `steps` шагов и отпускает; `resize` делает то же на ручке края и бросает исключение, если у окна её нет. Оба берут место нажатия из `getBoundingClientRect`, который в jsdom состоит из нулей, — это не мешает: жесту важно только, насколько сдвинулся указатель. `press` отправляет `keydown` и возвращает его, так что `defaultPrevented` говорит, взяла ли библиотека эту клавишу.
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { drag, press, resize, stubFrames, stubPointerCapture } from '@surdeddd/wmkit/testing'
+
+const frames = stubFrames()
+const release = stubPointerCapture()
+
+const wm = createWindowManager({ viewport: { width: 1200, height: 800 } })
+const desktop = attachDesktop(wm, document.body, { autoViewport: false, magnetism: false })
+wm.open({ id: 'notes', x: 100, y: 100, width: 300, height: 200 })
+const element = document.createElement('section')
+element.innerHTML = '<header data-wm-drag></header>'
+document.body.append(element)
+desktop.attachWindow('notes', element)
+
+drag(element.querySelector('[data-wm-drag]'), { x: 120, y: 80 }, { frames })
+resize(element, 'se', { x: 60, y: 40 }, { frames })
+press(element, 'ArrowRight')
+
+console.assert(wm.get('notes').bounds.width === 360)
+
+desktop.destroy()
+frames.restore()
+release()
+```
+
 ## `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 ```ts

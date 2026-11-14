@@ -1264,6 +1264,76 @@ A button element lives as long as its window or group does and is only written t
 </script>
 ```
 
+## Helpers for your tests — `@surdeddd/wmkit/testing`
+
+```ts
+stubFrames(view?: Window): Frames                 // requestAnimationFrame turned by hand
+stubPointerCapture(view?: Window): () => void     // setPointerCapture and friends where jsdom has none
+
+pointer(target: Element, type: string, x: number, y: number, details?: PointerDetails): PointerEvent
+drag(handle: Element, by: Point, options?: GestureOptions): void
+resize(windowElement: Element, edge: ResizeEdge, by: Point, options?: GestureOptions): void
+press(target: Element, key: string, init?: KeyboardEventInit): KeyboardEvent
+
+interface Frames {
+  flush(passes?: number): void   // run what is waiting; a callback that asks again waits for the next pass
+  waiting(): number
+  restore(): void
+}
+
+interface PointerDetails {
+  button?: number                         // 0
+  buttons?: number                        // 1, or 0 for pointerup and pointercancel
+  pointerId?: number                      // 1
+  pointerType?: 'mouse' | 'touch' | 'pen' // 'mouse'
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+  shiftKey?: boolean
+}
+
+interface GestureOptions extends PointerDetails {
+  from?: Point        // where the pointer goes down; the centre of the handle by default
+  steps?: number      // 4 — pointermove events on the way
+  frames?: Frames     // flushed after every move
+  release?: boolean   // true — false leaves the pointer down
+}
+
+type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+```
+
+What the library's own DOM tests are written with, for tests of an app that uses it. The helpers depend on no test runner and on nothing in the library: they dispatch events on the elements you give them.
+
+A drag or resize applies its geometry in an animation frame, and jsdom has neither a frame you can wait for exactly nor pointer capture. `stubFrames()` replaces `requestAnimationFrame` and `cancelAnimationFrame` with a queue that `flush()` runs, and `stubPointerCapture()` gives elements `setPointerCapture`, `releasePointerCapture` and `hasPointerCapture` that keep track of the holder; call both before `attachDesktop`, and call `restore()` and the returned function when the test is over.
+
+`pointer` dispatches one event: a `PointerEvent` where the page has the class, otherwise a `MouseEvent` carrying `pointerId`, `pointerType` and `isPrimary`. `drag` presses on a handle, moves `by` in `steps` and lets go; `resize` does the same on the handle of an edge and throws when the window has none. Both read where to press from `getBoundingClientRect`, which is all zeros in jsdom — that is fine, a gesture only cares how far the pointer travels. `press` sends a `keydown` and returns it, so `defaultPrevented` tells whether the library took the key.
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { drag, press, resize, stubFrames, stubPointerCapture } from '@surdeddd/wmkit/testing'
+
+const frames = stubFrames()
+const release = stubPointerCapture()
+
+const wm = createWindowManager({ viewport: { width: 1200, height: 800 } })
+const desktop = attachDesktop(wm, document.body, { autoViewport: false, magnetism: false })
+wm.open({ id: 'notes', x: 100, y: 100, width: 300, height: 200 })
+const element = document.createElement('section')
+element.innerHTML = '<header data-wm-drag></header>'
+document.body.append(element)
+desktop.attachWindow('notes', element)
+
+drag(element.querySelector('[data-wm-drag]'), { x: 120, y: 80 }, { frames })
+resize(element, 'se', { x: 60, y: 40 }, { frames })
+press(element, 'ArrowRight')
+
+console.assert(wm.get('notes').bounds.width === 360)
+
+desktop.destroy()
+frames.restore()
+release()
+```
+
 ## `createDevtools(wm, options?)` — `@surdeddd/wmkit/devtools`
 
 ```ts
