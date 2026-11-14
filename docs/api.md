@@ -126,7 +126,7 @@ interface ManagerState {
 }
 ```
 
-`getState()` returns a cached object that is replaced on every change, so a `!==` check is enough to know something happened. Window ids may be any string, `constructor` and `__proto__` included: `windows` has a null prototype, so read it with `Object.keys`, `in` or `Object.hasOwn`, not `windows.hasOwnProperty`.
+`getState()` returns a cached object that is replaced on every change, so a `!==` check is enough to know something happened. A window whose values did not change keeps its object from one state to the next, also through a `batch` that changes it and puts the same values back, so `state.windows[id] !== previous.windows[id]` means that window changed. Window ids may be any string, `constructor` and `__proto__` included: `windows` has a null prototype, so read it with `Object.keys`, `in` or `Object.hasOwn`, not `windows.hasOwnProperty`.
 
 The keys of `windows` are in opening order, also after `hydrate` and `loadLayout`, with one exception that comes from JavaScript itself: keys that look like integers (`'42'`) always come first, in numeric order. When you render a list from `windows`, use ids that are not bare integers, or sort by `openedSeq`.
 

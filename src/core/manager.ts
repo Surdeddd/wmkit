@@ -144,6 +144,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let flushing = false
   let historyDirty = false
   const pendingEvents: Array<() => void> = []
+  const touched = new Map<string, boolean>()
+  let base = windows
   const past: HistoryEntry[] = []
   let future: HistoryEntry[] = []
   let interactionDepth = 0
@@ -222,10 +224,23 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function setWindow(next: WindowState): void {
     const map = ownWindows()
     const previous = map[next.id]
+    if (!touched.has(next.id)) touched.set(next.id, true)
     const wasModal = previous?.layer === 'modal'
     if (wasModal !== (next.layer === 'modal')) modalCount += wasModal ? -1 : 1
     if (previous?.groupId !== next.groupId) groupsDirty = true
     map[next.id] = next
+  }
+
+  function reuse(): void {
+    for (const [id, free] of touched) {
+      const old = base[id]
+      const win = windows[id]
+      if (free && old && win && old !== win && equal(old, win, 2)) {
+        ownWindows()[id] = old
+        snapshot = null
+      }
+    }
+    touched.clear()
   }
 
   function removeWindow(id: string): void {
@@ -930,6 +945,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (equal(finalWin, win, 1)) return true
     const resized = !boundsEqual(finalWin.bounds, win.bounds)
     setWindow(finalWin)
+    touched.set(id, false)
     syncGroup(finalWin)
     if (patch.layer && patch.layer !== win.layer) {
       order = sortByLayer(order)
@@ -1233,13 +1249,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function transact<T>(run: () => T): T {
-    if (batchDepth === 0) openEntry()
+    if (batchDepth === 0) {
+      base = windows
+      openEntry()
+    }
     batchDepth += 1
     try {
       return run()
     } finally {
       batchDepth -= 1
       if (batchDepth === 0) {
+        reuse()
         recordHistory()
         historyDirty = false
         pendingHistory = null

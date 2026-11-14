@@ -3592,3 +3592,65 @@ describe('extension state', () => {
     }
   })
 })
+
+describe('a batch that ends where it began', () => {
+  it('hands back the same window objects', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40 })
+    wm.open({ id: 'b', x: 300, y: 200, meta: { kind: 'note' } })
+    const before = wm.getState().windows
+    wm.batch(() => {
+      wm.minimizeAll()
+      wm.restoreAll()
+    })
+    const after = wm.getState().windows
+    expect(after.a, 'a is a new object with the same values').toBe(before.a)
+    expect(after.b, 'b is a new object with the same values').toBe(before.b)
+  })
+
+  it('still replaces the window that did change, and only that one', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40 })
+    wm.open({ id: 'b', x: 300, y: 200 })
+    const before = wm.getState().windows
+    wm.batch(() => {
+      wm.minimizeAll()
+      wm.restoreAll()
+      wm.move('a', 60, 70)
+    })
+    const after = wm.getState().windows
+    expect(after.a).not.toBe(before.a)
+    expect(after.a?.bounds).toMatchObject({ x: 60, y: 70 })
+    expect(after.b).toBe(before.b)
+  })
+
+  it('does the same without history and inside an interaction', () => {
+    for (const wm of [makeWm({ historyLimit: 0 }), makeWm()]) {
+      wm.open({ id: 'a', x: 40, y: 40 })
+      wm.beginInteraction()
+      wm.move('a', 50, 50)
+      const before = wm.getState().windows.a
+      wm.batch(() => {
+        wm.move('a', 90, 90)
+        wm.move('a', 50, 50)
+      })
+      expect(wm.getState().windows.a).toBe(before)
+      wm.endInteraction()
+    }
+  })
+
+  it('leaves a window opened and closed inside it out, and a reopened one as the new object', () => {
+    const wm = makeWm()
+    wm.open({ id: 'a', x: 40, y: 40 })
+    const before = wm.getState().windows.a
+    wm.batch(() => {
+      wm.open({ id: 'gone' })
+      wm.close('gone')
+      wm.close('a')
+      wm.open({ id: 'a', x: 40, y: 40, title: 'Again' })
+    })
+    expect(wm.get('gone')).toBeUndefined()
+    expect(wm.getState().windows.a).not.toBe(before)
+    expect(wm.get('a')?.title).toBe('Again')
+  })
+})

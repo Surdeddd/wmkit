@@ -692,6 +692,11 @@ function audit(seed: number, steps: number, report: string[]): void {
       names.push('batch')
       wm.batch(() => {
         for (let i = 1 + Math.floor(random() * 3); i > 0; i -= 1) names.push(act())
+        if (random() < 0.4) {
+          names.push('thereAndBack')
+          wm.minimizeAll()
+          wm.restoreAll()
+        }
       })
     } else if (mode < 0.24) {
       names.push('interaction')
@@ -723,8 +728,8 @@ function audit(seed: number, steps: number, report: string[]): void {
       const prev = stateBefore.windows[id]
       const owned = prev && forced({ ...stateBefore, windows: { [id]: prev } }, stateAfter)
       if (
-        names.length === 1 &&
-        names[0] !== 'roundTrip' &&
+        (names.length === 1 || names[0] === 'batch') &&
+        !names.includes('roundTrip') &&
         prev &&
         prev !== next &&
         same(prev, next) &&
