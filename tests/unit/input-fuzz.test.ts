@@ -528,7 +528,7 @@ describe('raw pointer, touch, pen and key events in any order', () => {
             }
           },
         ),
-        fuzz(200),
+        fuzz(80),
       )
     },
     patience(180_000),

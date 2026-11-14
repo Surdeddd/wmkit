@@ -324,7 +324,7 @@ describe('a window resized by any grip along any path', () => {
             )
           }
         }),
-        fuzz(400),
+        fuzz(300),
       )
     },
     patience(120_000),

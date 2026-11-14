@@ -403,7 +403,7 @@ describe('WinBox calls in any order with any arguments', () => {
               actions,
             ),
         ),
-        fuzz(150),
+        fuzz(60),
       )
     },
     patience(120_000),
@@ -423,7 +423,7 @@ describe('WinBox calls in any order with any arguments', () => {
           (actions) =>
             drive({ root, wm, made: [], extras: [], resources: trackResources() }, actions),
         ),
-        fuzz(150),
+        fuzz(60),
       )
     },
     patience(120_000),

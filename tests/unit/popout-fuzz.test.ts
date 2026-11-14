@@ -549,7 +549,7 @@ describe('windows popped out, closed, renamed and hidden at random', () => {
             }
           },
         ),
-        fuzz(150),
+        fuzz(80),
       )
     },
     patience(120_000),

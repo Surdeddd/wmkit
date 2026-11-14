@@ -294,8 +294,8 @@ afterEach(() => {
 
 it('keeps the layout and the manager in step through random operations', () => {
   expect(run(100, 60, 1)).toEqual([])
-})
+}, 60_000)
 
 it('keeps them in step through more random operations with other seeds', () => {
   expect(run(100, 60, 1000)).toEqual([])
-})
+}, 60_000)

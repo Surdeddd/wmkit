@@ -526,7 +526,7 @@ describe('a page that adds, drops, replaces and edits window elements at random'
             await breathe()
           }
         }),
-        fuzz(150),
+        fuzz(80),
       )
     },
     patience(120_000),

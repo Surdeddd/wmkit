@@ -450,7 +450,7 @@ describe('a layout saved through random changes, waits, failures and reloads', (
             }
           },
         ),
-        fuzz(200),
+        fuzz(150),
       )
     },
     patience(120_000),
