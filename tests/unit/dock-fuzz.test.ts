@@ -11,6 +11,8 @@ import {
   type DockStack,
   dockLayout,
 } from '../../src/plugins/dock'
+import { patience, seedCount } from './support/fuzz'
+import { trackResources } from './support/resources'
 
 const POOL = ['a', 'b', 'c', 'd', 'e', 'f']
 const SIDES = ['left', 'right', 'top', 'bottom', 'center'] as const
@@ -97,6 +99,7 @@ function check({ wm, dock }: World): string | null {
       if (!win) return `tree names missing window ${id}`
       if (known && win.stage === 'normal') return `docked ${id} floats`
       if (win.resizable || win.maxSize || win.aspectRatio) return `docked ${id} is not locked`
+      if (win.minimizable || win.snappable) return `docked ${id} can still minimize or snap`
       groups.add(win.groupId)
       const b = win.bounds
       if (
@@ -135,6 +138,7 @@ function check({ wm, dock }: World): string | null {
     if (docked.has(id)) continue
     const win = wm.get(id)
     if (win && !win.resizable) return `undocked ${id} is still locked`
+    if (win && !(win.minimizable && win.snappable)) return `undocked ${id} lost a flag`
     if (win?.snapRect) return `undocked ${id} sits in a panel rectangle`
   }
   return null
@@ -255,6 +259,7 @@ function run(seeds: number, steps: number, offset: number): string[] {
   const problems: string[] = []
   for (let seed = offset; seed < offset + seeds; seed += 1) {
     const random = rng(seed * 7919)
+    const resources = trackResources()
     const w = world(seed % 4 === 0 ? undefined : { width: 1400, height: 900 })
     const trail: string[] = []
     for (let step = 0; step < steps; step += 1) {
@@ -283,7 +288,18 @@ function run(seeds: number, steps: number, offset: number): string[] {
         break
       }
     }
+    w.dock.destroy()
+    w.desktop.destroy()
+    w.wm.destroy()
+    const left = resources.leaks()
+    resources.restore()
+    if (left.length > 0 && problems.length === 0) {
+      problems.push(
+        `seed ${seed}: left behind ${left.join(', ')} after ${trail.slice(-8).join(' > ')}`,
+      )
+    }
     document.body.replaceChildren()
+    if (problems.length > 0) break
   }
   return problems
 }
@@ -292,10 +308,18 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-it('keeps the layout and the manager in step through random operations', () => {
-  expect(run(100, 60, 1)).toEqual([])
-}, 60_000)
+it(
+  'keeps the layout and the manager in step through random operations',
+  () => {
+    expect(run(seedCount(100), 60, 1)).toEqual([])
+  },
+  patience(60_000),
+)
 
-it('keeps them in step through more random operations with other seeds', () => {
-  expect(run(100, 60, 1000)).toEqual([])
-}, 60_000)
+it(
+  'keeps them in step through more random operations with other seeds',
+  () => {
+    expect(run(seedCount(100), 60, 1_000_000)).toEqual([])
+  },
+  patience(60_000),
+)

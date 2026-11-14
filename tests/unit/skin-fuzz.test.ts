@@ -4,6 +4,7 @@ import { createWindowManager } from '../../src/core/manager'
 import type { WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController, MountedWindow, WindowSkin } from '../../src/dom/shared'
+import { patience, seedCount } from './support/fuzz'
 
 const VIEWPORT = { width: 1024, height: 720 }
 const SKINS = ['plain', 'compact', 'wrapped'] as const
@@ -250,4 +251,17 @@ describe('random skin changes keep every window whole', () => {
       expect(drive(h, seed, 140)).toEqual([])
     }, 30_000)
   }
+
+  it(
+    'holds every mount invariant for as many more seeds as a long run asks for',
+    () => {
+      for (let seed = 100_000; seed < 100_000 + seedCount(0); seed += 1) {
+        const h = harness()
+        expect(drive(h, seed, 140), `seed ${seed}`).toEqual([])
+        vi.unstubAllGlobals()
+        document.body.replaceChildren()
+      }
+    },
+    patience(30_000),
+  )
 })

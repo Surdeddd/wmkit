@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { boundsEqual, clampToViewport } from '../../src/core/geometry'
 import { createWindowManager } from '../../src/core/manager'
 import type { ManagerState, SnapZone, WindowManager, WindowState } from '../../src/core/types'
+import { patience, seedCount } from './support/fuzz'
 
 const LAYER_RANK = { normal: 0, floating: 1, modal: 2 } as const
 const ZONES: SnapZone[] = [
@@ -792,11 +793,26 @@ describe('random operation sequences keep the state machine honest', () => {
     }
   })
 
-  it('keeps history, events and persistence truthful over long random runs', () => {
-    const report: string[] = []
-    for (let seed = 1; seed <= 24; seed += 1) audit(seed, 200, report)
-    expect(report.slice(0, 6)).toEqual([])
-  }, 120_000)
+  it(
+    'keeps history, events and persistence truthful over long random runs',
+    () => {
+      const report: string[] = []
+      for (let seed = 1; seed <= seedCount(24); seed += 1) audit(seed, 200, report)
+      expect(report.slice(0, 6)).toEqual([])
+    },
+    patience(120_000),
+  )
+
+  it(
+    'holds every invariant for as many more seeds as a long run asks for',
+    () => {
+      for (let seed = 100_000; seed < 100_000 + seedCount(0); seed += 1) {
+        const wm = createWindowManager({ viewport: { width: 1280, height: 800 }, historyLimit: 20 })
+        expect(drive(wm, seed, 400), `seed ${seed}`).toEqual([])
+      }
+    },
+    patience(120_000),
+  )
 
   it('re-syncs a hand-edited snapshot whose group members drifted apart', () => {
     const viewport = { width: 1280, height: 800 }
