@@ -137,6 +137,32 @@ describe('lit adapter', () => {
     expect(attached()).toEqual(['compact'])
   })
 
+  it('moves the desktop when a template swap builds its new element before dropping the old one', () => {
+    wm.open({ id: 'notes', title: 'Notes' })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const windows = () =>
+      html`<section ${wmWindow(binder, 'notes')}><header data-wm-drag></header></section>`
+    const page = (wide: boolean) =>
+      wide
+        ? html`<main class="wide" ${wmDesktop(binder)}>${windows()}</main>`
+        : html`<div class="narrow" ${wmDesktop(binder)}>${windows()}</div>`
+    const desktops = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-wm-desktop]')].map((node) => node.className)
+
+    render(page(false), host)
+    expect(desktops()).toEqual(['narrow'])
+    expect(() => render(page(true), host)).not.toThrow()
+    expect(desktops()).toEqual(['wide'])
+    expect(binder.controller()?.element.className).toBe('wide')
+    expect(host.querySelector<HTMLElement>('.wide [data-wm-window]')?.dataset.wmWindow).toBe(
+      'notes',
+    )
+    render(page(false), host)
+    expect(desktops()).toEqual(['narrow'])
+    expect(host.querySelectorAll('[data-wm-window]')).toHaveLength(1)
+  })
+
   it('refuses to sit anywhere but on an element', () => {
     const host = document.createElement('div')
     expect(() => render(html`<p>${wmDesktop(binder)}</p>`, host)).toThrow(/on an element/)

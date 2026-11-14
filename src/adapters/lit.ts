@@ -93,7 +93,7 @@ abstract class BindingDirective<A extends unknown[]> extends AsyncDirective {
   override update(part: ElementPart, args: A): typeof nothing {
     const element = part.element as HTMLElement
     if (element !== this.element || !this.same(args)) {
-      this.release?.()
+      this.disconnected()
       this.element = element
       this.args = args
       this.release = this.bind(element, ...args)
@@ -111,9 +111,18 @@ abstract class BindingDirective<A extends unknown[]> extends AsyncDirective {
   }
 }
 
+const owners = new WeakMap<DesktopBinder, DesktopDirective>()
+
 class DesktopDirective extends BindingDirective<[DesktopBinder]> {
   protected bind(element: HTMLElement, binder: DesktopBinder): () => void {
-    return binder.bindDesktop(element)
+    owners.get(binder)?.disconnected()
+    owners.set(binder, this)
+    const unbind = binder.bindDesktop(element)
+    return () => {
+      if (owners.get(binder) !== this) return
+      owners.delete(binder)
+      unbind()
+    }
   }
 }
 
