@@ -37,7 +37,7 @@ export default defineConfig({
   webServer: {
     command: `WMKIT_E2E=1 pnpm site:build && pnpm qwik:fixture && pnpm dashboard:fixture && node tests/e2e/qwik-ssr.build.mjs && pnpm site:preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/wmkit/`,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.WMKIT_E2E_REUSE === '1',
     timeout: 120_000,
   },
 })
