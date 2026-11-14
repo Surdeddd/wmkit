@@ -41,6 +41,37 @@ test('close button removes the window and hands focus back', async ({ page }) =>
   await expect(page.getByTestId('window-count')).toHaveText('1')
 })
 
+test('a window that is asked first waits for the answer, stays on a no and closes on a yes', async ({
+  page,
+}) => {
+  await spawn(page)
+  const asked = win(page, 't1')
+  await expect(asked).toBeVisible()
+  await page.evaluate(() => {
+    const answers: Array<(value: boolean) => void> = []
+    Object.assign(window, { __answers: answers })
+    window.__wm.onBeforeClose(() => new Promise<boolean>((resolve) => answers.push(resolve)))
+  })
+  const answer = (value: boolean) =>
+    page.evaluate((given) => {
+      const { __answers } = window as unknown as { __answers: Array<(value: boolean) => void> }
+      __answers.shift()?.(given)
+    }, value)
+
+  await asked.locator('[data-wm-close]').click()
+  await expect(asked).toHaveAttribute('data-wm-closing', '')
+  await expect(asked).toBeVisible()
+  await answer(false)
+  await expect(asked).not.toHaveAttribute('data-wm-closing')
+  await expect(asked).toBeVisible()
+
+  await asked.locator('[data-wm-close]').click()
+  await expect(asked).toHaveAttribute('data-wm-closing', '')
+  await answer(true)
+  await expect(asked).toHaveCount(0)
+  expect(await page.evaluate(() => window.__wm.get('t1'))).toBeUndefined()
+})
+
 test('minimize hides the window into the taskbar and restores from it', async ({ page }) => {
   await spawn(page)
   const window = win(page, 't1')

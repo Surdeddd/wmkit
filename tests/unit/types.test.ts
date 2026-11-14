@@ -92,6 +92,7 @@ describe('the types of the manager', () => {
     expectTypeOf<keyof ManagerEvents>().toEqualTypeOf<
       | 'open'
       | 'close'
+      | 'closing'
       | 'focus'
       | 'move'
       | 'resize'

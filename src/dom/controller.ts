@@ -742,6 +742,18 @@ export function attachDesktop(
     letGo()
   })
 
+  const closing = new Set<string>()
+  cleanup.push(
+    wm.on('closing', ({ window: win, pending }) => {
+      if (pending) closing.add(win.id)
+      else closing.delete(win.id)
+      registry.get(win.id)?.element.toggleAttribute('data-wm-closing', pending)
+    }),
+    wm.on('close', ({ window: win }) => {
+      closing.delete(win.id)
+    }),
+  )
+
   cleanup.push(
     wm.on('modalblocked', ({ window: win }) => {
       const attached = registry.get(win.id)
@@ -857,6 +869,7 @@ export function attachDesktop(
     }
 
     windowElement.dataset.wmWindow = id
+    windowElement.toggleAttribute('data-wm-closing', closing.has(id))
     windowElement.setAttribute('role', 'dialog')
     windowElement.tabIndex = -1
     windowElement.style.position = 'absolute'
@@ -1077,6 +1090,7 @@ export function attachDesktop(
       delete windowElement.dataset.wmTabTarget
       delete windowElement.dataset.wmFlash
       delete windowElement.dataset.wmDeep
+      delete windowElement.dataset.wmClosing
       if (wm.get(id)) windowElement.hidden = false
       reshown = true
       if (focusedEl === windowElement) focusedEl = null

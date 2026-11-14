@@ -15,6 +15,7 @@ export { createWindowManager } from './core/manager'
 export type {
   ArrangeMode,
   Bounds,
+  CloseGuard,
   HistoryEntry,
   ManagerEvents,
   ManagerOptions,

@@ -3,6 +3,7 @@ import { applyAspect, boundsEqual, clampSize, clampToViewport, zoneBounds } from
 import type {
   ArrangeMode,
   Bounds,
+  CloseGuard,
   HistoryEntry,
   ManagerEvents,
   ManagerOptions,
@@ -21,6 +22,7 @@ import type {
 } from './types'
 
 type Limits = Pick<WindowState, 'minSize' | 'maxSize' | 'aspectRatio'>
+type CloseRequest = { seq: number; promise: Promise<boolean>; end(closed: boolean): void }
 type Mark = {
   past: HistoryEntry[]
   future: HistoryEntry[]
@@ -154,6 +156,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let pendingHistory: HistoryEntry | null = null
   let dropped: [HistoryEntry, HistoryEntry[]] | undefined
   const layouts = new Map<string, SerializedState>()
+  const guards = new Set<{ ask: CloseGuard }>()
+  const closing = new Map<string, CloseRequest>()
 
   function getState(): ManagerState {
     if (!snapshot) {
@@ -580,6 +584,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const win = windows[id]
     if (!win) return false
     removeWindow(id)
+    closing.get(id)?.end(true)
     if (win.groupId !== null) {
       const remaining = membersOf(win.groupId)
       const wasActive = activeTabs[win.groupId] === id
@@ -597,6 +602,67 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     queueEvent(() => emitter.emit('order', { order }))
     commit()
     return true
+  }
+
+  function requestClose(id: string): Promise<boolean> {
+    const waiting = closing.get(id)
+    if (waiting) return waiting.promise
+    const asked = windows[id]
+    if (!asked) return Promise.resolve(false)
+    const queue = [...guards]
+    let told = false
+    let settle!: (closed: boolean) => void
+    let reject!: (error: unknown) => void
+    const tell = (pending: boolean) => {
+      const win = windows[id] as WindowState
+      transact(() => queueEvent(() => emitter.emit('closing', { window: win, pending })))
+    }
+    const finish = (end: () => void) => {
+      if (closing.get(id) !== request) return
+      closing.delete(id)
+      end()
+      if (told && windows[id]) tell(false)
+    }
+    const request: CloseRequest = {
+      seq: asked.openedSeq,
+      promise: new Promise<boolean>((resolve, fail) => {
+        settle = resolve
+        reject = fail
+      }),
+      end: (closed) => finish(() => settle(closed)),
+    }
+    const ask = (): void => {
+      while (closing.get(id) === request) {
+        const guard = queue.shift()
+        if (!guard) {
+          transact(() => close(id))
+          return
+        }
+        if (!guards.has(guard)) continue
+        let answer: ReturnType<CloseGuard>
+        try {
+          answer = guard.ask(windows[id] as WindowState)
+        } catch (error) {
+          finish(() => reject(error))
+          return
+        }
+        if (answer === false) request.end(false)
+        else if (answer && typeof answer === 'object') {
+          Promise.resolve(answer).then(
+            (late) => (late === false ? request.end(false) : ask()),
+            (error) => finish(() => reject(error)),
+          )
+          if (!told) {
+            told = true
+            tell(true)
+          }
+          return
+        }
+      }
+    }
+    closing.set(id, request)
+    ask()
+    return request.promise
   }
 
   function closeAll(): void {
@@ -1259,6 +1325,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     } finally {
       batchDepth -= 1
       if (batchDepth === 0) {
+        for (const [id, request] of closing) {
+          if (windows[id]?.openedSeq !== request.seq) request.end(true)
+        }
         reuse()
         recordHistory()
         historyDirty = false
@@ -1651,6 +1720,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function destroy(): void {
     emitter.clear()
+    guards.clear()
   }
 
   const by =
@@ -1661,6 +1731,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   return {
     open: (init) => transact(() => open(init)),
     close: by(close),
+    requestClose: (id) => requestClose(text(id)),
+    onBeforeClose(ask) {
+      const guard = { ask }
+      guards.add(guard)
+      return () => {
+        guards.delete(guard)
+      }
+    },
     closeAll: () => transact(closeAll),
     focus: by(focus),
     blur: () => transact(blur),

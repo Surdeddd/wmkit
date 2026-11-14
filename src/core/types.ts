@@ -131,8 +131,14 @@ export interface ManagerEvents {
   workspace: { workspace: number; previous: number }
   group: { groupId: string; members: readonly string[]; activeId: string; previous: string | null }
   modalblocked: { window: WindowState }
+  closing: { window: WindowState; pending: boolean }
   change: { state: ManagerState }
 }
+
+export type CloseGuard = (
+  window: WindowState,
+  // biome-ignore lint/suspicious/noConfusingVoidType: a guard may return nothing
+) => boolean | void | PromiseLike<boolean | void>
 
 export interface ManagerOptions {
   viewport?: Size
@@ -164,6 +170,8 @@ export interface WindowUpdate {
 export interface WindowManager {
   open(init?: WindowInit): WindowState
   close(id: string): boolean
+  requestClose(id: string): Promise<boolean>
+  onBeforeClose(guard: CloseGuard): () => void
   closeAll(): void
   focus(id: string): boolean
   blur(): void

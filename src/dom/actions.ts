@@ -23,7 +23,9 @@ export function createActions(
     focus: () => wm.focus(id),
     close: () => {
       const win = wm.get(id)
-      return !!win && beforeClose?.(win) !== false && wm.close(id)
+      if (!win || beforeClose?.(win) === false) return false
+      void wm.requestClose(id)
+      return !wm.get(id)
     },
     minimize: () => wm.minimize(id),
     maximize: () => wm.maximize(id),

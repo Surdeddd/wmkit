@@ -185,9 +185,30 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 | Method | Returns | Notes |
 | --- | --- | --- |
 | `open(init?)` | `WindowState` | throws on a duplicate id; cascades when `x`/`y` are omitted; focuses unless minimized or on another workspace |
-| `close(id)` | `boolean` | `false` for unknown ids; focus moves to the next eligible window |
-| `closeAll()` | `void` | every workspace, one transaction. Emits `close` for each window in opening order, one `order`, then `group` for each group that dissolved, and no `focus` |
-| `destroy()` | `void` | drops all listeners; the state object stays usable |
+| `close(id)` | `boolean` | `false` for unknown ids; focus moves to the next eligible window. Never asks the guards |
+| `requestClose(id)` | `Promise<boolean>` | asks the guards and closes the window unless one of them says no; `true` once the window is closed. See [below](#asking-before-a-window-closes) |
+| `onBeforeClose(guard)` | `() => void` | adds a guard and returns the function that removes it. Subscribing the same function twice gives two guards, and each returned function removes only its own |
+| `closeAll()` | `void` | every workspace, one transaction. Emits `close` for each window in opening order, one `order`, then `group` for each group that dissolved, and no `focus`. Never asks the guards |
+| `destroy()` | `void` | drops all listeners and guards; the state object stays usable |
+
+#### Asking before a window closes
+
+A guard is `(window: WindowState) => boolean | void | PromiseLike<boolean | void>`, exported as `CloseGuard`. `requestClose(id)` asks the guards one at a time, in the order they subscribed, and only `false` is a no: the first guard that answers `false` keeps the window open, the rest are not asked and the promise gives `false`. When nobody refuses, the window closes exactly as `close(id)` closes it, in one undo step, and the promise gives `true`. An unknown id gives `false` and asks nobody.
+
+```js
+const stop = wm.onBeforeClose(async (win) => {
+  if (!win.meta.unsaved) return
+  return await askToDiscard(win.title)   // false keeps the window open
+})
+
+const closed = await wm.requestClose('editor')
+```
+
+Guards that answer at once are asked before `requestClose` returns, so with no guard, or with guards that are all synchronous, the window is already gone on the next line. A guard may answer later with a promise or any thenable; the request then waits, and the `closing` event says so with `pending: true`. While a request waits, asking again for the same window returns the same promise and asks no guard twice. A guard that subscribes during a wait is asked from the next request on, and one that unsubscribes is not asked any more, even by a request that is already waiting.
+
+A guard that throws, or whose promise rejects, keeps the window open and rejects the promise of the request with that error; the guards after it are not asked. Each guard is shown the window as it is when its turn comes.
+
+If the window goes away while it is being asked — `close`, `closeAll`, `undo`, `redo`, `hydrate` or `loadLayout` took it — the promise gives `true` at once and nobody else is asked. An answer that arrives after that is dropped, so it can never close a window that was opened later with the same id. A request follows the window it was made for, told apart by `openedSeq`: when history or a saved state puts another window under that id, the request ends the same way, with `true`, while a window that `undo` merely moved back goes on being asked about.
 
 ### Focus and order
 
@@ -359,6 +380,7 @@ interface ManagerEvents {
   workspace: { workspace: number; previous: number }
   group: { groupId: string; members: readonly string[]; activeId: string; previous: string | null }
   modalblocked: { window: WindowState }   // the modal that blocked, not the blocked window
+  closing: { window: WindowState; pending: boolean }   // a close request began or stopped waiting
   change: { state: ManagerState }
 }
 ```
@@ -366,6 +388,8 @@ interface ManagerEvents {
 Ordering inside one transaction: the specific events fire in the order they happened, then `change` last. Payload objects are the post-change state.
 
 `focus` fires only when `focusedId` changes, so `previous` is never the window itself; raising the focused window emits `order` alone. It also fires for `undo`, `redo`, `hydrate` and `loadLayout` when focus moves, and when an `open` behind a modal hands focus to the modal. `modalblocked` is emitted by a blocked `focus()` call only.
+
+`closing` belongs to `requestClose`: `pending: true` when the request starts to wait for a guard that answers later, once per request, and `pending: false` when that wait ends with the window still open. A window that closes ends its wait with `close`, and a request whose guards all answer at once emits no `closing` at all.
 
 A modal that becomes the top modal through `update(…, { layer })` or `moveToWorkspace` (any tab of a modal group) takes focus; demoting the focused modal hands focus to the next visible modal.
 
@@ -424,17 +448,15 @@ interface DesktopOptions {
 
 The nested option objects are exported as types: `GroupingOptions`, `DesktopSnapOptions`, `DesktopKeyboardOptions`, `HitAreaOptions`, `MagnetismOptions`, `GridOptions`, `StackingOptions` and `AnimationOptions`.
 
-`beforeClose` is asked by everything that closes a window on the user's behalf: a `data-wm-close` button, the close action a skin receives and `desktop.actions(id).close()`. Return `false` to keep the window open. `wm.close(id)` never asks and always closes, so call it to finish after a confirmation of your own:
+Everything that closes a window on the user's behalf — a `data-wm-close` button, the close action a skin receives and `desktop.actions(id).close()` — asks first: the `beforeClose` option of this desktop, which answers at once, and after its yes the guards of the manager through [`wm.requestClose(id)`](#asking-before-a-window-closes), which may take their time. Return `false` from `beforeClose` to keep the window open without asking the guards:
 
 ```js
 attachDesktop(wm, root, {
-  beforeClose: (win) => {
-    if (!win.meta.unsaved) return true
-    askToDiscard(win.title).then((discard) => discard && wm.close(win.id))
-    return false
-  },
+  beforeClose: (win) => !win.meta.pinned,
 })
 ```
+
+A confirmation that needs the user belongs in a guard, `wm.onBeforeClose`, where it can be awaited. While a request waits for one, the element of the window carries `data-wm-closing`, whoever made the request. `wm.close(id)` never asks and always closes.
 
 Where `ResizeObserver` is missing, `autoViewport` measures the element once at attach and does not follow it afterwards.
 
@@ -524,7 +546,7 @@ const act = desktop.actions('notes')
 closeButton.onclick = () => act.close()
 ```
 
-`focus`, `close`, `minimize`, `maximize`, `toggleMaximize`, `restore`, `center`, `sendToBack`, `snap(zone)` and `moveToWorkspace(n)`. Each returns the same boolean the manager returns, and each returns `false` once the window is gone rather than throwing. `close()` asks `beforeClose` first and returns `false` when it refuses.
+`focus`, `close`, `minimize`, `maximize`, `toggleMaximize`, `restore`, `center`, `sendToBack`, `snap(zone)` and `moveToWorkspace(n)`. Each returns the same boolean the manager returns, and each returns `false` once the window is gone rather than throwing. `close()` asks `beforeClose` and then the guards of the manager, and returns `true` only when the window is closed by the time it returns: `false` when one of them refused, and `false` while a guard that answers later is still thinking — the window then closes, or stays, when it answers.
 
 ### `desktop.addDropTarget(hit)`
 
@@ -544,7 +566,7 @@ Any element inside a window can carry one of these and the controller will act o
 
 | attribute | effect |
 | --- | --- |
-| `data-wm-close` | closes the window, after asking `beforeClose` |
+| `data-wm-close` | closes the window, after asking `beforeClose` and the guards of the manager |
 | `data-wm-minimize` | minimizes it |
 | `data-wm-maximize` | toggles maximized |
 | `data-wm-restore` | returns it to its stored bounds |

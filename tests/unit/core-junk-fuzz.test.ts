@@ -11,6 +11,8 @@ const IDS = ['a', 'b', 'c', '__proto__', 'constructor', '42', ''] as const
 const METHODS = [
   'open',
   'close',
+  'requestClose',
+  'onBeforeClose',
   'closeAll',
   'focus',
   'blur',
@@ -222,7 +224,8 @@ describe('a manager called with anything at all', () => {
           wm.open({ id: 'b', x: 400, y: 80, width: 300, height: 200 })
           for (const { method, args } of calls) {
             try {
-              ;(wm[method] as (...given: unknown[]) => unknown)(...args)
+              const out = (wm[method] as (...given: unknown[]) => unknown)(...args)
+              if (out instanceof Promise) out.catch(() => {})
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error)
               if (!EXPECTED.test(message)) {

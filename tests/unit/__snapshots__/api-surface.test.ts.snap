@@ -9,6 +9,7 @@ exports[`exports exactly the recorded names from every entry point 1`] = `
     "AnnouncerMessages: type",
     "ArrangeMode: type",
     "Bounds: type",
+    "CloseGuard: type",
     "DesktopBinder: type",
     "DesktopController: type",
     "DesktopGesture: type",
