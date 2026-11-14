@@ -28,10 +28,31 @@ jobs:
       - run: pnpm attw
       - run: pnpm smoke
       - run: pnpm smoke:template
+      - run: pnpm smoke:peers
 
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: chromium
+            browser: chromium
+            projects: --project=chromium
+          - name: mobile
+            browser: chromium
+            projects: --project=mobile
+          - name: webkit
+            browser: webkit
+            projects: --project=webkit
+          - name: apple
+            browser: webkit
+            projects: --project=iphone --project=ipad
+          - name: firefox
+            browser: firefox
+            projects: --project=firefox
+    name: e2e (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -45,14 +66,14 @@ jobs:
           version="$(pnpm exec playwright --version | awk '{ print $2 }')"
           test -n "$version"
           . /etc/os-release
-          echo "key=playwright-${ID}-${VERSION_ID}-${RUNNER_ARCH}-${version}" >> "$GITHUB_OUTPUT"
+          echo "key=playwright-${ID}-${VERSION_ID}-${RUNNER_ARCH}-${version}-${{ matrix.browser }}" >> "$GITHUB_OUTPUT"
       - id: browsers
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ steps.playwright.outputs.key }}
       - if: steps.browsers.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium webkit firefox
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
         timeout-minutes: 15
       - if: steps.browsers.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -60,12 +81,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ steps.playwright.outputs.key }}
       - if: steps.browsers.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium webkit firefox
+        run: pnpm exec playwright install-deps ${{ matrix.browser }}
         timeout-minutes: 10
-      - run: pnpm test:e2e
+      - run: pnpm exec playwright test ${{ matrix.projects }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.name }}
           path: playwright-report/
           retention-days: 14

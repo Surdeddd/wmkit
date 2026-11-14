@@ -1,0 +1,73 @@
+name: Soak
+
+on:
+  schedule:
+    - cron: '17 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: soak
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run fuzz resize-props
+        env:
+          WMKIT_FUZZ: 1500
+
+  monkey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit firefox
+        timeout-minutes: 15
+      - run: pnpm exec playwright test monkey.spec.ts --project=chromium --project=webkit --project=firefox --project=mobile
+        env:
+          WMKIT_MONKEY: 8
+          WMKIT_MONKEY_STEPS: 100
+          WMKIT_MONKEY_SEED: ${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: monkey-report
+          path: playwright-report/
+          retention-days: 14
+
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:mutation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30
