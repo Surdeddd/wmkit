@@ -54,7 +54,7 @@ function markLongestIncreasing(target: StackingTarget): number {
 }
 
 function between(low: number, high: number, base: number, gap: number): number | null {
-  if (!Number.isFinite(high)) return Number.isFinite(low) ? low + gap : base + gap
+  if (!Number.isFinite(high)) return low + gap
   if (!Number.isFinite(low)) {
     const candidate = high - gap > base ? high - gap : Math.floor((base + high) / 2)
     return candidate > base && candidate < high ? candidate : null

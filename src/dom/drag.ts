@@ -42,8 +42,8 @@ export function createDragStarter(ctx: SessionContext) {
   return function startDrag(id: string, handle: HTMLElement, event: PointerEvent): void {
     const win = wm.get(id)
     if (!win?.draggable || event.button !== 0 || ctx.currentDrag()) return
-    const target = (event.composedPath()[0] ?? event.target) as Element | null
-    if (target?.closest?.(ctx.interactiveSelector)) return
+    const target = event.composedPath()[0] as Element
+    if (target.closest?.(ctx.interactiveSelector)) return
     event.preventDefault()
     try {
       handle.setPointerCapture(event.pointerId)

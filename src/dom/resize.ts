@@ -91,7 +91,13 @@ export function createResizeStarter(ctx: SessionContext) {
           : applyAspect(raw, aspect, minSize, maxSize, drive)
       const available = start.y + start.height - floor
       if (direction.includes('n') && size.height > available) {
-        size = applyAspect({ ...size, height: available }, aspect ?? 0, minSize, maxSize, 'height')
+        size = applyAspect(
+          { ...size, height: available },
+          aspect as number,
+          minSize,
+          maxSize,
+          'height',
+        )
       }
       const next: Bounds = {
         x: direction.includes('w') ? start.x + start.width - size.width : start.x,

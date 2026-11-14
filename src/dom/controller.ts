@@ -135,8 +135,8 @@ function retire(slot: MountSlot): void {
 }
 
 function firedOn(event: Event): Element | null {
-  const first = (event.composedPath()[0] ?? event.target) as Element | null
-  return first?.nodeType === 1 ? first : null
+  const first = event.composedPath()[0] as Element
+  return first.nodeType === 1 ? first : null
 }
 
 function findInWindow(el: HTMLElement, selector: string): HTMLElement | null {
@@ -926,7 +926,7 @@ export function attachDesktop(
       }
       const snapTarget = target.closest<HTMLElement>('[data-wm-snap]')
       if (snapTarget) {
-        const zone = snapTarget.dataset.wmSnap ?? ''
+        const zone = snapTarget.dataset.wmSnap as string
         if (current.snappable && SNAP_ZONES.has(zone)) act.snap(zone as SnapZone)
         return
       }
@@ -944,7 +944,7 @@ export function attachDesktop(
       }
       const workspaceTarget = target.closest<HTMLElement>('[data-wm-to-workspace]')
       if (workspaceTarget) {
-        act.moveToWorkspace(Number.parseInt(workspaceTarget.dataset.wmToWorkspace ?? '', 10))
+        act.moveToWorkspace(Number.parseInt(workspaceTarget.dataset.wmToWorkspace as string, 10))
       }
     }
     windowElement.addEventListener('click', onClick)
@@ -1034,10 +1034,9 @@ export function attachDesktop(
       const focusables = focusablesOf(windowElement).filter(
         (node) => node.offsetParent !== null || node === active || node.getClientRects().length > 0,
       )
-      if (focusables.length === 0) return
       const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      if (!first || !last) return
+      const last = focusables[focusables.length - 1] as HTMLElement
+      if (!first) return
       if (!windowElement.contains(doc.activeElement)) {
         event.preventDefault()
         ;(event.shiftKey ? last : first).focus()
@@ -1067,7 +1066,7 @@ export function attachDesktop(
       for (const dispose of attached.cleanup) dispose()
       for (const resizeHandle of attached.handles) resizeHandle.remove()
       registry.delete(id)
-      if (registry.get(id)?.element !== windowElement) delete windowElement.dataset.wmWindow
+      delete windowElement.dataset.wmWindow
       delete windowElement.dataset.wmFocused
       delete windowElement.dataset.wmTabTarget
       delete windowElement.dataset.wmFlash

@@ -119,7 +119,6 @@ class DesktopDirective extends BindingDirective<[DesktopBinder]> {
     owners.set(binder, this)
     const unbind = binder.bindDesktop(element)
     return () => {
-      if (owners.get(binder) !== this) return
       owners.delete(binder)
       unbind()
     }
