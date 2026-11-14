@@ -192,6 +192,16 @@ describe('non-finite numbers never enter the state', () => {
     expect(wm.get('a')?.bounds).toMatchObject({ width: 1, height: 1 })
   })
 
+  it('never makes a window smaller than one pixel under a maximum below one pixel either', () => {
+    const wm = makeWm()
+    wm.update('a', { maxSize: { width: 0.2, height: Number.MIN_VALUE } })
+    expect(wm.get('a')?.bounds).toMatchObject({ width: 1, height: 1 })
+    wm.open({ id: 'b', width: 300, height: 200, maxWidth: 0.5, maxHeight: Number.MIN_VALUE })
+    expect(wm.get('b')?.bounds).toMatchObject({ width: 1, height: 1 })
+    wm.open({ id: 'c', width: 300, height: 200, aspectRatio: 2, maxHeight: 0.1 })
+    expect(wm.get('c')?.bounds).toMatchObject({ width: 2, height: 1 })
+  })
+
   it('keeps a saved layout loadable after a bad number was offered', () => {
     const wm = createWindowManager({ viewport: VIEWPORT })
     wm.open({ id: 'a', x: 10, y: 10, width: 300, height: 200 })

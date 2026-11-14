@@ -472,9 +472,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function normalizeSize(size: Size, lim: Limits, drive: 'width' | 'height' = 'width'): Size {
-    const min = { width: Math.max(1, lim.minSize.width), height: Math.max(1, lim.minSize.height) }
-    if (lim.aspectRatio === null) return clampSize(size, min, lim.maxSize)
-    return applyAspect(size, lim.aspectRatio, min, lim.maxSize, drive)
+    const least = (limit: Size) => ({
+      width: Math.max(1, limit.width),
+      height: Math.max(1, limit.height),
+    })
+    const min = least(lim.minSize)
+    const max = lim.maxSize && least(lim.maxSize)
+    if (lim.aspectRatio === null) return clampSize(size, min, max)
+    return applyAspect(size, lim.aspectRatio, min, max, drive)
   }
 
   function positionForOpen(init: { x?: number; y?: number }): { x: number; y: number } {
