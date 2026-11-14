@@ -4,6 +4,42 @@ const SEEDS = Number(process.env.WMKIT_MONKEY) || 2
 const STEPS = Number(process.env.WMKIT_MONKEY_STEPS) || 40
 const FIRST = Number(process.env.WMKIT_MONKEY_SEED) || 1
 
+interface Stage {
+  name: string
+  url: string
+  desktop: string
+  manager: 'page' | 'element' | 'dock'
+  closing: boolean
+}
+
+const STAGES: Stage[] = [
+  {
+    name: 'vanilla',
+    url: 'test/vanilla.html',
+    desktop: '#desktop',
+    manager: 'page',
+    closing: true,
+  },
+  {
+    name: 'web components',
+    url: 'test/elements.html',
+    desktop: 'wm-desktop',
+    manager: 'element',
+    closing: true,
+  },
+  { name: 'dock', url: 'test/dock.html', desktop: '#desktop', manager: 'dock', closing: false },
+]
+
+interface Tree {
+  windows?: string[]
+  children?: Tree[]
+}
+
+interface Docked {
+  wm: typeof window.__wm
+  dock: { layout(): { root: Tree | null } }
+}
+
 interface Box {
   x: number
   y: number
@@ -15,6 +51,7 @@ interface Scene {
   desktop: Box
   windows: Array<{ id: string; box: Box; handle: Box | null; controls: Box[] }>
   tasks: Box[]
+  sashes: Box[]
 }
 
 function rng(seed: number): () => number {
@@ -25,7 +62,7 @@ function rng(seed: number): () => number {
   }
 }
 
-function look(): Scene {
+function look(stage: Stage): Scene {
   const box = (node: Element): Box => {
     const rect = node.getBoundingClientRect()
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
@@ -34,27 +71,30 @@ function look(): Scene {
     ...host.querySelectorAll(selector),
     ...(host.shadowRoot?.querySelectorAll(selector) ?? []),
   ]
-  const desktop = document.querySelector('#desktop') as HTMLElement
-  const order = window.__wm.getState().order
-  const windows = [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')]
+  const desktop = document.querySelector(stage.desktop) as HTMLElement
+  const nodes = [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')]
+  const buttons = stage.closing
+    ? '[data-wm-minimize], [data-wm-maximize], [data-wm-close]'
+    : '[data-wm-minimize], [data-wm-maximize]'
+  const windows = nodes
     .filter((node) => !node.hidden)
-    .sort(
-      (a, b) =>
-        order.indexOf(a.dataset.wmWindow as string) - order.indexOf(b.dataset.wmWindow as string),
-    )
+    .sort((a, b) => Number(a.style.zIndex) - Number(b.style.zIndex))
     .map((node) => {
       const handle = inner(node, '[data-wm-drag]')[0]
       return {
         id: node.dataset.wmWindow as string,
         box: box(node),
         handle: handle ? box(handle) : null,
-        controls: inner(node, '[data-wm-minimize], [data-wm-maximize], [data-wm-close]').map(box),
+        controls: inner(node, buttons)
+          .filter((button) => (button as HTMLElement).offsetParent !== null)
+          .map(box),
       }
     })
   return {
     desktop: box(desktop),
     windows,
     tasks: [...document.querySelectorAll('#taskbar [data-task]')].map(box),
+    sashes: [...desktop.querySelectorAll('[data-wm-sash]')].map(box),
   }
 }
 
@@ -70,11 +110,17 @@ async function rest(page: Page): Promise<void> {
   })
 }
 
-function inspect(): string[] {
+function inspect(stage: Stage): string[] {
   const found: string[] = []
-  const wm = window.__wm
+  const desktop = document.querySelector(stage.desktop) as HTMLElement
+  const held = (window as unknown as { __dock: Docked }).__dock
+  const wm =
+    stage.manager === 'page'
+      ? window.__wm
+      : stage.manager === 'dock'
+        ? held.wm
+        : (desktop as unknown as { manager: typeof window.__wm }).manager
   const state = wm.getState()
-  const desktop = document.querySelector('#desktop') as HTMLElement
   const base = desktop.getBoundingClientRect()
   const nodes = [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')]
   const byId = new Map<string, HTMLElement>()
@@ -104,6 +150,20 @@ function inspect(): string[] {
     if (!(z > previous)) found.push(`${id} breaks the z ladder at ${z}`)
     previous = z
   }
+  const docked = new Set<string>()
+  if (stage.manager === 'dock') {
+    let gaps = 0
+    const walk = (node: Tree | null) => {
+      for (const id of node?.windows ?? []) docked.add(id)
+      const children = node?.children ?? []
+      gaps += Math.max(0, children.length - 1)
+      for (const child of children) walk(child)
+    }
+    const layout = state.extensions.dock as { workspace?: number } | undefined
+    if (layout?.workspace === state.workspace) walk(held.dock.layout().root)
+    const sashes = desktop.querySelectorAll('[data-wm-sash]').length
+    if (sashes !== gaps) found.push(`${sashes} separators are drawn, the layout has ${gaps}`)
+  }
   for (const [id, node] of byId) {
     const win = state.windows[id]
     if (!win) {
@@ -112,8 +172,13 @@ function inspect(): string[] {
     }
     const { x, y, width, height } = win.bounds
     if (![x, y, width, height].every(Number.isFinite)) found.push(`${id} has broken bounds`)
-    for (const mark of ['wmDragging', 'wmResizing', 'wmPinching', 'wmTabTarget']) {
+    for (const mark of ['wmDragging', 'wmResizing', 'wmPinching', 'wmTabTarget', 'wmLive']) {
       if (node.dataset[mark] !== undefined) found.push(`${id} still carries ${mark}`)
+    }
+    if (stage.manager === 'dock' && (node.dataset.wmDocked !== undefined) !== docked.has(id)) {
+      found.push(
+        `${id} docked mark is ${node.dataset.wmDocked !== undefined}, the layout on screen holds [${[...docked]}]`,
+      )
     }
     const group = win.groupId === null ? undefined : state.groups[win.groupId]
     const hidden =
@@ -149,34 +214,79 @@ function inspect(): string[] {
       )
     }
   }
+  if (stage.manager === 'element') {
+    for (const node of desktop.querySelectorAll<HTMLElement>('wm-window')) {
+      const id = (node as unknown as { windowId: string | null }).windowId
+      if (id !== null && node.hasAttribute('closed') !== !state.windows[id]) {
+        found.push(`${id} closed attribute is ${node.hasAttribute('closed')}`)
+      }
+    }
+  }
   const preview = desktop.querySelector<HTMLElement>('[data-wm-snap-preview]')
   if (preview && getComputedStyle(preview).display !== 'none') {
     found.push('the snap preview is still showing')
   }
-  const tasks = document.querySelectorAll('#taskbar [data-task]').length
-  if (tasks !== wm.minimized().length) {
-    found.push(`${tasks} taskbar buttons for ${wm.minimized().length} minimized windows`)
+  if (desktop.querySelector('[data-wm-sash][data-wm-active]')) {
+    found.push('a separator is still marked active')
+  }
+  if (stage.manager === 'page') {
+    const tasks = document.querySelectorAll('#taskbar [data-task]').length
+    if (tasks !== wm.minimized().length) {
+      found.push(`${tasks} taskbar buttons for ${wm.minimized().length} minimized windows`)
+    }
   }
   return found
 }
 
 const center = (box: Box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
 
-async function act(page: Page, random: () => number, opened: { count: number }): Promise<string> {
+async function open(page: Page, stage: Stage, random: () => number): Promise<string> {
+  if (stage.manager === 'page') {
+    const buttons = ['#btn-open', '#btn-open', '#btn-open-iframe', '#btn-open-modal']
+    const kind = buttons[Math.floor(random() * buttons.length)] as string
+    await page.click(kind)
+    return `click ${kind}`
+  }
+  if (stage.manager === 'dock') return 'nothing to open'
+  const made = Math.floor(random() * 1_000_000)
+  return page.evaluate(
+    ([desktop, id, x, y]) => {
+      const closed = document.querySelector(`${desktop} wm-window[closed]`)
+      if (closed) {
+        closed.removeAttribute('closed')
+        return `reopen ${closed.getAttribute('window-id')}`
+      }
+      const node = document.createElement('wm-window')
+      node.setAttribute('window-id', `m${id}`)
+      node.setAttribute('label', `M ${id}`)
+      node.setAttribute('x', String(x))
+      node.setAttribute('y', String(y))
+      node.setAttribute('width', '240')
+      node.setAttribute('height', '170')
+      document.querySelector(desktop as string)?.append(node)
+      return `add wm-window m${id}`
+    },
+    [
+      stage.desktop,
+      made,
+      20 + Math.floor(random() * 300),
+      20 + Math.floor(random() * 200),
+    ] as const,
+  )
+}
+
+async function act(page: Page, stage: Stage, random: () => number): Promise<string> {
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
-  const scene = await page.evaluate(look)
+  const scene = await page.evaluate(look, stage)
   const win = scene.windows.length > 0 ? pick(scene.windows) : null
   const inside = () => ({
     x: scene.desktop.x + random() * scene.desktop.width,
     y: scene.desktop.y + random() * scene.desktop.height,
   })
-  const roll = Math.floor(random() * 15)
+  const roll = Math.floor(random() * 16)
 
   if (roll === 0 || scene.windows.length === 0 || (roll < 3 && scene.windows.length < 5)) {
-    opened.count += 1
-    const kind = pick(['#btn-open', '#btn-open', '#btn-open-iframe', '#btn-open-modal'])
-    await page.click(kind)
-    return `click ${kind}`
+    return open(page, stage, random)
   }
   if (!win) return 'nothing to do'
   if (roll < 6 && win.handle) {
@@ -188,7 +298,7 @@ async function act(page: Page, random: () => number, opened: { count: number }):
     await page.mouse.move(to.x, to.y, { steps: 2 + Math.floor(random() * 8) })
     if (cancelled) await page.keyboard.press('Escape')
     await page.mouse.up()
-    return `drag ${win.id} to ${Math.round(to.x)},${Math.round(to.y)}${cancelled ? ' then cancelled' : ''}`
+    return `drag ${win.id} to ${Math.round(to.x)},${Math.round(to.y)}${cancelled ? ' then escape' : ''}`
   }
   if (roll < 9) {
     const edge = pick(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'])
@@ -237,6 +347,16 @@ async function act(page: Page, random: () => number, opened: { count: number }):
     await page.setViewportSize(size)
     return `viewport ${size.width}x${size.height}`
   }
+  if (roll === 13 && scene.sashes.length > 0) {
+    const from = center(pick(scene.sashes))
+    const dx = Math.round((random() - 0.5) * 300)
+    const dy = Math.round((random() - 0.5) * 300)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + dx, from.y + dy, { steps: 3 })
+    await page.mouse.up()
+    return `drag a separator by ${dx},${dy}`
+  }
   if (win.handle) {
     const at = center(win.handle)
     await page.mouse.click(at.x, at.y)
@@ -261,29 +381,30 @@ async function act(page: Page, random: () => number, opened: { count: number }):
   return `press ${key} on ${win.id}`
 }
 
-test.describe('random input in a real browser', () => {
-  for (let seed = FIRST; seed < FIRST + SEEDS; seed += 1) {
-    test(`keeps the page and the state in step for seed ${seed}`, async ({ page }) => {
-      test.setTimeout(60_000 + STEPS * 3_000)
-      const errors: string[] = []
-      page.on('pageerror', (error) => errors.push(`page error: ${error.message}`))
-      page.on('console', (message) => {
-        if (message.type() !== 'error') return
-        const text = message.text()
-        if (!text.includes('Failed to load resource')) errors.push(`console error: ${text}`)
+for (const stage of STAGES) {
+  test.describe(`random input on the ${stage.name} page`, () => {
+    for (let seed = FIRST; seed < FIRST + SEEDS; seed += 1) {
+      test(`keeps the page and the state in step for seed ${seed}`, async ({ page }) => {
+        test.setTimeout(60_000 + STEPS * 3_000)
+        const errors: string[] = []
+        page.on('pageerror', (error) => errors.push(`page error: ${error.message}`))
+        page.on('console', (message) => {
+          if (message.type() !== 'error') return
+          const text = message.text()
+          if (!text.includes('Failed to load resource')) errors.push(`console error: ${text}`)
+        })
+        await page.goto(stage.url)
+        await expect(page.locator(stage.desktop)).toBeVisible()
+        const random = rng(seed * 7919)
+        const trail: string[] = []
+        for (let step = 0; step < STEPS; step += 1) {
+          trail.push(await act(page, stage, random))
+          await page.mouse.move(3, 3)
+          await rest(page)
+          const found = [...(await page.evaluate(inspect, stage)), ...errors]
+          expect(found, `seed ${seed}, step ${step}:\n${trail.slice(-8).join('\n')}`).toEqual([])
+        }
       })
-      await page.goto('test/vanilla.html')
-      await expect(page.locator('#desktop')).toBeVisible()
-      const random = rng(seed * 7919)
-      const opened = { count: 0 }
-      const trail: string[] = []
-      for (let step = 0; step < STEPS; step += 1) {
-        trail.push(await act(page, random, opened))
-        await page.mouse.move(3, 3)
-        await rest(page)
-        const found = [...(await page.evaluate(inspect)), ...errors]
-        expect(found, `seed ${seed}, step ${step}:\n${trail.slice(-8).join('\n')}`).toEqual([])
-      }
-    })
-  }
-})
+    }
+  })
+}
