@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": { "configFile": "vitest.mutation.config.ts" },
+  "mutate": [
+    "src/core/**/*.ts",
+    "src/dom/**/*.ts",
+    "src/plugins/**/*.ts",
+    "src/adapters/**/*.ts",
+    "!src/adapters/qwik.ts"
+  ],
+  "ignorePatterns": [
+    "dist",
+    "site/dist",
+    "docs/.vitepress/cache",
+    "docs/.vitepress/dist",
+    "memory-bank",
+    ".remember",
+    ".claude",
+    "coverage",
+    "test-results",
+    "playwright-report",
+    "tests/e2e"
+  ],
+  "ignoreStatic": true,
+  "incremental": true,
+  "incrementalFile": "reports/mutation/incremental.json",
+  "reporters": ["progress", "html", "json"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "jsonReporter": { "fileName": "reports/mutation/mutation.json" },
+  "tempDirName": ".stryker-tmp"
+}

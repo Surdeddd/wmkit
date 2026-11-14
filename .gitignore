@@ -13,6 +13,8 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+.stryker-tmp/
+reports/
 
 # ai working context (kept local by design)
 memory-bank/
