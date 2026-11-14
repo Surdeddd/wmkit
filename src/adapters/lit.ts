@@ -69,6 +69,15 @@ export class WmWindowController implements ReactiveController {
   }
 }
 
+function fields(value: unknown): unknown[] {
+  return value instanceof Object ? Object.entries(value).flat() : [value]
+}
+
+function alike(given: unknown, held: unknown): boolean {
+  const [now, before] = [fields(given), fields(held)]
+  return now.length === before.length && now.every((value, at) => value === before[at])
+}
+
 abstract class BindingDirective<A extends unknown[]> extends AsyncDirective {
   private release: (() => void) | null = null
   private element: HTMLElement | null = null
@@ -83,7 +92,7 @@ abstract class BindingDirective<A extends unknown[]> extends AsyncDirective {
   protected abstract bind(element: HTMLElement, ...args: A): () => void
 
   protected same(next: A): boolean {
-    return this.args !== null && next.every((value, i) => value === (this.args as A)[i])
+    return this.args !== null && next.every((value, i) => alike(value, (this.args as A)[i]))
   }
 
   render(..._args: A): typeof nothing {

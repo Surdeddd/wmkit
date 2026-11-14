@@ -445,7 +445,7 @@ customElements.define('app-desktop', AppDesktop)
 | `wmDesktop(binder)` | element directive that binds the desktop element |
 | `wmWindow(binder, id, options?)` | element directive that binds a window element |
 
-The directives bind when the part renders, release when it disconnects and bind again on reconnect, so moving the host around the page is safe. The controllers re-read the state on reconnect, so a host that was detached while the manager changed renders fresh. Key the window list with `repeat`, so a template instance stays with its window. Render into the light DOM (`createRenderRoot() { return this }`) for a theme stylesheet in the page to reach the windows. Inside the element's own shadow root, add the theme to its styles instead: `static styles = unsafeCSS(themeStyle('glass'))`, with `themeStyle` from `@surdeddd/wmkit/themes` ([Theming](./theming.md#themes-as-text)).
+The directives bind when the part renders, release when it disconnects and bind again on reconnect, so moving the host around the page is safe. The controllers re-read the state on reconnect, so a host that was detached while the manager changed renders fresh. Key the window list with `repeat`, so a template instance stays with its window. A directive binds again only when the binder, the id or one of the options it is given is another one, so an options object written in the template does not rebind the window on every render. Render into the light DOM (`createRenderRoot() { return this }`) for a theme stylesheet in the page to reach the windows. Inside the element's own shadow root, add the theme to its styles instead: `static styles = unsafeCSS(themeStyle('glass'))`, with `themeStyle` from `@surdeddd/wmkit/themes` ([Theming](./theming.md#themes-as-text)).
 
 ## Qwik
 
