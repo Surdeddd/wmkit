@@ -243,6 +243,41 @@ describe('non-finite numbers never enter the state', () => {
   })
 })
 
+describe('window ids are strings', () => {
+  it('takes a number for an id and keeps its string form everywhere', () => {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    expect(wm.open({ id: 7 as never }).id).toBe('7')
+    wm.open({ id: '42' })
+    wm.open({ id: 'a' })
+    expect(wm.focus(42 as never)).toBe(true)
+    expect(wm.getState().order).toEqual(['7', 'a', '42'])
+    expect(wm.getState().focusedId).toBe('42')
+    expect(wm.get(7 as never)?.id).toBe('7')
+    expect(wm.move(7 as never, 50, 60)).toBe(true)
+    expect(wm.get('7')?.bounds).toMatchObject({ x: 50, y: 60 })
+    expect(wm.group([7, 42] as never)).not.toBeNull()
+    expect(Object.values(wm.getState().groups)[0]?.members).toEqual(['7', '42'])
+    expect(() => wm.open({ id: 42 as never })).toThrow('window id "42" already exists')
+  })
+
+  it('finds nothing for an id of any other type and changes nothing', () => {
+    const wm = makeWm()
+    const before = wm.getState()
+    const strange = [['a'], { toString: () => 'a' }, null, undefined, true, Symbol('a'), () => 'a']
+    for (const id of strange as never[]) {
+      expect(wm.get(id)).toBeUndefined()
+      expect(wm.focus(id)).toBe(false)
+      expect(wm.minimize(id)).toBe(false)
+      expect(wm.move(id, 1, 2)).toBe(false)
+      expect(wm.update(id, { title: 'x' })).toBe(false)
+      expect(wm.close(id)).toBe(false)
+    }
+    expect(wm.getState()).toBe(before)
+    expect(wm.open({ id: ['x'] as never }).id).toMatch(/^wm-\d+$/)
+    expect(wm.open({ id: Number.NaN as never }).id).toBe('NaN')
+  })
+})
+
 describe('manager options fall back to the defaults for bad numbers', () => {
   it('ignores a bad viewport, default size, cascade, visibility and history limit', () => {
     const wm = createWindowManager({

@@ -59,6 +59,12 @@ function finite(...values: unknown[]): boolean {
   return values.every(Number.isFinite)
 }
 
+const NO_ID = Symbol() as unknown as string
+
+function text(id: unknown): string {
+  return typeof id === 'string' ? id : typeof id === 'number' ? String(id) : NO_ID
+}
+
 function num(value: unknown, min = Number.NEGATIVE_INFINITY): number | undefined {
   return Number.isFinite(value) && (value as number) >= min ? (value as number) : undefined
 }
@@ -485,8 +491,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function open(init: WindowInit = {}): WindowState {
-    let id = init.id
-    if (!id) {
+    let id = text(init.id)
+    if (!id || typeof id !== 'string') {
       do {
         id = `${idPrefix}-${++idCounter}`
       } while (windows[id])
@@ -1627,41 +1633,45 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     emitter.clear()
   }
 
+  const by =
+    <A extends unknown[], R>(run: (id: string, ...rest: A) => R) =>
+    (id: string, ...rest: A): R =>
+      transact(() => run(text(id), ...rest))
+
   return {
     open: (init) => transact(() => open(init)),
-    close: (id) => transact(() => close(id)),
+    close: by(close),
     closeAll: () => transact(closeAll),
-    focus: (id) => transact(() => focus(id)),
+    focus: by(focus),
     blur: () => transact(blur),
     cycleFocus: (direction) => transact(() => cycleFocus(direction)),
-    minimize: (id) => transact(() => minimize(id)),
-    maximize: (id) => transact(() => maximize(id)),
-    toggleMaximize: (id) => transact(() => toggleMaximize(id)),
-    restore: (id) => transact(() => restore(id)),
-    restoreTo: (id, bounds) => transact(() => restoreTo(id, bounds)),
-    snap: (id, zone) => transact(() => ZONES.includes(zone) && snap(id, zone)),
-    snapTo: (id, rect) =>
-      transact(() => {
-        const unit = unitRect(rect)
-        return !!unit && snap(id, null, unit)
-      }),
-    move: (id, x, y) => transact(() => move(id, x, y)),
-    moveBy: (id, dx, dy) => transact(() => moveBy(id, dx, dy)),
-    center: (id) => transact(() => center(id)),
-    sendToBack: (id) => transact(() => sendToBack(id)),
-    resize: (id, patch) => transact(() => resize(id, patch)),
-    update: (id, patch) => transact(() => update(id, patch)),
-    get: (id) => windows[id],
+    minimize: by(minimize),
+    maximize: by(maximize),
+    toggleMaximize: by(toggleMaximize),
+    restore: by(restore),
+    restoreTo: by(restoreTo),
+    snap: by((id, zone: SnapZone) => ZONES.includes(zone) && snap(id, zone)),
+    snapTo: by((id, rect: Bounds) => {
+      const unit = unitRect(rect)
+      return !!unit && snap(id, null, unit)
+    }),
+    move: by(move),
+    moveBy: by(moveBy),
+    center: by(center),
+    sendToBack: by(sendToBack),
+    resize: by(resize),
+    update: by(update),
+    get: (id) => windows[text(id)],
     getState,
     minimized,
     setViewport: (next) => transact(() => setViewport(next)),
     workspace: () => workspace,
     setWorkspace: (next) => transact(() => setWorkspace(next)),
-    moveToWorkspace: (id, next) => transact(() => moveToWorkspace(id, next)),
-    group: (ids) => transact(() => group(ids)),
-    ungroup: (id) => transact(() => ungroup(id)),
-    activateTab: (id) => transact(() => activateTab(id)),
-    moveTab: (id, index) => transact(() => moveTab(id, index)),
+    moveToWorkspace: by(moveToWorkspace),
+    group: (ids) => transact(() => group(ids.map(text))),
+    ungroup: by(ungroup),
+    activateTab: by(activateTab),
+    moveTab: by(moveTab),
     cycleTab: (direction) => transact(() => cycleTab(direction)),
     groupMembers,
     batch: (run) => transact(run),

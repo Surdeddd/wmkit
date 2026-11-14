@@ -227,6 +227,8 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 
 A number that is not finite never enters the state: `move`, `moveBy`, `resize`, `restoreTo` and `snapTo` given `NaN` or `Infinity` change nothing and return `false`. A partial patch keeps what it does not name, so `wm.resize(id, { width: 400, height: undefined })` keeps the height, and so does `height: null`. Sizes never go below 1 px, whatever the minimum, the maximum or the aspect ratio says: a ratio that no finite size of at least 1 px can hold is left out for that window.
 
+An id is a string. Every method that takes one also accepts a number and reads it as its string form, so `wm.focus(42)` finds the window opened as `'42'`; a value of any other type finds no window. `open` generates an id when the one it was given is empty or neither a string nor a number.
+
 `update(id, patch)` returns `false` and changes nothing for an impossible limit — a `minSize` axis that is negative, not finite or missing, a `maxSize` axis that is not above 0 or missing (`Infinity` is fine) — or for an unknown layer. It stores copies of `minSize` and `maxSize`, so mutating the object you passed changes nothing later.
 
 ### Workspaces
