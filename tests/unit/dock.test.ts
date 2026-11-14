@@ -287,8 +287,11 @@ describe('keeping the layout in step', () => {
     h.add('b')
     h.dock.dock('a')
     h.dock.dock('b', { side: 'right' })
-    const data = h.wm.serialize()
+    const data = JSON.parse(JSON.stringify(h.wm.serialize()))
     for (const win of data.windows) win.restoreBounds = null
+    for (const entry of Object.values<{ home?: unknown }>(data.extensions.dock.flags)) {
+      delete entry.home
+    }
     h.wm.hydrate(data)
     h.dock.undock('a')
     expect(h.wm.get('a')).toMatchObject({ stage: 'normal', bounds: { x: 0, width: 497 } })
@@ -1636,5 +1639,64 @@ describe('the capture taken from a separator while the button is still held', ()
     sash.dispatchEvent(event)
     expect(sash.hasAttribute('data-wm-active')).toBe(false)
     expect(h.wm.get('a')?.bounds.width).toBe(497)
+  })
+})
+
+describe('a window leaving a stack it shared', () => {
+  function shared(): Harness {
+    const h = setup()
+    h.add('a', { x: 40, y: 40, width: 300, height: 200 })
+    h.add('b', { x: 500, y: 300, width: 260, height: 180 })
+    h.dock.dock('a')
+    h.dock.dock('b', { stackId: (h.dock.layout().root as DockStack).id })
+    return h
+  }
+
+  it('floats back where it was before it was docked, not where its host was', () => {
+    const h = shared()
+    h.dock.undock('b')
+    expect(h.wm.get('b')?.stage).toBe('normal')
+    expect(bounds(h.wm, 'b')).toBe('500,300 260x180')
+    h.dock.undock('a')
+    expect(bounds(h.wm, 'a')).toBe('40,40 300x200')
+  })
+
+  it('floats back there when the manager ungroups it', () => {
+    const h = shared()
+    h.wm.ungroup('b')
+    expect(h.wm.get('b')?.stage).toBe('normal')
+    expect(bounds(h.wm, 'b')).toBe('500,300 260x180')
+  })
+
+  it('still knows its place after the window it joined has left', () => {
+    const h = shared()
+    h.dock.undock('a')
+    expect(bounds(h.wm, 'a')).toBe('40,40 300x200')
+    h.dock.undock('b')
+    expect(bounds(h.wm, 'b')).toBe('500,300 260x180')
+  })
+
+  it('finds it again after a reload', () => {
+    const h = shared()
+    const data = JSON.parse(JSON.stringify(h.wm.serialize()))
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.hydrate(data)
+    const again = setup({}, wm)
+    again.dock.undock('b')
+    expect(bounds(wm, 'b')).toBe('500,300 260x180')
+  })
+
+  it('falls back to the shared restore place when its stored one is missing or broken', () => {
+    for (const home of [undefined, 'nowhere', { x: 1, y: Number.NaN, width: 10, height: 10 }]) {
+      const h = shared()
+      const data = JSON.parse(JSON.stringify(h.wm.serialize()))
+      data.extensions.dock.flags.b.home = home
+      const wm = createWindowManager({ viewport: VIEWPORT })
+      wm.hydrate(data)
+      const again = setup({}, wm)
+      expect(again.dock.undock('b'), `home ${JSON.stringify(home)}`).toBe(true)
+      expect(wm.get('b')?.stage).toBe('normal')
+      expect(bounds(wm, 'b')).toBe('40,40 300x200')
+    }
   })
 })

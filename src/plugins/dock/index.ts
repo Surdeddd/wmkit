@@ -90,6 +90,7 @@ export interface Dock {
 type Saved = Pick<WindowFlags, 'resizable' | 'minimizable' | 'snappable'> & {
   maxSize?: SerializedMaxSize | null
   aspectRatio?: number | null
+  home?: Bounds
 }
 
 interface DockState {
@@ -166,10 +167,11 @@ function capture(win: WindowState): Saved {
     snappable: win.snappable,
     maxSize: win.maxSize && { width: json(win.maxSize.width), height: json(win.maxSize.height) },
     aspectRatio: win.aspectRatio,
+    home: win.stage === 'normal' ? win.bounds : (win.restoreBounds ?? win.bounds),
   }
 }
 
-function unlock({ maxSize, ...saved }: Saved): WindowUpdate {
+function unlock({ maxSize, home: _home, ...saved }: Saved): WindowUpdate {
   const open = (value?: number | null) =>
     (value ?? 0) > 0 ? (value as number) : Number.POSITIVE_INFINITY
   return {
@@ -292,9 +294,12 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     return [{ ...state, root: layout.root }, out, loose]
   }
 
-  function unpin(id: string): void {
+  function unpin(id: string, home?: Bounds): void {
     const win = wm.get(id) as WindowState
-    const to = win.restoreBounds ?? win.bounds
+    const to =
+      home && [home.x, home.y, home.width, home.height].every(Number.isFinite)
+        ? home
+        : (win.restoreBounds ?? win.bounds)
     if (win.workspace !== wm.workspace() && win.stage === 'snapped') wm.resize(id, to)
     if (wm.get(id)?.stage === 'normal') return
     wm.moveToWorkspace(id, wm.workspace())
@@ -374,7 +379,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const { waiting: _held, ...rest } = next
     const state = { ...rest, root: shown.root, flags, ...(waiting ? { waiting } : {}) }
     wm.setExtension(KEY, shown.root ? state : undefined)
-    for (const id of loose) unpin(id)
+    for (const id of loose) unpin(id, next.flags[id]?.home)
     torn = null
   }
 
