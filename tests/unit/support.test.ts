@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { breathe, fuzz, seedCount } from './support/fuzz'
+import { breathe, fuzz, patience, seedCount } from './support/fuzz'
 import { type Resources, trackResources } from './support/resources'
 
 let resources: Resources | null = null
@@ -250,6 +250,13 @@ describe('fuzz budget', () => {
     const budget = fuzz(40)
     expect(budget.numRuns).toBe(300)
     expect(Number.isInteger(budget.seed) && budget.seed >= 0).toBe(true)
+  })
+
+  it('gives a long run an hour and a normal run its own timeout', () => {
+    vi.stubEnv('WMKIT_FUZZ', '')
+    expect(patience(120_000)).toBe(120_000)
+    vi.stubEnv('WMKIT_FUZZ', '3000')
+    expect(patience(120_000)).toBe(3_600_000)
   })
 
   it('ignores a WMKIT_FUZZ that is not a positive number', () => {

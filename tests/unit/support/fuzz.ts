@@ -24,6 +24,10 @@ export function fuzz(base: number): FuzzBudget {
   }
 }
 
+export function patience(base: number): number {
+  return positive(process.env.WMKIT_FUZZ) === null ? base : 3_600_000
+}
+
 export function breathe(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))
 }

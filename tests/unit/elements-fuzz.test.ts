@@ -7,7 +7,7 @@ import {
   type WmDesktopElement,
   type WmWindowElement,
 } from '../../src/plugins/elements'
-import { breathe, fuzz, junkString } from './support/fuzz'
+import { breathe, fuzz, junkString, patience } from './support/fuzz'
 import { trackResources } from './support/resources'
 
 const IDS = ['a', 'b', 'c', 'd'] as const
@@ -496,35 +496,39 @@ afterEach(() => {
 })
 
 describe('a page that adds, drops, replaces and edits window elements at random', () => {
-  it('keeps every element in step with its window and leaves nothing behind', async () => {
-    await fc.assert(
-      fc.asyncProperty(fc.commands(steps, { maxCommands: 24, size: 'max' }), async (commands) => {
-        const resources = trackResources()
-        const holder = document.createElement('div')
-        document.body.append(holder)
-        try {
-          const desktop = document.createElement('wm-desktop') as WmDesktopElement
-          desktop.options = { viewport: { width: 1200, height: 800 } }
-          holder.append(desktop)
-          const page: Page = { holder, desktop }
-          const model: Model = {
-            elements: new Set(),
-            open: new Set(),
-            marked: new Set(),
-            leaving: new Map(),
+  it(
+    'keeps every element in step with its window and leaves nothing behind',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(fc.commands(steps, { maxCommands: 24, size: 'max' }), async (commands) => {
+          const resources = trackResources()
+          const holder = document.createElement('div')
+          document.body.append(holder)
+          try {
+            const desktop = document.createElement('wm-desktop') as WmDesktopElement
+            desktop.options = { viewport: { width: 1200, height: 800 } }
+            holder.append(desktop)
+            const page: Page = { holder, desktop }
+            const model: Model = {
+              elements: new Set(),
+              open: new Set(),
+              marked: new Set(),
+              leaving: new Map(),
+            }
+            await fc.asyncModelRun(() => ({ model, real: page }), commands)
+            holder.remove()
+            await settle()
+            const left = resources.leaks()
+            if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
+          } finally {
+            resources.restore()
+            holder.remove()
+            await breathe()
           }
-          await fc.asyncModelRun(() => ({ model, real: page }), commands)
-          holder.remove()
-          await settle()
-          const left = resources.leaks()
-          if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
-        } finally {
-          resources.restore()
-          holder.remove()
-          await breathe()
-        }
-      }),
-      fuzz(150),
-    )
-  }, 120_000)
+        }),
+        fuzz(150),
+      )
+    },
+    patience(120_000),
+  )
 })

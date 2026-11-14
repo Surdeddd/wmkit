@@ -6,7 +6,7 @@ import type { WindowManager, WindowStage } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController } from '../../src/dom/shared'
 import { type PopoutHandle, type PopoutOptions, popout } from '../../src/plugins/popout'
-import { breathe, fuzz } from './support/fuzz'
+import { breathe, fuzz, patience } from './support/fuzz'
 import { trackResources } from './support/resources'
 
 const IDS = ['a', 'b', 'c'] as const
@@ -463,86 +463,95 @@ afterEach(() => {
 })
 
 describe('windows popped out, closed, renamed and hidden at random', () => {
-  it('always bring their content home and leave no popup or listener behind', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.boolean(),
-        fc.boolean(),
-        fc.commands(steps, { maxCommands: 40, size: 'max' }),
-        async (pipApi, screens, commands) => {
-          const resources = trackResources()
-          const root = document.createElement('div')
-          document.body.append(root)
-          const wm = createWindowManager({ viewport: { width: 1280, height: 800 } })
-          const desktop = attachDesktop(wm, root, { autoViewport: false, announce: false })
-          const page: Page = {
-            wm,
-            desktop,
-            root,
-            popups: [],
-            blocked: false,
-            asking: null,
-            requests: new Map(),
-            promises: new Map(),
-            options: new Map(),
-            live: new Map(),
-            failures: [],
-          }
-          known = page.popups
-          const make = (): Popup => {
-            const popup = new Popup()
-            page.popups.push(popup)
-            return popup
-          }
-          vi.stubGlobal('open', () => (page.blocked ? null : make()))
-          vi.stubGlobal(
-            'documentPictureInPicture',
-            pipApi
-              ? {
-                  requestWindow: () =>
-                    new Promise<Popup>((resolve, reject) => {
-                      page.requests.set(page.asking as Id, { popup: make(), resolve, reject })
-                    }),
-                }
-              : undefined,
-          )
-          vi.stubGlobal(
-            'getScreenDetails',
-            screens
-              ? async () => {
-                  const screen = { availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1080 }
-                  return {
-                    screens: [screen, { ...screen, availLeft: 1920 }],
-                    currentScreen: screen,
+  it(
+    'always bring their content home and leave no popup or listener behind',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.boolean(),
+          fc.boolean(),
+          fc.commands(steps, { maxCommands: 40, size: 'max' }),
+          async (pipApi, screens, commands) => {
+            const resources = trackResources()
+            const root = document.createElement('div')
+            document.body.append(root)
+            const wm = createWindowManager({ viewport: { width: 1280, height: 800 } })
+            const desktop = attachDesktop(wm, root, { autoViewport: false, announce: false })
+            const page: Page = {
+              wm,
+              desktop,
+              root,
+              popups: [],
+              blocked: false,
+              asking: null,
+              requests: new Map(),
+              promises: new Map(),
+              options: new Map(),
+              live: new Map(),
+              failures: [],
+            }
+            known = page.popups
+            const make = (): Popup => {
+              const popup = new Popup()
+              page.popups.push(popup)
+              return popup
+            }
+            vi.stubGlobal('open', () => (page.blocked ? null : make()))
+            vi.stubGlobal(
+              'documentPictureInPicture',
+              pipApi
+                ? {
+                    requestWindow: () =>
+                      new Promise<Popup>((resolve, reject) => {
+                        page.requests.set(page.asking as Id, { popup: make(), resolve, reject })
+                      }),
                   }
-                }
-              : undefined,
-          )
-          try {
-            const model: Model = { open: new Set(), live: new Set(), pending: new Set() }
-            for (const id of IDS) {
-              openWindow(page, id)
-              model.open.add(id)
+                : undefined,
+            )
+            vi.stubGlobal(
+              'getScreenDetails',
+              screens
+                ? async () => {
+                    const screen = {
+                      availLeft: 0,
+                      availTop: 0,
+                      availWidth: 1920,
+                      availHeight: 1080,
+                    }
+                    return {
+                      screens: [screen, { ...screen, availLeft: 1920 }],
+                      currentScreen: screen,
+                    }
+                  }
+                : undefined,
+            )
+            try {
+              const model: Model = { open: new Set(), live: new Set(), pending: new Set() }
+              for (const id of IDS) {
+                openWindow(page, id)
+                model.open.add(id)
+              }
+              await fc.asyncModelRun(() => ({ model, real: page }), commands)
+              for (const request of page.requests.values()) {
+                request.popup.closed = true
+                request.reject(new Error('the page is going away'))
+              }
+              for (const live of page.live.values()) live.handle.close()
+              await settle()
+              desktop.destroy()
+              wm.destroy()
+              const left = resources.leaks()
+              if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
+            } finally {
+              resources.restore()
+              root.remove()
+              await breathe()
             }
-            await fc.asyncModelRun(() => ({ model, real: page }), commands)
-            for (const request of page.requests.values()) {
-              request.popup.closed = true
-              request.reject(new Error('the page is going away'))
-            }
-            for (const live of page.live.values()) live.handle.close()
-            await settle()
-            desktop.destroy()
-            wm.destroy()
-            const left = resources.leaks()
-            if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
-          } finally {
-            resources.restore()
-            root.remove()
-            await breathe()
-          }
-        },
-      ),
-      fuzz(150),
-    )
-  }, 120_000)
+          },
+        ),
+        fuzz(150),
+      )
+    },
+    patience(120_000),
+  )
 })

@@ -4,7 +4,7 @@ import { afterEach, describe, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { SerializedState, WindowManager } from '../../src/core/types'
 import { type PersistController, type PersistStorage, persist } from '../../src/plugins/persist'
-import { fuzz, junkString } from './support/fuzz'
+import { fuzz, junkString, patience } from './support/fuzz'
 import { trackResources } from './support/resources'
 
 const KEY = 'layout'
@@ -402,53 +402,57 @@ afterEach(() => {
 })
 
 describe('a layout saved through random changes, waits, failures and reloads', () => {
-  it('always matches what the last successful save wrote, and never throws', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          debounce: fc.constantFrom(0, 1, 50, 150),
-          maxWait: fc.constantFrom(undefined, 0, 10, 100, 5000, -1, Number.NaN, Infinity),
-          listens: fc.boolean(),
-        }),
-        fc.commands(steps, { maxCommands: 60, size: 'max' }),
-        (setup, commands) => {
-          vi.useFakeTimers()
-          const resources = trackResources()
-          const real = { setup, storage: new Memory(), changes: 0, errors: [], reports: 0 } as
-            | Real
-            | (Omit<Real, 'wm' | 'store' | 'stop'> & Partial<Real>)
-          vi.stubGlobal('reportError', () => {
-            real.reports += 1
-          })
-          try {
-            connect(real as Real, 0, 'identity')
-            const model: Model = {
-              stored: null,
-              ours: true,
-              dirty: false,
-              idle: 0,
-              waiting: 0,
-              version: 0,
-              migration: 'identity',
-              errors: 0,
-              reports: 0,
-              streaks: new Set(),
+  it(
+    'always matches what the last successful save wrote, and never throws',
+    () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            debounce: fc.constantFrom(0, 1, 50, 150),
+            maxWait: fc.constantFrom(undefined, 0, 10, 100, 5000, -1, Number.NaN, Infinity),
+            listens: fc.boolean(),
+          }),
+          fc.commands(steps, { maxCommands: 60, size: 'max' }),
+          (setup, commands) => {
+            vi.useFakeTimers()
+            const resources = trackResources()
+            const real = { setup, storage: new Memory(), changes: 0, errors: [], reports: 0 } as
+              | Real
+              | (Omit<Real, 'wm' | 'store' | 'stop'> & Partial<Real>)
+            vi.stubGlobal('reportError', () => {
+              real.reports += 1
+            })
+            try {
+              connect(real as Real, 0, 'identity')
+              const model: Model = {
+                stored: null,
+                ours: true,
+                dirty: false,
+                idle: 0,
+                waiting: 0,
+                version: 0,
+                migration: 'identity',
+                errors: 0,
+                reports: 0,
+                streaks: new Set(),
+              }
+              fc.modelRun(() => ({ model, real: real as Real }), commands)
+              ;(real as Real).store.destroy()
+              ;(real as Real).stop()
+              ;(real as Real).wm.destroy()
+              const left = [...resources.leaks()]
+              if (vi.getTimerCount() > 0) left.push(`${vi.getTimerCount()} timers`)
+              if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
+            } finally {
+              resources.restore()
+              vi.clearAllTimers()
+              vi.useRealTimers()
             }
-            fc.modelRun(() => ({ model, real: real as Real }), commands)
-            ;(real as Real).store.destroy()
-            ;(real as Real).stop()
-            ;(real as Real).wm.destroy()
-            const left = [...resources.leaks()]
-            if (vi.getTimerCount() > 0) left.push(`${vi.getTimerCount()} timers`)
-            if (left.length > 0) throw new Error(`left behind: ${left.join(', ')}`)
-          } finally {
-            resources.restore()
-            vi.clearAllTimers()
-            vi.useRealTimers()
-          }
-        },
-      ),
-      fuzz(200),
-    )
-  }, 120_000)
+          },
+        ),
+        fuzz(200),
+      )
+    },
+    patience(120_000),
+  )
 })
