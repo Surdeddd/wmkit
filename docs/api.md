@@ -379,7 +379,7 @@ The controller moves real DOM focus into the window that `focus` reports, so an 
 
 ## `attachDesktop(wm, element, options?)`
 
-Binds the manager to a DOM subtree and returns a `DesktopController`. The element becomes the coordinate space; it gets `data-wm-desktop`, `tabindex="-1"` and `position: relative` when it was `static`. Pointer positions account for the element's border, its scroll offset and a scale transform on it.
+Binds the manager to a DOM subtree and returns a `DesktopController`. The element becomes the coordinate space; it gets `data-wm-desktop`, `tabindex="-1"` and `position: relative` when it was `static`. Pointer positions account for the element's border, its scroll offset and a scale transform on it. A desktop that hides its overflow (`overflow: hidden`) is kept at its origin: when the browser scrolls it to bring a focused control into view — Tab, `focus()`, an on-screen keyboard — the controller scrolls it straight back, each axis on its own, so the windows stay where the state says they are. Give the element `overflow: auto` or `scroll` when it is meant to scroll; with `overflow: clip` it never scrolls in the first place.
 
 ```ts
 interface DesktopOptions {

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { boxOf, openVanilla, spawn, win } from './utils'
+import { boxOf, desktopBox, openVanilla, spawn, win } from './utils'
 
 test.beforeEach(async ({ page }) => {
   await openVanilla(page)
@@ -118,4 +118,43 @@ test('screen reader announcements follow window lifecycle', async ({ page }) => 
   await expect(announcer).toHaveText(/Test 1 minimized/)
   await page.locator('#taskbar [data-task="t1"]').click()
   await expect(announcer).toHaveText(/Test 1 restored/)
+})
+
+test('focus on a control that sticks out of the desktop does not leave the desktop scrolled', async ({
+  page,
+}) => {
+  await spawn(page, 'fixed')
+  const target = win(page, 'fixed')
+  const desk = await desktopBox(page)
+  await page.evaluate((height) => window.__wm.move('fixed', 100, height - 60), desk.height)
+  const before = await boxOf(target)
+  const scrolled: number[] = []
+  await page.exposeFunction('__scrolled', (top: number) => scrolled.push(top))
+  await page.evaluate(() => {
+    const desktop = document.querySelector('#desktop') as HTMLElement
+    desktop.addEventListener(
+      'scroll',
+      () =>
+        (globalThis as unknown as { __scrolled(top: number): void }).__scrolled(desktop.scrollTop),
+      true,
+    )
+  })
+
+  await target.locator('input').evaluate((input: HTMLInputElement) => input.focus())
+  await expect
+    .poll(() => scrolled.length, 'the browser never tried to scroll the desktop')
+    .toBeGreaterThan(0)
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const desktop = document.querySelector('#desktop') as HTMLElement
+        return [desktop.scrollLeft, desktop.scrollTop]
+      }),
+    )
+    .toEqual([0, 0])
+  const after = await boxOf(target)
+  expect(
+    Math.abs(after.y - before.y),
+    'the window is drawn away from its place',
+  ).toBeLessThanOrEqual(1)
 })

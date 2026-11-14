@@ -237,6 +237,14 @@ export function attachDesktop(
   let titlebar: { win: WindowState; box: DOMRect } | null = null
   let destroyed = false
 
+  const pin = () => {
+    const { overflowX, overflowY } = view.getComputedStyle(element)
+    if (overflowX === 'hidden') element.scrollLeft = 0
+    if (overflowY === 'hidden') element.scrollTop = 0
+  }
+  element.addEventListener('scroll', pin)
+  cleanup.push(() => element.removeEventListener('scroll', pin))
+
   let announcer: Announcer | null = null
   if (options.announce !== false) {
     announcer = createAnnouncer(
