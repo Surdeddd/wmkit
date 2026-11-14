@@ -21,6 +21,7 @@ interface PinchSession extends ActiveGesture {
   startBounds: Bounds
   midX: number
   midY: number
+  host: HTMLElement | undefined
 }
 
 function spreadOf(a: Point, b: Point): number {
@@ -108,15 +109,13 @@ function start(ctx: GestureContext, options: Settings): () => void {
     session = null
     if (cancelled) wm.resize(active.id, active.startBounds)
     ctx.release(active)
-    const host = ctx.windowElement(active.id)
-    if (host) delete host.dataset.wmPinching
+    if (active.host) delete active.host.dataset.wmPinching
     if (cancelled) wm.abortInteraction()
     else wm.endInteraction()
   }
 
-  function beginPinch(id: string, mid: Point): void {
-    const win = wm.get(id)
-    if (!win) return
+  function beginPinch(win: WindowState, mid: Point): void {
+    const { id } = win
     const claimed: PinchSession = {
       id,
       finish: (cancelled: boolean) => {
@@ -126,12 +125,12 @@ function start(ctx: GestureContext, options: Settings): () => void {
       startBounds: win.bounds,
       midX: mid.x,
       midY: mid.y,
+      host: ctx.windowElement(id),
     }
     session = claimed
     ctx.claim(claimed)
     wm.beginInteraction()
-    const host = ctx.windowElement(id)
-    if (host) host.dataset.wmPinching = ''
+    if (claimed.host) claimed.host.dataset.wmPinching = ''
   }
 
   function applyPinch(active: PinchSession, win: WindowState, spread: number): void {
@@ -169,7 +168,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
     if (pinch !== null && target !== null && Math.abs(spread - startSpread) > pinch.threshold) {
       const win = wm.get(target)
       if (!win) return
-      beginPinch(target, startMid)
+      beginPinch(win, startMid)
       if (session) applyPinch(session, win, spread)
       return
     }
@@ -228,8 +227,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
     const finger = fingers.get(event.pointerId)
     if (!finger) return
     finger.point = ctx.toLocal(event)
-    if (!armed) return
-    const both = pair()
+    const both = armed && pair()
     if (!both) return
     pending = [both[0].point, both[1].point]
     if (raf === 0) raf = view.requestAnimationFrame(flush)

@@ -109,6 +109,33 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
+describe('a desktop destroyed by a listener while a cancelled pinch puts the size back', () => {
+  it('ends the pinch once and takes its mark off the window', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    harness.wm.clearHistory()
+    pinch(harness, root, [200, 200, 260, 200], [150, 200, 310, 200])
+    expect(root.dataset.wmPinching).toBeDefined()
+    expect(harness.wm.get('a')?.bounds.width).toBeGreaterThan(300)
+
+    let armed = true
+    harness.wm.subscribe(() => {
+      if (!armed) return
+      armed = false
+      harness.desktop.destroy()
+    })
+    expect(() =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    ).not.toThrow()
+    expect(root.dataset.wmPinching, 'the mark outlived the pinch').toBeUndefined()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100, width: 300, height: 200 })
+    expect(harness.wm.canUndo(), 'the cancelled pinch left an undo step').toBe(false)
+    harness.wm.move('a', 300, 300)
+    expect(harness.wm.undo()).toBe(true)
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+  })
+})
+
 describe('pinch to resize', () => {
   it('scales the window around the midpoint of the two fingers', () => {
     const harness = makeHarness()
