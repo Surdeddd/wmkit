@@ -440,7 +440,7 @@ Rows are patched in place rather than re-rendered, so keyboard focus inside the 
 }
 ```
 
-Fifteen more ready-made themes ship alongside — `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest` and `synth`. They all style the same `data-wm-*` attributes, so switching is a one-line import swap, and every one of them ships 24px pointer targets plus `prefers-reduced-motion` and `forced-colors` blocks. Every one is also held to WCAG AA contrast by a browser test that measures the rendered pixels of the demo under all sixteen.
+Fifteen more ready-made themes ship alongside — `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest` and `synth`. They all style the same `data-wm-*` attributes, so switching is a one-line import swap, and every one of them ships 24px pointer targets plus `prefers-reduced-motion` and `forced-colors` blocks, and the see-through ones turn opaque under `prefers-reduced-transparency`. Every one is also held to WCAG AA contrast by a browser test that measures the rendered pixels of the demo under all sixteen.
 
 Three layers, from the widest to the narrowest:
 

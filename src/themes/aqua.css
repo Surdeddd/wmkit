@@ -297,3 +297,12 @@
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+}

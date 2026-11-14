@@ -301,3 +301,17 @@
     box-shadow: none;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+
+  [data-wm-snap-preview] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

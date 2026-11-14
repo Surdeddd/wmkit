@@ -4,6 +4,7 @@ export const amberTheme: string = `[data-wm-desktop] {
   --wm-radius: 6px;
   --wm-bg: rgba(24, 14, 2, 0.94);
   --wm-bg-focused: rgba(30, 18, 3, 0.98);
+  --wm-bg-solid: rgb(24, 14, 2);
   --wm-border: rgba(255, 176, 46, 0.24);
   --wm-border-focused: rgba(255, 176, 46, 0.6);
   --wm-shadow: 0 0 0 1px rgba(255, 176, 46, 0.06);
@@ -323,6 +324,13 @@ export const amberTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const amberShadowTheme: string = `[part=titlebar],
@@ -342,6 +350,7 @@ export const amberShadowTheme: string = `[part=titlebar],
   --wm-radius: 6px;
   --wm-bg: rgba(24, 14, 2, 0.94);
   --wm-bg-focused: rgba(30, 18, 3, 0.98);
+  --wm-bg-solid: rgb(24, 14, 2);
   --wm-border: rgba(255, 176, 46, 0.24);
   --wm-border-focused: rgba(255, 176, 46, 0.6);
   --wm-shadow: 0 0 0 1px rgba(255, 176, 46, 0.06);
@@ -656,6 +665,14 @@ export const amberShadowTheme: string = `[part=titlebar],
     }
 
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      background: var(--wm-bg-solid);
+    }
+
+}
 `
 
 export const aquaTheme: string = `[data-wm-desktop] {
@@ -955,6 +972,15 @@ export const aquaTheme: string = `[data-wm-desktop] {
   [data-wm-snap-preview] {
     background: transparent;
     border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
   }
 }
 `
@@ -1264,12 +1290,23 @@ export const aquaShadowTheme: string = `[part=titlebar],
     }
 
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
+    }
+
+}
 `
 
 export const blueprintTheme: string = `[data-wm-desktop] {
   --wm-radius: 2px;
   --wm-bg: rgba(10, 36, 74, 0.94);
   --wm-bg-focused: rgba(12, 44, 90, 0.98);
+  --wm-bg-solid: rgb(10, 36, 74);
   --wm-border: rgba(190, 220, 255, 0.35);
   --wm-border-focused: rgba(215, 235, 255, 0.8);
   --wm-shadow: none;
@@ -1576,6 +1613,13 @@ export const blueprintTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const blueprintShadowTheme: string = `[part=titlebar],
@@ -1595,6 +1639,7 @@ export const blueprintShadowTheme: string = `[part=titlebar],
   --wm-radius: 2px;
   --wm-bg: rgba(10, 36, 74, 0.94);
   --wm-bg-focused: rgba(12, 44, 90, 0.98);
+  --wm-bg-solid: rgb(10, 36, 74);
   --wm-border: rgba(190, 220, 255, 0.35);
   --wm-border-focused: rgba(215, 235, 255, 0.8);
   --wm-shadow: none;
@@ -1887,6 +1932,14 @@ export const blueprintShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25a1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      background: var(--wm-bg-solid);
     }
 
 }
@@ -2534,6 +2587,7 @@ export const candyTheme: string = `[data-wm-desktop] {
   --wm-radius: 22px;
   --wm-bg: rgba(255, 250, 253, 0.94);
   --wm-bg-focused: #fffdfe;
+  --wm-bg-solid: rgb(255, 250, 253);
   --wm-border: rgba(236, 130, 175, 0.28);
   --wm-border-focused: rgba(236, 130, 175, 0.6);
   --wm-shadow: 0 10px 24px rgba(236, 130, 175, 0.18);
@@ -2814,6 +2868,12 @@ export const candyTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window] {
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const candyShadowTheme: string = `[part=titlebar],
@@ -2833,6 +2893,7 @@ export const candyShadowTheme: string = `[part=titlebar],
   --wm-radius: 22px;
   --wm-bg: rgba(255, 250, 253, 0.94);
   --wm-bg-focused: #fffdfe;
+  --wm-bg-solid: rgb(255, 250, 253);
   --wm-border: rgba(236, 130, 175, 0.28);
   --wm-border-focused: rgba(236, 130, 175, 0.6);
   --wm-shadow: 0 10px 24px rgba(236, 130, 175, 0.18);
@@ -3103,6 +3164,13 @@ export const candyShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25a1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host {
+      background: var(--wm-bg-solid);
     }
 
 }
@@ -3730,6 +3798,7 @@ export const forestTheme: string = `[data-wm-desktop] {
   --wm-radius: 12px;
   --wm-bg: rgba(24, 33, 26, 0.92);
   --wm-bg-focused: rgba(30, 42, 33, 0.97);
+  --wm-bg-solid: rgb(24, 33, 26);
   --wm-border: rgba(154, 190, 140, 0.22);
   --wm-border-focused: rgba(154, 190, 140, 0.55);
   --wm-shadow: 0 8px 24px rgba(5, 12, 8, 0.5);
@@ -4011,6 +4080,13 @@ export const forestTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const forestShadowTheme: string = `[part=titlebar],
@@ -4030,6 +4106,7 @@ export const forestShadowTheme: string = `[part=titlebar],
   --wm-radius: 12px;
   --wm-bg: rgba(24, 33, 26, 0.92);
   --wm-bg-focused: rgba(30, 42, 33, 0.97);
+  --wm-bg-solid: rgb(24, 33, 26);
   --wm-border: rgba(154, 190, 140, 0.22);
   --wm-border-focused: rgba(154, 190, 140, 0.55);
   --wm-shadow: 0 8px 24px rgba(5, 12, 8, 0.5);
@@ -4301,6 +4378,14 @@ export const forestShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25a1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      background: var(--wm-bg-solid);
     }
 
 }
@@ -4597,6 +4682,15 @@ export const frostTheme: string = `[data-wm-desktop] {
   [data-wm-snap-preview] {
     background: transparent;
     border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
   }
 }
 `
@@ -4900,6 +4994,16 @@ export const frostShadowTheme: string = `[part=titlebar],
     }
 
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
+    }
+
+}
 `
 
 export const glassTheme: string = `[data-wm-desktop] {
@@ -5183,6 +5287,20 @@ export const glassTheme: string = `[data-wm-desktop] {
   [data-wm-snap-preview] {
     background: transparent;
     border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+
+  [data-wm-snap-preview] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 `
@@ -5473,6 +5591,16 @@ export const glassShadowTheme: string = `[part=titlebar],
     }
 
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
+    }
+
+}
 `
 
 export const lightTheme: string = `[data-wm-desktop] {
@@ -5756,6 +5884,20 @@ export const lightTheme: string = `[data-wm-desktop] {
   [data-wm-snap-preview] {
     background: transparent;
     border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+
+  [data-wm-snap-preview] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 `
@@ -6043,6 +6185,16 @@ export const lightShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25A1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
     }
 
 }
@@ -6351,6 +6503,20 @@ export const neonTheme: string = `[data-wm-desktop] {
     box-shadow: none;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+
+  [data-wm-snap-preview] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
 `
 
 export const neonShadowTheme: string = `[part=titlebar],
@@ -6654,6 +6820,16 @@ export const neonShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25A1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
     }
 
 }
@@ -8527,6 +8703,15 @@ export const synthTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const synthShadowTheme: string = `[part=titlebar],
@@ -8832,12 +9017,23 @@ export const synthShadowTheme: string = `[part=titlebar],
     }
 
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--wm-bg-solid);
+    }
+
+}
 `
 
 export const terminalTheme: string = `[data-wm-desktop] {
   --wm-radius: 4px;
   --wm-bg: rgba(8, 14, 10, 0.9);
   --wm-bg-focused: rgba(10, 18, 13, 0.98);
+  --wm-bg-solid: rgb(8, 14, 10);
   --wm-border: rgba(74, 222, 128, 0.22);
   --wm-border-focused: rgba(74, 222, 128, 0.55);
   --wm-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06);
@@ -9114,6 +9310,13 @@ export const terminalTheme: string = `[data-wm-desktop] {
     border: 2px solid Highlight;
   }
 }
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    background: var(--wm-bg-solid);
+  }
+}
 `
 
 export const terminalShadowTheme: string = `[part=titlebar],
@@ -9133,6 +9336,7 @@ export const terminalShadowTheme: string = `[part=titlebar],
   --wm-radius: 4px;
   --wm-bg: rgba(8, 14, 10, 0.9);
   --wm-bg-focused: rgba(10, 18, 13, 0.98);
+  --wm-bg-solid: rgb(8, 14, 10);
   --wm-border: rgba(74, 222, 128, 0.22);
   --wm-border-focused: rgba(74, 222, 128, 0.55);
   --wm-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06);
@@ -9399,6 +9603,14 @@ export const terminalShadowTheme: string = `[part=titlebar],
 
   [data-wm-maximize]::before {
       content: "\\25A1";
+    }
+
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :host,
+  :host([data-wm-focused]) {
+      background: var(--wm-bg-solid);
     }
 
 }

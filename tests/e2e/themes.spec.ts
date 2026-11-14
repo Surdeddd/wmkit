@@ -223,3 +223,66 @@ test.describe('a theme inside a web component', () => {
     })
   }
 })
+
+test.describe('reduced transparency', () => {
+  test.skip(
+    ({ browserName }) => browserName !== 'chromium',
+    'only Chromium can be told the preference',
+  )
+
+  const looks = (page: Page) =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('#plain [data-wm-window], wm-window')].map(
+        (el) => {
+          const style = getComputedStyle(el)
+          return {
+            where: `${el.localName} ${el.dataset.wmWindow}`,
+            blur: style.backdropFilter,
+            background: style.backgroundColor,
+          }
+        },
+      ),
+    )
+  const seeThrough = (look: { blur: string; background: string }) =>
+    look.blur !== 'none' || !look.background.startsWith('rgb(')
+
+  for (const theme of [
+    'amber',
+    'aqua',
+    'blueprint',
+    'candy',
+    'forest',
+    'frost',
+    'glass',
+    'light',
+    'neon',
+    'synth',
+    'terminal',
+  ]) {
+    test(`${theme} paints windows opaque and unblurred, in the page and in a web component`, async ({
+      page,
+    }) => {
+      await page.goto(`test/themes.html?theme=${theme}`)
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+      const before = await looks(page)
+      expect(before).toHaveLength(4)
+      expect(
+        before.filter(seeThrough).length,
+        'the theme is see-through to begin with',
+      ).toBeGreaterThan(0)
+
+      const cdp = await page.context().newCDPSession(page)
+      await cdp.send('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }],
+      })
+      await expect
+        .poll(() =>
+          page.evaluate(() => matchMedia('(prefers-reduced-transparency: reduce)').matches),
+        )
+        .toBe(true)
+      await expect
+        .poll(async () => (await looks(page)).filter(seeThrough).map((look) => look.where))
+        .toEqual([])
+    })
+  }
+})

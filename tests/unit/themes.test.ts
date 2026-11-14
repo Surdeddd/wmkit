@@ -24,7 +24,7 @@ interface WindowRule {
   order: number
 }
 
-function topLevelRules(css: string): Array<{ head: string; body: string }> {
+function blocks(css: string): Array<{ head: string; body: string }> {
   const rules: Array<{ head: string; body: string }> = []
   let depth = 0
   let start = 0
@@ -39,12 +39,16 @@ function topLevelRules(css: string): Array<{ head: string; body: string }> {
     } else if (css[i] === '}') {
       depth -= 1
       if (depth === 0) {
-        if (!head.startsWith('@')) rules.push({ head, body: css.slice(start, i) })
+        rules.push({ head, body: css.slice(start, i) })
         start = i + 1
       }
     }
   }
   return rules
+}
+
+function topLevelRules(css: string): Array<{ head: string; body: string }> {
+  return blocks(css).filter((rule) => !rule.head.startsWith('@'))
 }
 
 function windowRules(css: string, flavour: Flavour): WindowRule[] {
@@ -427,5 +431,79 @@ describe('the shadow generator', () => {
     expect(toShadowCss('.page [data-wm-window], [data-wm-window] [data-wm-drag] { a: b }')).toBe(
       '[data-wm-drag] { a: b }\n',
     )
+  })
+})
+
+describe('for people who asked for less transparency', () => {
+  const QUERY = '@media (prefers-reduced-transparency: reduce)'
+  const flat = (text: string) => text.replace(/\s+/g, ' ').trim()
+  const asked = (css: string) =>
+    blocks(css)
+      .map((rule) => (flat(rule.head) === QUERY ? rule.body : `${rule.head} {${rule.body}}`))
+      .join('\n')
+
+  function seeThrough(css: string, flavour: Flavour): string[] {
+    const found: string[] = []
+    for (const extra of ALONGSIDE) {
+      const state = extra.join('') || 'at rest'
+      for (const property of ['backdrop-filter', '-webkit-backdrop-filter']) {
+        const value = effective(css, flavour, extra, property) ?? 'none'
+        if (value !== 'none') found.push(`${state} keeps ${property}: ${value}`)
+      }
+      const background = token(css, effective(css, flavour, extra, 'background') ?? '')
+      if (alpha(background) !== 1) found.push(`${state} sits on ${background}`)
+    }
+    return found
+  }
+
+  const translucent = themeNames.filter((name) => seeThrough(themeCss[name], 'document').length > 0)
+
+  it('finds the themes whose windows let the desktop show through', () => {
+    expect([...translucent].sort()).toEqual([
+      'amber',
+      'aqua',
+      'blueprint',
+      'candy',
+      'forest',
+      'frost',
+      'glass',
+      'light',
+      'neon',
+      'synth',
+      'terminal',
+    ])
+  })
+
+  it('every theme paints its windows opaque and unblurred, whatever their state, in both flavours', () => {
+    const leaks: string[] = []
+    for (const name of themeNames) {
+      for (const [flavour, sheets] of Object.entries(FLAVOURS) as [Flavour, typeof themeCss][]) {
+        for (const leak of seeThrough(asked(sheets[name] as string), flavour)) {
+          leaks.push(`${name} ${flavour} ${leak}`)
+        }
+      }
+    }
+    expect(leaks, leaks.join('\n')).toEqual([])
+  })
+
+  it('a blurred snap preview loses its blur as well', () => {
+    for (const name of themeNames) {
+      const css = themeCss[name]
+      const blurs = /\[data-wm-snap-preview\] \{[^}]*backdrop-filter: blur/.test(css)
+      const block = blocks(css).find((rule) => flat(rule.head) === QUERY)
+      const preview = topLevelRules(block?.body ?? '').find(
+        (rule) => flat(rule.head) === '[data-wm-snap-preview]',
+      )
+      expect(preview !== undefined, name).toBe(blurs)
+      if (preview) expect(declared(preview.body, 'backdrop-filter'), name).toBe('none')
+    }
+  })
+
+  it('themes that were opaque all along say nothing about it', () => {
+    const opaque = themeNames.filter((name) => !translucent.includes(name))
+    expect(opaque.length).toBeGreaterThan(0)
+    for (const name of opaque) {
+      expect(themeCss[name], name).not.toContain('prefers-reduced-transparency')
+    }
   })
 })

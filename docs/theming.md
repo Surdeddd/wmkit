@@ -31,8 +31,10 @@ import '@surdeddd/wmkit/themes/light.css'  // light translucent
 | `synth.css` | sunset gradient titlebar over deep purple |
 
 Every one of them ships the same contract: 24px pointer targets on the window
-controls, a `prefers-reduced-motion` block that drops the transitions, and a
-`forced-colors` block that swaps the controls for labelled glyphs.
+controls, a `prefers-reduced-motion` block that drops the transitions, a
+`forced-colors` block that swaps the controls for labelled glyphs, and, where
+the windows are see-through, a `prefers-reduced-transparency` block that paints
+them solid.
 
 ## One window at a time
 
@@ -114,7 +116,7 @@ Geometry is inline `transform: translate3d()`, `width`, `height` and `z-index`. 
 | --- | --- |
 | `--wm-radius` | window and titlebar corner radius |
 | `--wm-bg`, `--wm-bg-focused` | window background |
-| `--wm-bg-solid` | opaque background for windows that lose their blur, see [below](#large-desktops-and-live-resizing) |
+| `--wm-bg-solid` | opaque version of `--wm-bg`, in the eleven see-through themes: the background of a window that has to hide what lies under it, see [below](#large-desktops-and-live-resizing) and [Reduced transparency](#reduced-transparency) |
 | `--wm-border`, `--wm-border-focused` | window border |
 | `--wm-shadow`, `--wm-shadow-focused` | window shadow |
 | `--wm-titlebar-bg` | titlebar fill |
@@ -343,3 +345,20 @@ The window controls are small on purpose, so every theme grows their hit area wi
 ### Windows high contrast
 
 Under `forced-colors: active` the platform throws away your colours, which would otherwise leave the three traffic lights as three identical circles. Every shipped theme redraws them in that mode as bordered buttons carrying `✕`, `–` and `□`, repaints the frame with `Canvas`/`CanvasText`, marks the focused window with `Highlight`, and turns the snap preview into a solid `Highlight` outline. A custom theme should do the same — colour alone is never enough to tell the controls apart.
+
+### Reduced transparency
+
+Eleven shipped themes have windows that let the desktop show through: `glass`, `light`, `neon`, `aqua`, `frost` and `synth` blur it, `candy`, `terminal`, `blueprint`, `amber` and `forest` only tint it. Under `prefers-reduced-transparency: reduce` all eleven paint their windows with `--wm-bg-solid`, focused or not, and the six that blur drop the `backdrop-filter`, on the window and on the snap preview alike. The focused window is still told apart by its border, shadow and titlebar. The other five themes were opaque all along and say nothing about the preference.
+
+A see-through theme of your own should carry the same block; a browser that does not know the query skips it.
+
+```css
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--wm-bg-solid);
+  }
+}
+```

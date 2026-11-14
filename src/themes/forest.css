@@ -2,6 +2,7 @@
   --wm-radius: 12px;
   --wm-bg: rgba(24, 33, 26, 0.92);
   --wm-bg-focused: rgba(30, 42, 33, 0.97);
+  --wm-bg-solid: rgb(24, 33, 26);
   --wm-border: rgba(154, 190, 140, 0.22);
   --wm-border-focused: rgba(154, 190, 140, 0.55);
   --wm-shadow: 0 8px 24px rgba(5, 12, 8, 0.5);
@@ -281,5 +282,12 @@
   [data-wm-snap-preview] {
     background: transparent;
     border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-wm-window],
+  [data-wm-window][data-wm-focused] {
+    background: var(--wm-bg-solid);
   }
 }

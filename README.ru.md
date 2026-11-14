@@ -368,7 +368,7 @@ panel.destroy()
 
 Подключите `@surdeddd/wmkit/themes/glass.css` и переопределяйте CSS-переменные (`--wm-radius`, `--wm-bg`, `--wm-accent`, …) — или не подключайте ничего и стилизуйте `data-wm-stage`, `data-wm-focused`, `data-wm-dragging`, `[hidden]` сами.
 
-Ещё пятнадцать готовых тем: `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest`, `synth`. Все стилизуют одни и те же `data-wm-*` атрибуты — переключение = замена одного импорта, и у каждой есть 24px тач-цели плюс блоки `prefers-reduced-motion` и `forced-colors`.
+Ещё пятнадцать готовых тем: `light`, `retro`, `terminal`, `paper`, `neon`, `aqua`, `frost`, `candy`, `carbon`, `brutalist`, `blueprint`, `amber`, `noir`, `forest`, `synth`. Все стилизуют одни и те же `data-wm-*` атрибуты — переключение = замена одного импорта, и у каждой есть 24px тач-цели плюс блоки `prefers-reduced-motion` и `forced-colors`, а просвечивающие темы становятся сплошными при `prefers-reduced-transparency`.
 
 Каждая тема к тому же держит контраст WCAG AA: браузерный тест меряет отрендеренные пиксели демо под всеми шестнадцатью и падает ниже 4.5:1.
 

@@ -55,6 +55,7 @@ Nothing in `src/core` touches `window` or `document`, so the manager can be crea
 | `contain: layout style` | window element | a perf hint only |
 | individual `translate` / `scale` properties | open and modal-blocked keyframes | the animation is skipped |
 | `prefers-reduced-motion` | every theme | fewer animations, never more |
+| `prefers-reduced-transparency` | the eleven see-through themes | windows stay translucent where the browser does not know the query |
 
 All themes are pure custom properties over `data-wm-*` attributes, so replacing a theme with your own CSS removes every requirement in this table.
 
