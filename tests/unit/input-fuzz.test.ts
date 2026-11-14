@@ -7,6 +7,7 @@ import { attachDesktop } from '../../src/dom/controller'
 import type { DesktopController } from '../../src/dom/shared'
 import { touchGestures } from '../../src/plugins/gestures'
 import { domDrift, gestureResidue, stateDrift } from './support/dom-state'
+import { type Frames, stubFrames } from './support/frames'
 import { breathe, fuzz, patience } from './support/fuzz'
 import { type Resources, trackResources } from './support/resources'
 
@@ -62,7 +63,7 @@ interface Harness {
   desktop: DesktopController
   element: HTMLElement
   outside: HTMLElement
-  frames: Array<() => void>
+  frames: Frames
   captured: Map<number, Element>
   pointers: Map<number, { kind: Kind; target: Element }>
   depth: number
@@ -103,7 +104,7 @@ function outer(resources: Resources): string {
 }
 
 function build(): Harness {
-  const frames: Array<() => void> = []
+  const frames = stubFrames()
   const captured = new Map<number, Element>()
   Element.prototype.setPointerCapture = function setPointerCapture(id: number) {
     captured.set(id, this)
@@ -114,12 +115,6 @@ function build(): Harness {
   Element.prototype.hasPointerCapture = function hasPointerCapture(id: number) {
     return captured.get(id) === this
   }
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    frames.push(() => callback(0))
-    return frames.length
-  })
-  vi.stubGlobal('cancelAnimationFrame', () => {})
-
   const resources = trackResources()
   const outside = document.createElement('aside')
   const element = document.createElement('div')
@@ -175,9 +170,7 @@ function build(): Harness {
 }
 
 function flush(harness: Harness): void {
-  for (let pass = 0; pass < 3 && harness.frames.length > 0; pass += 1) {
-    for (const frame of harness.frames.splice(0)) frame()
-  }
+  harness.frames.flush(3)
 }
 
 function nodeAt(harness: Harness, where: Where): Element {
@@ -358,7 +351,8 @@ function rest(harness: Harness): void {
     ...gestureResidue(harness.element),
   ]
   if (harness.depth !== 0) found.push(`${harness.depth} interactions were left open`)
-  if (harness.frames.length > 0) found.push(`${harness.frames.length} frames keep rescheduling`)
+  if (harness.frames.waiting() > 0)
+    found.push(`${harness.frames.waiting()} frames keep rescheduling`)
   const now = outer(harness.resources)
   if (now !== harness.baseline) {
     found.push(`listeners outside the desktop changed:\n${now}\n  were:\n${harness.baseline}`)
