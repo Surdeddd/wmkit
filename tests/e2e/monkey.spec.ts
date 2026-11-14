@@ -5,6 +5,8 @@ const SEEDS = Number(process.env.WMKIT_MONKEY) || 2
 const STEPS = Number(process.env.WMKIT_MONKEY_STEPS) || 40
 const FIRST = Number(process.env.WMKIT_MONKEY_SEED) || 1
 
+type Dress = '' | 'right to left' | 'scaled down' | 'scrolled page'
+
 interface Stage {
   name: string
   url: string
@@ -17,6 +19,7 @@ interface Stage {
   gestures: boolean
   reloads: boolean
   tasks: boolean
+  dress: Dress
 }
 
 const PLAIN = {
@@ -27,6 +30,7 @@ const PLAIN = {
   gestures: false,
   reloads: false,
   tasks: false,
+  dress: '',
 } as const
 
 const STAGES: Stage[] = [
@@ -91,6 +95,8 @@ const STAGES: Stage[] = [
     tasks: true,
   },
 ]
+
+const ROUNDS = ['vanilla', 'web components', 'dock', 'dashboard']
 
 const SIZES = [
   { width: 1280, height: 720 },
@@ -218,6 +224,8 @@ function inspect(stage: Stage): string[] {
           : (desktop as unknown as { manager: typeof window.__wm }).manager
   const state = wm.getState()
   const base = desktop.getBoundingClientRect()
+  const scaleX = desktop.offsetWidth ? base.width / desktop.offsetWidth : 1
+  const scaleY = desktop.offsetHeight ? base.height / desktop.offsetHeight : 1
   const nodes = [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')]
   const byId = new Map<string, HTMLElement>()
   for (const node of nodes) {
@@ -300,16 +308,15 @@ function inspect(stage: Stage): string[] {
     }
     if (hidden) continue
     const rect = node.getBoundingClientRect()
-    const off = [
-      rect.left - base.left - desktop.clientLeft + desktop.scrollLeft - x,
-      rect.top - base.top - desktop.clientTop + desktop.scrollTop - y,
-      rect.width - width,
-      rect.height - height,
+    const drawn = [
+      (rect.left - base.left) / scaleX - desktop.clientLeft + desktop.scrollLeft,
+      (rect.top - base.top) / scaleY - desktop.clientTop + desktop.scrollTop,
+      rect.width / scaleX,
+      rect.height / scaleY,
     ]
-    if (off.some((delta) => Math.abs(delta) > 1.5)) {
+    if ([x, y, width, height].some((value, index) => Math.abs((drawn[index] ?? 0) - value) > 1.5)) {
       found.push(
-        `${id} is drawn at ${Math.round(rect.left - base.left)},${Math.round(rect.top - base.top)} ` +
-          `${Math.round(rect.width)}x${Math.round(rect.height)}, the state says ${x},${y} ${width}x${height}`,
+        `${id} is drawn at ${drawn.map(Math.round).join(',')}, the state says ${x},${y},${width},${height}`,
       )
     }
   }
@@ -341,6 +348,13 @@ function inspect(stage: Stage): string[] {
   ) {
     found.push(`the desktop is scrolled to ${desktop.scrollLeft},${desktop.scrollTop}`)
   }
+  const dressed =
+    stage.dress === 'scaled down'
+      ? Math.abs(scaleX - 0.8) < 0.01
+      : stage.dress === 'right to left'
+        ? getComputedStyle(desktop).direction === 'rtl'
+        : stage.dress !== 'scrolled page' || document.body.style.marginTop === '300px'
+  if (!dressed) found.push(`the page is no longer ${stage.dress}`)
   const zoom = window.visualViewport?.scale ?? 1
   if (Math.abs(zoom - 1) > 0.01) found.push(`the page is zoomed to ${zoom}`)
   return found
@@ -380,13 +394,20 @@ const fingers = (cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd',
     })),
   })
 
+interface Hand {
+  cdp: CDPSession | null
+  taps: boolean
+  wheel: boolean
+}
+
 async function stroke(
   page: Page,
-  touch: CDPSession | null,
+  hand: Hand,
   random: () => number,
   from: Point,
   to: Point,
 ): Promise<string> {
+  const touch = hand.cdp
   const finger = touch !== null && random() < 0.5
   const steps = 2 + Math.floor(random() * 8)
   const twist = random() < 0.3 ? TWISTS[Math.floor(random() * TWISTS.length)] : null
@@ -427,12 +448,12 @@ async function stroke(
 
 async function poke(
   page: Page,
-  touch: CDPSession | null,
+  hand: Hand,
   random: () => number,
   at: Point,
   twice = false,
 ): Promise<string> {
-  if (touch !== null && random() < 0.5) {
+  if (hand.taps && random() < 0.5) {
     await page.touchscreen.tap(at.x, at.y)
     if (twice) await page.touchscreen.tap(at.x, at.y)
     return 'a finger'
@@ -459,6 +480,21 @@ async function arrive(page: Page, stage: Stage): Promise<void> {
       }
     }, stage.desktop)
   }
+  await page.evaluate(
+    ([selector, dress]) => {
+      const desktop = document.querySelector(selector as string) as HTMLElement
+      if (dress === 'right to left') document.documentElement.dir = 'rtl'
+      if (dress === 'scaled down') {
+        desktop.style.transformOrigin = '0 0'
+        desktop.style.transform = 'scale(0.8)'
+      }
+      if (dress === 'scrolled page') {
+        document.body.style.marginTop = '300px'
+        window.scrollTo(0, 180)
+      }
+    },
+    [stage.desktop, stage.dress] as const,
+  )
   await rest(page)
 }
 
@@ -466,7 +502,7 @@ async function open(
   page: Page,
   stage: Stage,
   scene: Scene,
-  touch: CDPSession | null,
+  hand: Hand,
   random: () => number,
 ): Promise<string> {
   if (stage.manager === 'element' && !stage.opener) {
@@ -498,15 +534,11 @@ async function open(
   }
   if (scene.openers.length === 0) return 'nothing to open'
   const opener = scene.openers[Math.floor(random() * scene.openers.length)] as Scene['openers'][0]
-  return `open ${opener.name} with ${await poke(page, touch, random, center(opener))}`
+  return `open ${opener.name} with ${await poke(page, hand, random, center(opener))}`
 }
 
-async function act(
-  page: Page,
-  stage: Stage,
-  touch: CDPSession | null,
-  random: () => number,
-): Promise<string> {
+async function act(page: Page, stage: Stage, hand: Hand, random: () => number): Promise<string> {
+  const touch = hand.cdp
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
   const scene = await page.evaluate(look, stage)
   const win = scene.windows.length > 0 ? pick(scene.windows) : null
@@ -517,13 +549,13 @@ async function act(
   const roll = Math.floor(random() * 19)
 
   if (roll === 0 || scene.windows.length === 0 || (roll < 3 && scene.windows.length < 5)) {
-    return open(page, stage, scene, touch, random)
+    return open(page, stage, scene, hand, random)
   }
   if (!win) return 'nothing to do'
   if (roll < 6 && win.handle) {
     const from = center(win.handle)
     const to = random() < 0.2 ? { x: scene.desktop.x + 2, y: from.y } : inside()
-    const how = await stroke(page, touch, random, from, to)
+    const how = await stroke(page, hand, random, from, to)
     return `drag ${win.id} to ${Math.round(to.x)},${Math.round(to.y)} with ${how}`
   }
   if (roll < 9) {
@@ -542,17 +574,17 @@ async function act(
     }
     const dx = Math.round((random() - 0.5) * 400)
     const dy = Math.round((random() - 0.5) * 300)
-    const how = await stroke(page, touch, random, from, { x: from.x + dx, y: from.y + dy })
+    const how = await stroke(page, hand, random, from, { x: from.x + dx, y: from.y + dy })
     return `resize ${win.id} by its ${edge} edge ${dx},${dy} with ${how}`
   }
   if (roll === 9 && win.controls.length > 0) {
-    return `press a control of ${win.id} with ${await poke(page, touch, random, center(pick(win.controls)))}`
+    return `press a control of ${win.id} with ${await poke(page, hand, random, center(pick(win.controls)))}`
   }
   if (roll === 10 && win.handle) {
-    return `double press the titlebar of ${win.id} with ${await poke(page, touch, random, center(win.handle), true)}`
+    return `double press the titlebar of ${win.id} with ${await poke(page, hand, random, center(win.handle), true)}`
   }
   if (roll === 11 && scene.tasks.length > 0) {
-    return `press a taskbar button with ${await poke(page, touch, random, center(pick(scene.tasks)))}`
+    return `press a taskbar button with ${await poke(page, hand, random, center(pick(scene.tasks)))}`
   }
   if (roll === 12) {
     const size = pick(SIZES)
@@ -563,7 +595,7 @@ async function act(
     const from = center(pick(scene.sashes))
     const dx = Math.round((random() - 0.5) * 300)
     const dy = Math.round((random() - 0.5) * 300)
-    const how = await stroke(page, touch, random, from, { x: from.x + dx, y: from.y + dy })
+    const how = await stroke(page, hand, random, from, { x: from.x + dx, y: from.y + dy })
     return `drag a separator by ${dx},${dy} with ${how}`
   }
   if (roll === 14 && touch !== null && stage.gestures) {
@@ -605,7 +637,7 @@ async function act(
     await arrive(page, stage)
     return 'reload the page'
   }
-  if (roll === 16) {
+  if (roll === 16 && hand.wheel) {
     const at = center(win.box)
     const dy = pick([-300, 120, 300])
     await page.mouse.move(at.x, at.y)
@@ -640,39 +672,76 @@ async function act(
   return `press ${key} on ${win.id}`
 }
 
+interface Setting {
+  name: string
+  dress: Dress
+  media?: { reducedMotion?: 'reduce'; forcedColors?: 'active'; colorScheme?: 'light' }
+  ratio?: number
+}
+
+const SETTINGS: Setting[] = [
+  { name: 'right to left', dress: 'right to left' },
+  { name: 'scaled down', dress: 'scaled down' },
+  { name: 'scrolled page', dress: 'scrolled page' },
+  { name: 'reduced motion', dress: '', media: { reducedMotion: 'reduce' } },
+  { name: 'forced colors', dress: '', media: { forcedColors: 'active' } },
+  { name: 'light scheme', dress: '', media: { colorScheme: 'light' } },
+  { name: 'pixel ratio 1.5', dress: '', ratio: 1.5 },
+  { name: 'pixel ratio 3', dress: '', ratio: 3 },
+]
+
+function run(stage: Stage, seed: number, setting: Setting | null): void {
+  const title = setting
+    ? `keeps the page and the state in step for seed ${seed}, ${setting.name}`
+    : `keeps the page and the state in step for seed ${seed}`
+  test(title, async ({ page, context, isMobile, hasTouch, browserName }) => {
+    test.skip(
+      setting?.media?.forcedColors !== undefined && browserName === 'webkit',
+      'WebKit cannot emulate forced colors',
+    )
+    test.setTimeout(60_000 + STEPS * 4_000)
+    const hand: Hand = {
+      cdp: isMobile && browserName === 'chromium' ? await context.newCDPSession(page) : null,
+      taps: hasTouch === true,
+      wheel: !(isMobile && browserName === 'webkit'),
+    }
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(`page error: ${error.message}`))
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return
+      const text = message.text()
+      if (!text.includes('Failed to load resource')) errors.push(`console error: ${text}`)
+    })
+    if (setting?.media) await page.emulateMedia(setting.media)
+    await page.goto(stage.url)
+    await arrive(page, stage)
+    const random = rng(seed * 7919)
+    const trail: string[] = []
+    for (let step = 0; step < STEPS; step += 1) {
+      trail.push(await act(page, stage, hand, random))
+      await page.mouse.move(3, 3)
+      await rest(page)
+      const found = [...(await page.evaluate(inspect, stage)), ...errors]
+      expect(
+        found,
+        `seed ${seed}, step ${step} (replay: WMKIT_MONKEY_SEED=${seed} WMKIT_MONKEY=1 WMKIT_MONKEY_STEPS=${STEPS}):\n${trail.slice(-8).join('\n')}`,
+      ).toEqual([])
+    }
+  })
+}
+
 for (const stage of STAGES) {
   test.describe(`random input on the ${stage.name} page`, () => {
-    for (let seed = FIRST; seed < FIRST + SEEDS; seed += 1) {
-      test(`keeps the page and the state in step for seed ${seed}`, async ({
-        page,
-        context,
-        isMobile,
-        browserName,
-      }) => {
-        test.setTimeout(60_000 + STEPS * 4_000)
-        const touch =
-          isMobile && browserName === 'chromium' ? await context.newCDPSession(page) : null
-        const errors: string[] = []
-        page.on('pageerror', (error) => errors.push(`page error: ${error.message}`))
-        page.on('console', (message) => {
-          if (message.type() !== 'error') return
-          const text = message.text()
-          if (!text.includes('Failed to load resource')) errors.push(`console error: ${text}`)
-        })
-        await page.goto(stage.url)
-        await arrive(page, stage)
-        const random = rng(seed * 7919)
-        const trail: string[] = []
-        for (let step = 0; step < STEPS; step += 1) {
-          trail.push(await act(page, stage, touch, random))
-          await page.mouse.move(3, 3)
-          await rest(page)
-          const found = [...(await page.evaluate(inspect, stage)), ...errors]
-          expect(
-            found,
-            `seed ${seed}, step ${step} (replay: WMKIT_MONKEY_SEED=${seed} WMKIT_MONKEY=1 WMKIT_MONKEY_STEPS=${STEPS}):\n${trail.slice(-8).join('\n')}`,
-          ).toEqual([])
-        }
+    for (let seed = FIRST; seed < FIRST + SEEDS; seed += 1) run(stage, seed, null)
+  })
+}
+
+for (const setting of SETTINGS) {
+  test.describe(`random input, ${setting.name}`, () => {
+    if (setting.ratio) test.use({ deviceScaleFactor: setting.ratio })
+    for (const stage of STAGES.filter(({ name }) => ROUNDS.includes(name))) {
+      test.describe(`on the ${stage.name} page`, () => {
+        run({ ...stage, dress: setting.dress }, FIRST, setting)
       })
     }
   })

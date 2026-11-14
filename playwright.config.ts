@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = Number(process.env.WMKIT_E2E_PORT ?? 4188)
+const APPLE = /(monkey|adapters|windows|elements|dock|dashboard)\.spec\.ts$/
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -32,6 +33,16 @@ export default defineConfig({
     {
       name: 'mobile',
       use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'iphone',
+      use: { ...devices['iPhone 15'] },
+      testMatch: APPLE,
+    },
+    {
+      name: 'ipad',
+      use: { ...devices['iPad Pro 11'] },
+      testMatch: APPLE,
     },
   ],
   webServer: {
