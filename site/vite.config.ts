@@ -22,6 +22,7 @@ const TEST_PAGES = [
   'solid',
   'svelte',
   'angular',
+  'themes',
 ] as const
 
 function svelteFiles(): Plugin {

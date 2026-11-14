@@ -110,3 +110,116 @@ test.describe('forced colors', () => {
     }
   })
 })
+
+test.describe('a theme inside a web component', () => {
+  for (const theme of [
+    'amber',
+    'aqua',
+    'blueprint',
+    'brutalist',
+    'candy',
+    'carbon',
+    'forest',
+    'frost',
+    'glass',
+    'light',
+    'neon',
+    'noir',
+    'paper',
+    'retro',
+    'synth',
+    'terminal',
+  ]) {
+    test(`${theme} paints the titlebar, title and buttons as it does in the page`, async ({
+      page,
+    }) => {
+      await page.goto(`test/themes.html?theme=${theme}`)
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+      await expect(page.locator('wm-window[window-id="front"]')).toHaveAttribute(
+        'data-wm-focused',
+        '',
+      )
+      await page.evaluate(async () => {
+        const finite = document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.effect?.getComputedTiming().iterations !== Number.POSITIVE_INFINITY,
+          )
+        await Promise.all(finite.map((animation) => animation.finished.catch(() => {})))
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      })
+      const differences = await page.evaluate(() => {
+        const BOX = ['width', 'height'] as const
+        const LOOK = [
+          'opacity',
+          'borderTopLeftRadius',
+          'borderBottomRightRadius',
+          'borderTopWidth',
+          'borderTopStyle',
+          'borderTopColor',
+          'backgroundColor',
+          'backgroundImage',
+          'color',
+          'fontFamily',
+          'fontSize',
+          'fontWeight',
+          'lineHeight',
+          'letterSpacing',
+          'textTransform',
+          'paddingTop',
+          'paddingLeft',
+          'paddingRight',
+          'gap',
+          'display',
+          'alignItems',
+        ] as const
+        const SPOTS: Array<[string, string, string?]> = [
+          ['titlebar', '[data-wm-drag]'],
+          ['title', '[data-wm-title]'],
+          ['minimize', '[data-wm-minimize]'],
+          ['minimize glyph', '[data-wm-minimize]', '::after'],
+          ['maximize', '[data-wm-maximize]'],
+          ['maximize glyph', '[data-wm-maximize]', '::after'],
+          ['close', '[data-wm-close]'],
+          ['close glyph', '[data-wm-close]', '::after'],
+        ]
+        const apart = (left: string, right: string) => {
+          if (left === right) return false
+          const [a, b] = [Number.parseFloat(left), Number.parseFloat(right)]
+          const unit = (value: string) => value.replace(/^-?[\d.]+/, '')
+          return !(Math.abs(a - b) <= 0.5 && unit(left) === unit(right) && unit(left) === 'px')
+        }
+        const out: string[] = []
+        for (const id of ['front', 'behind']) {
+          const plain = document.querySelector(`#plain [data-wm-window="${id}"]`) as HTMLElement
+          const host = document.querySelector(`wm-window[window-id="${id}"]`) as HTMLElement
+          for (const [label, selector, pseudo] of SPOTS) {
+            const inPage = plain.querySelector(selector) as HTMLElement
+            const inShadow = host.shadowRoot?.querySelector(selector) as HTMLElement
+            const a = getComputedStyle(inPage, pseudo)
+            const b = getComputedStyle(inShadow, pseudo)
+            for (const prop of pseudo ? ([...LOOK, 'content'] as const) : LOOK) {
+              if (apart(a[prop], b[prop])) {
+                out.push(
+                  `${id} ${label} ${prop}: ${a[prop]} in the page, ${b[prop]} in the shadow root`,
+                )
+              }
+            }
+            if (pseudo) continue
+            const [x, y] = [inPage.getBoundingClientRect(), inShadow.getBoundingClientRect()]
+            for (const side of BOX) {
+              if (Math.abs(x[side] - y[side]) > 0.5) {
+                out.push(
+                  `${id} ${label} ${side}: ${x[side]} in the page, ${y[side]} in the shadow root`,
+                )
+              }
+            }
+          }
+        }
+        return out
+      })
+      expect(differences).toEqual([])
+    })
+  }
+})

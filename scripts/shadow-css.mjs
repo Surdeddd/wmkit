@@ -175,6 +175,25 @@ function transform(css) {
   return `${out.join('\n\n')}\n`
 }
 
+const LEVEL = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+`
+
 export function toShadowCss(css) {
   return transform(css.replace(/\/\*[\s\S]*?\*\//g, ''))
+}
+
+export function toShadowTheme(css) {
+  return LEVEL + toShadowCss(css)
 }

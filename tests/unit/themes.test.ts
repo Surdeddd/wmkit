@@ -83,7 +83,7 @@ function effective(
 }
 
 function token(css: string, value: string): string {
-  const first = topLevelRules(css)[0]?.body ?? ''
+  const first = topLevelRules(css).find((rule) => rule.body.includes('--wm-'))?.body ?? ''
   return value.replace(/var\((--wm-[a-z-]+)\)/g, (whole, name: string) => {
     const defined = new RegExp(`(?:^|\\s)${name}:\\s*([^;]+);`).exec(first)?.[1]
     return defined === undefined ? whole : defined.trim()
@@ -174,11 +174,26 @@ describe('the shipped themes', () => {
 
   it('carries the tokens of the desktop block and drops its layout', () => {
     const shadow = themeShadowCss.light
-    const host = shadow.slice(0, shadow.indexOf('}'))
+    const from = shadow.indexOf(':host {')
+    const host = shadow.slice(from, shadow.indexOf('}', from))
 
     expect(host).toContain('--wm-radius')
     expect(host).not.toContain('overflow: hidden')
     expect(host).not.toContain('position: relative')
+  })
+
+  it('starts by returning the chrome of a web component to the browser defaults', () => {
+    for (const name of themeNames) {
+      const [first, second] = topLevelRules(themeShadowCss[name])
+      expect(first?.head.replace(/\s+/g, ' '), name).toBe(
+        '[part=titlebar], [part=title], :where([part=titlebar]) > [data-wm-controls], [part~=control]',
+      )
+      expect(first?.body.trim(), name).toBe('all: revert;')
+      expect(second?.head.replace(/\s+/g, ' '), name).toBe(
+        '[part~=control]:hover, [part~=control]:focus-visible',
+      )
+      expect(themeCss[name], name).not.toContain('[part')
+    }
   })
 
   it('styles the content twice: slotted where a skin projects it, plain where the box sits inside the root', () => {

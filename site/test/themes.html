@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wmkit themes test page</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #20242e;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        box-sizing: border-box;
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+      }
+      #plain,
+      wm-desktop {
+        display: block;
+        flex: 1;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="plain"></div>
+    <wm-desktop id="sealed">
+      <wm-window window-id="behind" label="Behind" x="70" y="80" width="260" height="170">
+        <p>behind</p>
+      </wm-window>
+      <wm-window window-id="front" label="In a shadow root" x="16" y="16" width="260" height="170">
+        <p>content</p>
+      </wm-window>
+    </wm-desktop>
+    <script type="module" src="./themes.ts"></script>
+  </body>
+</html>

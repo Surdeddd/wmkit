@@ -2,7 +2,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { toShadowCss } from './shadow-css.mjs'
+import { toShadowTheme } from './shadow-css.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(root, 'src', 'themes')
@@ -34,7 +34,7 @@ const css = [
   ...names.flatMap((name) => [
     `export const ${name}Theme: string = \`${quote(read(name))}\``,
     '',
-    `export const ${name}ShadowTheme: string = \`${quote(toShadowCss(read(name)))}\``,
+    `export const ${name}ShadowTheme: string = \`${quote(toShadowTheme(read(name)))}\``,
     '',
   ]),
   'export const themeCss: Record<ThemeName, string> = {',

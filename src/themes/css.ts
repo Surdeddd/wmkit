@@ -325,7 +325,20 @@ export const amberTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const amberShadowTheme: string = `:host {
+export const amberShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 6px;
   --wm-bg: rgba(24, 14, 2, 0.94);
   --wm-bg-focused: rgba(30, 18, 3, 0.98);
@@ -946,7 +959,20 @@ export const aquaTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const aquaShadowTheme: string = `:host {
+export const aquaShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 10px;
   --wm-bg: rgba(238, 241, 246, 0.94);
   --wm-bg-focused: rgba(246, 248, 252, 0.96);
@@ -1552,7 +1578,20 @@ export const blueprintTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const blueprintShadowTheme: string = `:host {
+export const blueprintShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 2px;
   --wm-bg: rgba(10, 36, 74, 0.94);
   --wm-bg-focused: rgba(12, 44, 90, 0.98);
@@ -2169,7 +2208,20 @@ export const brutalistTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const brutalistShadowTheme: string = `:host {
+export const brutalistShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 0px;
   --wm-bg: #f4f2ec;
   --wm-bg-focused: #ffffff;
@@ -2764,7 +2816,20 @@ export const candyTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const candyShadowTheme: string = `:host {
+export const candyShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 22px;
   --wm-bg: rgba(255, 250, 253, 0.94);
   --wm-bg-focused: #fffdfe;
@@ -3349,7 +3414,20 @@ export const carbonTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const carbonShadowTheme: string = `:host {
+export const carbonShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 0px;
   --wm-bg: #161616;
   --wm-bg-focused: #1c1c1c;
@@ -3935,7 +4013,20 @@ export const forestTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const forestShadowTheme: string = `:host {
+export const forestShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 12px;
   --wm-bg: rgba(24, 33, 26, 0.92);
   --wm-bg-focused: rgba(30, 42, 33, 0.97);
@@ -4510,7 +4601,20 @@ export const frostTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const frostShadowTheme: string = `:host {
+export const frostShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 18px;
   --wm-bg: rgba(255, 255, 255, 0.82);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
@@ -5083,7 +5187,20 @@ export const glassTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const glassShadowTheme: string = `:host {
+export const glassShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 14px;
   --wm-bg: rgba(22, 24, 34, 0.55);
   --wm-bg-focused: rgba(26, 28, 40, 0.68);
@@ -5643,7 +5760,20 @@ export const lightTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const lightShadowTheme: string = `:host {
+export const lightShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 12px;
   --wm-bg: rgba(255, 255, 255, 0.9);
   --wm-bg-focused: rgba(255, 255, 255, 0.96);
@@ -6223,7 +6353,20 @@ export const neonTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const neonShadowTheme: string = `:host {
+export const neonShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 16px;
   --wm-bg: rgba(13, 8, 30, 0.72);
   --wm-bg-focused: rgba(18, 11, 40, 0.84);
@@ -6807,7 +6950,20 @@ export const noirTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const noirShadowTheme: string = `:host {
+export const noirShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 0px;
   --wm-bg: #000000;
   --wm-bg-focused: #000000;
@@ -7353,7 +7509,20 @@ export const paperTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const paperShadowTheme: string = `:host {
+export const paperShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 6px;
   --wm-bg: #fdfaf3;
   --wm-bg-focused: #fffdf8;
@@ -7829,7 +7998,20 @@ export const retroTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const retroShadowTheme: string = `:host {
+export const retroShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-face: #c0c0c0;
   --wm-face-light: #ffffff;
   --wm-face-dark: #808080;
@@ -8347,7 +8529,20 @@ export const synthTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const synthShadowTheme: string = `:host {
+export const synthShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 8px;
   --wm-bg: rgba(24, 12, 44, 0.82);
   --wm-bg-focused: rgba(30, 15, 54, 0.92);
@@ -8921,7 +9116,20 @@ export const terminalTheme: string = `[data-wm-desktop] {
 }
 `
 
-export const terminalShadowTheme: string = `:host {
+export const terminalShadowTheme: string = `[part=titlebar],
+[part=title],
+:where([part=titlebar]) > [data-wm-controls],
+[part~=control] {
+  all: revert;
+}
+
+[part~=control]:hover,
+[part~=control]:focus-visible {
+  outline: revert;
+  opacity: revert;
+}
+
+:host {
   --wm-radius: 4px;
   --wm-bg: rgba(8, 14, 10, 0.9);
   --wm-bg-focused: rgba(10, 18, 13, 0.98);
