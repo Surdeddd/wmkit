@@ -204,6 +204,7 @@ export function setTheme(name) {
 Тема и вариант перекрашивают то, что уже есть. Скин это заменяет: другие элементы, другие кнопки, другой тайтлбар. Берите скин, когда у окна отличается *структура*, и вариант, когда отличаются только цвета.
 
 ```js
+import { attachDesktop } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
 
 const desktop = attachDesktop(wm, root, {
@@ -222,6 +223,7 @@ wm.update('notes', { meta: { skin: 'compact' } })  // пересобираетс
 Таблица стилей, загруженная в `document.head`, не достаёт внутрь теневого корня, поэтому её не видят ни скин, собранный с `shadow: true`, ни обвязка веб-компонента `<wm-window>`. Для этого случая те же шестнадцать тем поставляются строками, каждая в двух вариантах: `carbonTheme` для документа и `carbonShadowTheme` для теневого корня.
 
 ```js
+import { skin } from '@surdeddd/wmkit/chrome'
 import { carbonShadowTheme } from '@surdeddd/wmkit/themes'
 
 const dressed = skin({

@@ -204,6 +204,7 @@ Three layers, from the widest to the narrowest:
 A theme and a variant repaint what is already there. A skin replaces it: different elements, different buttons, a different titlebar. Reach for a skin when the window's *structure* differs, and for a variant when only its colours do.
 
 ```js
+import { attachDesktop } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
 
 const desktop = attachDesktop(wm, root, {
@@ -222,6 +223,7 @@ wm.update('notes', { meta: { skin: 'compact' } })  // rebuilt in place
 A stylesheet loaded into `document.head` cannot reach inside a shadow root, so a skin built with `shadow: true` never sees it, and neither does the chrome of a `<wm-window>` web component. For that case the same sixteen themes ship as strings, each in two flavours: `carbonTheme` for a document and `carbonShadowTheme` for a shadow root.
 
 ```js
+import { skin } from '@surdeddd/wmkit/chrome'
 import { carbonShadowTheme } from '@surdeddd/wmkit/themes'
 
 const dressed = skin({

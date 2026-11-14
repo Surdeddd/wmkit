@@ -308,7 +308,9 @@ That is exactly what `useWmWindow` and `wmWindowStore` do, and it is why a fifty
 A node React rendered loses its handlers when it moves into another document, because React listens on its own root. Leave the content where it is and render a copy into the popout through a portal:
 
 ```tsx
+import { type MouseEvent, type ReactNode, useState } from 'react'
 import { createPortal } from 'react-dom'
+import type { WindowManager } from '@surdeddd/wmkit'
 import { popout, type PopoutHandle } from '@surdeddd/wmkit/popout'
 
 function PopoutButton({ wm, id, children }: { wm: WindowManager; id: string; children: ReactNode }) {
@@ -421,6 +423,7 @@ The template must contain exactly one `[data-wm-content]` attribute and a single
 `shadow: true` builds the chrome inside an open shadow root. Your content is the template's own `[data-wm-content]` element, moved into the light DOM and projected through a `<slot>` placed where it stood, so shadow CSS reaches it as `::slotted([data-wm-content])`. Page CSS cannot reach in, the window's own CSS cannot leak out, and the styles become one constructable stylesheet shared by every window of that skin.
 
 ```js
+import { skin } from '@surdeddd/wmkit/chrome'
 import { themeStyle } from '@surdeddd/wmkit/themes'
 
 const sealed = skin({
@@ -443,6 +446,7 @@ Gestures are opt-in: the core ships none, and `@surdeddd/wmkit/gestures` costs 1
 The two never fight: whichever crosses its own threshold first wins, and neither starts while a drag or resize already owns the pointer.
 
 ```js
+import { attachDesktop } from '@surdeddd/wmkit'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
 
 attachDesktop(wm, root, {

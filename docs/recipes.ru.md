@@ -308,7 +308,9 @@ const stop = wm.subscribe(() => {
 Узел, который отрендерил React, теряет обработчики при переносе в другой документ, потому что React слушает события на собственном корне. Оставьте контент на месте и отрендерите его копию в popout через портал:
 
 ```tsx
+import { type MouseEvent, type ReactNode, useState } from 'react'
 import { createPortal } from 'react-dom'
+import type { WindowManager } from '@surdeddd/wmkit'
 import { popout, type PopoutHandle } from '@surdeddd/wmkit/popout'
 
 function PopoutButton({ wm, id, children }: { wm: WindowManager; id: string; children: ReactNode }) {
@@ -420,6 +422,7 @@ notes.content.append(myApp)
 `shadow: true` собирает обвязку внутри открытого теневого корня. Ваш контент — это собственный элемент `[data-wm-content]` шаблона: он переносится в light DOM и проецируется через `<slot>`, поставленный на его место, так что теневой CSS достаёт до него как `::slotted([data-wm-content])`. CSS страницы не проникает внутрь, собственный CSS окна не вытекает наружу, а стили становятся одной constructable stylesheet, общей для всех окон этого скина.
 
 ```js
+import { skin } from '@surdeddd/wmkit/chrome'
 import { themeStyle } from '@surdeddd/wmkit/themes'
 
 const sealed = skin({
@@ -442,6 +445,7 @@ const sealed = skin({
 Они никогда не конфликтуют: побеждает тот, кто первым перешагнёт свой порог, и ни один не начинается, пока указателем уже владеет перетаскивание или ресайз.
 
 ```js
+import { attachDesktop } from '@surdeddd/wmkit'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
 
 attachDesktop(wm, root, {
