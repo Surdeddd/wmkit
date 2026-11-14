@@ -430,7 +430,11 @@ export class WmWindowElement extends Base {
     this.last = null
     host.windows.delete(id)
     detach()
-    if (close) host.manager?.close(id)
+    const wm = host.manager
+    if (!close || !wm) return
+    const heir = [...host[MEMBERS]].find((member) => member.windowId === id)
+    if (heir) heir[SYNC](wm.getState())
+    else wm.close(id)
   }
 
   private chrome(messages: ElementsMessages): void {

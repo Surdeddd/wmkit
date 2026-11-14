@@ -196,6 +196,66 @@ describe('an element follows the manager', () => {
   })
 })
 
+describe('a re-render that replaces the element of an open window', () => {
+  for (const order of ['the old element leaves first', 'the newcomer arrives first'] as const) {
+    it(`keeps the window open and where it was when ${order}`, async () => {
+      const desktop = mount(
+        '<wm-desktop><wm-window window-id="a" label="A" x="40" y="40" width="300" height="200"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
+      )
+      const wm = desktop.manager
+      wm?.move('a', 220, 160)
+      wm?.clearHistory()
+      const closings: string[] = []
+      desktop.addEventListener('wm-close', (event) => {
+        closings.push((event.target as WmWindowElement).windowId ?? '')
+      })
+      const old = windowOf(desktop, 'a')
+      const fresh = document.createElement('wm-window') as WmWindowElement
+      fresh.setAttribute('window-id', 'a')
+      if (order === 'the old element leaves first') {
+        old.remove()
+        desktop.append(fresh)
+      } else {
+        old.after(fresh)
+        old.remove()
+      }
+      await flush()
+
+      expect(wm?.get('a')?.bounds).toEqual({ x: 220, y: 160, width: 300, height: 200 })
+      expect(fresh.hasAttribute('closed')).toBe(false)
+      expect(fresh.dataset.wmWindow).toBe('a')
+      expect(fresh.style.transform).toBe('translate3d(220px, 160px, 0)')
+      expect(desktop.windows.get('a')).toBe(fresh)
+      expect(old.dataset.wmWindow).toBeUndefined()
+      expect(closings).toEqual([])
+      expect(closedList(desktop)).toBeUndefined()
+      expect(wm?.canUndo()).toBe(false)
+    })
+  }
+
+  it('lets the newcomer take over even when its markup says closed', async () => {
+    const desktop = mount('<wm-desktop><wm-window window-id="a"></wm-window></wm-desktop>')
+    const fresh = document.createElement('wm-window') as WmWindowElement
+    fresh.setAttribute('window-id', 'a')
+    fresh.setAttribute('closed', '')
+    windowOf(desktop, 'a').replaceWith(fresh)
+    await flush()
+    expect(desktop.manager?.get('a')).toBeDefined()
+    expect(fresh.hasAttribute('closed')).toBe(false)
+    expect(desktop.windows.get('a')).toBe(fresh)
+  })
+
+  it('still closes the window when the element leaves and nothing replaces it', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="a"></wm-window><wm-window window-id="b"></wm-window></wm-desktop>',
+    )
+    windowOf(desktop, 'a').remove()
+    await flush()
+    expect(desktop.manager?.get('a')).toBeUndefined()
+    expect(desktop.manager?.get('b')).toBeDefined()
+  })
+})
+
 describe('closed panels', () => {
   it('stay closed after a reload with persist', async () => {
     const html =
