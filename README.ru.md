@@ -355,6 +355,17 @@ const picker = createLayoutPicker(desktop, { messages: layoutMessagesRu })
 const link = linkSnapped(desktop, { messages: layoutMessagesRu })
 ```
 
+### `createSwitcher(desktop, options?)` — `@surdeddd/wmkit/switcher`
+
+Alt+Tab для рабочего стола и его обзор. Удерживайте Alt и нажимайте обратный апостроф, чтобы идти по окнам от недавнего к давнему, и отпустите, чтобы переключиться; `switcher.overview()` уменьшает все окна и ставит их в сетку, чтобы выбрать одно указателем или стрелками. Обзор двигает элементы, а не состояние: менеджер, его история и то, что сохранил `persist`, остаются нетронутыми.
+
+```js
+import { createSwitcher, switcherMessagesRu } from '@surdeddd/wmkit/switcher'
+
+const switcher = createSwitcher(desktop, { messages: switcherMessagesRu })
+switcher.overview()
+```
+
 ### `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 Готовая панель задач: по кнопке на окно в порядке открытия, одна кнопка на группу вкладок, клик фокусирует, возвращает или сворачивает окно, средняя кнопка просит его закрыться, а по самой панели ходят стрелками — это одна остановка Tab. Панель следует за менеджером, а не за DOM, и не приносит стилей.

@@ -24,6 +24,7 @@ export default defineConfig({
     'taskbar/define': 'src/plugins/taskbar/define.ts',
     taskbar: 'src/plugins/taskbar/index.ts',
     layouts: 'src/plugins/layouts/index.ts',
+    switcher: 'src/plugins/switcher/index.ts',
     themes: 'src/themes/index.ts',
   },
   format: ['esm', 'cjs'],

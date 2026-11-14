@@ -99,6 +99,9 @@ export default defineConfig({
       '@surdeddd/wmkit/layouts': fileURLToPath(
         new URL('../src/plugins/layouts/index.ts', import.meta.url),
       ),
+      '@surdeddd/wmkit/switcher': fileURLToPath(
+        new URL('../src/plugins/switcher/index.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },

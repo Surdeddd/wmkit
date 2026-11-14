@@ -418,6 +418,17 @@ const picker = createLayoutPicker(desktop, { layouts: [snapLayouts.halves, snapL
 const link = linkSnapped(desktop)
 ```
 
+### `createSwitcher(desktop, options?)` — `@surdeddd/wmkit/switcher`
+
+An Alt+Tab for the desktop and an overview of it. Hold Alt and press the backquote to walk the windows from the most recently used and let go to switch; `switcher.overview()` scales every window down into a grid to pick one by pointer or arrows. The overview moves elements, not state: the manager, its history and what `persist` saved are untouched.
+
+```js
+import { createSwitcher } from '@surdeddd/wmkit/switcher'
+
+const switcher = createSwitcher(desktop)
+switcher.overview()
+```
+
 ### `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 A ready taskbar: one button per window in opening order, one per tab group, a click to focus, restore or minimize, a middle click to ask the window to close, and a single tab stop that the arrow keys walk. It follows the manager, never the DOM, and brings no styles.

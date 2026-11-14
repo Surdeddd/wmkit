@@ -92,6 +92,7 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-resizing` | window | the direction: `n`, `se`, … |
 | `data-wm-pinching` | window | present while two fingers are resizing it (gestures plugin) |
 | `data-wm-closing` | window | present while a close request waits for a guard that answers later |
+| `data-wm-overview` | window | present while the overview of the switcher plugin shows the window scaled down |
 | `data-wm-variant` | window | the variant name, when the window has one |
 | `data-wm-group` | window | the id of its tab group, on grouped windows |
 | `data-wm-tab` | window | `active` or `inactive`, on grouped windows |

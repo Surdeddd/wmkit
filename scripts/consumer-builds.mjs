@@ -53,6 +53,7 @@ import { useWmState as reactState } from '@surdeddd/wmkit/react'
 import { announcerMessagesRu } from '@surdeddd/wmkit/ru'
 import { useWmState as solidState } from '@surdeddd/wmkit/solid'
 import { wmStore } from '@surdeddd/wmkit/svelte'
+import { createSwitcher, type SwitcherOptions } from '@surdeddd/wmkit/switcher'
 import { createTaskbar, type TaskbarOptions } from '@surdeddd/wmkit/taskbar'
 import '@surdeddd/wmkit/taskbar/define'
 import { type ThemeName, themeStyle } from '@surdeddd/wmkit/themes'
@@ -71,6 +72,7 @@ const desk: DesktopOptions = {
 }
 const docking: DockOptions = { sash: 8 }
 const tasks: TaskbarOptions = { show: 'minimized', workspace: 'all' }
+const switching: SwitcherOptions = { shortcut: { code: 'KeyK', modifier: 'ctrl' }, animation: false }
 const columns: SnapLayout = [snapLayouts.halves[0], { x: 0.5, y: 0, width: 0.5, height: 1 }]
 const saving: PersistOptions = { key: 'app' }
 const out: PopoutOptions = { width: 400 }
@@ -99,6 +101,7 @@ export function run(element: HTMLElement): unknown[] {
     isPopoutSupported(),
     createDevtools(wm),
     createTaskbar(wm, element, tasks).targetOf(win),
+    createSwitcher(desktop, switching).overview(),
     createLayoutPicker(desktop, { layouts: [columns], hover: false }).open(win.id),
     touchGestures({ pinch: { threshold: 12 } }),
     skin({ template: '<section><div data-wm-content></div></section>' }),

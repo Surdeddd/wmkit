@@ -8,6 +8,7 @@ import { skin } from '@surdeddd/wmkit/chrome'
 import { createLayoutPicker, linkSnapped } from '@surdeddd/wmkit/layouts'
 import { persist } from '@surdeddd/wmkit/persist'
 import { popout } from '@surdeddd/wmkit/popout'
+import { createSwitcher } from '@surdeddd/wmkit/switcher'
 import { createTaskbar } from '@surdeddd/wmkit/taskbar'
 import '@surdeddd/wmkit/themes/glass.css'
 
@@ -200,6 +201,7 @@ declare global {
       createTaskbar: typeof createTaskbar
       createLayoutPicker: typeof createLayoutPicker
       linkSnapped: typeof linkSnapped
+      createSwitcher: typeof createSwitcher
     }
   }
 }
@@ -213,4 +215,5 @@ window.__wmkit = {
   createTaskbar,
   createLayoutPicker,
   linkSnapped,
+  createSwitcher,
 }

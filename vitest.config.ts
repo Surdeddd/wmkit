@@ -29,6 +29,8 @@ export default defineConfig({
         .pathname,
       '@surdeddd/wmkit/layouts': new URL('./src/plugins/layouts/index.ts', import.meta.url)
         .pathname,
+      '@surdeddd/wmkit/switcher': new URL('./src/plugins/switcher/index.ts', import.meta.url)
+        .pathname,
       '@surdeddd/wmkit': new URL('./src/index.ts', import.meta.url).pathname,
     },
   },

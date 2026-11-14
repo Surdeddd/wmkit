@@ -1061,6 +1061,55 @@ Opened from the keyboard or the context menu, the menu takes the focus on its fi
 
 Both inject one small stylesheet each, shared between instances and removed with the last one; it reads the theme tokens of the desktop and falls back to neutral colours. `destroy()` removes what was added and may be called more than once.
 
+## `createSwitcher(desktop, options?)` — `@surdeddd/wmkit/switcher`
+
+```ts
+interface SwitcherOptions {
+  shortcut?: false | {
+    code?: string                        // 'Backquote' — a KeyboardEvent.code
+    modifier?: 'alt' | 'ctrl' | 'meta'   // 'alt'
+  }
+  messages?: Partial<SwitcherMessages>
+  animation?: number | false             // 220 — ms the overview glides; false turns it off
+  gap?: number                           // 24 — px between the windows of the overview
+}
+
+interface Switcher {
+  element: HTMLElement
+  open(): boolean        // the list
+  overview(): boolean    // the grid of windows
+  close(): void
+  destroy(): void
+}
+
+interface SwitcherMessages {
+  label: string       // 'Switch window', the name of the list
+  overview: string    // 'All windows', the name of the overview
+}
+
+const switcherMessages: SwitcherMessages     // the English catalogue
+const switcherMessagesRu: SwitcherMessages   // the Russian one
+```
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createSwitcher } from '@surdeddd/wmkit/switcher'
+
+const wm = createWindowManager()
+const desktop = attachDesktop(wm, document.querySelector('#desktop'))
+const switcher = createSwitcher(desktop)
+
+document.querySelector('#show-all').addEventListener('click', () => switcher.overview())
+```
+
+Two ways to get to a window, one element: `[data-wm-switcher][role=listbox]` inside the desktop, with a `[role=option][data-wm-switch="<id>"]` per window and `aria-activedescendant` on the choice. Both offer the windows of the active workspace, one entry for a tab group, and only the modal windows while a modal is open.
+
+**The list** is what Alt+Tab is to an operating system. Hold the modifier and press the key — Alt and the backquote by default, since the browser keeps Tab for itself — and the windows are listed from the most recently used, with the one before the current picked. Every further press moves on, with Shift back, and letting the modifier go focuses the choice; a minimized window comes back. The arrow keys, Home and End move the choice as well, Enter and Space take it, a click takes the window it lands on, and Escape leaves everything as it was. `switcher.open()` shows the same list from your own code; it then stays until a choice is made.
+
+**The overview** is `switcher.overview()`: every window of the workspace that is not minimized is scaled down and laid out in a grid, in opening order, so that all of them can be seen at once. The arrow keys walk the grid, Enter or a click focuses a window and leaves, Escape or a click between windows leaves. The manager is not touched: the windows are moved with the `translate` and `scale` properties of their elements, which carry `data-wm-overview` meanwhile, so the state, the history and what `persist` saved stay as they were. It glides for `animation` milliseconds, and not at all under `prefers-reduced-motion`.
+
+Either closes when the focus goes somewhere else — a press outside, another window taking the focus, the page losing it. Both follow windows that close, are renamed or resize the desktop while they are open. One stylesheet is injected, shared between switchers and removed with the last one; it reads the theme tokens of the desktop. `destroy()` removes everything and may be called more than once.
+
 ## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 ```ts

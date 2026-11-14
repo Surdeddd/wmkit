@@ -1061,6 +1061,55 @@ const link = linkSnapped(desktop)
 
 Оба добавляют по одной небольшой таблице стилей, общей для всех экземпляров; она уходит вместе с последним, читает токены темы рабочего стола и подставляет нейтральные цвета, если их нет. `destroy()` убирает всё добавленное, вызывать его можно не один раз.
 
+## `createSwitcher(desktop, options?)` — `@surdeddd/wmkit/switcher`
+
+```ts
+interface SwitcherOptions {
+  shortcut?: false | {
+    code?: string                        // 'Backquote' — a KeyboardEvent.code
+    modifier?: 'alt' | 'ctrl' | 'meta'   // 'alt'
+  }
+  messages?: Partial<SwitcherMessages>
+  animation?: number | false             // 220 — ms the overview glides; false turns it off
+  gap?: number                           // 24 — px between the windows of the overview
+}
+
+interface Switcher {
+  element: HTMLElement
+  open(): boolean        // the list
+  overview(): boolean    // the grid of windows
+  close(): void
+  destroy(): void
+}
+
+interface SwitcherMessages {
+  label: string       // 'Switch window', the name of the list
+  overview: string    // 'All windows', the name of the overview
+}
+
+const switcherMessages: SwitcherMessages     // the English catalogue
+const switcherMessagesRu: SwitcherMessages   // the Russian one
+```
+
+```js
+import { attachDesktop, createWindowManager } from '@surdeddd/wmkit'
+import { createSwitcher } from '@surdeddd/wmkit/switcher'
+
+const wm = createWindowManager()
+const desktop = attachDesktop(wm, document.querySelector('#desktop'))
+const switcher = createSwitcher(desktop)
+
+document.querySelector('#show-all').addEventListener('click', () => switcher.overview())
+```
+
+Два способа добраться до окна, один элемент: `[data-wm-switcher][role=listbox]` внутри рабочего стола, в нём `[role=option][data-wm-switch="<id>"]` на окно и `aria-activedescendant` на выбранном. Оба предлагают окна активного рабочего стола, одну запись на группу вкладок и только модальные окна, пока открыта модалка.
+
+**Список** — то же, что Alt+Tab в операционной системе. Удерживайте модификатор и нажимайте клавишу — по умолчанию Alt и обратный апостроф, потому что Tab браузер оставляет себе, — и окна выстроятся от недавнего к давнему, а выбрано будет то, что было перед текущим. Каждое следующее нажатие идёт дальше, с Shift — назад, а отпускание модификатора фокусирует выбранное; свёрнутое окно возвращается. Стрелки, Home и End тоже двигают выбор, Enter и пробел его подтверждают, клик берёт окно, на которое попал, а Escape оставляет всё как было. `switcher.open()` показывает тот же список из вашего кода; тогда он остаётся, пока не сделан выбор.
+
+**Обзор** — это `switcher.overview()`: каждое несвёрнутое окно рабочего стола уменьшается и встаёт в сетку в порядке открытия, так что все окна видны сразу. Стрелки ходят по сетке, Enter или клик фокусирует окно и выходит, Escape или клик между окнами выходит. Менеджер при этом не трогается: окна двигаются свойствами `translate` и `scale` своих элементов, которые в это время несут `data-wm-overview`, так что состояние, история и то, что сохранил `persist`, остаются прежними. Окна плывут `animation` миллисекунд, а при `prefers-reduced-motion` не плывут вовсе.
+
+И то и другое закрывается, когда фокус уходит в другое место: нажатие снаружи, другое окно забрало фокус, страница его потеряла. Оба следуют за окнами, которые закрываются, переименовываются или меняют размер рабочего стола, пока они открыты. Добавляется одна таблица стилей, общая для всех переключателей; она уходит с последним и читает токены темы рабочего стола. `destroy()` убирает всё, вызывать его можно не один раз.
+
 ## `createTaskbar(wm, element, options?)` — `@surdeddd/wmkit/taskbar`
 
 ```ts
