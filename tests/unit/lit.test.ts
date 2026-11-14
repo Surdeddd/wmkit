@@ -111,6 +111,32 @@ describe('lit adapter', () => {
     expect(element.textContent).toBe('none')
   })
 
+  it('hands a window over when a template swap builds its new element before dropping the old one', () => {
+    wm.open({ id: 'notes', title: 'Notes', x: 40, y: 40, width: 300, height: 200 })
+    wm.move('notes', 220, 160)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const compact = () =>
+      html`<section class="compact" ${wmWindow(binder, 'notes')}><header data-wm-drag></header></section>`
+    const full = () =>
+      html`<article class="full" ${wmWindow(binder, 'notes')}><header data-wm-drag></header></article>`
+    const page = (wide: boolean) =>
+      html`<div ${wmDesktop(binder)}>${wide ? full() : compact()}</div>`
+    const attached = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-wm-window]')].map((node) => node.className)
+
+    render(page(false), host)
+    expect(attached()).toEqual(['compact'])
+    expect(() => render(page(true), host)).not.toThrow()
+    expect(attached()).toEqual(['full'])
+    expect((host.querySelector('.full') as HTMLElement).style.transform).toBe(
+      'translate3d(220px, 160px, 0)',
+    )
+    expect(wm.get('notes')?.bounds).toMatchObject({ x: 220, y: 160 })
+    render(page(false), host)
+    expect(attached()).toEqual(['compact'])
+  })
+
   it('refuses to sit anywhere but on an element', () => {
     const host = document.createElement('div')
     expect(() => render(html`<p>${wmDesktop(binder)}</p>`, host)).toThrow(/on an element/)

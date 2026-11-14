@@ -647,8 +647,8 @@ interface DesktopBinder {
 `bindDesktop` throws if a desktop is already bound. Unbinding and re-binding is supported — the binder re-subscribes, which is what makes React StrictMode double-mounting harmless. Unbinding the desktop keeps the window bindings, and they attach to the next desktop element.
 
 - A bound element with no parent (one that was removed, for example by `removeOnClose` when its window closed) is appended to the desktop element when its window attaches, so a window that comes back through undo or a reopen is visible again. Elements still inside some tree are left where they are, even an off-document one. The element comes back as a direct child of the desktop, not inside the wrapper it lived in, so use `removeOnClose` only for nodes you created yourself, never for nodes a framework renders. A framework removes its own nodes: render the window only while it exists, as every example in [Adapters](adapters.md) does.
-- When a window opens, only the first element bound to that id attaches, so `wm.open` never throws from the binder. When the attached element unbinds, the next element bound to the same id takes over.
-- A `bindWindow` call that throws (for example "already attached") leaves no binding behind.
+- One window shows in one element at a time, and elements bound to the same id queue for it. When a window opens, only the first element bound to that id attaches, so `wm.open` never throws from the binder. An element bound while another one already shows the window waits its turn too, and when the attached element unbinds, the next element in the queue takes over. That is what carries a window through a re-render that builds the new element before it drops the old one, as Lit does when it swaps templates.
+- A `bindWindow` call that throws (for example when the element already drives another window) leaves no binding behind.
 
 ## Geometry helpers
 

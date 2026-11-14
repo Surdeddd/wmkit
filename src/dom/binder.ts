@@ -23,10 +23,10 @@ export function createDesktopBinder(wm: WindowManager, options?: DesktopOptions)
   const entries = new Set<PendingWindow>()
 
   function attachEntry(entry: PendingWindow): void {
-    if (controller && !entry.detach && wm.get(entry.id)) {
-      if (!entry.element.parentNode) controller.element.append(entry.element)
-      entry.detach = controller.attachWindow(entry.id, entry.element, entry.options)
-    }
+    if (!controller || entry.detach || !wm.get(entry.id)) return
+    for (const other of entries) if (other.id === entry.id && other.detach) return
+    if (!entry.element.parentNode) controller.element.append(entry.element)
+    entry.detach = controller.attachWindow(entry.id, entry.element, entry.options)
   }
 
   function unbindDesktop(): void {

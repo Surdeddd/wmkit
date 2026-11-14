@@ -84,9 +84,9 @@ export function createDesktop(wm: WindowManager, options?: DesktopOptions): Angu
     window(id, windowOptions, lifetime) {
       const owner = destroyRefOf(lifetime)
       return (element) => {
-        for (const binding of bindings) {
-          if (binding.id === id && !binding.element.isConnected) binding.release()
-        }
+        const dead = [...bindings].filter((held) => held.id === id && !held.element.isConnected)
+        const shown = (held: WindowBinding) => Number(held.element.dataset.wmWindow !== undefined)
+        for (const held of dead.sort((a, b) => shown(a) - shown(b))) held.release()
         const unbind = binder.bindWindow(id, element, windowOptions)
         const binding: WindowBinding = {
           id,

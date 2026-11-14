@@ -402,9 +402,9 @@ describe('angular element bindings', () => {
     dk.window('notes')(first)
 
     const twin = panel(host)
-    expect(() => dk.window('notes')(twin), 'two live elements shared one id').toThrow(
-      /already attached/,
-    )
+    expect(() => dk.window('notes')(twin), 'a second live element broke the first').not.toThrow()
+    expect(first.dataset.wmWindow).toBe('notes')
+    expect(twin.dataset.wmWindow, 'two live elements shared one id').toBeUndefined()
     twin.remove()
 
     first.remove()
@@ -412,6 +412,24 @@ describe('angular element bindings', () => {
     expect(() => dk.window('notes')(second)).not.toThrow()
     expect(second.dataset.wmWindow).toBe('notes')
     expect(first.dataset.wmWindow, 'the dead element kept its binding').toBeUndefined()
+    expect(twin.isConnected, 'a dead element that only waited came back').toBe(false)
+    expect(twin.dataset.wmWindow).toBeUndefined()
+  })
+
+  it('hands the window to a live element that waited when the one showing it dies', () => {
+    const { wm, dk, host } = ngDesktop()
+    dk.desktop(host)
+    wm.open({ id: 'notes', title: 'Notes' })
+    const first = panel(host)
+    dk.window('notes')(first)
+    const heir = panel(host)
+    dk.window('notes')(heir)
+    first.remove()
+    const third = panel(host)
+    dk.window('notes')(third)
+    expect(heir.dataset.wmWindow).toBe('notes')
+    expect(third.dataset.wmWindow).toBeUndefined()
+    expect(first.dataset.wmWindow).toBeUndefined()
   })
 
   it('releases bindings with an explicit DestroyRef, so a reopened id leaves the dead element alone', () => {
@@ -959,7 +977,7 @@ describe('binder lifecycle', () => {
     expect(second.dataset.wmWindow).toBeUndefined()
   })
 
-  it('a bindWindow that throws leaves nothing behind', () => {
+  it('an element bound while another shows the window waits and takes over when that one unbinds', () => {
     const wm = createWindowManager(VIEWPORT)
     const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
     const desktopEl = document.createElement('div')
@@ -970,12 +988,35 @@ describe('binder lifecycle', () => {
     const second = document.createElement('section')
     desktopEl.append(first, second)
     const unbindFirst = binder.bindWindow('a', first)
-    expect(() => binder.bindWindow('a', second)).toThrow(/already attached/)
+    const unbindSecond = binder.bindWindow('a', second)
+    expect(first.dataset.wmWindow).toBe('a')
+    expect(second.dataset.wmWindow).toBeUndefined()
 
     unbindFirst()
-    wm.close('a')
-    wm.open({ id: 'a', title: 'A again' })
-    expect(second.dataset.wmWindow, 'the binding whose call threw attached later').toBeUndefined()
+    expect(first.dataset.wmWindow).toBeUndefined()
+    expect(second.dataset.wmWindow).toBe('a')
+    unbindSecond()
+    expect(desktopEl.querySelector('[data-wm-window]')).toBeNull()
+    expect(wm.get('a')).toBeDefined()
+  })
+
+  it('a bindWindow that throws leaves nothing behind', () => {
+    const wm = createWindowManager(VIEWPORT)
+    const binder = createDesktopBinder(wm, DESKTOP_OPTIONS)
+    const desktopEl = document.createElement('div')
+    document.body.append(desktopEl)
+    binder.bindDesktop(desktopEl)
+    wm.open({ id: 'a', title: 'A' })
+    wm.open({ id: 'b', title: 'B' })
+    const shared = document.createElement('section')
+    desktopEl.append(shared)
+    const unbindFirst = binder.bindWindow('a', shared)
+    expect(() => binder.bindWindow('b', shared)).toThrow(/already attached/)
+
+    unbindFirst()
+    wm.close('b')
+    wm.open({ id: 'b', title: 'B again' })
+    expect(shared.dataset.wmWindow, 'the binding whose call threw attached later').toBeUndefined()
   })
 })
 
