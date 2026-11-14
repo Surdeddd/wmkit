@@ -711,12 +711,16 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
 
   function onKeydown(event: KeyboardEvent): void {
     const side = SIDES[event.key]
-    if (!side || !event.shiftKey || !event.altKey || !(event.ctrlKey || event.metaKey)) return
+    const leave = event.key === 'Backspace'
+    if (!(side || leave) || !event.shiftKey || !event.altKey || !(event.ctrlKey || event.metaKey)) {
+      return
+    }
     const focused = wm.getState().focusedId
-    if (!focused || stackOf(read(), focused)) return
+    if (!focused || !stackOf(read(), focused) !== !leave) return
     event.preventDefault()
     event.stopPropagation()
-    dock(focused, { side })
+    if (side) dock(focused, { side })
+    else undock(focused)
   }
 
   const track = (event: PointerEvent) => {

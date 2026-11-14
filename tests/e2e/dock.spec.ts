@@ -181,6 +181,21 @@ test('the keyboard docks the focused window and moves a separator', async ({ pag
   await expect(sash).toHaveAttribute('role', 'separator')
 })
 
+test('the keyboard undocks the focused docked window and one undo docks it again', async ({
+  page,
+}) => {
+  await header(page, 'files').click({ position: { x: 30, y: 8 } })
+  await expect(panel(page, 'files')).toHaveAttribute('data-wm-focused', '')
+  const before = await docked(page)
+  expect(before).toContain('files')
+  await page.keyboard.press('Control+Alt+Shift+Backspace')
+  await expect.poll(() => docked(page)).toEqual(before.filter((id) => id !== 'files'))
+  await expect(panel(page, 'files')).not.toHaveAttribute('data-wm-docked', '')
+  await expect(panel(page, 'files')).toHaveAttribute('data-wm-focused', '')
+  await page.keyboard.press('Control+z')
+  await expect.poll(() => docked(page)).toEqual(before)
+})
+
 test('axe finds no serious violations in the docked layout', async ({ page }) => {
   const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze()
   const serious = results.violations.filter(

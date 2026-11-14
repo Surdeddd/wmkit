@@ -251,11 +251,51 @@ describe('docking', () => {
     h.element.dispatchEvent(key('ArrowUp', { metaKey: true, altKey: true, shiftKey: true }))
   })
 
+  it('undocks the focused docked window with Ctrl or Cmd, Alt, Shift and Backspace, as one step', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.wm.focus('b')
+    const floating = key('Backspace', { ctrlKey: true, altKey: true, shiftKey: true })
+    h.element.dispatchEvent(floating)
+    expect(floating.defaultPrevented).toBe(false)
+    h.wm.focus('a')
+    for (const partial of [
+      { ctrlKey: true, altKey: true },
+      { ctrlKey: true, shiftKey: true },
+      { altKey: true, shiftKey: true },
+    ]) {
+      const ignored = key('Backspace', partial)
+      h.element.dispatchEvent(ignored)
+      expect(ignored.defaultPrevented).toBe(false)
+    }
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+
+    const pressed = key('Backspace', { metaKey: true, altKey: true, shiftKey: true })
+    h.element.dispatchEvent(pressed)
+    expect(pressed.defaultPrevented).toBe(true)
+    expect(h.dock.layout().root).toBeNull()
+    expect(h.wm.get('a')).toMatchObject({ stage: 'normal', resizable: true })
+    expect(h.wm.getState().focusedId).toBe('a')
+    expect(h.announced()).toBe('A undocked')
+    expect(h.wm.undo()).toBe(true)
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
+    h.wm.blur()
+    const nobody = key('Backspace', { ctrlKey: true, altKey: true, shiftKey: true })
+    h.element.dispatchEvent(nobody)
+    expect(nobody.defaultPrevented).toBe(false)
+  })
+
   it('leaves the keyboard alone when told to', () => {
     const h = setup({ keyboard: false })
     h.add('a')
     h.element.dispatchEvent(key('ArrowLeft', { ctrlKey: true, altKey: true, shiftKey: true }))
     expect(h.dock.layout().root).toBeNull()
+    h.dock.dock('a')
+    h.wm.focus('a')
+    h.element.dispatchEvent(key('Backspace', { ctrlKey: true, altKey: true, shiftKey: true }))
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['a'])
   })
 })
 
