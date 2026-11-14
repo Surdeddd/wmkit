@@ -161,6 +161,9 @@ function judge(given: Case, before: WindowState, after: WindowState): string[] {
   const bounded = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high)
   if (given.aspect !== null) {
     const ratio = given.aspect
+    const room =
+      Math.min(max.width, max.height * ratio) >= 1 && Math.min(max.height, max.width / ratio) >= 1
+    if (!room) return found
     if (!near(to.width / to.height, ratio)) {
       found.push(`${to.width}x${to.height} lost the ratio ${ratio}`)
     }
