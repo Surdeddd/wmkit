@@ -261,6 +261,7 @@
     "publint": "publint",
     "smoke": "node scripts/consumer-smoke.mjs",
     "smoke:template": "node scripts/consumer-smoke.mjs --template",
+    "smoke:peers": "node scripts/peer-floors.mjs",
     "prepublishOnly": "pnpm build",
     "verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm size && pnpm publint && pnpm attw && pnpm smoke && pnpm test:e2e",
     "release": "semantic-release",

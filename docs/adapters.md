@@ -393,7 +393,7 @@ export function Desktop() {
 }
 ```
 
-The same five hooks with the same contracts as the React adapter, built on `preact/hooks` (Preact 10 and later, JSX works the same way). Preact has no `useSyncExternalStore`, so the hooks subscribe in a layout effect and re-read the snapshot right after subscribing: a change made between render and subscription is not lost.
+The same five hooks with the same contracts as the React adapter, built on `preact/hooks` (Preact 10 and later, JSX works the same way). Loaded by Node as native ES modules, as a server render does, it needs Preact 10.5 or later, the first release with an `exports` map; 10.0 to 10.4 work through a bundler or CommonJS. Preact has no `useSyncExternalStore`, so the hooks subscribe in a layout effect and re-read the snapshot right after subscribing: a change made between render and subscription is not lost.
 
 ## Lit
 
