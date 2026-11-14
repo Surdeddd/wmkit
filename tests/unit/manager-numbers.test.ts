@@ -202,6 +202,36 @@ describe('non-finite numbers never enter the state', () => {
     expect(wm.get('c')?.bounds).toMatchObject({ width: 2, height: 1 })
   })
 
+  it('keeps every size finite under an aspect ratio no finite size can hold', () => {
+    for (const ratio of [Number.MAX_VALUE, Number.MIN_VALUE, 1e300, 1e-300]) {
+      const wm = createWindowManager({ viewport: VIEWPORT })
+      const whole = (id: string, from: typeof wm) => {
+        const bounds = from.get(id)?.bounds
+        return finite(bounds) && (bounds?.width ?? 0) >= 1 && (bounds?.height ?? 0) >= 1
+      }
+      wm.open({ id: 'far', width: 300, height: 200, aspectRatio: ratio })
+      wm.open({
+        id: 'capped',
+        width: 300,
+        height: 200,
+        aspectRatio: ratio,
+        maxWidth: 250,
+        maxHeight: 150,
+      })
+      expect(whole('far', wm), `open with ${ratio}`).toBe(true)
+      expect(whole('capped', wm), `open with ${ratio} under a maximum`).toBe(true)
+      wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+      wm.update('a', { aspectRatio: ratio })
+      wm.resize('a', { width: 420, height: 90 })
+      wm.maximize('a')
+      wm.restore('a')
+      expect(whole('a', wm), `update with ${ratio}`).toBe(true)
+      const copy = createWindowManager({ viewport: VIEWPORT })
+      expect(copy.hydrate(JSON.parse(JSON.stringify(wm.serialize())))).toBe(true)
+      expect(whole('a', copy) && whole('far', copy) && whole('capped', copy)).toBe(true)
+    }
+  })
+
   it('keeps a saved layout loadable after a bad number was offered', () => {
     const wm = createWindowManager({ viewport: VIEWPORT })
     wm.open({ id: 'a', x: 10, y: 10, width: 300, height: 200 })

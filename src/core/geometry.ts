@@ -4,10 +4,18 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
+function atLeastOne(limit: Size): Size {
+  return { width: Math.max(1, limit.width), height: Math.max(1, limit.height) }
+}
+
+const NONE: Size = { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY }
+
 export function clampSize(size: Size, min: Size, max: Size | null): Size {
+  const low = atLeastOne(min)
+  const high = max ? atLeastOne(max) : NONE
   return {
-    width: clamp(size.width, min.width, max ? max.width : Number.POSITIVE_INFINITY),
-    height: clamp(size.height, min.height, max ? max.height : Number.POSITIVE_INFINITY),
+    width: clamp(size.width, low.width, high.width),
+    height: clamp(size.height, low.height, high.height),
   }
 }
 
@@ -31,23 +39,28 @@ export function applyAspect(
   max: Size | null,
   drive: 'width' | 'height',
 ): Size {
-  if (!Number.isFinite(ratio) || ratio <= 0) return clampSize(size, min, max)
-  const maxWidth = max ? max.width : Number.POSITIVE_INFINITY
-  const maxHeight = max ? max.height : Number.POSITIVE_INFINITY
+  const plain = clampSize(size, min, max)
+  if (!Number.isFinite(ratio) || ratio <= 0) return plain
+  const low = atLeastOne(min)
+  const high = max ? atLeastOne(max) : NONE
+  let fitted: Size
   if (drive === 'height') {
     const height = clamp(
       size.height,
-      Math.max(min.height, min.width / ratio),
-      Math.min(maxHeight, maxWidth / ratio),
+      Math.max(low.height, low.width / ratio),
+      Math.min(high.height, high.width / ratio),
     )
-    return { width: height * ratio, height }
+    fitted = { width: height * ratio, height }
+  } else {
+    const width = clamp(
+      size.width,
+      Math.max(low.width, low.height * ratio),
+      Math.min(high.width, high.height * ratio),
+    )
+    fitted = { width, height: width / ratio }
   }
-  const width = clamp(
-    size.width,
-    Math.max(min.width, min.height * ratio),
-    Math.min(maxWidth, maxHeight * ratio),
-  )
-  return { width, height: width / ratio }
+  const whole = fitted.width >= 1 && fitted.height >= 1
+  return whole && Number.isFinite(fitted.width + fitted.height) ? fitted : plain
 }
 
 export function zoneBounds(zone: SnapZone, viewport: Size): Bounds {

@@ -257,6 +257,39 @@ describe('applyAspect', () => {
     ).toEqual({ width: 400, height: 400 })
   })
 
+  it('drops a ratio that would give a size that is not finite or under one pixel', () => {
+    const size = { width: 300, height: 200 }
+    for (const ratio of [Number.MAX_VALUE, Number.MIN_VALUE]) {
+      for (const drive of ['width', 'height'] as const) {
+        expect(applyAspect(size, ratio, min, null, drive), `${ratio} by ${drive}`).toEqual(size)
+        expect(
+          applyAspect(size, ratio, min, { width: 250, height: 150 }, drive),
+          `${ratio} by ${drive} under a maximum`,
+        ).toEqual({ width: 250, height: 150 })
+      }
+    }
+    expect(applyAspect(size, 1000, min, { width: 500, height: 400 }, 'width')).toEqual({
+      width: 300,
+      height: 200,
+    })
+    expect(applyAspect(size, 100, min, { width: 500, height: 400 }, 'width')).toEqual({
+      width: 500,
+      height: 5,
+    })
+  })
+
+  it('never sizes under one pixel, whatever the limits say', () => {
+    const none = { width: 0, height: 0 }
+    expect(clampSize({ width: 0, height: 0.2 }, none, null)).toEqual({ width: 1, height: 1 })
+    expect(
+      clampSize({ width: 300, height: 200 }, none, { width: 0.2, height: Number.MIN_VALUE }),
+    ).toEqual({ width: 1, height: 1 })
+    expect(applyAspect({ width: 0, height: 0 }, 2, none, null, 'width')).toEqual({
+      width: 2,
+      height: 1,
+    })
+  })
+
   it('keeps the ratio while honouring both minimums', () => {
     expect(
       applyAspect({ width: 10, height: 10 }, 2, { width: 100, height: 90 }, null, 'width'),
