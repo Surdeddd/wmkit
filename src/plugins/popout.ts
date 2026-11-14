@@ -175,10 +175,15 @@ async function launch(
   }
   if (!target) throw new Error('wmkit: the popout window was blocked')
   const popped = target
+  const now = wm.get(id)
+  if (!now) {
+    popped.close()
+    throw new Error(`wmkit: window "${id}" closed before its popout opened`)
+  }
   const doc = popped.document
   const source = content.ownerDocument
   if (options.copyStyles !== false) copyStylesInto(doc, source)
-  doc.title = win.title
+  doc.title = now.title
   const container = doc.createElement('div')
   container.dataset.wmPopout = id
   doc.body.append(container)
@@ -188,7 +193,7 @@ async function launch(
     content.parentNode?.insertBefore(marker, content)
     container.append(content)
   }
-  const minimized = options.minimizeWhilePopped !== false && win.stage !== 'minimized'
+  const minimized = options.minimizeWhilePopped !== false && now.stage !== 'minimized'
   if (minimized) wm.minimize(id)
 
   let settle!: () => void

@@ -141,6 +141,36 @@ describe('picture-in-picture', () => {
     handle.close()
     expect(wm.get('p')?.stage).toBe('normal')
   })
+
+  it('gives up and closes the arriving window when its window closed while the request was pending', async () => {
+    const { target } = stubPip()
+    const { wm, holder, content } = setup()
+    const pending = popout(wm, 'p', content)
+    wm.close('p')
+    await expect(pending).rejects.toThrow('wmkit: window "p" closed before its popout opened')
+    expect(target.close).toHaveBeenCalledTimes(1)
+    expect(content.parentNode).toBe(holder)
+    expect(holder.childNodes).toHaveLength(1)
+    expect(target.document.body.childNodes).toHaveLength(0)
+
+    wm.open({ id: 'p', title: 'Again', width: 300, height: 200 })
+    const next = stubPip()
+    const handle = await popout(wm, 'p', content)
+    expect(handle.window).toBe(next.target)
+    expect(next.target.document.title).toBe('Again')
+  })
+
+  it('reads the window when the popup arrives, not when it was asked for', async () => {
+    const { target } = stubPip()
+    const { wm, content } = setup()
+    const pending = popout(wm, 'p', content)
+    wm.update('p', { title: 'Renamed meanwhile' })
+    wm.minimize('p')
+    const handle = await pending
+    expect(target.document.title).toBe('Renamed meanwhile')
+    handle.close()
+    expect(wm.get('p')?.stage, 'a window the user minimized was restored').toBe('minimized')
+  })
 })
 
 describe('popup window', () => {
