@@ -23,6 +23,7 @@ const AMBIENT: Record<string, string> = {
   id: 'string',
 }
 
+const IMPORTS = /^(?:import\s[^\n]*|\}\s*from\s)[^\n]*'@surdeddd\/wmkit/m
 const REACT = ['useState', 'useEffect', 'useRef', 'useMemo', 'useCallback', 'ReactNode']
 
 interface Block {
@@ -60,7 +61,7 @@ function blocks(): Block[] {
       const { lang, from, body } = open
       open = null
       const text = body.join('\n')
-      if (!['js', 'ts', 'tsx', 'jsx'].includes(lang) || !/from '@surdeddd\/wmkit/.test(text)) return
+      if (!['js', 'ts', 'tsx', 'jsx'].includes(lang) || !IMPORTS.test(text)) return
       const extension = lang === 'tsx' || lang === 'jsx' ? 'tsx' : 'ts'
       const jsx = /from 'solid-js/.test(text)
         ? 'solid-js'
@@ -176,6 +177,6 @@ it('compiles every self-contained code block of the documentation against the so
       problems.push(`${block.where}+${at - 1} TS${diagnostic.code} ${text.slice(0, 160)}`)
     }
   }
-  expect(all.length, 'no code block was found to compile').toBeGreaterThan(30)
+  expect(all.length, 'too few code blocks were found to compile').toBeGreaterThan(60)
   expect(problems).toEqual([])
 }, 300_000)
