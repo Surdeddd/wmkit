@@ -83,3 +83,31 @@ test('maximized windows expose no resize handles', async ({ page }) => {
   await expect(window).toHaveAttribute('data-wm-stage', 'maximized')
   await expect(window.locator('[data-wm-resize="se"]')).toBeHidden()
 })
+
+test('a resize released outside the page is over by the next mouse move, and the desktop works on', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'edges are too thin for a phone viewport')
+  const target = await freshWindow(page)
+  const box = await boxOf(target)
+  await page.mouse.move(box.x + 1, box.y + 1)
+  await page.mouse.down()
+  await page.mouse.move(-120, box.y - 30, { steps: 4 })
+  await page.mouse.up()
+  await page.mouse.move(box.x + 200, box.y + 300)
+  await expect
+    .poll(() => target.evaluate((node: HTMLElement) => node.dataset.wmResizing ?? null))
+    .toBeNull()
+
+  const before = await boxOf(target)
+  const handle = target.locator('[data-wm-drag]')
+  const grip = await boxOf(handle)
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x + grip.width / 2 + 90, grip.y + grip.height / 2 + 70, { steps: 6 })
+  await page.mouse.up()
+  const after = await boxOf(target)
+  expect(Math.abs(after.x - before.x - 90)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after.y - before.y - 70)).toBeLessThanOrEqual(2)
+})

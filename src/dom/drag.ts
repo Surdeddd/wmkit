@@ -1,6 +1,12 @@
 import { clamp, detectSnapZone, magnetize, zoneBounds } from '../core/geometry'
 import type { Bounds, SnapZone, WindowStage } from '../core/types'
-import type { ActiveDrag, DropHit, Point, SessionContext } from './shared'
+import {
+  type ActiveDrag,
+  type DropHit,
+  lostRelease,
+  type Point,
+  type SessionContext,
+} from './shared'
 
 interface DragSession extends ActiveDrag {
   pointerId: number
@@ -271,6 +277,8 @@ export function createDragStarter(ctx: SessionContext) {
       } finally {
         releaseRect()
         handle.removeEventListener('pointermove', onMove)
+        doc.removeEventListener('pointerdown', onStray, true)
+        doc.removeEventListener('pointermove', onStray, true)
         doc.removeEventListener('pointerup', onUp, true)
         doc.removeEventListener('pointercancel', onCancel, true)
         doc.removeEventListener('lostpointercapture', onCancel, true)
@@ -290,9 +298,15 @@ export function createDragStarter(ctx: SessionContext) {
       }
     }
 
+    function onStray(strayEvent: PointerEvent): void {
+      if (lostRelease(strayEvent, event)) finish(false)
+    }
+
     wm.beginInteraction()
     ctx.claimDrag(session)
     handle.addEventListener('pointermove', onMove)
+    doc.addEventListener('pointerdown', onStray, true)
+    doc.addEventListener('pointermove', onStray, true)
     doc.addEventListener('pointerup', onUp, true)
     doc.addEventListener('pointercancel', onCancel, true)
     doc.addEventListener('lostpointercapture', onCancel, true)

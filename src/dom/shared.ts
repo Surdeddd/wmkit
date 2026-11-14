@@ -165,6 +165,14 @@ export interface SessionContext {
   releaseDrag(session: ActiveDrag): void
 }
 
+export function lostRelease(event: PointerEvent, press: PointerEvent): boolean {
+  return (
+    event.pointerId === press.pointerId &&
+    (event.type === 'pointerdown' ||
+      (press.buttons !== 0 && event.pointerType === 'mouse' && event.buttons === 0))
+  )
+}
+
 export function windowOf(element: HTMLElement): Window & typeof globalThis {
   const view = element.ownerDocument.defaultView
   if (!view) throw new Error('wmkit: desktop element is not attached to a document')

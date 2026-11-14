@@ -1,6 +1,6 @@
 import { applyAspect, clampSize } from '../core/geometry'
 import type { Bounds, SnapZone } from '../core/types'
-import type { ActiveDrag, SessionContext } from './shared'
+import { type ActiveDrag, lostRelease, type SessionContext } from './shared'
 
 export const RESIZE_DIRECTIONS = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const
 export type ResizeDirection = (typeof RESIZE_DIRECTIONS)[number]
@@ -129,6 +129,8 @@ export function createResizeStarter(ctx: SessionContext) {
       } finally {
         releaseRect()
         handleEl.removeEventListener('pointermove', onMove)
+        doc.removeEventListener('pointerdown', onStray, true)
+        doc.removeEventListener('pointermove', onStray, true)
         doc.removeEventListener('pointerup', onUp, true)
         doc.removeEventListener('pointercancel', onCancelPointer, true)
         doc.removeEventListener('lostpointercapture', onCancelPointer, true)
@@ -160,7 +162,13 @@ export function createResizeStarter(ctx: SessionContext) {
       }
     }
 
+    function onStray(strayEvent: PointerEvent): void {
+      if (lostRelease(strayEvent, event)) finish(false)
+    }
+
     handleEl.addEventListener('pointermove', onMove)
+    doc.addEventListener('pointerdown', onStray, true)
+    doc.addEventListener('pointermove', onStray, true)
     doc.addEventListener('pointerup', onUp, true)
     doc.addEventListener('pointercancel', onCancelPointer, true)
     doc.addEventListener('lostpointercapture', onCancelPointer, true)
