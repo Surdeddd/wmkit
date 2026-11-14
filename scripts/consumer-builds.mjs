@@ -48,6 +48,7 @@ import { isPopoutSupported, type PopoutOptions, popout } from '@surdeddd/wmkit/p
 import { useWmState as preactState } from '@surdeddd/wmkit/preact'
 import { WmDesktop, WmWindow } from '@surdeddd/wmkit/qwik'
 import { useWmState as reactState } from '@surdeddd/wmkit/react'
+import { announcerMessagesRu } from '@surdeddd/wmkit/ru'
 import { useWmState as solidState } from '@surdeddd/wmkit/solid'
 import { wmStore } from '@surdeddd/wmkit/svelte'
 import { type ThemeName, themeStyle } from '@surdeddd/wmkit/themes'
@@ -57,7 +58,12 @@ import WinBox, { type WinBoxOptions } from '@surdeddd/wmkit/winbox'
 const manager: ManagerOptions = { historyLimit: 20 }
 const init: WindowInit = { title: 'Notes', minWidth: 120 }
 const patch: WindowUpdate = { title: 'Renamed' }
-const desk: DesktopOptions = { snap: { threshold: 10 }, keyboard: { moveStep: 8 }, magnetism: false }
+const desk: DesktopOptions = {
+  snap: { threshold: 10 },
+  keyboard: { moveStep: 8 },
+  magnetism: false,
+  announce: announcerMessagesRu,
+}
 const docking: DockOptions = { sash: 8 }
 const saving: PersistOptions = { key: 'app' }
 const out: PopoutOptions = { width: 400 }

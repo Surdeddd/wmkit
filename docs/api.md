@@ -686,6 +686,7 @@ Both flips render a throwaway ghost element and remove it on finish or cancel. T
 ```ts
 createAnnouncer(wm, container, messages?: Partial<AnnouncerMessages>): Announcer
 const defaultMessages: AnnouncerMessages   // the English catalogue
+const announcerMessagesRu: AnnouncerMessages   // the Russian one, exported by @surdeddd/wmkit/ru
 
 interface AnnouncerMessages {
   opened(title: string): string
@@ -711,7 +712,7 @@ interface Announcer {
 
 `attachDesktop` creates one unless `announce: false`; pass an object to localise. A message set to `undefined` (`announce: { opened: undefined }`) silences that event. A stage or workspace message always wins over the focus message produced in the same transaction, so the region never narrates "focused" over "maximized". Two identical announcements in a row still change the live region's text (a trailing no-break space toggles), so a screen reader speaks both.
 
-When several windows open, close, minimize or restore in one transaction, the region reads one summary instead of the last window's message. The English summaries are used only while the matching single message is the default one: once you replace `opened`, the default `openedMany` is dropped and the region falls back to the last window's message. A translated catalogue should therefore bring its own summaries.
+When several windows open, close, minimize or restore in one transaction, the region reads one summary instead of the last window's message. The English summaries are used only while the matching single message is the default one: once you replace `opened`, the default `openedMany` is dropped and the region falls back to the last window's message. A translated catalogue should therefore bring its own summaries. The Russian catalogue ships with the package: `attachDesktop(wm, el, { announce: announcerMessagesRu })` names every snap zone and declines the counted windows («1 окно», «2 окна», «5 окон»).
 
 ## Emitter
 

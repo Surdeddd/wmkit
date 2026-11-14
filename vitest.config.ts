@@ -22,6 +22,7 @@ export default defineConfig({
       '@surdeddd/wmkit/vue': new URL('./src/adapters/vue.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/svelte': new URL('./src/adapters/svelte.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/solid': new URL('./src/adapters/solid.ts', import.meta.url).pathname,
+      '@surdeddd/wmkit/ru': new URL('./src/locales/ru.ts', import.meta.url).pathname,
       '@surdeddd/wmkit': new URL('./src/index.ts', import.meta.url).pathname,
     },
   },

@@ -20,6 +20,7 @@ export default defineConfig({
     dock: 'src/plugins/dock/index.ts',
     elements: 'src/plugins/elements/index.ts',
     'elements/define': 'src/plugins/elements/define.ts',
+    ru: 'src/locales/ru.ts',
     themes: 'src/themes/index.ts',
   },
   format: ['esm', 'cjs'],

@@ -226,6 +226,16 @@
         "default": "./dist/elements/define.cjs"
       }
     },
+    "./ru": {
+      "import": {
+        "types": "./dist/ru.d.ts",
+        "default": "./dist/ru.js"
+      },
+      "require": {
+        "types": "./dist/ru.d.cts",
+        "default": "./dist/ru.cjs"
+      }
+    },
     "./themes": {
       "import": {
         "types": "./dist/themes.d.ts",
@@ -454,6 +464,11 @@
       "limit": "23 kB"
     },
     {
+      "name": "russian catalogue",
+      "path": "dist/ru.js",
+      "limit": "600 B"
+    },
+    {
       "name": "themes as text",
       "path": "dist/themes.js",
       "limit": "8 kB"
@@ -514,6 +529,9 @@
       ],
       "qwik": [
         "./dist/qwik.d.ts"
+      ],
+      "ru": [
+        "./dist/ru.d.ts"
       ]
     }
   },

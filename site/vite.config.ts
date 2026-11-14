@@ -89,6 +89,7 @@ export default defineConfig({
         new URL('../src/adapters/angular.ts', import.meta.url),
       ),
       '@surdeddd/wmkit/themes': fileURLToPath(new URL('../src/themes', import.meta.url)),
+      '@surdeddd/wmkit/ru': fileURLToPath(new URL('../src/locales/ru.ts', import.meta.url)),
       '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },

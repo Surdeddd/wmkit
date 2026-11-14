@@ -35,6 +35,7 @@
       "@surdeddd/wmkit/dock": ["./src/plugins/dock/index.ts"],
       "@surdeddd/wmkit/elements": ["./src/plugins/elements/index.ts"],
       "@surdeddd/wmkit/elements/define": ["./src/plugins/elements/define.ts"],
+      "@surdeddd/wmkit/ru": ["./src/locales/ru.ts"],
       "@surdeddd/wmkit/themes": ["./src/themes/index.ts"],
       "@surdeddd/wmkit/angular": ["./src/adapters/angular.ts"],
       "@surdeddd/wmkit/preact": ["./src/adapters/preact.ts"],
