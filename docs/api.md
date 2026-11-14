@@ -832,13 +832,14 @@ interface PersistOptions {
   onError?: (error: unknown, phase: 'load' | 'migrate' | 'save') => void  // globalThis.reportError
 }
 
-interface PersistStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-  removeItem(key: string): void
+interface PersistStorage {   // each method may answer at once or with a promise
+  getItem(key: string): string | null | PromiseLike<string | null>
+  setItem(key: string, value: string): void | PromiseLike<void>
+  removeItem(key: string): void | PromiseLike<void>
 }
 
 interface PersistController {
+  readonly ready: Promise<boolean>   // the outcome of the latest restore; never rejects
   restore(): boolean
   save(): void
   clear(): void
@@ -859,6 +860,24 @@ Nothing the plugin does throws at you. An absent storage turns it into a no-op, 
 | `'save'` | the state cannot be serialized (a circular value, a `BigInt`) or the storage threw, in `clear()` too |
 
 With `onError`, every failure is passed to it. Without it, the first failure of each phase goes to `globalThis.reportError` where it exists, which reports it the way an uncaught error is reported without stopping anything, and that phase then stays quiet until it succeeds again. Empty storage, a payload of the wrong shape, `migrate` returning `null` and `hydrate` refusing the data are not errors and are not reported. There is no write probe: a full storage is still read.
+
+#### A storage that answers later
+
+A storage whose methods return promises — IndexedDB, a server, an extension API — is used the same way. `restore()` cannot wait, so over such a storage it returns `false` and the answer comes through `ready`, which resolves to `true` when a stored desktop was put back and to `false` otherwise; it never rejects, a failed read goes to `onError` as `'load'`. Over a storage that answers at once `ready` is already settled with what `restore()` returned.
+
+```js
+import { persist } from '@surdeddd/wmkit/persist'
+import { idbStorage } from '@surdeddd/wmkit/persist/idb'
+
+const store = persist(wm, { storage: idbStorage() })
+if (!(await store.ready)) openDefaultWindows()
+```
+
+What was stored wins over what happened while it was being read: windows opened in the meantime are replaced when the saved desktop arrives, exactly as a synchronous restore would have replaced them, so wait for `ready` before opening defaults. Nothing is saved on its own while a read is in flight — a change made meanwhile is written once the storage turns out to be empty or the read fails, and dropped when the read restores. `save()` called by hand still writes at once.
+
+Writes never overlap: while one is in flight the next waits, and when several pile up only the last is sent, carrying the state of that moment; `clear()` waits its turn the same way, so an older write cannot land after it. `destroy()` and `pagehide` send the pending write and do not wait for it. A read that arrives after `destroy()` restores nothing.
+
+`idbStorage({ database?, store? })` from `@surdeddd/wmkit/persist/idb` is such a storage on IndexedDB: a database named `wmkit` with one object store named `state` by default, opened on first use. Where IndexedDB is missing or refuses to open, its methods reject, which `persist` reports as `'load'` and `'save'`, and the next call tries to open again.
 
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 

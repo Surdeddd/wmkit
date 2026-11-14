@@ -26,6 +26,7 @@
       "@surdeddd/wmkit/vue": ["./src/adapters/vue.ts"],
       "@surdeddd/wmkit/svelte": ["./src/adapters/svelte.ts"],
       "@surdeddd/wmkit/solid": ["./src/adapters/solid.ts"],
+      "@surdeddd/wmkit/persist/idb": ["./src/plugins/persist-idb.ts"],
       "@surdeddd/wmkit/persist": ["./src/plugins/persist.ts"],
       "@surdeddd/wmkit/popout": ["./src/plugins/popout.ts"],
       "@surdeddd/wmkit/devtools": ["./src/plugins/devtools/index.ts"],

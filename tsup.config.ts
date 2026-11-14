@@ -11,6 +11,7 @@ export default defineConfig({
     angular: 'src/adapters/angular.ts',
     preact: 'src/adapters/preact.ts',
     lit: 'src/adapters/lit.ts',
+    'persist/idb': 'src/plugins/persist-idb.ts',
     persist: 'src/plugins/persist.ts',
     popout: 'src/plugins/popout.ts',
     devtools: 'src/plugins/devtools/index.ts',

@@ -1,9 +1,11 @@
 import type { SerializedState, WindowManager } from '../core/types'
 
+type Later<T> = T | PromiseLike<T>
+
 export interface PersistStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-  removeItem(key: string): void
+  getItem(key: string): Later<string | null>
+  setItem(key: string, value: string): Later<void>
+  removeItem(key: string): Later<void>
 }
 
 export interface PersistOptions {
@@ -35,10 +37,15 @@ function unwrap(raw: unknown): PersistEnvelope | null {
 }
 
 export interface PersistController {
+  readonly ready: Promise<boolean>
   restore(): boolean
   save(): void
   clear(): void
   destroy(): void
+}
+
+function later(value: unknown): value is PromiseLike<unknown> {
+  return typeof (value as PromiseLike<unknown> | null)?.then === 'function'
 }
 
 function defaultStorage(): PersistStorage | null {
@@ -70,24 +77,90 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   let timer: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
   let suspended = false
+  let alive = true
+  let loading = 0
+  let held = false
+  let busy = false
+  let queued: (() => unknown) | undefined
+  let ready = Promise.resolve(false)
 
-  function save(): void {
-    if (!storage) return
-    try {
-      storage.setItem(key, JSON.stringify({ version, state: wm.serialize() }))
+  function write(op: () => unknown): void {
+    if (busy) {
+      queued = op
+      return
+    }
+    const done = () => {
       reported.delete('save')
+    }
+    const fail = (error: unknown) => report(error, 'save')
+    try {
+      const out = op()
+      if (!later(out)) {
+        done()
+        return
+      }
+      busy = true
+      Promise.resolve(out)
+        .then(done, fail)
+        .then(() => {
+          const next = queued
+          busy = false
+          queued = undefined
+          if (next === push && loading) held = true
+          else if (next) write(next)
+        })
     } catch (error) {
-      report(error, 'save')
+      fail(error)
     }
   }
 
+  const push = () =>
+    (storage as PersistStorage).setItem(key, JSON.stringify({ version, state: wm.serialize() }))
+
+  function save(): void {
+    if (storage) write(() => push())
+  }
+
   function restore(): boolean {
+    ready = Promise.resolve(false)
     if (!storage) return false
+    let raw: Later<string | null>
+    try {
+      raw = storage.getItem(key)
+    } catch (error) {
+      report(error, 'load')
+      return false
+    }
+    if (!later(raw)) {
+      const done = apply(raw)
+      ready = Promise.resolve(done)
+      return done
+    }
+    loading += 1
+    ready = Promise.resolve(raw)
+      .then(
+        (text) => alive && apply(text),
+        (error) => {
+          report(error, 'load')
+          return false
+        },
+      )
+      .then((done) => {
+        loading -= 1
+        if (!loading && held) {
+          held = false
+          if (!done) write(push)
+        }
+        return done
+      })
+    return false
+  }
+
+  function apply(raw: string | null): boolean {
     let phase: Phase = 'load'
     let data: SerializedState | null
     let stale: boolean
     try {
-      const raw = storage.getItem(key)
       const envelope = raw ? unwrap(JSON.parse(raw)) : null
       reported.delete(phase)
       if (!envelope) return false
@@ -123,18 +196,13 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   function flush(): void {
     if (timer === undefined) return
     cancel()
-    save()
+    if (loading) held = true
+    else if (storage) write(push)
   }
 
   function clear(): void {
     cancel()
-    if (!storage) return
-    try {
-      storage.removeItem(key)
-      reported.delete('save')
-    } catch (error) {
-      report(error, 'save')
-    }
+    if (storage) write(() => storage.removeItem(key))
   }
 
   const unsubscribe = wm.subscribe(() => {
@@ -150,6 +218,9 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
   if (options.autoRestore !== false) restore()
 
   return {
+    get ready() {
+      return ready
+    },
     restore,
     save,
     clear,
@@ -157,6 +228,7 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
       unsubscribe()
       host.removeEventListener?.('pagehide', flush)
       flush()
+      alive = false
     },
   }
 }

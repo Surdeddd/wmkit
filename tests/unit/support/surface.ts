@@ -13,6 +13,7 @@ export const ENTRIES: Record<string, string> = {
   './preact': 'src/adapters/preact.ts',
   './lit': 'src/adapters/lit.ts',
   './qwik': 'src/adapters/qwik.ts',
+  './persist/idb': 'src/plugins/persist-idb.ts',
   './persist': 'src/plugins/persist.ts',
   './popout': 'src/plugins/popout.ts',
   './gestures': 'src/plugins/gestures.ts',

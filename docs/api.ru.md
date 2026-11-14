@@ -832,13 +832,14 @@ interface PersistOptions {
   onError?: (error: unknown, phase: 'load' | 'migrate' | 'save') => void  // globalThis.reportError
 }
 
-interface PersistStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-  removeItem(key: string): void
+interface PersistStorage {   // each method may answer at once or with a promise
+  getItem(key: string): string | null | PromiseLike<string | null>
+  setItem(key: string, value: string): void | PromiseLike<void>
+  removeItem(key: string): void | PromiseLike<void>
 }
 
 interface PersistController {
+  readonly ready: Promise<boolean>   // the outcome of the latest restore; never rejects
   restore(): boolean
   save(): void
   clear(): void
@@ -859,6 +860,24 @@ interface PersistController {
 | `'save'` | состояние нельзя сериализовать (циклическое значение, `BigInt`) или хранилище бросило исключение, в том числе в `clear()` |
 
 С `onError` ему передаётся каждая ошибка. Без него первая ошибка каждой фазы уходит в `globalThis.reportError`, если он есть: тот сообщает о ней так же, как о неперехваченной ошибке, ничего при этом не прерывая, а дальше эта фаза молчит, пока снова не пройдёт успешно. Пустое хранилище, данные неправильной формы, `null` из `migrate` и отказ `hydrate` ошибками не считаются и не сообщаются. Пробной записи нет: заполненное хранилище всё равно читается.
+
+#### Хранилище, которое отвечает позже
+
+Хранилищем, методы которого возвращают промисы, — IndexedDB, сервер, API расширения — пользуются точно так же. `restore()` ждать не может, поэтому с таким хранилищем он возвращает `false`, а ответ приходит через `ready`: он даёт `true`, когда сохранённый рабочий стол вернули на место, и `false` в остальных случаях; он никогда не отклоняется, неудачное чтение уходит в `onError` как `'load'`. С хранилищем, которое отвечает сразу, `ready` уже выполнен и несёт то, что вернул `restore()`.
+
+```js
+import { persist } from '@surdeddd/wmkit/persist'
+import { idbStorage } from '@surdeddd/wmkit/persist/idb'
+
+const store = persist(wm, { storage: idbStorage() })
+if (!(await store.ready)) openDefaultWindows()
+```
+
+Сохранённое сильнее того, что случилось, пока его читали: окна, открытые за это время, заменяются, когда приходит сохранённый рабочий стол, — ровно так же, как их заменило бы синхронное восстановление, — поэтому дождитесь `ready`, прежде чем открывать окна по умолчанию. Пока идёт чтение, само ничего не сохраняется: изменение, сделанное в это время, записывается, когда хранилище оказалось пустым или чтение не удалось, и отбрасывается, когда чтение восстановило рабочий стол. `save()`, вызванный вручную, пишет сразу.
+
+Записи никогда не накладываются: пока одна в полёте, следующая ждёт, а когда их накопилось несколько, уходит только последняя и несёт состояние на тот момент; `clear()` ждёт своей очереди так же, поэтому более старая запись не может прийти после него. `destroy()` и `pagehide` отправляют отложенную запись и не ждут её. Чтение, которое пришло после `destroy()`, ничего не восстанавливает.
+
+`idbStorage({ database?, store? })` из `@surdeddd/wmkit/persist/idb` — такое хранилище на IndexedDB: по умолчанию база `wmkit` с одним хранилищем объектов `state`, открывается при первом обращении. Там, где IndexedDB нет или она не открывается, его методы отклоняют промис, о чём `persist` сообщает как о `'load'` и `'save'`, а следующий вызов пробует открыть базу снова.
 
 ## `popout(wm, id, content, options?)` — `@surdeddd/wmkit/popout`
 

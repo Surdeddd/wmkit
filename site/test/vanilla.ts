@@ -7,6 +7,7 @@ import {
 import { skin } from '@surdeddd/wmkit/chrome'
 import { createLayoutPicker, linkSnapped } from '@surdeddd/wmkit/layouts'
 import { persist } from '@surdeddd/wmkit/persist'
+import { idbStorage } from '@surdeddd/wmkit/persist/idb'
 import { popout } from '@surdeddd/wmkit/popout'
 import { createSwitcher } from '@surdeddd/wmkit/switcher'
 import { createTaskbar } from '@surdeddd/wmkit/taskbar'
@@ -202,6 +203,8 @@ declare global {
       createLayoutPicker: typeof createLayoutPicker
       linkSnapped: typeof linkSnapped
       createSwitcher: typeof createSwitcher
+      persist: typeof persist
+      idbStorage: typeof idbStorage
     }
   }
 }
@@ -216,4 +219,6 @@ window.__wmkit = {
   createLayoutPicker,
   linkSnapped,
   createSwitcher,
+  persist,
+  idbStorage,
 }

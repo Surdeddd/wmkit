@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
+      '@surdeddd/wmkit/persist/idb': new URL('./src/plugins/persist-idb.ts', import.meta.url)
+        .pathname,
       '@surdeddd/wmkit/persist': new URL('./src/plugins/persist.ts', import.meta.url).pathname,
       '@surdeddd/wmkit/devtools': new URL('./src/plugins/devtools/index.ts', import.meta.url)
         .pathname,

@@ -50,6 +50,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@surdeddd/wmkit/persist/idb': fileURLToPath(
+        new URL('../src/plugins/persist-idb.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit/persist': fileURLToPath(
         new URL('../src/plugins/persist.ts', import.meta.url),
       ),

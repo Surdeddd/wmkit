@@ -352,6 +352,8 @@ persist(wm, {
 })
 ```
 
+A storage may answer with promises: `persist(wm, { storage: idbStorage() })` with `idbStorage` from `@surdeddd/wmkit/persist/idb` keeps the desktop in IndexedDB, and `await store.ready` tells whether one was restored.
+
 ### `popout(wm, id, contentEl, options?)` — `@surdeddd/wmkit/popout`
 
 Moves a window's content into a separate OS window, keeping the same JS context and state: an always-on-top [Document Picture-in-Picture](https://developer.mozilla.org/docs/Web/API/Document_Picture-in-Picture_API) window where the browser has one (Chrome, Edge, Firefox), a popup everywhere else. `screen: 'other'` puts the popup on a second monitor through the Window Management API. Call it from a user gesture.

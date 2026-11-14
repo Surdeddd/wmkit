@@ -148,6 +148,16 @@
         "default": "./dist/persist.cjs"
       }
     },
+    "./persist/idb": {
+      "import": {
+        "types": "./dist/persist/idb.d.ts",
+        "default": "./dist/persist/idb.js"
+      },
+      "require": {
+        "types": "./dist/persist/idb.d.cts",
+        "default": "./dist/persist/idb.cjs"
+      }
+    },
     "./popout": {
       "import": {
         "types": "./dist/popout.d.ts",
@@ -471,6 +481,11 @@
       "limit": "1 kB"
     },
     {
+      "name": "persist in IndexedDB",
+      "path": "dist/persist/idb.js",
+      "limit": "500 B"
+    },
+    {
       "name": "popout plugin",
       "path": "dist/popout.js",
       "limit": "2.5 kB"
@@ -601,6 +616,9 @@
       ],
       "switcher": [
         "./dist/switcher.d.ts"
+      ],
+      "persist/idb": [
+        "./dist/persist/idb.d.ts"
       ]
     }
   },

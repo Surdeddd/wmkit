@@ -46,6 +46,7 @@ import { touchGestures } from '@surdeddd/wmkit/gestures'
 import { createLayoutPicker, type SnapLayout, snapLayouts } from '@surdeddd/wmkit/layouts'
 import { WmStateController, wmDesktop, wmWindow } from '@surdeddd/wmkit/lit'
 import { type PersistOptions, persist } from '@surdeddd/wmkit/persist'
+import { idbStorage } from '@surdeddd/wmkit/persist/idb'
 import { isPopoutSupported, type PopoutOptions, popout } from '@surdeddd/wmkit/popout'
 import { useWmState as preactState } from '@surdeddd/wmkit/preact'
 import { WmDesktop, WmWindow } from '@surdeddd/wmkit/qwik'
@@ -74,7 +75,7 @@ const docking: DockOptions = { sash: 8 }
 const tasks: TaskbarOptions = { show: 'minimized', workspace: 'all' }
 const switching: SwitcherOptions = { shortcut: { code: 'KeyK', modifier: 'ctrl' }, animation: false }
 const columns: SnapLayout = [snapLayouts.halves[0], { x: 0.5, y: 0, width: 0.5, height: 1 }]
-const saving: PersistOptions = { key: 'app' }
+const saving: PersistOptions = { key: 'app', storage: idbStorage({ database: 'app' }) }
 const out: PopoutOptions = { width: 400 }
 const box: WinBoxOptions = { title: 'Box' }
 const theme: ThemeName = 'glass'
@@ -96,6 +97,7 @@ export function run(element: HTMLElement): unknown[] {
     binder.controller(),
     dock.layout(),
     store.restore(),
+    store.ready,
     host.manager,
     popout(wm, win.id, element, out),
     isPopoutSupported(),
