@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fuzz, seedCount } from './support/fuzz'
+import { breathe, fuzz, seedCount } from './support/fuzz'
 import { type Resources, trackResources } from './support/resources'
 
 let resources: Resources | null = null
@@ -68,6 +68,30 @@ describe('resource tracker', () => {
     panel.addEventListener('click', () => {})
     document.createElement('div').addEventListener('click', { handleEvent() {} })
     expect(tracker.live()).toEqual(['listener click on <section#notes>', 'listener click on <div>'])
+  })
+
+  it('counts as a leak only what outlives the page: the window, the document and connected nodes', () => {
+    const tracker = track()
+    const kept = document.createElement('section')
+    const gone = document.createElement('div')
+    document.body.append(kept)
+    kept.addEventListener('click', () => {})
+    gone.addEventListener('click', () => {})
+    window.addEventListener('resize', () => {})
+    expect(tracker.live()).toHaveLength(3)
+    expect(tracker.leaks()).toEqual(['listener click on <section>', 'listener resize on window'])
+    kept.remove()
+    expect(tracker.leaks()).toEqual(['listener resize on window'])
+  })
+
+  it('ignores timers that third-party code sets for itself', () => {
+    const tracker = track()
+    const field = document.createElement('div')
+    field.tabIndex = 0
+    document.body.append(field)
+    field.focus()
+    expect(document.activeElement).toBe(field)
+    expect(tracker.live()).toEqual([])
   })
 
   it('leaves alone listeners that existed before tracking began', () => {
@@ -198,6 +222,14 @@ describe('resource tracker', () => {
 })
 
 describe('fuzz budget', () => {
+  it('lets the event loop turn between runs', async () => {
+    const order: string[] = []
+    setImmediate(() => order.push('loop'))
+    await breathe()
+    order.push('run')
+    expect(order).toEqual(['loop', 'run'])
+  })
+
   it('uses the base run count and a fixed seed by default', () => {
     vi.stubEnv('WMKIT_FUZZ', '')
     vi.stubEnv('WMKIT_FUZZ_SEED', '')

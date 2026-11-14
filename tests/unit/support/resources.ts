@@ -26,6 +26,7 @@ interface Held {
   type: string
   capture: boolean
   listener: object
+  origin: string
 }
 
 type Schedule = (handler: (...args: unknown[]) => void, ...rest: unknown[]) => unknown
@@ -41,6 +42,7 @@ type ObserverClass = new (...args: never[]) => ObserverLike
 
 export interface Resources {
   live(): string[]
+  leaks(): string[]
   restore(): void
 }
 
@@ -58,10 +60,26 @@ function nameOf(target: object, view: View): string {
   return `<${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}>`
 }
 
+function origin(): string {
+  const frame = new Error().stack
+    ?.split('\n')
+    .find((line) => line.includes('/src/') && !line.includes('node_modules'))
+  const at = frame?.match(/\/(src\/[^\s)]+)/)?.[1]
+  return at ? ` from ${at}` : ''
+}
+
+function foreign(): boolean {
+  const caller = new Error().stack
+    ?.split('\n')
+    .slice(1)
+    .find((line) => !line.includes('/support/resources.'))
+  return caller?.includes('node_modules') === true
+}
+
 export function trackResources(view: View = window): Resources {
   const held: Held[] = []
   const pending = new Map<unknown, string>()
-  const watched = new Map<object, { name: string; targets: Set<object> }>()
+  const watched = new Map<object, { name: string; targets: Set<object>; origin: string }>()
   const undo: Array<() => void> = []
   let internal = false
 
@@ -80,10 +98,11 @@ export function trackResources(view: View = window): Resources {
     host.addEventListener = function addEventListener(this: unknown, type, listener, options) {
       const target = self ?? (this as object | undefined) ?? view
       const settings = typeof options === 'object' ? options : undefined
-      if (!internal && listener && !settings?.once && !settings?.signal?.aborted) {
+      const ours = !internal && listener && !settings?.once && !settings?.signal?.aborted
+      if (ours && !foreign()) {
         const capture = captureOf(options)
         if (indexOf(target, type, capture, listener) < 0) {
-          const entry: Held = { target, type, capture, listener }
+          const entry: Held = { target, type, capture, listener, origin: origin() }
           held.push(entry)
           if (settings?.signal) {
             internal = true
@@ -122,7 +141,7 @@ export function trackResources(view: View = window): Resources {
     const cancel = slots[clear] as Cancel | undefined
     if (typeof schedule !== 'function' || typeof cancel !== 'function') return
     slots[set] = (handler: unknown, ...rest: unknown[]) => {
-      if (typeof handler !== 'function') return schedule(handler as never, ...rest)
+      if (typeof handler !== 'function' || foreign()) return schedule(handler as never, ...rest)
       const id: unknown = schedule(
         (...args: unknown[]) => {
           if (!repeats) pending.delete(id)
@@ -130,7 +149,7 @@ export function trackResources(view: View = window): Resources {
         },
         ...rest,
       )
-      pending.set(id, label)
+      pending.set(id, `pending ${label}${origin()}`)
       return id
     }
     slots[clear] = (id: unknown) => {
@@ -149,9 +168,11 @@ export function trackResources(view: View = window): Resources {
     if (typeof Original !== 'function') return
     const Tracked = class extends Original {
       override observe(target: object, ...rest: unknown[]): void {
-        const entry = watched.get(this) ?? { name, targets: new Set<object>() }
-        entry.targets.add(target)
-        watched.set(this, entry)
+        if (!foreign()) {
+          const entry = watched.get(this) ?? { name, targets: new Set<object>(), origin: origin() }
+          entry.targets.add(target)
+          watched.set(this, entry)
+        }
         super.observe(target, ...rest)
       }
 
@@ -173,6 +194,25 @@ export function trackResources(view: View = window): Resources {
     })
   }
 
+  function report(listeners: Held[]): string[] {
+    return [
+      ...listeners.map(
+        (entry) =>
+          `listener ${entry.type}${entry.capture ? ' (capture)' : ''} on ${nameOf(entry.target, view)}${entry.origin}`,
+      ),
+      ...pending.values(),
+      ...[...watched.values()].map(
+        (entry) => `${entry.name} watching ${entry.targets.size}${entry.origin}`,
+      ),
+    ]
+  }
+
+  function reachable(target: object): boolean {
+    if (target === view || target === view.document) return true
+    const node = target as Partial<Node>
+    return typeof node.isConnected !== 'boolean' || node.isConnected
+  }
+
   patchListeners(view.EventTarget.prototype as unknown as ListenerHost)
   if (Object.hasOwn(view, 'addEventListener')) {
     patchListeners(view as unknown as ListenerHost, view)
@@ -183,16 +223,8 @@ export function trackResources(view: View = window): Resources {
   for (const name of OBSERVERS) patchObserver(name)
 
   return {
-    live() {
-      return [
-        ...held.map(
-          (entry) =>
-            `listener ${entry.type}${entry.capture ? ' (capture)' : ''} on ${nameOf(entry.target, view)}`,
-        ),
-        ...[...pending.values()].map((label) => `pending ${label}`),
-        ...[...watched.values()].map((entry) => `${entry.name} watching ${entry.targets.size}`),
-      ]
-    },
+    live: () => report(held),
+    leaks: () => report(held.filter((entry) => reachable(entry.target))),
     restore() {
       for (const step of undo.splice(0).reverse()) step()
     },

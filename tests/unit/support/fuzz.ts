@@ -24,6 +24,10 @@ export function fuzz(base: number): FuzzBudget {
   }
 }
 
+export function breathe(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
 export const junkNumber: fc.Arbitrary<number> = fc.oneof(
   fc.constantFrom(
     Number.NaN,
