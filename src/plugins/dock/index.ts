@@ -378,6 +378,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     } finally {
       applying -= 1
     }
+    seen = []
     render()
   }
 

@@ -11,7 +11,7 @@ import {
   type DockStack,
   dockLayout,
 } from '../../src/plugins/dock'
-import { patience, seedCount } from './support/fuzz'
+import { breathe, patience, seedCount } from './support/fuzz'
 import { trackResources } from './support/resources'
 
 const POOL = ['a', 'b', 'c', 'd', 'e', 'f']
@@ -22,6 +22,7 @@ interface World {
   desktop: DesktopController
   dock: Dock
   element: HTMLElement
+  panels: Map<string, { root: HTMLElement; detach(): void }>
 }
 
 type Op = [string, (w: World, random: () => number) => void]
@@ -59,15 +60,39 @@ function world(viewport?: Size, data?: SerializedState): World {
     })
     wm.clearHistory()
   }
-  return { wm, desktop, dock, element }
+  return { wm, desktop, dock, element, panels: new Map() }
 }
 
-function check({ wm, dock }: World): string | null {
+function mount(w: World): void {
+  for (const id of POOL) {
+    const panel = w.panels.get(id)
+    if (w.wm.get(id) && !panel) {
+      const root = document.createElement('section')
+      w.element.append(root)
+      w.panels.set(id, { root, detach: w.desktop.attachWindow(id, root) })
+    } else if (!w.wm.get(id) && panel) {
+      panel.detach()
+      panel.root.remove()
+      w.panels.delete(id)
+    }
+  }
+}
+
+async function settle(w: World): Promise<void> {
+  mount(w)
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
+const spot = (values: number[]): string =>
+  values.map((value) => Math.round(value * 100) / 100).join(' ')
+
+function check({ wm, dock, element, panels }: World): string | null {
   const layout = dock.layout()
   if (!dockLayout.validate(layout)) return 'tree fails validate'
   const state = wm.getState()
   const known = state.viewport.width > 0
-  const placed = dockLayout.rects(
+  const tiling = dockLayout.rects(
     layout,
     { x: 0, y: 0, ...state.viewport },
     {
@@ -85,7 +110,8 @@ function check({ wm, dock }: World): string | null {
           { width: 0, height: 0 },
         ),
     },
-  ).stacks
+  )
+  const placed = tiling.stacks
   const docked = new Set(dockLayout.windowsOf(layout))
   for (const stack of stacksOf(layout.root)) {
     const rect = placed.find((entry) => entry.id === stack.id)?.bounds
@@ -140,6 +166,32 @@ function check({ wm, dock }: World): string | null {
     if (win && !win.resizable) return `undocked ${id} is still locked`
     if (win && !(win.minimizable && win.snappable)) return `undocked ${id} lost a flag`
     if (win?.snapRect) return `undocked ${id} sits in a panel rectangle`
+  }
+  const shown =
+    (state.extensions.dock as { workspace?: number } | undefined)?.workspace === state.workspace
+  for (const [id, panel] of panels) {
+    const marked = panel.root.hasAttribute('data-wm-docked')
+    if (marked !== (shown && docked.has(id))) {
+      return `${id} carries the docked mark: ${marked}, the layout on screen holds [${shown ? [...docked] : []}]`
+    }
+  }
+  const nodes = [...element.querySelectorAll<HTMLElement>('[data-wm-sash]')]
+  const wanted = shown ? tiling.sashes : []
+  if (nodes.length !== wanted.length) {
+    return `${nodes.length} separators drawn, the layout has ${wanted.length}`
+  }
+  if (known) {
+    const drawn = nodes
+      .map(({ style }) =>
+        spot([style.left, style.top, style.width, style.height].map(Number.parseFloat)),
+      )
+      .sort()
+    const due = wanted
+      .map(({ bounds }) => spot([bounds.x, bounds.y, bounds.width, bounds.height]))
+      .sort()
+    if (drawn.join('; ') !== due.join('; ')) {
+      return `separators drawn at [${drawn.join('; ')}], the layout has [${due.join('; ')}]`
+    }
   }
   return null
 }
@@ -255,12 +307,13 @@ const OPS: Op[] = [
   ['redo', (w) => void w.wm.redo()],
 ]
 
-function run(seeds: number, steps: number, offset: number): string[] {
+async function run(seeds: number, steps: number, offset: number): Promise<string[]> {
   const problems: string[] = []
   for (let seed = offset; seed < offset + seeds; seed += 1) {
     const random = rng(seed * 7919)
     const resources = trackResources()
     const w = world(seed % 4 === 0 ? undefined : { width: 1400, height: 900 })
+    await settle(w)
     const trail: string[] = []
     for (let step = 0; step < steps; step += 1) {
       const [label, op] = pick(random, OPS)
@@ -269,13 +322,17 @@ function run(seeds: number, steps: number, offset: number): string[] {
       try {
         const before = label === 'undo' ? JSON.stringify(w.wm.serialize()) : null
         op(w, random)
+        await settle(w)
         problem = check(w)
         const undone = JSON.stringify(w.wm.serialize())
         if (!problem && before !== null && before !== undone) {
           w.wm.redo()
+          await settle(w)
           if (JSON.stringify(w.wm.serialize()) !== before) problem = 'undo then redo changed state'
           else problem = check(w)
           w.wm.undo()
+          await settle(w)
+          if (!problem) problem = check(w)
           if (!problem && JSON.stringify(w.wm.serialize()) !== undone) {
             problem = 'redo then undo changed state'
           }
@@ -300,6 +357,7 @@ function run(seeds: number, steps: number, offset: number): string[] {
     }
     document.body.replaceChildren()
     if (problems.length > 0) break
+    await breathe()
   }
   return problems
 }
@@ -310,16 +368,16 @@ afterEach(() => {
 
 it(
   'keeps the layout and the manager in step through random operations',
-  () => {
-    expect(run(seedCount(100), 60, 1)).toEqual([])
+  async () => {
+    expect(await run(seedCount(100), 60, 1)).toEqual([])
   },
   patience(60_000),
 )
 
 it(
   'keeps them in step through more random operations with other seeds',
-  () => {
-    expect(run(seedCount(100), 60, 1_000_000)).toEqual([])
+  async () => {
+    expect(await run(seedCount(100), 60, 1_000_000)).toEqual([])
   },
   patience(60_000),
 )
