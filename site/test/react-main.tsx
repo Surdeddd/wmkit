@@ -1,6 +1,6 @@
 import type { DesktopBinder, WindowManager, WindowState } from '@surdeddd/wmkit'
 import { useDesktop, useWindowManager, useWmState, useWmWindowRef } from '@surdeddd/wmkit/react'
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@surdeddd/wmkit/themes/glass.css'
 
@@ -49,6 +49,9 @@ function App() {
   const { ref, binder } = useDesktop(wm)
   const state = useWmState(wm)
   const [counter, setCounter] = useState(0)
+  useEffect(() => {
+    Object.assign(window, { __wm: wm })
+  }, [wm])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

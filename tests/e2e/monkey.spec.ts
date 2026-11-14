@@ -1,3 +1,4 @@
+import type { CDPSession } from '@playwright/test'
 import { expect, type Page, test } from './fixtures'
 
 const SEEDS = Number(process.env.WMKIT_MONKEY) || 2
@@ -8,27 +9,97 @@ interface Stage {
   name: string
   url: string
   desktop: string
-  manager: 'page' | 'element' | 'dock'
+  manager: 'page' | 'element' | 'dock' | 'demo'
+  dock: '' | '__dock' | '__dashboard'
+  opener: string
+  ready: string
   closing: boolean
+  gestures: boolean
+  reloads: boolean
+  tasks: boolean
 }
+
+const PLAIN = {
+  dock: '',
+  opener: '',
+  ready: '',
+  closing: true,
+  gestures: false,
+  reloads: false,
+  tasks: false,
+} as const
 
 const STAGES: Stage[] = [
   {
+    ...PLAIN,
     name: 'vanilla',
     url: 'test/vanilla.html',
     desktop: '#desktop',
     manager: 'page',
-    closing: true,
+    opener: '#btn-open, #btn-open-iframe, #btn-open-modal',
+    reloads: true,
+    tasks: true,
   },
   {
+    ...PLAIN,
     name: 'web components',
-    url: 'test/elements.html',
+    url: 'test/elements.html?persist=monkey',
     desktop: 'wm-desktop',
     manager: 'element',
-    closing: true,
+    reloads: true,
   },
-  { name: 'dock', url: 'test/dock.html', desktop: '#desktop', manager: 'dock', closing: false },
+  {
+    ...PLAIN,
+    name: 'dock',
+    url: 'test/dock.html',
+    desktop: '#desktop',
+    manager: 'dock',
+    dock: '__dock',
+    closing: false,
+    reloads: true,
+  },
+  ...['react', 'preact', 'lit'].map(
+    (name): Stage => ({
+      ...PLAIN,
+      name,
+      url: `test/${name}.html`,
+      desktop: '[data-wm-desktop]',
+      manager: 'page',
+      opener: '#btn-open',
+      tasks: true,
+    }),
+  ),
+  {
+    ...PLAIN,
+    name: 'dashboard',
+    url: 'test/dashboard/',
+    desktop: 'wm-desktop',
+    manager: 'element',
+    dock: '__dashboard',
+    opener: '#reset, #float',
+    reloads: true,
+  },
+  {
+    ...PLAIN,
+    name: 'demo',
+    url: '?lang=en',
+    desktop: '#desktop',
+    manager: 'demo',
+    opener: 'button[data-app]',
+    ready: '#boot[data-done]',
+    gestures: true,
+    tasks: true,
+  },
 ]
+
+const SIZES = [
+  { width: 1280, height: 720 },
+  { width: 900, height: 600 },
+  { width: 640, height: 480 },
+  { width: 1500, height: 900 },
+]
+
+const TWISTS = ['escape', 'viewport', 'blur', 'leave', 'other button', 'tab away'] as const
 
 interface Tree {
   windows?: string[]
@@ -40,9 +111,14 @@ interface Docked {
   dock: { layout(): { root: Tree | null } }
 }
 
-interface Box {
+type Held = Record<string, Docked | undefined>
+
+interface Point {
   x: number
   y: number
+}
+
+interface Box extends Point {
   width: number
   height: number
 }
@@ -52,6 +128,7 @@ interface Scene {
   windows: Array<{ id: string; box: Box; handle: Box | null; controls: Box[] }>
   tasks: Box[]
   sashes: Box[]
+  openers: Array<Box & { name: string }>
 }
 
 function rng(seed: number): () => number {
@@ -67,6 +144,7 @@ function look(stage: Stage): Scene {
     const rect = node.getBoundingClientRect()
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
   }
+  const seen = (node: Element): boolean => (node as HTMLElement).offsetParent !== null
   const inner = (host: HTMLElement, selector: string): Element[] => [
     ...host.querySelectorAll(selector),
     ...(host.shadowRoot?.querySelectorAll(selector) ?? []),
@@ -85,27 +163,43 @@ function look(stage: Stage): Scene {
         id: node.dataset.wmWindow as string,
         box: box(node),
         handle: handle ? box(handle) : null,
-        controls: inner(node, buttons)
-          .filter((button) => (button as HTMLElement).offsetParent !== null)
-          .map(box),
+        controls: inner(node, buttons).filter(seen).map(box),
       }
     })
+  const openers = stage.opener ? [...document.querySelectorAll<HTMLElement>(stage.opener)] : []
   return {
     desktop: box(desktop),
     windows,
-    tasks: [...document.querySelectorAll('#taskbar [data-task]')].map(box),
+    tasks: [...document.querySelectorAll('[data-task]')].filter(seen).map(box),
     sashes: [...desktop.querySelectorAll('[data-wm-sash]')].map(box),
+    openers: openers
+      .filter(seen)
+      .map((node) => ({ ...box(node), name: node.id || node.dataset.app || 'opener' })),
   }
 }
 
 async function rest(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const frame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+    const running = () =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState !== 'finished' &&
+            animation.playState !== 'idle' &&
+            animation.effect?.getComputedTiming().iterations !== Number.POSITIVE_INFINITY,
+        )
     await frame()
     await frame()
-    await Promise.all(
-      document.getAnimations().map((animation) => animation.finished.catch(() => {})),
-    )
+    const deadline = performance.now() + 3000
+    for (let live = running(); live.length > 0 && performance.now() < deadline; live = running()) {
+      await Promise.race([
+        Promise.all(live.map((animation) => animation.finished.catch(() => {}))),
+        new Promise((resolve) => setTimeout(resolve, 500)),
+      ])
+      await frame()
+    }
     await frame()
   })
 }
@@ -113,13 +207,15 @@ async function rest(page: Page): Promise<void> {
 function inspect(stage: Stage): string[] {
   const found: string[] = []
   const desktop = document.querySelector(stage.desktop) as HTMLElement
-  const held = (window as unknown as { __dock: Docked }).__dock
+  const held = (window as unknown as Held)[stage.dock]
   const wm =
     stage.manager === 'page'
       ? window.__wm
       : stage.manager === 'dock'
-        ? held.wm
-        : (desktop as unknown as { manager: typeof window.__wm }).manager
+        ? (held as Docked).wm
+        : stage.manager === 'demo'
+          ? window.__wmDemo.wm
+          : (desktop as unknown as { manager: typeof window.__wm }).manager
   const state = wm.getState()
   const base = desktop.getBoundingClientRect()
   const nodes = [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')]
@@ -151,7 +247,7 @@ function inspect(stage: Stage): string[] {
     previous = z
   }
   const docked = new Set<string>()
-  if (stage.manager === 'dock') {
+  if (held) {
     let gaps = 0
     const walk = (node: Tree | null) => {
       for (const id of node?.windows ?? []) docked.add(id)
@@ -164,6 +260,9 @@ function inspect(stage: Stage): string[] {
     const sashes = desktop.querySelectorAll('[data-wm-sash]').length
     if (sashes !== gaps) found.push(`${sashes} separators are drawn, the layout has ${gaps}`)
   }
+  for (const id of ids) {
+    if (!byId.has(id)) found.push(`${id} is in the state with no element on the page`)
+  }
   for (const [id, node] of byId) {
     const win = state.windows[id]
     if (!win) {
@@ -175,7 +274,7 @@ function inspect(stage: Stage): string[] {
     for (const mark of ['wmDragging', 'wmResizing', 'wmPinching', 'wmTabTarget', 'wmLive']) {
       if (node.dataset[mark] !== undefined) found.push(`${id} still carries ${mark}`)
     }
-    if (stage.manager === 'dock' && (node.dataset.wmDocked !== undefined) !== docked.has(id)) {
+    if (held && (node.dataset.wmDocked !== undefined) !== docked.has(id)) {
       found.push(
         `${id} docked mark is ${node.dataset.wmDocked !== undefined}, the layout on screen holds [${[...docked]}]`,
       )
@@ -202,8 +301,8 @@ function inspect(stage: Stage): string[] {
     if (hidden) continue
     const rect = node.getBoundingClientRect()
     const off = [
-      rect.left - base.left - x,
-      rect.top - base.top - y,
+      rect.left - base.left - desktop.clientLeft + desktop.scrollLeft - x,
+      rect.top - base.top - desktop.clientTop + desktop.scrollTop - y,
       rect.width - width,
       rect.height - height,
     ]
@@ -229,76 +328,203 @@ function inspect(stage: Stage): string[] {
   if (desktop.querySelector('[data-wm-sash][data-wm-active]')) {
     found.push('a separator is still marked active')
   }
-  if (stage.manager === 'page') {
-    const tasks = document.querySelectorAll('#taskbar [data-task]').length
+  if (stage.tasks) {
+    const tasks = document.querySelectorAll('[data-task]').length
     if (tasks !== wm.minimized().length) {
       found.push(`${tasks} taskbar buttons for ${wm.minimized().length} minimized windows`)
     }
   }
+  const overflow = getComputedStyle(desktop)
+  if (
+    (overflow.overflowX === 'hidden' && desktop.scrollLeft !== 0) ||
+    (overflow.overflowY === 'hidden' && desktop.scrollTop !== 0)
+  ) {
+    found.push(`the desktop is scrolled to ${desktop.scrollLeft},${desktop.scrollTop}`)
+  }
+  const zoom = window.visualViewport?.scale ?? 1
+  if (Math.abs(zoom - 1) > 0.01) found.push(`the page is zoomed to ${zoom}`)
   return found
 }
 
-const center = (box: Box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
+const center = (box: Box): Point => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
 
-async function open(page: Page, stage: Stage, random: () => number): Promise<string> {
-  if (stage.manager === 'page') {
-    const buttons = ['#btn-open', '#btn-open', '#btn-open-iframe', '#btn-open-modal']
-    const kind = buttons[Math.floor(random() * buttons.length)] as string
-    await page.click(kind)
-    return `click ${kind}`
-  }
-  if (stage.manager === 'dock') return 'nothing to open'
-  const made = Math.floor(random() * 1_000_000)
-  return page.evaluate(
-    ([desktop, id, x, y]) => {
-      const closed = document.querySelector(`${desktop} wm-window[closed]`)
-      if (closed) {
-        closed.removeAttribute('closed')
-        return `reopen ${closed.getAttribute('window-id')}`
-      }
-      const node = document.createElement('wm-window')
-      node.setAttribute('window-id', `m${id}`)
-      node.setAttribute('label', `M ${id}`)
-      node.setAttribute('x', String(x))
-      node.setAttribute('y', String(y))
-      node.setAttribute('width', '240')
-      node.setAttribute('height', '170')
-      document.querySelector(desktop as string)?.append(node)
-      return `add wm-window m${id}`
-    },
-    [
-      stage.desktop,
-      made,
-      20 + Math.floor(random() * 300),
-      20 + Math.floor(random() * 200),
-    ] as const,
+function lands([selector, id, points]: readonly [string, string | null, Point[]]): boolean {
+  const desktop = document.querySelector(selector) as HTMLElement
+  const target =
+    id === null
+      ? desktop
+      : [...desktop.querySelectorAll<HTMLElement>('[data-wm-window]')].find(
+          (node) => node.dataset.wmWindow === id,
+        )
+  return (
+    target !== undefined &&
+    points.every(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y)
+      return hit !== null && target.contains(hit)
+    })
   )
 }
 
-async function act(page: Page, stage: Stage, random: () => number): Promise<string> {
+function ownGround({ x, y }: Point): boolean {
+  const hit = document.elementFromPoint(x, y)
+  return hit !== null && !hit.matches('iframe, object, embed')
+}
+
+const fingers = (cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', at: Point[]) =>
+  cdp.send('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: at.map((point, index) => ({
+      x: Math.round(point.x),
+      y: Math.round(point.y),
+      id: index + 1,
+    })),
+  })
+
+async function stroke(
+  page: Page,
+  touch: CDPSession | null,
+  random: () => number,
+  from: Point,
+  to: Point,
+): Promise<string> {
+  const finger = touch !== null && random() < 0.5
+  const steps = 2 + Math.floor(random() * 8)
+  const twist = random() < 0.3 ? TWISTS[Math.floor(random() * TWISTS.length)] : null
+  const half = Math.ceil(steps / 2)
+  const at = (step: number): Point => ({
+    x: from.x + ((to.x - from.x) * step) / steps,
+    y: from.y + ((to.y - from.y) * step) / steps,
+  })
+  const travel = async (first: number, last: number) => {
+    for (let step = first; step <= last; step += 1) {
+      if (finger) await fingers(touch, 'touchMove', [at(step)])
+      else await page.mouse.move(at(step).x, at(step).y)
+    }
+  }
+  if (finger) {
+    await fingers(touch, 'touchStart', [from])
+  } else {
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+  }
+  await travel(1, half)
+  if (twist === 'escape') await page.keyboard.press('Escape')
+  if (twist === 'tab away') await page.keyboard.press('Tab')
+  if (twist === 'blur') await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  if (twist === 'viewport') {
+    await page.setViewportSize(SIZES[Math.floor(random() * SIZES.length)] as (typeof SIZES)[0])
+  }
+  if (twist === 'leave' && !finger) await page.mouse.move(-20, at(half).y)
+  if (twist === 'other button' && !finger && (await page.evaluate(ownGround, at(half)))) {
+    await page.mouse.down({ button: 'right' })
+    await page.mouse.up({ button: 'right' })
+  }
+  await travel(half + 1, steps)
+  if (finger) await fingers(touch, 'touchEnd', [])
+  else await page.mouse.up()
+  return `${finger ? 'a finger' : 'the mouse'}${twist ? `, ${twist} midway` : ''}`
+}
+
+async function poke(
+  page: Page,
+  touch: CDPSession | null,
+  random: () => number,
+  at: Point,
+  twice = false,
+): Promise<string> {
+  if (touch !== null && random() < 0.5) {
+    await page.touchscreen.tap(at.x, at.y)
+    if (twice) await page.touchscreen.tap(at.x, at.y)
+    return 'a finger'
+  }
+  if (twice) await page.mouse.dblclick(at.x, at.y)
+  else await page.mouse.click(at.x, at.y)
+  return 'the mouse'
+}
+
+async function arrive(page: Page, stage: Stage): Promise<void> {
+  await expect(page.locator(stage.desktop)).toBeVisible()
+  if (stage.ready) await page.locator(stage.ready).waitFor({ state: 'attached' })
+  if (stage.manager === 'element' && !stage.opener) {
+    await page.evaluate((selector) => {
+      const desktop = document.querySelector(selector) as HTMLElement & {
+        manager: typeof window.__wm
+      }
+      for (const id of Object.keys(desktop.manager.getState().windows)) {
+        if (desktop.querySelector(`wm-window[window-id="${id}"]`)) continue
+        const node = document.createElement('wm-window')
+        node.setAttribute('window-id', id)
+        node.setAttribute('label', id)
+        desktop.append(node)
+      }
+    }, stage.desktop)
+  }
+  await rest(page)
+}
+
+async function open(
+  page: Page,
+  stage: Stage,
+  scene: Scene,
+  touch: CDPSession | null,
+  random: () => number,
+): Promise<string> {
+  if (stage.manager === 'element' && !stage.opener) {
+    const made = Math.floor(random() * 1_000_000)
+    return page.evaluate(
+      ([desktop, id, x, y]) => {
+        const closed = document.querySelector(`${desktop} wm-window[closed]`)
+        if (closed) {
+          closed.removeAttribute('closed')
+          return `reopen ${closed.getAttribute('window-id')}`
+        }
+        const node = document.createElement('wm-window')
+        node.setAttribute('window-id', `m${id}`)
+        node.setAttribute('label', `M ${id}`)
+        node.setAttribute('x', String(x))
+        node.setAttribute('y', String(y))
+        node.setAttribute('width', '240')
+        node.setAttribute('height', '170')
+        document.querySelector(desktop as string)?.append(node)
+        return `add wm-window m${id}`
+      },
+      [
+        stage.desktop,
+        made,
+        20 + Math.floor(random() * 300),
+        20 + Math.floor(random() * 200),
+      ] as const,
+    )
+  }
+  if (scene.openers.length === 0) return 'nothing to open'
+  const opener = scene.openers[Math.floor(random() * scene.openers.length)] as Scene['openers'][0]
+  return `open ${opener.name} with ${await poke(page, touch, random, center(opener))}`
+}
+
+async function act(
+  page: Page,
+  stage: Stage,
+  touch: CDPSession | null,
+  random: () => number,
+): Promise<string> {
   const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T
   const scene = await page.evaluate(look, stage)
   const win = scene.windows.length > 0 ? pick(scene.windows) : null
-  const inside = () => ({
+  const inside = (): Point => ({
     x: scene.desktop.x + random() * scene.desktop.width,
     y: scene.desktop.y + random() * scene.desktop.height,
   })
-  const roll = Math.floor(random() * 16)
+  const roll = Math.floor(random() * 19)
 
   if (roll === 0 || scene.windows.length === 0 || (roll < 3 && scene.windows.length < 5)) {
-    return open(page, stage, random)
+    return open(page, stage, scene, touch, random)
   }
   if (!win) return 'nothing to do'
   if (roll < 6 && win.handle) {
     const from = center(win.handle)
     const to = random() < 0.2 ? { x: scene.desktop.x + 2, y: from.y } : inside()
-    const cancelled = random() < 0.15
-    await page.mouse.move(from.x, from.y)
-    await page.mouse.down()
-    await page.mouse.move(to.x, to.y, { steps: 2 + Math.floor(random() * 8) })
-    if (cancelled) await page.keyboard.press('Escape')
-    await page.mouse.up()
-    return `drag ${win.id} to ${Math.round(to.x)},${Math.round(to.y)}${cancelled ? ' then escape' : ''}`
+    const how = await stroke(page, touch, random, from, to)
+    return `drag ${win.id} to ${Math.round(to.x)},${Math.round(to.y)} with ${how}`
   }
   if (roll < 9) {
     const edge = pick(['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'])
@@ -316,34 +542,20 @@ async function act(page: Page, stage: Stage, random: () => number): Promise<stri
     }
     const dx = Math.round((random() - 0.5) * 400)
     const dy = Math.round((random() - 0.5) * 300)
-    await page.mouse.move(from.x, from.y)
-    await page.mouse.down()
-    await page.mouse.move(from.x + dx, from.y + dy, { steps: 2 + Math.floor(random() * 6) })
-    await page.mouse.up()
-    return `resize ${win.id} by its ${edge} edge ${dx},${dy}`
+    const how = await stroke(page, touch, random, from, { x: from.x + dx, y: from.y + dy })
+    return `resize ${win.id} by its ${edge} edge ${dx},${dy} with ${how}`
   }
   if (roll === 9 && win.controls.length > 0) {
-    const at = center(pick(win.controls))
-    await page.mouse.click(at.x, at.y)
-    return `click a control of ${win.id}`
+    return `press a control of ${win.id} with ${await poke(page, touch, random, center(pick(win.controls)))}`
   }
   if (roll === 10 && win.handle) {
-    const at = center(win.handle)
-    await page.mouse.dblclick(at.x, at.y)
-    return `double click the titlebar of ${win.id}`
+    return `double press the titlebar of ${win.id} with ${await poke(page, touch, random, center(win.handle), true)}`
   }
   if (roll === 11 && scene.tasks.length > 0) {
-    const at = center(pick(scene.tasks))
-    await page.mouse.click(at.x, at.y)
-    return 'click a taskbar button'
+    return `press a taskbar button with ${await poke(page, touch, random, center(pick(scene.tasks)))}`
   }
   if (roll === 12) {
-    const size = pick([
-      { width: 1280, height: 720 },
-      { width: 900, height: 600 },
-      { width: 640, height: 480 },
-      { width: 1500, height: 900 },
-    ])
+    const size = pick(SIZES)
     await page.setViewportSize(size)
     return `viewport ${size.width}x${size.height}`
   }
@@ -351,11 +563,54 @@ async function act(page: Page, stage: Stage, random: () => number): Promise<stri
     const from = center(pick(scene.sashes))
     const dx = Math.round((random() - 0.5) * 300)
     const dy = Math.round((random() - 0.5) * 300)
-    await page.mouse.move(from.x, from.y)
-    await page.mouse.down()
-    await page.mouse.move(from.x + dx, from.y + dy, { steps: 3 })
-    await page.mouse.up()
-    return `drag a separator by ${dx},${dy}`
+    const how = await stroke(page, touch, random, from, { x: from.x + dx, y: from.y + dy })
+    return `drag a separator by ${dx},${dy} with ${how}`
+  }
+  if (roll === 14 && touch !== null && stage.gestures) {
+    const middle = center(win.box)
+    const [start, end] = random() < 0.5 ? [30, 110] : [110, 30]
+    const pair = (spread: number): Point[] => [
+      { x: middle.x - spread, y: middle.y },
+      { x: middle.x + spread, y: middle.y },
+    ]
+    if (!(await page.evaluate(lands, [stage.desktop, win.id, pair(start)] as const))) {
+      return `no room to pinch ${win.id}`
+    }
+    await fingers(touch, 'touchStart', pair(start))
+    for (let step = 1; step <= 5; step += 1) {
+      await fingers(touch, 'touchMove', pair(start + ((end - start) * step) / 5))
+    }
+    await fingers(touch, 'touchEnd', [])
+    return `pinch ${win.id} from ${start} to ${end}`
+  }
+  if (roll === 15 && touch !== null && stage.gestures) {
+    const middle = center(scene.desktop)
+    const reach = random() < 0.5 ? 220 : -220
+    const pair = (shift: number): Point[] => [
+      { x: middle.x + shift, y: middle.y - 25 },
+      { x: middle.x + shift, y: middle.y + 25 },
+    ]
+    if (!(await page.evaluate(lands, [stage.desktop, null, pair(0)] as const))) {
+      return 'no room to swipe'
+    }
+    await fingers(touch, 'touchStart', pair(0))
+    for (let step = 1; step <= 5; step += 1) {
+      await fingers(touch, 'touchMove', pair((reach * step) / 5))
+    }
+    await fingers(touch, 'touchEnd', [])
+    return `swipe two fingers by ${reach}`
+  }
+  if (roll === 17 && stage.reloads) {
+    await page.reload()
+    await arrive(page, stage)
+    return 'reload the page'
+  }
+  if (roll === 16) {
+    const at = center(win.box)
+    const dy = pick([-300, 120, 300])
+    await page.mouse.move(at.x, at.y)
+    await page.mouse.wheel(0, dy)
+    return `wheel ${dy} over ${win.id}`
   }
   if (win.handle) {
     const at = center(win.handle)
@@ -376,6 +631,10 @@ async function act(page: Page, stage: Stage, random: () => number): Promise<stri
     'Escape',
     'Control+z',
     'Control+Shift+z',
+    'Tab',
+    'Shift+Tab',
+    'Enter',
+    'Space',
   ])
   await page.keyboard.press(key)
   return `press ${key} on ${win.id}`
@@ -384,8 +643,15 @@ async function act(page: Page, stage: Stage, random: () => number): Promise<stri
 for (const stage of STAGES) {
   test.describe(`random input on the ${stage.name} page`, () => {
     for (let seed = FIRST; seed < FIRST + SEEDS; seed += 1) {
-      test(`keeps the page and the state in step for seed ${seed}`, async ({ page }) => {
-        test.setTimeout(60_000 + STEPS * 3_000)
+      test(`keeps the page and the state in step for seed ${seed}`, async ({
+        page,
+        context,
+        isMobile,
+        browserName,
+      }) => {
+        test.setTimeout(60_000 + STEPS * 4_000)
+        const touch =
+          isMobile && browserName === 'chromium' ? await context.newCDPSession(page) : null
         const errors: string[] = []
         page.on('pageerror', (error) => errors.push(`page error: ${error.message}`))
         page.on('console', (message) => {
@@ -394,15 +660,18 @@ for (const stage of STAGES) {
           if (!text.includes('Failed to load resource')) errors.push(`console error: ${text}`)
         })
         await page.goto(stage.url)
-        await expect(page.locator(stage.desktop)).toBeVisible()
+        await arrive(page, stage)
         const random = rng(seed * 7919)
         const trail: string[] = []
         for (let step = 0; step < STEPS; step += 1) {
-          trail.push(await act(page, stage, random))
+          trail.push(await act(page, stage, touch, random))
           await page.mouse.move(3, 3)
           await rest(page)
           const found = [...(await page.evaluate(inspect, stage)), ...errors]
-          expect(found, `seed ${seed}, step ${step}:\n${trail.slice(-8).join('\n')}`).toEqual([])
+          expect(
+            found,
+            `seed ${seed}, step ${step} (replay: WMKIT_MONKEY_SEED=${seed} WMKIT_MONKEY=1 WMKIT_MONKEY_STEPS=${STEPS}):\n${trail.slice(-8).join('\n')}`,
+          ).toEqual([])
         }
       })
     }

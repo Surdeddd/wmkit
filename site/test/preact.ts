@@ -1,7 +1,7 @@
 import type { DesktopBinder, WindowManager, WindowState } from '@surdeddd/wmkit'
 import { useDesktop, useWindowManager, useWmState, useWmWindowRef } from '@surdeddd/wmkit/preact'
 import { h, render } from 'preact'
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import '@surdeddd/wmkit/themes/glass.css'
 
 function Win({ binder, win }: { binder: DesktopBinder; win: WindowState }) {
@@ -55,6 +55,9 @@ function App() {
   const { ref, binder } = useDesktop(wm)
   const state = useWmState(wm)
   const [counter, setCounter] = useState(0)
+  useEffect(() => {
+    Object.assign(window, { __wm: wm })
+  }, [wm])
   return h(
     'div',
     { style: { display: 'flex', flexDirection: 'column', height: '100%' } },

@@ -49,20 +49,32 @@ function mountWindow(win: WindowState, content: (body: HTMLElement) => void): vo
   desktop.attachWindow(win.id, el, { removeOnClose: true })
 }
 
+const contents = new Map<string, ((body: HTMLElement) => void) | undefined>()
+
+function mountMissing(): void {
+  for (const win of Object.values(wm.getState().windows)) {
+    if (!contents.has(win.id)) continue
+    if (desktopEl.querySelector(`[data-wm-window="${CSS.escape(win.id)}"]`)) continue
+    mountWindow(
+      win,
+      contents.get(win.id) ??
+        ((body) => {
+          const text = document.createElement('p')
+          text.textContent = `Content of ${win.title}`
+          const input = document.createElement('input')
+          input.type = 'text'
+          input.placeholder = 'type here'
+          body.append(text, input)
+        }),
+    )
+  }
+}
+
 function spawn(init: WindowInit, content?: (body: HTMLElement) => void): WindowState {
+  if (init.id) contents.set(init.id, content)
   const win = wm.open(init)
-  mountWindow(
-    win,
-    content ??
-      ((body) => {
-        const text = document.createElement('p')
-        text.textContent = `Content of ${win.title}`
-        const input = document.createElement('input')
-        input.type = 'text'
-        input.placeholder = 'type here'
-        body.append(text, input)
-      }),
-  )
+  contents.set(win.id, content)
+  mountMissing()
   return win
 }
 
@@ -80,6 +92,7 @@ function renderTaskbar(): void {
 }
 
 wm.subscribe((state) => {
+  mountMissing()
   renderTaskbar()
   countEl.textContent = String(state.order.length)
 })
@@ -88,15 +101,19 @@ countEl.textContent = String(wm.getState().order.length)
 
 let counter = 0
 
+function fresh(prefix: string): string {
+  do counter += 1
+  while (wm.get(`${prefix}${counter}`))
+  return `${prefix}${counter}`
+}
+
 document.querySelector('#btn-open')?.addEventListener('click', () => {
-  counter += 1
-  spawn({ id: `t${counter}`, title: `Test ${counter}`, width: 320, height: 220 })
+  spawn({ id: fresh('t'), title: `Test ${counter}`, width: 320, height: 220 })
 })
 
 document.querySelector('#btn-open-modal')?.addEventListener('click', () => {
-  counter += 1
   spawn({
-    id: `modal${counter}`,
+    id: fresh('modal'),
     title: `Modal ${counter}`,
     layer: 'modal',
     width: 300,
@@ -107,9 +124,8 @@ document.querySelector('#btn-open-modal')?.addEventListener('click', () => {
 })
 
 document.querySelector('#btn-open-iframe')?.addEventListener('click', () => {
-  counter += 1
   spawn(
-    { id: `frame${counter}`, title: `Frame ${counter}`, width: 400, height: 300, x: 60, y: 60 },
+    { id: fresh('frame'), title: `Frame ${counter}`, width: 400, height: 300, x: 60, y: 60 },
     (body) => {
       body.style.padding = '0'
       const frame = document.createElement('iframe')
@@ -127,9 +143,8 @@ document.querySelector('#btn-open-fixed')?.addEventListener('click', () => {
 document.querySelector('#btn-stress')?.addEventListener('click', () => {
   wm.batch(() => {
     for (let i = 0; i < 50; i += 1) {
-      counter += 1
       spawn({
-        id: `s${counter}`,
+        id: fresh('s'),
         title: `Stress ${counter}`,
         width: 240,
         height: 160,
@@ -157,11 +172,13 @@ const shadowSkin = skin({
 })
 
 document.querySelector('#btn-open-shadow')?.addEventListener('click', () => {
-  wm.open({ id: 'shadow', title: 'Shadow', x: 80, y: 80, width: 360, height: 260 })
-  const mounted = desktop.mountWindow('shadow', shadowSkin, { removeOnClose: true })
-  const text = document.createElement('p')
-  text.textContent = 'projected content'
-  mounted.content.append(text)
+  wm.batch(() => {
+    wm.open({ id: 'shadow', title: 'Shadow', x: 80, y: 80, width: 360, height: 260 })
+    const mounted = desktop.mountWindow('shadow', shadowSkin, { removeOnClose: true })
+    const text = document.createElement('p')
+    text.textContent = 'projected content'
+    mounted.content.append(text)
+  })
 })
 
 document.querySelector('#btn-clear')?.addEventListener('click', () => {
@@ -173,12 +190,13 @@ document.querySelector('#btn-clear')?.addEventListener('click', () => {
 const saved = wm.getState()
 for (const id of saved.order) {
   const win = saved.windows[id]
-  if (win)
-    mountWindow(win, (body) => {
-      const text = document.createElement('p')
-      text.textContent = `Content of ${win.title}`
-      body.append(text)
-    })
+  if (!win) continue
+  contents.set(id, undefined)
+  mountWindow(win, (body) => {
+    const text = document.createElement('p')
+    text.textContent = `Content of ${win.title}`
+    body.append(text)
+  })
 }
 
 declare global {

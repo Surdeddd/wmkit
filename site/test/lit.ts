@@ -6,6 +6,7 @@ import '@surdeddd/wmkit/themes/glass.css'
 
 const wm = createWindowManager()
 const binder = createDesktopBinder(wm)
+Object.assign(window, { __wm: wm })
 
 class TestDesktop extends LitElement {
   private readonly view = new WmStateController(this, wm)
