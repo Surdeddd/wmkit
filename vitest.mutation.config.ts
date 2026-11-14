@@ -9,6 +9,7 @@ export default mergeConfig(
         'tests/unit/adapters-qwik.test.ts',
         'tests/unit/api-surface.test.ts',
         'tests/unit/claims.test.ts',
+        'tests/unit/docs-code.test.ts',
         'tests/unit/docs.test.ts',
         'tests/unit/landing-idle.test.ts',
         'tests/unit/site-build.test.ts',
