@@ -304,7 +304,10 @@
     }
   },
   "devDependencies": {
+    "@angular/common": "20.3.35",
+    "@angular/compiler": "20.3.35",
     "@angular/core": "^20.3.35",
+    "@angular/platform-browser": "20.3.35",
     "@arethetypeswrong/cli": "^0.18.2",
     "@axe-core/playwright": "^4.10.2",
     "@biomejs/biome": "^2.0.0",

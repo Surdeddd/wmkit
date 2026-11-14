@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { compile } from 'svelte/compiler'
+import { defineConfig, type Plugin } from 'vite'
 import { landingPages, RUSSIAN_PAGE } from './landing-plugin'
 
 const pkg = JSON.parse(
@@ -9,7 +10,30 @@ const pkg = JSON.parse(
 
 const page = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
-const TEST_PAGES = ['vanilla', 'react', 'winbox', 'elements', 'preact', 'lit', 'dock'] as const
+const TEST_PAGES = [
+  'vanilla',
+  'react',
+  'winbox',
+  'elements',
+  'preact',
+  'lit',
+  'dock',
+  'vue',
+  'solid',
+  'svelte',
+  'angular',
+] as const
+
+function svelteFiles(): Plugin {
+  return {
+    name: 'wmkit-test-svelte',
+    transform(code, id) {
+      if (!id.endsWith('.svelte')) return null
+      const { js } = compile(code, { filename: id, generate: 'client', css: 'injected' })
+      return { code: js.code, map: js.map }
+    },
+  }
+}
 
 const testPages =
   process.env.WMKIT_E2E === '1'
@@ -18,7 +42,7 @@ const testPages =
 
 export default defineConfig({
   base: process.env.VERCEL ? '/' : '/wmkit/',
-  plugins: [landingPages()],
+  plugins: [landingPages(), svelteFiles()],
   define: {
     __WMKIT_VERSION__: JSON.stringify(pkg.version),
     'import.meta.env.WMKIT_VERSION': JSON.stringify(pkg.version),
@@ -55,6 +79,14 @@ export default defineConfig({
         new URL('../src/adapters/preact.ts', import.meta.url),
       ),
       '@surdeddd/wmkit/lit': fileURLToPath(new URL('../src/adapters/lit.ts', import.meta.url)),
+      '@surdeddd/wmkit/vue': fileURLToPath(new URL('../src/adapters/vue.ts', import.meta.url)),
+      '@surdeddd/wmkit/solid': fileURLToPath(new URL('../src/adapters/solid.ts', import.meta.url)),
+      '@surdeddd/wmkit/svelte': fileURLToPath(
+        new URL('../src/adapters/svelte.ts', import.meta.url),
+      ),
+      '@surdeddd/wmkit/angular': fileURLToPath(
+        new URL('../src/adapters/angular.ts', import.meta.url),
+      ),
       '@surdeddd/wmkit/themes': fileURLToPath(new URL('../src/themes', import.meta.url)),
       '@surdeddd/wmkit': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },

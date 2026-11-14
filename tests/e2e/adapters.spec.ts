@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures'
 import { boxOf, dragBy } from './utils'
 
-for (const name of ['preact', 'lit']) {
+for (const name of ['preact', 'lit', 'vue', 'solid', 'svelte', 'angular']) {
   test.describe(`${name} adapter`, () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`test/${name}.html`)
@@ -58,3 +58,35 @@ for (const name of ['preact', 'lit']) {
     })
   })
 }
+
+test.describe('svelte adapter with an outro on its windows', () => {
+  for (const pause of [0, 60]) {
+    test(`shows a window once when it comes back ${pause} ms into its fade`, async ({ page }) => {
+      await page.goto('test/svelte.html')
+      await page.click('#btn-open')
+      const shown = page.locator('[data-wm-window="w1"]')
+      await expect(shown).toHaveCount(1)
+      await page.evaluate(() => window.__wm.move('w1', 140, 90))
+
+      await page.evaluate(async (wait) => {
+        window.__wm.close('w1')
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+        window.__wm.undo()
+      }, pause)
+
+      await expect(shown).toHaveCount(1)
+      await expect(shown).toBeVisible()
+      await expect.poll(() => page.getByTestId('window-w1').count()).toBe(1)
+      await expect.poll(() => shown.evaluate((node) => getComputedStyle(node).opacity)).toBe('1')
+      const desktop = await boxOf(page.locator('[data-wm-desktop]'))
+      const box = await boxOf(shown)
+      expect(Math.abs(box.x - desktop.x - 140)).toBeLessThanOrEqual(1)
+      expect(Math.abs(box.y - desktop.y - 90)).toBeLessThanOrEqual(1)
+
+      const before = await boxOf(shown)
+      await dragBy(page, shown.locator('[data-wm-drag]'), 60, 40)
+      const after = await boxOf(shown)
+      expect(Math.abs(after.x - before.x - 60)).toBeLessThanOrEqual(2)
+    })
+  }
+})

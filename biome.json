@@ -15,7 +15,8 @@
       "!playwright-report",
       "!memory-bank",
       "!docs/.vitepress/cache",
-      "!CHANGELOG.md"
+      "!CHANGELOG.md",
+      "!**/*.svelte"
     ]
   },
   "formatter": {

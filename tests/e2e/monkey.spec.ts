@@ -58,7 +58,7 @@ const STAGES: Stage[] = [
     closing: false,
     reloads: true,
   },
-  ...['react', 'preact', 'lit'].map(
+  ...['react', 'preact', 'lit', 'vue', 'solid', 'svelte', 'angular'].map(
     (name): Stage => ({
       ...PLAIN,
       name,
