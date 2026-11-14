@@ -540,6 +540,16 @@ describe('tearing down', () => {
     expect(root.querySelectorAll('[data-winbox-root]')).toHaveLength(1)
   })
 
+  it('still lets go of the page after a box was refused because its id was taken', () => {
+    const first = box({ id: 'same' })
+    expect(() => new WinBox({ root, id: 'same' })).toThrow('window id "same" already exists')
+    expect(WinBox.stack()).toEqual([first])
+    const layer = root.querySelector('[data-winbox-root]')
+    first.close()
+    expect(layer?.isConnected).toBe(false)
+    expect(root.querySelector('[data-winbox-root]')).toBeNull()
+  })
+
   it('lets go of the old manager, so its windows cannot touch a box that took the same id', () => {
     const first = box('First', { id: 'tx' })
     const old = managerOf(first)

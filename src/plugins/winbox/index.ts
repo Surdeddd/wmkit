@@ -421,7 +421,6 @@ export class WinBox {
     const [top, right, bottom, left] = insets as [number, number, number, number]
     const area = { width: outer.width - left - right, height: outer.height - top - bottom }
     this.runtime = runtimeFor(root, insets, settings.overflow === true)
-    this.runtime.boxes += 1
     const { wm } = this.runtime
 
     const classes =
@@ -450,6 +449,7 @@ export class WinBox {
         classes.filter((name) => FLAGS[name]).map((name) => [FLAGS[name], false]),
       ),
     })
+    this.runtime.boxes += 1
 
     const messages = config.messages ?? winboxMessages
     const mounted = this.runtime.desktop.mountWindow(
