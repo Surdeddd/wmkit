@@ -311,3 +311,93 @@ describe('applyAspect', () => {
     })
   })
 })
+
+describe('the edges of every rule, to the pixel', () => {
+  const viewport = { width: 1000, height: 800 }
+
+  it('snaps a pointer that is exactly on a threshold and lets go one pixel further in', () => {
+    expect(detectSnapZone(12, 400, viewport)).toBe('left')
+    expect(detectSnapZone(13, 400, viewport)).toBeNull()
+    expect(detectSnapZone(988, 400, viewport)).toBe('right')
+    expect(detectSnapZone(987, 400, viewport)).toBeNull()
+    expect(detectSnapZone(500, 12, viewport)).toBe('top')
+    expect(detectSnapZone(500, 13, viewport)).toBeNull()
+    expect(detectSnapZone(500, 788, viewport)).toBe('bottom')
+    expect(detectSnapZone(500, 787, viewport)).toBeNull()
+  })
+
+  it('takes a corner for a pointer exactly on the corner size and the edge one pixel past it', () => {
+    expect(detectSnapZone(0, 64, viewport)).toBe('top-left')
+    expect(detectSnapZone(0, 65, viewport)).toBe('left')
+    expect(detectSnapZone(0, 736, viewport)).toBe('bottom-left')
+    expect(detectSnapZone(0, 735, viewport)).toBe('left')
+    expect(detectSnapZone(64, 0, viewport)).toBe('top-left')
+    expect(detectSnapZone(65, 0, viewport)).toBe('top')
+    expect(detectSnapZone(936, 0, viewport)).toBe('top-right')
+    expect(detectSnapZone(935, 0, viewport)).toBe('top')
+    expect(detectSnapZone(64, 800, viewport)).toBe('bottom-left')
+    expect(detectSnapZone(65, 800, viewport)).toBe('bottom')
+    expect(detectSnapZone(936, 800, viewport)).toBe('bottom-right')
+    expect(detectSnapZone(935, 800, viewport)).toBe('bottom')
+  })
+
+  it('finds no zone on a desktop that has only one of its two sizes', () => {
+    expect(detectSnapZone(0, 0, { width: 0, height: 800 })).toBeNull()
+    expect(detectSnapZone(0, 0, { width: 1000, height: 0 })).toBeNull()
+    expect(detectSnapZone(0, 400, { width: 1000, height: 1 })).not.toBeNull()
+  })
+
+  it('leaves bounds alone on a desktop that has only one of its two sizes', () => {
+    const far = { x: 5000, y: 5000, width: 200, height: 100 }
+    expect(clampToViewport(far, { width: 0, height: 800 }, 48)).toBe(far)
+    expect(clampToViewport(far, { width: 1000, height: 0 }, 48)).toBe(far)
+    expect(clampToViewport(far, { width: 1, height: 1 }, 48)).not.toBe(far)
+  })
+
+  it('catches an edge that is exactly the threshold away and not one that is a pixel further', () => {
+    const me = { x: 0, y: 0, width: 100, height: 100 }
+    const at = (x: number, y: number) => [{ x, y, width: 100, height: 100 }]
+    expect(magnetize(me, at(108, 500), 8)).toMatchObject({ x: 8, snappedX: true })
+    expect(magnetize(me, at(109, 500), 8)).toMatchObject({ x: 0, snappedX: false })
+    expect(magnetize(me, at(500, 108), 8)).toMatchObject({ y: 8, snappedY: true })
+    expect(magnetize(me, at(500, 109), 8)).toMatchObject({ y: 0, snappedY: false })
+    expect(magnetize(me, at(108.5, 500), 8)).toMatchObject({ x: 0, snappedX: false })
+    expect(magnetize(me, at(500, 108.5), 8)).toMatchObject({ y: 0, snappedY: false })
+  })
+
+  it('keeps the first of two edges that are equally near, and takes a nearer one over it', () => {
+    const me = { x: 100, y: 0, width: 100, height: 100 }
+    const left = { x: 96, y: 500, width: 0, height: 10 }
+    const right = { x: 104, y: 500, width: 0, height: 10 }
+    expect(magnetize(me, [left, right], 8).x).toBe(96)
+    expect(magnetize(me, [right, left], 8).x).toBe(104)
+    const nearer = { x: 102, y: 500, width: 0, height: 10 }
+    expect(magnetize(me, [left, nearer], 8).x).toBe(102)
+    expect(magnetize(me, [nearer, left], 8).x).toBe(102)
+  })
+
+  it('aligns my far edge with the far edge of a target', () => {
+    const me = { x: 0, y: 0, width: 100, height: 100 }
+    const wide = { x: -500, y: -500, width: 605, height: 603 }
+    expect(magnetize(me, [wide], 8)).toEqual({ x: 5, y: 3, snappedX: true, snappedY: true })
+  })
+
+  it('treats a ratio of zero as no ratio, and a size that is only wide as too thin', () => {
+    const min = { width: 10, height: 10 }
+    expect(applyAspect({ width: 300, height: 50 }, 0, min, null, 'width')).toEqual({
+      width: 300,
+      height: 50,
+    })
+    expect(applyAspect({ width: 300, height: 50 }, -2, min, null, 'width')).toEqual({
+      width: 300,
+      height: 50,
+    })
+  })
+
+  it('has no upper limit on a size without a maximum', () => {
+    expect(clampSize({ width: 1e9, height: 2e9 }, { width: 1, height: 1 }, null)).toEqual({
+      width: 1e9,
+      height: 2e9,
+    })
+  })
+})
