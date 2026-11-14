@@ -20,12 +20,17 @@ export function stateDrift(wm: WindowManager): string[] {
       found.push(`${id} has broken bounds ${JSON.stringify(win.bounds)}`)
       continue
     }
-    if (win.stage !== 'normal') continue
-    if (width < win.minSize.width || height < win.minSize.height) {
-      found.push(`${id} is ${width}x${height}, under its minimum`)
-    }
-    if (win.maxSize && (width > win.maxSize.width || height > win.maxSize.height)) {
+    if (width < 1 || height < 1) found.push(`${id} is ${width}x${height}, under one pixel`)
+    if (win.stage !== 'normal' || win.groupId !== null || win.aspectRatio !== null) continue
+    const most = win.maxSize ?? { width: Infinity, height: Infinity }
+    if (width > Math.max(1, most.width) || height > Math.max(1, most.height)) {
       found.push(`${id} is ${width}x${height}, over its maximum`)
+    }
+    if (width < Math.min(win.minSize.width, most.width)) {
+      found.push(`${id} is ${width} wide, under its minimum`)
+    }
+    if (height < Math.min(win.minSize.height, most.height)) {
+      found.push(`${id} is ${height} tall, under its minimum`)
     }
   }
   return found
