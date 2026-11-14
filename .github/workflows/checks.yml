@@ -29,6 +29,27 @@ jobs:
       - run: pnpm smoke
       - run: pnpm smoke:template
       - run: pnpm smoke:peers
+      - run: pnpm smoke:builds
+
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24]
+    name: node ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm smoke
 
   e2e:
     runs-on: ubuntu-latest
