@@ -196,6 +196,32 @@ describe('an element follows the manager', () => {
   })
 })
 
+describe('a stage attribute the window cannot take', () => {
+  it('is put back to the real stage instead of staying on the element', () => {
+    const desktop = mount('<wm-desktop><wm-window window-id="a"></wm-window></wm-desktop>')
+    const wm = desktop.manager
+    const element = windowOf(desktop, 'a')
+    for (const written of ['', 'bogus', 'snapped']) {
+      element.setAttribute('stage', written)
+      expect(wm?.get('a')?.stage, `after "${written}"`).toBe('normal')
+      expect(element.getAttribute('stage'), `after "${written}"`).toBe('normal')
+    }
+
+    wm?.maximize('a')
+    element.setAttribute('stage', 'bogus')
+    expect(wm?.get('a')?.stage).toBe('normal')
+    expect(element.getAttribute('stage')).toBe('normal')
+
+    element.removeAttribute('stage')
+    expect(element.hasAttribute('stage')).toBe(false)
+    wm?.maximize('a')
+    expect(element.getAttribute('stage')).toBe('maximized')
+    element.removeAttribute('stage')
+    expect(wm?.get('a')?.stage).toBe('normal')
+    expect(element.getAttribute('stage') ?? 'normal').toBe('normal')
+  })
+})
+
 describe('a re-render that replaces the element of an open window', () => {
   for (const order of ['the old element leaves first', 'the newcomer arrives first'] as const) {
     it(`keeps the window open and where it was when ${order}`, async () => {

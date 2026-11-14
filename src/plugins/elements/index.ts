@@ -293,6 +293,10 @@ export class WmWindowElement extends Base {
       if (value === 'minimized') wm.minimize(id)
       else if (value === 'maximized') wm.maximize(id)
       else for (let i = 0; i < 2 && wm.get(id)?.stage !== 'normal'; i += 1) wm.restore(id)
+      const stage = wm.get(id)?.stage
+      if (stage && (value ?? 'normal') !== stage) {
+        this.reflect(() => this.setAttribute('stage', stage))
+      }
     } else if (name === 'workspace') wm.moveToWorkspace(id, numberAt(this, name) ?? 0)
     else if (name === 'x' || name === 'y') {
       const at = numberAt(this, name)
