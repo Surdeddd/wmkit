@@ -401,8 +401,11 @@ export class WmWindowElement extends Base {
     this.windowId = id
     if (id === null || !wm.get(id)) {
       if (!reopen && (this.hasAttribute('closed') || host[OWNERS].has(id as string))) {
-        if (id !== null) host[OWNERS].set(id, this)
         this.reflect(() => this.toggleAttribute('closed', true))
+        if (id !== null) {
+          host[OWNERS].set(id, this)
+          store(wm, host[OWNERS])
+        }
         return
       }
       const init: WindowInit = {

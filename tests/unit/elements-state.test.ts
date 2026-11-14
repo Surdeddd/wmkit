@@ -257,6 +257,21 @@ describe('a re-render that replaces the element of an open window', () => {
 })
 
 describe('closed panels', () => {
+  it('are marked from the moment the page renders them closed, without an undo step', () => {
+    const desktop = mount('<wm-desktop><wm-window window-id="a" closed></wm-window></wm-desktop>')
+    const wm = desktop.manager
+    expect(wm?.get('a')).toBeUndefined()
+    expect(closedList(desktop)).toEqual(['a'])
+    expect(wm?.canUndo()).toBe(false)
+
+    const later = document.createElement('wm-window')
+    later.setAttribute('window-id', 'b')
+    later.setAttribute('closed', '')
+    desktop.append(later)
+    expect(closedList(desktop)).toEqual(['a', 'b'])
+    expect(wm?.canUndo()).toBe(false)
+  })
+
   it('stay closed after a reload with persist', async () => {
     const html =
       '<wm-desktop persist="k"><wm-window window-id="a" label="A"></wm-window><wm-window window-id="b" label="B"></wm-window></wm-desktop>'
