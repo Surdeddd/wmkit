@@ -131,7 +131,7 @@ const en: Dict = {
   meta: {
     title: 'wmkit — headless window manager for the web',
     description:
-      'Draggable, resizable, snappable windows for any web app. Headless core under 19 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
+      'Draggable, resizable, snappable windows for any web app. Headless core under 20 kB, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, docking, workspaces, undo/redo, first-class accessibility, 60fps.',
     og: 'A whole desktop inside the page: windows, dock, workspaces, snapping, undo. This page is the demo — it runs on the library.',
     image:
       'The wmkit landing page: the WINDOWS headline beside a readme window and a terminal window, a dock of apps along the bottom.',
@@ -233,7 +233,7 @@ const en: Dict = {
     body: 'The core is a pure state machine: it knows bounds, stacking, stages and focus, and it never touches the DOM. The DOM layer turns pointer events into state transitions at 60fps. Adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, and the web components, are thin wrappers over the same object.',
     badges: [
       ['0', 'dependencies'],
-      ['<19 kB', 'brotli core'],
+      ['<20 kB', 'brotli core'],
       ['100%', 'core coverage'],
       ['MIT', 'license'],
     ],
@@ -507,7 +507,7 @@ const en: Dict = {
     {
       label: 'Bundle (brotli)',
       cells: [
-        { text: '~18 kB', tone: 'plain' },
+        { text: '~19 kB', tone: 'plain' },
         { text: '~15 kB', tone: 'plain' },
         { text: '~60 kB', tone: 'bad' },
         { text: '~10 kB', tone: 'good' },
@@ -535,7 +535,7 @@ const ru: Dict = {
   meta: {
     title: 'wmkit — headless-оконный менеджер для веба',
     description:
-      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 19 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
+      'Перетаскиваемые, растягиваемые, прилипающие окна для любого веб-приложения. Headless-ядро меньше 20 кБ, адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik, веб-компоненты, докинг, рабочие столы, undo/redo, доступность и 60fps.',
     og: 'Целый рабочий стол внутри страницы: окна, док, рабочие столы, прилипание, отмена. Эта страница и есть демо — она работает на самой библиотеке.',
     image:
       'Лендинг wmkit: заголовок WINDOWS рядом с окнами readme и терминала, внизу док с приложениями.',
@@ -650,7 +650,7 @@ const ru: Dict = {
     body: 'Ядро это чистая машина состояний: границы, порядок, стадии и фокус — и ни одного обращения к DOM. DOM-слой превращает события указателя в переходы состояний на 60fps, а адаптеры для React, Vue, Svelte, Solid, Angular, Preact, Lit и Qwik и веб-компоненты — тонкие обёртки над тем же объектом.',
     badges: [
       ['0', 'зависимостей'],
-      ['<19 кБ', 'ядро в brotli'],
+      ['<20 кБ', 'ядро в brotli'],
       ['100%', 'покрытие ядра'],
       ['MIT', 'лицензия'],
     ],
@@ -924,7 +924,7 @@ const ru: Dict = {
     {
       label: 'Размер (brotli)',
       cells: [
-        { text: '~18 кБ', tone: 'plain' },
+        { text: '~19 кБ', tone: 'plain' },
         { text: '~15 кБ', tone: 'plain' },
         { text: '~60 кБ', tone: 'bad' },
         { text: '~10 кБ', tone: 'good' },

@@ -29,7 +29,7 @@
 - 🖼️ **Popout** — send a window into Picture-in-Picture or a popup on another monitor
 - 🧩 **Docking** — tile windows into split panels with tabs and draggable separators, dockview style, while the rest keep floating; undoable and persisted
 - 📦 **WinBox compatible** — `@surdeddd/wmkit/winbox` speaks the WinBox.js API; [migrate in one import](docs/winbox-migration.md)
-- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 19 kB brotli core
+- 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 20 kB brotli core
 
 ## Install
 
