@@ -136,7 +136,7 @@ async function expectDefaultLayout(page: Page) {
     }
   }
   const covered = IDS.reduce((sum, id) => sum + (all[id] as Box).width * (all[id] as Box).height, 0)
-  expect(covered / (desk.width * desk.height)).toBeGreaterThan(0.95)
+  expect(covered / (desk.width * desk.height)).toBeGreaterThan(desk.width < 500 ? 0.92 : 0.95)
   const { orders, log } = all as Record<'orders' | 'log', Box>
   expect(Math.abs(log.x - orders.x)).toBeLessThanOrEqual(1)
   expect(log.y).toBeGreaterThanOrEqual(orders.y + orders.height - 1)

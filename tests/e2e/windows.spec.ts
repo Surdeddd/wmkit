@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures'
-import { boxOf, desktopBox, openVanilla, spawn, win } from './utils'
+import { boxOf, desktopBox, openVanilla, reach, spawn, win } from './utils'
 
 test.beforeEach(async ({ page }) => {
   await openVanilla(page)
@@ -105,6 +105,7 @@ test('modal blocks focus on background windows and flashes', async ({ page }) =>
     )
     .toBe(true)
 
+  await reach(modal)
   await modal.locator('[data-wm-close]').click()
   await doc.locator('[data-wm-content]').click({ position: { x: 10, y: 10 } })
   await expect(doc).toHaveAttribute('data-wm-focused', '')

@@ -1,6 +1,6 @@
 import type { WindowManager } from '@surdeddd/wmkit'
 import { expect, type Page, test } from './fixtures'
-import { boxOf, dragBy } from './utils'
+import { boxOf, dragBy, reach } from './utils'
 
 const managerOf = (page: Page) =>
   page.evaluate(() => {
@@ -47,6 +47,7 @@ test('a window drags by its shadow titlebar and resizes by its grips', async ({ 
 test('the shadow buttons minimize, maximize and close, and the stage is reflected', async ({
   page,
 }) => {
+  await reach(element(page, 'chart'))
   await bar(page, 'chart').locator('[part~=maximize]').click()
   await expect(element(page, 'chart')).toHaveAttribute('stage', 'maximized')
   await bar(page, 'chart').locator('[part~=maximize]').click()
@@ -198,6 +199,7 @@ test.describe('with persist', () => {
   test('a closed panel stays closed after a reload and opens again on request', async ({
     page,
   }) => {
+    await reach(element(page, 'chart'))
     await bar(page, 'chart').locator('[part~=close]').click()
     await expect(element(page, 'chart')).toHaveAttribute('closed', '')
     await expect.poll(() => closedInStorage(page)).toContain('chart')
@@ -217,6 +219,7 @@ test.describe('with persist', () => {
   })
 
   test('undo brings a closed panel back on screen', async ({ page }) => {
+    await reach(element(page, 'chart'))
     await bar(page, 'chart').locator('[part~=close]').click()
     await expect(element(page, 'chart')).toBeHidden()
     await element(page, 'notes').focus()

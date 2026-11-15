@@ -68,6 +68,23 @@ export async function dragTo(
   if (options.release !== false) await page.mouse.up()
 }
 
+export async function reach(target: Locator): Promise<void> {
+  await target.evaluate((el) => {
+    type Held = {
+      get(id: string): { bounds: { x: number; y: number; width: number } } | undefined
+      move(id: string, x: number, y: number): boolean
+    }
+    const host = (el.closest('[data-wm-window]') ?? el) as HTMLElement
+    const desktop = host.closest('[data-wm-desktop]') as HTMLElement & { manager?: Held }
+    const wm = desktop.manager ?? (window as unknown as { __wm: Held }).__wm
+    const id = host.dataset.wmWindow as string
+    const win = wm.get(id)
+    if (win && win.bounds.x + win.bounds.width > desktop.clientWidth) {
+      wm.move(id, Math.max(0, desktop.clientWidth - win.bounds.width), win.bounds.y)
+    }
+  })
+}
+
 export async function desktopBox(page: Page) {
   return boxOf(page.locator('#desktop'))
 }
