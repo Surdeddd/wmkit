@@ -9,7 +9,7 @@ import type {
   WindowState,
   WindowUpdate,
 } from '../../core/types'
-import { attachDesktop } from '../../dom/controller'
+import { attachDesktop, FOCUSABLE_SELECTOR } from '../../dom/controller'
 import type { DesktopController, DesktopOptions } from '../../dom/shared'
 import { type PersistController, persist } from '../persist'
 
@@ -53,6 +53,7 @@ const CHROME_CSS = `:host{position:absolute;left:0;top:0;display:flex;flex-direc
 [part~=active]{font-weight:600;background:color-mix(in srgb,currentColor 12%,transparent)}
 [part~=tab]:focus-visible{opacity:1;outline:2px solid var(--wm-accent,currentColor)}
 [part=content]{position:relative;flex:1;min-height:0;overflow:auto;border-radius:inherit;border-top-left-radius:0;border-top-right-radius:0}
+[part=content]:focus-visible{outline:2px solid var(--wm-accent,currentColor);outline-offset:-2px}
 :host([chrome=none]) [part=titlebar]{display:none}`
 
 const NUMBERS: Record<string, keyof WindowInit> = {
@@ -499,7 +500,16 @@ export class WmWindowElement extends Base {
     bar.append(title, strip, actions, controls)
     const content = part(doc, 'div', 'content')
     content.dataset.wmContent = ''
-    content.append(doc.createElement('slot'))
+    content.tabIndex = 0
+    const slot = doc.createElement('slot')
+    slot.addEventListener('slotchange', () => {
+      const busy = slot
+        .assignedElements()
+        .some((node) => node.matches(FOCUSABLE_SELECTOR) || node.querySelector(FOCUSABLE_SELECTOR))
+      if (busy) content.removeAttribute('tabindex')
+      else content.tabIndex = 0
+    })
+    content.append(slot)
     root.append(style, bar, content)
   }
 }

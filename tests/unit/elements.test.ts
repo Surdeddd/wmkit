@@ -347,3 +347,43 @@ describe('a window', () => {
     expect(b.hasAttribute('closed')).toBe(false)
   })
 })
+
+describe('the content of a window that may have to scroll', () => {
+  const content = (element: Element | null) =>
+    element?.shadowRoot?.querySelector('[part=content]') as HTMLElement
+
+  it('can take the focus when nothing inside it can', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="text" label="Text"><p>only words</p></wm-window>' +
+        '<wm-window window-id="form" label="Form"><p>words</p><div><button>act</button></div></wm-window>' +
+        '<wm-window window-id="empty" label="Empty"></wm-window></wm-desktop>',
+    )
+    await flush()
+    expect(content(desktop.querySelector('[window-id="text"]')).getAttribute('tabindex')).toBe('0')
+    expect(content(desktop.querySelector('[window-id="empty"]')).getAttribute('tabindex')).toBe('0')
+    expect(content(desktop.querySelector('[window-id="form"]')).hasAttribute('tabindex')).toBe(
+      false,
+    )
+  })
+
+  it('follows what is put into the window and taken out of it', async () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window window-id="text" label="Text"><p>only words</p></wm-window></wm-desktop>',
+    )
+    const element = desktop.querySelector('[window-id="text"]') as HTMLElement
+    await flush()
+    const link = document.createElement('a')
+    link.href = '#somewhere'
+    element.append(link)
+    await flush()
+    expect(content(element).hasAttribute('tabindex')).toBe(false)
+    link.remove()
+    await flush()
+    expect(content(element).getAttribute('tabindex')).toBe('0')
+    const action = document.createElement('button')
+    action.slot = 'actions'
+    element.append(action)
+    await flush()
+    expect(content(element).getAttribute('tabindex')).toBe('0')
+  })
+})

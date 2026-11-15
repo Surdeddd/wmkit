@@ -251,3 +251,31 @@ test('typing in a slotted field stays in the window and keeps it focused', async
     )
     .toBe('notes')
 })
+
+test('the content of a window with nothing to focus inside is reached by Tab and scrolls from the keyboard', async ({
+  page,
+}) => {
+  const content = (id: string) => element(page, id).locator('[part=content]')
+  await reach(element(page, 'chart'))
+  await expect(content('chart')).toHaveAttribute('tabindex', '0')
+  await expect(content('notes')).not.toHaveAttribute('tabindex')
+  await page.evaluate(() => {
+    ;(document.querySelector('#chart-body') as HTMLElement).style.height = '900px'
+  })
+
+  await bar(page, 'chart').locator('[part~=close]').focus()
+  await page.keyboard.press('Tab')
+  await expect(content('chart')).toBeFocused()
+  const before = await state(page, 'chart')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('PageDown')
+  await expect.poll(() => content('chart').evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  expect((await state(page, 'chart'))?.bounds).toEqual(before?.bounds)
+
+  await page.evaluate(() => {
+    const field = document.createElement('input')
+    field.setAttribute('aria-label', 'Chart filter')
+    document.querySelector('[window-id="chart"]')?.append(field)
+  })
+  await expect(content('chart')).not.toHaveAttribute('tabindex')
+})

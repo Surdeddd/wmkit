@@ -77,7 +77,7 @@ const SNAP_ZONES = new Set<string>([
 
 const LANDMARK_TAGS = new Set(['header', 'footer', 'aside', 'nav'])
 
-const FOCUSABLE_SELECTOR =
+export const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable]:not([contenteditable=false]), iframe, summary, [controls]'
 
 const FRAMES = 'iframe, object, embed'
