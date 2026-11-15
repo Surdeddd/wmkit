@@ -1,3 +1,30 @@
+## [0.13.1](https://github.com/Surdeddd/wmkit/compare/v0.13.0...v0.13.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* **adapters:** an element bound while another shows the window waits and takes over, so a Lit template swap no longer throws ([2058764](https://github.com/Surdeddd/wmkit/commit/20587641bf5e8d9c7146d898ab7c5bc815bb9d82))
+* **core:** a maximum size under one pixel no longer makes a window smaller than one pixel ([c7a4602](https://github.com/Surdeddd/wmkit/commit/c7a4602086bc32b9c2b5a3f0d14713b63d41be6b))
+* **core:** a number given as a window id is read as its string form, and an id of any other type finds no window ([20ef2be](https://github.com/Surdeddd/wmkit/commit/20ef2befed059fe1ae701da869ee4104eaeb8788))
+* **core:** a window keeps its object through a batch that ends with the values it began with ([5d7d6cf](https://github.com/Surdeddd/wmkit/commit/5d7d6cf37e5eba5b020df30e1fa4ce98ec83c0db))
+* **core:** an aspect ratio no finite size can hold no longer makes a window infinite or thinner than one pixel ([c3a7a22](https://github.com/Surdeddd/wmkit/commit/c3a7a2213daac2624e0d854501405162f7fb5bb5))
+* **dock:** a separator drag whose release the page never heard ends with the next press instead of blocking every separator ([e253afc](https://github.com/Surdeddd/wmkit/commit/e253afca22453ae4c76f7632ad9fafe3e9af9e13))
+* **dock:** a step back to a state the dock drew before its own change redraws the marks and the separators ([a5a447c](https://github.com/Surdeddd/wmkit/commit/a5a447ce4df8c3879845125db758b38002ce5dc1))
+* **dock:** a window that leaves a stack it shared floats back to its own place, not to where the first window of the stack was ([56ae594](https://github.com/Surdeddd/wmkit/commit/56ae5948bc88a6c5365f8a5cbb3908a31cf230c7))
+* **dom:** a desktop that hides its overflow goes back to its origin after the browser scrolls it to a focused control ([deb6a40](https://github.com/Surdeddd/wmkit/commit/deb6a404cfe97d02d06929f590e11ed71c7cb7ab))
+* **dom:** a drag or resize whose release the page never heard ends with the next press or the next mouse move without a button ([5a0d3be](https://github.com/Surdeddd/wmkit/commit/5a0d3be2f2360c4cf19d912f772371fef8a6f728))
+* **dom:** a second mouse button pressed in the middle of a drag, a resize or a separator drag no longer strands or cancels it ([35808a2](https://github.com/Surdeddd/wmkit/commit/35808a2b40d1055cf112d37cc716897a1845a741))
+* **elements:** a panel rendered closed is marked closed at once, not at the next change ([39dab65](https://github.com/Surdeddd/wmkit/commit/39dab65d427d7e25a0abd9b63f4924db0af5af5f))
+* **elements:** a stage attribute the window cannot take is put back to the real stage ([a78738f](https://github.com/Surdeddd/wmkit/commit/a78738f5838e2ee24beef9f4c2be89f06c545341))
+* **elements:** an open window stays open, where it was, when a re-render replaces its element ([58ab719](https://github.com/Surdeddd/wmkit/commit/58ab7194831f91e80c35ae14adb5c451e7b47368))
+* **elements:** the content of a window is reached and scrolled from the keyboard ([27f6211](https://github.com/Surdeddd/wmkit/commit/27f6211ebf2701cf51616c0f19de9eba44b9f726))
+* **gestures:** a pinch takes its mark off the window even when the desktop is destroyed while the pinch ends ([235f51b](https://github.com/Surdeddd/wmkit/commit/235f51bfbddf27ce3aa016190782b48cbea7e3eb))
+* **lit:** a template swap that rebuilds the desktop element moves the desktop instead of throwing ([c66195e](https://github.com/Surdeddd/wmkit/commit/c66195e7ade60ff25bfeb3b222d908f13b201559))
+* **lit:** wmWindow keeps its window bound when the options are written in the template ([0bcd847](https://github.com/Surdeddd/wmkit/commit/0bcd8470519a279fde5d2cab86275ecd8c895e68))
+* **popout:** a window that closed while its picture-in-picture request was pending gets no popup, and the popup reads the title and stage on arrival ([882f2c2](https://github.com/Surdeddd/wmkit/commit/882f2c22078abf8667c414160019e41cdf0a36a4))
+* **themes:** a theme paints the titlebar, title and buttons of a web component the way it paints a plain window ([e29c5db](https://github.com/Surdeddd/wmkit/commit/e29c5db57dc56d4e73d51842d9e37b3c7f73c97d))
+* **winbox:** a box refused because its id is taken no longer keeps the page layer and its manager alive after the last box closes ([1d65b37](https://github.com/Surdeddd/wmkit/commit/1d65b37f043d7c152816676fc319acc1113927fa))
+
 # [0.13.0](https://github.com/Surdeddd/wmkit/compare/v0.12.1...v0.13.0) (2026-11-10)
 
 
