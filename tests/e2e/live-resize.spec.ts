@@ -33,10 +33,13 @@ test('a maximized window follows a browser resize in the frame of the resize', a
       state.resized.push({ gap: gap(), live: el.hasAttribute('data-wm-live') })
     }).observe(desk)
     const channel = new MessageChannel()
-    channel.port1.onmessage = () => state.painted.push(gap())
+    const span = () => desk.getBoundingClientRect().width
+    channel.port1.onmessage = (event) => {
+      if (span() === event.data) state.painted.push(gap())
+    }
     const tick = () => {
       if (!state.sampling) return
-      channel.port2.postMessage(null)
+      channel.port2.postMessage(span())
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
