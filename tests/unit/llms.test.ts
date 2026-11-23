@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { surface } from './support/surface'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -35,6 +35,12 @@ function members(file: string, type: string): Set<string> {
 }
 
 describe('llms.txt', () => {
+  let exportsOf: Record<string, string[]>
+
+  beforeAll(() => {
+    exportsOf = surface()
+  }, 120_000)
+
   it('has a note for every entry point of the package and for nothing else', async () => {
     const { ENTRY_NOTES, exportedEntries } = await load()
     const manifest = JSON.parse(read('package.json')) as { exports: Record<string, unknown> }
@@ -45,7 +51,6 @@ describe('llms.txt', () => {
 
   it('names only what an entry really exports', async () => {
     const { ENTRY_NOTES } = await load()
-    const exportsOf = surface()
     const manager = members('src/core/types.ts', 'WindowManager')
     const platform = new Set(['localStorage', 'BroadcastChannel'])
     expect(manager.has('requestClose')).toBe(true)
@@ -69,7 +74,7 @@ describe('llms.txt', () => {
     const { RULES } = await load()
     const manager = members('src/core/types.ts', 'WindowManager')
     const desktop = members('src/dom/shared.ts', 'DesktopController')
-    const core = new Set((surface()['.'] ?? []).map((line) => line.split(':')[0]))
+    const core = new Set((exportsOf['.'] ?? []).map((line) => line.split(':')[0]))
     const called = RULES.flatMap((rule) => quoted(rule))
     const methods = called.flatMap((token) => [...token.matchAll(/\bwm\.([A-Za-z]+)/g)])
     expect(methods.length).toBeGreaterThan(5)
