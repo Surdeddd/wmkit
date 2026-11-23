@@ -1,3 +1,10 @@
+## [0.14.1](https://github.com/Surdeddd/wmkit/compare/v0.14.0...v0.14.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **gestures:** a pinch stops when the window is as large as the desktop ([ca85849](https://github.com/Surdeddd/wmkit/commit/ca85849b2e008ed3820d26caa2ee1153418b071a))
+
 # [0.14.0](https://github.com/Surdeddd/wmkit/compare/v0.13.1...v0.14.0) (2026-11-23)
 
 
