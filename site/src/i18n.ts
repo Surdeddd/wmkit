@@ -417,7 +417,7 @@ const en: Dict = {
     keep: 'keep editing',
   },
   devtools: {
-    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.9 kB entry point you can drop into your own app. It follows the manager, not this page.',
+    lead: 'The panel below is @surdeddd/wmkit/devtools, the same 3.1 kB entry point you can drop into your own app. It follows the manager, not this page.',
   },
   skins: {
     lead: 'Sixteen shipped themes dress every window. A variant dresses one: the desktop mirrors it to data-wm-variant and your CSS overrides the tokens from there.',
@@ -644,7 +644,7 @@ const en: Dict = {
     {
       label: 'Bundle (brotli)',
       cells: [
-        { text: '~19 kB', tone: 'plain' },
+        { text: '~20 kB', tone: 'plain' },
         { text: '~15 kB', tone: 'plain' },
         { text: '~60 kB', tone: 'bad' },
         { text: '~10 kB', tone: 'good' },
@@ -946,7 +946,7 @@ const ru: Dict = {
     keep: 'вернуться к правке',
   },
   devtools: {
-    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.9 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
+    lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 3.1 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
   },
   skins: {
     lead: 'Шестнадцать готовых тем одевают все окна сразу. Вариант одевает одно: десктоп зеркалит его в data-wm-variant, а дальше ваш CSS переопределяет токены.',
@@ -1173,7 +1173,7 @@ const ru: Dict = {
     {
       label: 'Размер (brotli)',
       cells: [
-        { text: '~19 кБ', tone: 'plain' },
+        { text: '~20 кБ', tone: 'plain' },
         { text: '~15 кБ', tone: 'plain' },
         { text: '~60 кБ', tone: 'bad' },
         { text: '~10 кБ', tone: 'good' },
