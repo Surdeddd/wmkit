@@ -211,8 +211,9 @@ describe('a window that a modal blocks', () => {
     )
 
   it('is marked on the page while the modal of its family is up', () => {
-    const { h } = scene()
+    const { h, doc } = scene()
     expect(marked(h)).toEqual(['doc', 'find'])
+    expect(doc.root.dataset.wmBlocked).toBe('')
     h.wm.minimize('ask')
     expect(marked(h)).toEqual(['doc', 'find'])
     h.wm.close('ask')
