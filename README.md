@@ -393,7 +393,11 @@ dock.dock('files', { side: 'left' })
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.76 kB brotlied.
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.77 kB brotlied.
+
+<a href="https://wmkit.vercel.app"><img src="https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/phone.png" width="260" alt="The wmkit demo on a phone: the WINDOWS headline across the screen, a readme window under it and a dock with an apps button"></a>
+
+The [demo](https://wmkit.vercel.app) on a phone: windows drag by their titles, snap at the edges, and the menus and the launcher fold into a sheet and a drawer.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'

@@ -328,7 +328,11 @@ dock.dock('files', { side: 'left' })
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.76 кБ в brotli.
+Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.77 кБ в brotli.
+
+<a href="https://wmkit.vercel.app/ru/"><img src="https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/phone.png" width="260" alt="Демо wmkit на телефоне: заголовок WINDOWS во всю ширину экрана, под ним окно readme и док с кнопкой приложений"></a>
+
+[Демо](https://wmkit.vercel.app/ru/) на телефоне: окна тащатся за заголовок и прилипают к краям, а меню и лента запуска складываются в шторку и ящик.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
