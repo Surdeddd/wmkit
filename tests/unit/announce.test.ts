@@ -274,6 +274,13 @@ describe('flip animations', () => {
     flipToTarget(collapsed.source, collapsed.target)
     flipFromTarget(collapsed.source, collapsed.target)
     expect(collapsed.animate).not.toHaveBeenCalled()
+
+    const flat = setup()
+    flat.target.getBoundingClientRect = () =>
+      ({ left: 300, top: 400, width: 0, height: 20 }) as DOMRect
+    flipToTarget(flat.source, flat.target)
+    flipFromTarget(flat.source, flat.target)
+    expect(flat.animate).not.toHaveBeenCalled()
   })
 
   it('falls back to no motion where the browser has no web animations', () => {
