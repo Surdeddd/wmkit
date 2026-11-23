@@ -310,3 +310,51 @@ test('the phone controls speak Russian on the Russian page', async ({ page }) =>
   await expect(page.locator('#menus').getByRole('group', { name: 'Сцены' })).toBeVisible()
   await expect(page.locator('#menus [data-action="theme"]')).toHaveText('Следующая тема')
 })
+
+test('the tour speaks of taps on a touch screen and of the mouse elsewhere', async ({
+  page,
+  hasTouch,
+}) => {
+  await boot(page)
+  await pick(page, 'tour')
+  const steps = win(page, 'tour').locator('.tour li')
+  await expect(steps).toHaveCount(12)
+  if (hasTouch) {
+    await expect(steps.first()).toContainText('Press show')
+    await expect(win(page, 'tour')).not.toContainText('mouse')
+    await expect(win(page, 'tour')).not.toContainText('Alt')
+  } else {
+    await expect(steps.first()).toContainText('Rest the mouse')
+  }
+})
+
+test('an untouched desktop follows a phone that is turned on its side, and an arranged one stays', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, 'the desktop follows a turn only where the pointer is a finger')
+  await boot(page)
+  await page.setViewportSize({ width: 664, height: 390 })
+  await expect(page.locator('#desktop')).toHaveAttribute('data-fit', 'tight')
+  await expect(win(page, 'readme')).toBeVisible()
+  await settle(win(page, 'readme'))
+  const hero = await page.locator('.wallpaper .wall-actions').boundingBox()
+  const beside = await win(page, 'readme').boundingBox()
+  expect(beside?.x ?? 0).toBeGreaterThanOrEqual((hero?.x ?? 0) + (hero?.width ?? 0))
+  expect((beside?.x ?? 0) + (beside?.width ?? 0)).toBeLessThanOrEqual(664)
+
+  const before = await page.evaluate(() => {
+    const { wm } = window.__wmDemo
+    wm.resize('readme', { x: 330, y: 40, width: 300, height: 180 })
+    return wm.get('readme')?.bounds
+  })
+  await page.setViewportSize({ width: 390, height: 664 })
+  await expect(page.locator('#desktop')).toHaveAttribute('data-fit', 'snug')
+  const after = await page.evaluate(() => {
+    const state = window.__wmDemo.wm.getState()
+    return { count: state.order.length, bounds: state.windows.readme?.bounds }
+  })
+  expect(after.count).toBe(1)
+  expect(after.bounds?.width).toBe(before?.width)
+  expect(after.bounds?.height).toBe(before?.height)
+})

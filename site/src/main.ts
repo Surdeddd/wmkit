@@ -439,6 +439,32 @@ function fitHero(): void {
   desktopEl.dataset.fit = height < 430 ? 'tight' : height < 600 ? 'snug' : 'roomy'
 }
 
+function shapeOf(): string {
+  return JSON.stringify(
+    Object.values(wm.getState().windows).map((win) => [
+      win.id,
+      win.stage,
+      win.bounds,
+      win.groupId,
+      win.workspace,
+    ]),
+  )
+}
+
+let bootShape = ''
+let upright = window.innerHeight >= window.innerWidth
+
+function turn(): void {
+  const now = window.innerHeight >= window.innerWidth
+  if (now === upright) return
+  upright = now
+  if (!window.matchMedia('(pointer: coarse)').matches) return
+  const untouched = shapeOf() === bootShape
+  wm.setViewport({ width: desktopEl.clientWidth, height: desktopEl.clientHeight })
+  fitHero()
+  if (untouched) resetDesktop()
+}
+
 function remountDesktop(): void {
   const contents = new Map<string, ChildNode[]>()
   for (const [id, entry] of mounted) {
@@ -766,6 +792,7 @@ function openDefaults(): void {
   if (width >= 1440) openApp('tour')
   if (rows) openApp('terminal')
   wm.focus(rows ? 'terminal' : 'readme')
+  bootShape = shapeOf()
 }
 
 type Scene = 'studio' | 'board' | 'retro' | 'clean'
@@ -901,18 +928,8 @@ const tourActions: Record<TourStep, () => void> = {
     window.open(location.href, '_blank')
   },
   undo() {
-    const shape = () =>
-      JSON.stringify(
-        Object.values(wm.getState().windows).map((win) => [
-          win.id,
-          win.stage,
-          win.bounds,
-          win.groupId,
-          win.workspace,
-        ]),
-      )
-    const before = shape()
-    while (wm.undo() && shape() === before);
+    const before = shapeOf()
+    while (wm.undo() && shapeOf() === before);
   },
   themes() {
     const at = THEME_NAMES.indexOf(theme)
@@ -1345,6 +1362,7 @@ sheetQuery.addEventListener('change', () => {
 })
 
 drawerQuery.addEventListener('change', () => setDrawer(false))
+window.addEventListener('resize', turn)
 
 function dismiss(): void {
   const active = elementOf(document.activeElement)

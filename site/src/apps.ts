@@ -1098,11 +1098,13 @@ const tour: AppSpec = {
   render(body, ctx) {
     const draw = () => {
       const copy = ctx.dict().tour
+      const coarse = window.matchMedia('(pointer: coarse)').matches
       const list = el('ol', 'tour')
       for (const step of copy.steps) {
         const item = el('li')
         const words = el('div')
-        words.append(el('strong', undefined, step.title), el('p', 'app-note', step.text))
+        const text = coarse ? (step.touch ?? step.text) : step.text
+        words.append(el('strong', undefined, step.title), el('p', 'app-note', text))
         const run = button(copy.show, () => ctx.show(step.id))
         run.dataset.tour = step.id
         run.setAttribute('aria-label', `${copy.show}: ${step.title}`)

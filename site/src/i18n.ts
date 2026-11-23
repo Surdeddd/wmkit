@@ -110,7 +110,7 @@ export interface Dict {
   tour: {
     lead: string
     show: string
-    steps: Array<{ id: TourStep; title: string; text: string }>
+    steps: Array<{ id: TourStep; title: string; text: string; touch?: string }>
   }
   notes: { placeholder: string; label: string; save: string; saved: string; unsaved: string }
   confirm: { text: string; discard: string; keep: string }
@@ -386,21 +386,25 @@ const en: Dict = {
         id: 'layouts',
         title: 'Snap layouts',
         text: 'Rest the mouse on a maximize button, or press ⌘⌥L, and pick a tile for the window.',
+        touch: 'A menu of tiles for the window. Press show, then pick a place.',
       },
       {
         id: 'seams',
         title: 'Linked resize',
         text: 'Two windows side by side share a separator. Drag it and both resize.',
+        touch: 'Two windows that touch share a separator. Drag it and both resize.',
       },
       {
         id: 'overview',
         title: 'Overview',
         text: 'Every window shrinks into a grid. Pick one with the pointer or the arrows.',
+        touch: 'Every window shrinks into a grid. Tap the one you want.',
       },
       {
         id: 'switcher',
         title: 'Window switcher',
         text: 'Alt + ` walks the windows from the most recent one, like Alt+Tab.',
+        touch: 'A list of the windows from the most recent one. Tap a name to switch.',
       },
       {
         id: 'tabs',
@@ -426,6 +430,7 @@ const en: Dict = {
         id: 'grid',
         title: 'Grid',
         text: 'Windows land on a 16 px step. Hold Alt to drag freely.',
+        touch: 'Windows land on a 16 px step as you drag them.',
       },
       {
         id: 'sync',
@@ -436,6 +441,7 @@ const en: Dict = {
         id: 'undo',
         title: 'Undo',
         text: 'Every step above is one entry in history. ⌘Z takes it back.',
+        touch: 'Every step above is one entry in history. Undo in the menu takes it back.',
       },
       {
         id: 'themes',
@@ -964,21 +970,25 @@ const ru: Dict = {
         id: 'layouts',
         title: 'Раскладки',
         text: 'Задержите мышь на кнопке разворачивания или нажмите ⌘⌥L и выберите место для окна.',
+        touch: 'Меню мест для окна. Нажмите «показать» и выберите одно.',
       },
       {
         id: 'seams',
         title: 'Связанный ресайз',
         text: 'У двух окон бок о бок общий разделитель. Потяните его, и размер поменяют оба.',
+        touch: 'У двух соседних окон общий разделитель. Потяните его, и размер поменяют оба.',
       },
       {
         id: 'overview',
         title: 'Обзор',
         text: 'Все окна уменьшаются в сетку. Выберите одно указателем или стрелками.',
+        touch: 'Все окна уменьшаются в сетку. Коснитесь нужного.',
       },
       {
         id: 'switcher',
         title: 'Переключатель окон',
         text: 'Alt + ` идёт по окнам от последнего использованного, как Alt+Tab.',
+        touch: 'Список окон от последнего использованного. Коснитесь названия, чтобы перейти.',
       },
       {
         id: 'tabs',
@@ -1004,6 +1014,7 @@ const ru: Dict = {
         id: 'grid',
         title: 'Сетка',
         text: 'Окна встают на шаг 16 px. С зажатым Alt тащатся свободно.',
+        touch: 'Окна встают на шаг 16 px, пока вы их тащите.',
       },
       {
         id: 'sync',
@@ -1014,6 +1025,7 @@ const ru: Dict = {
         id: 'undo',
         title: 'Отмена',
         text: 'Каждый шаг выше — одна запись в истории. ⌘Z возвращает её.',
+        touch: 'Каждый шаг выше — одна запись в истории. «Отменить» в меню возвращает её.',
       },
       {
         id: 'themes',
