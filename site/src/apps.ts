@@ -482,7 +482,7 @@ const layouts: AppSpec = {
         load.style.background = 'none'
         load.style.border = '0'
         load.style.padding = '0'
-        const remove = button('✕', () => {
+        const remove = button('×', () => {
           ctx.wm.deleteLayout(name)
           renderSaved()
         })
@@ -621,7 +621,7 @@ const bench: AppSpec = {
       for (const [key, value] of rows) {
         stats.append(el('dt', undefined, key), el('dd', undefined, value))
       }
-      fill.style.width = `${Math.min(100, (commit / 60) * 100)}%`
+      fill.style.setProperty('--fill', String(Math.min(1, commit / 60)))
     }
 
     const relabel = () => {

@@ -44,6 +44,7 @@ import { apps, isThemeName, THEME_NAMES } from './apps'
 import { initBuilder } from './builder'
 import { startFpsMeter } from './fps'
 import { type AppId, type Dict, dictionaries, type Lang, type TourStep } from './i18n'
+import { iconUrl } from './icons'
 import './os.css'
 import './apps.css'
 
@@ -913,17 +914,13 @@ wallSkinsEl.addEventListener('click', () => {
   wm.focus('skins')
 })
 
-const taskIcons = document.head.appendChild(document.createElement('style'))
-
-function paintTaskIcons(): void {
-  const quote = (icon: string) => `"${icon.replace(/[\\"]/g, '\\$&')} "`
-  taskIcons.textContent = apps
-    .map((spec) => {
-      const icon = quote(dict().apps[spec.id].icon)
-      return `#dock [data-wm-task="${spec.id}"] [data-wm-task-title]::before{content:${icon}}`
-    })
-    .join('\n')
-}
+const appIcons = document.head.appendChild(document.createElement('style'))
+appIcons.textContent = apps
+  .map((spec) => {
+    const where = `#launcher [data-app="${spec.id}"] .ico,#dock [data-wm-task="${spec.id}"] [data-wm-task-title]::before`
+    return `${where}{-webkit-mask-image:${iconUrl(spec.id)};mask-image:${iconUrl(spec.id)}}`
+  })
+  .join('\n')
 
 function syncStats(): void {
   const state = wm.getState()
@@ -941,7 +938,6 @@ function relocalize(): void {
   taskbar.destroy()
   taskbar = createTaskbar(wm, dockEl, lang === 'ru' ? { messages: taskbarMessagesRu } : {})
   remountDesktop()
-  paintTaskIcons()
 }
 
 function renderLauncher(): void {
@@ -955,7 +951,6 @@ function renderLauncher(): void {
         node.dataset.app = spec.id
         const icon = document.createElement('span')
         icon.className = 'ico'
-        icon.textContent = copy.icon
         const label = document.createElement('span')
         label.className = 'lbl'
         label.textContent = copy.title
@@ -1379,7 +1374,6 @@ renderWorkspaces()
 renderFeatures()
 renderFrameworks()
 renderCompare()
-paintTaskIcons()
 syncStats()
 if (options.sync) share(true)
 boot()

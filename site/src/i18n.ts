@@ -48,7 +48,7 @@ export interface Dict {
   ui: Record<string, string>
   announce: AnnouncerMessages
   menus: MenuCopy[]
-  apps: Record<AppId, { title: string; icon: string }>
+  apps: Record<AppId, { title: string }>
   readme: { lead: string; body: string; badges: Array<[string, string]> }
   terminal: {
     hello: string
@@ -254,20 +254,20 @@ const en: Dict = {
     },
   ],
   apps: {
-    readme: { title: 'readme.md', icon: '◆' },
-    terminal: { title: 'terminal', icon: '›_' },
-    inspector: { title: 'inspector', icon: '◈' },
-    layouts: { title: 'layouts', icon: '▤' },
-    code: { title: 'code.ts', icon: '{}' },
-    bench: { title: 'bench', icon: '▲' },
-    paint: { title: 'paint', icon: '✎' },
-    settings: { title: 'settings', icon: '⚙' },
-    skins: { title: 'skins', icon: '◈' },
-    devtools: { title: 'devtools', icon: '⌥' },
-    shortcuts: { title: 'shortcuts', icon: '⌘' },
-    tour: { title: 'tour', icon: '★' },
-    notes: { title: 'notes.txt', icon: '¶' },
-    confirm: { title: 'close notes.txt?', icon: '!' },
+    readme: { title: 'readme.md' },
+    terminal: { title: 'terminal' },
+    inspector: { title: 'inspector' },
+    layouts: { title: 'layouts' },
+    code: { title: 'code.ts' },
+    bench: { title: 'bench' },
+    paint: { title: 'paint' },
+    settings: { title: 'settings' },
+    skins: { title: 'skins' },
+    devtools: { title: 'devtools' },
+    shortcuts: { title: 'shortcuts' },
+    tour: { title: 'tour' },
+    notes: { title: 'notes.txt' },
+    confirm: { title: 'close notes.txt?' },
   },
   readme: {
     lead: 'A window manager with no opinion about your UI.',
@@ -782,20 +782,20 @@ const ru: Dict = {
     },
   ],
   apps: {
-    readme: { title: 'читай.md', icon: '◆' },
-    terminal: { title: 'терминал', icon: '›_' },
-    inspector: { title: 'инспектор', icon: '◈' },
-    layouts: { title: 'раскладки', icon: '▤' },
-    code: { title: 'код.ts', icon: '{}' },
-    bench: { title: 'бенчмарк', icon: '▲' },
-    paint: { title: 'рисовалка', icon: '✎' },
-    settings: { title: 'настройки', icon: '⚙' },
-    skins: { title: 'оформление', icon: '◈' },
-    devtools: { title: 'девтулы', icon: '⌥' },
-    shortcuts: { title: 'клавиши', icon: '⌘' },
-    tour: { title: 'тур', icon: '★' },
-    notes: { title: 'notes.txt', icon: '¶' },
-    confirm: { title: 'закрыть notes.txt?', icon: '!' },
+    readme: { title: 'читай.md' },
+    terminal: { title: 'терминал' },
+    inspector: { title: 'инспектор' },
+    layouts: { title: 'раскладки' },
+    code: { title: 'код.ts' },
+    bench: { title: 'бенчмарк' },
+    paint: { title: 'рисовалка' },
+    settings: { title: 'настройки' },
+    skins: { title: 'оформление' },
+    devtools: { title: 'девтулы' },
+    shortcuts: { title: 'клавиши' },
+    tour: { title: 'тур' },
+    notes: { title: 'notes.txt' },
+    confirm: { title: 'закрыть notes.txt?' },
   },
   readme: {
     lead: 'Оконный менеджер без единого мнения о вашем интерфейсе.',

@@ -311,7 +311,10 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
-  transition: all 140ms var(--ease);
+  transition:
+    background-color 140ms var(--ease),
+    border-color 140ms var(--ease),
+    color 140ms var(--ease);
 }
 
 .workspaces button:hover {
@@ -477,13 +480,22 @@ body {
   letter-spacing: 0.04em;
   text-decoration: none;
   cursor: pointer;
-  transition: all 160ms var(--ease);
+  transition:
+    border-color 160ms var(--ease),
+    color 160ms var(--ease),
+    filter 160ms var(--ease),
+    transform 160ms var(--ease);
 }
 
 .btn:hover {
   border-color: var(--signal);
   color: var(--signal);
-  transform: translateY(-1px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .btn-primary {
@@ -569,7 +581,10 @@ body {
   letter-spacing: 0.02em;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 150ms var(--ease);
+  transition:
+    border-color 150ms var(--ease),
+    color 150ms var(--ease),
+    box-shadow 150ms var(--ease);
 }
 
 .launcher button:hover,
@@ -591,10 +606,22 @@ body {
 }
 
 .launcher .ico,
-.tasks .ico {
-  font-size: 13px;
-  line-height: 1;
-  filter: grayscale(0.35);
+.tasks [data-wm-task-title]::before {
+  content: "";
+  flex: none;
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.tasks [data-wm-task-title] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
 
 .launcher button {
@@ -895,7 +922,10 @@ body {
   border: 1px solid var(--line);
   color: var(--fg-dim);
   cursor: pointer;
-  transition: all 150ms var(--ease);
+  transition:
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease),
+    color 150ms var(--ease);
 }
 
 .copy:hover {
