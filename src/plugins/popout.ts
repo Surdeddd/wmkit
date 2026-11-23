@@ -194,7 +194,10 @@ async function launch(
     content.parentNode?.insertBefore(marker, content)
     container.append(content)
   }
-  const minimized = options.minimizeWhilePopped !== false && now.stage !== 'minimized'
+  const family =
+    now.ownerId !== null ||
+    Object.values(wm.getState().windows).some((other) => other.ownerId === id)
+  const minimized = options.minimizeWhilePopped !== false && now.stage !== 'minimized' && !family
   if (minimized) wm.minimize(id)
 
   let settle!: () => void

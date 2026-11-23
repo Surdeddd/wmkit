@@ -133,6 +133,21 @@ describe('picture-in-picture', () => {
     expect(wm.get('p')?.stage).toBe('maximized')
   })
 
+  it('leaves a window that owns windows or is owned where it is, so that its family stays up', async () => {
+    stubPip()
+    const { wm, content } = setup()
+    wm.open({ id: 'tool', owner: 'p' })
+    const handle = await popout(wm, 'p', content)
+    expect([wm.get('p')?.stage, wm.get('tool')?.stage]).toEqual(['normal', 'normal'])
+    handle.close()
+    await handle.closed
+    const inner = document.createElement('div')
+    document.body.append(inner)
+    const second = await popout(wm, 'tool', inner)
+    expect([wm.get('p')?.stage, wm.get('tool')?.stage]).toEqual(['normal', 'normal'])
+    second.close()
+  })
+
   it('does not minimize or restore when told not to', async () => {
     stubPip()
     const { wm, content } = setup()

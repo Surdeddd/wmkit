@@ -994,7 +994,7 @@ interface PopoutOptions {
   top?: number
   mode?: 'move' | 'container'       // 'move' — carry `content`; 'container' — leave it, render into handle.container
   copyStyles?: boolean              // true — styleSheets and adoptedStyleSheets, with their media; disabled sheets skipped
-  minimizeWhilePopped?: boolean     // true, unless the window is already minimized
+  minimizeWhilePopped?: boolean     // true, unless the window is already minimized, owns windows or is owned
 }
 
 interface PopoutHandle {
