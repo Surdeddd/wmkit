@@ -1,10 +1,68 @@
-import type { WindowManager } from '../../../src/core/types'
+import type { ManagerState, WindowManager, WindowState } from '../../../src/core/types'
 
 const GESTURE_MARKS = ['wmDragging', 'wmResizing', 'wmPinching', 'wmTabTarget'] as const
 
-export function stateDrift(wm: WindowManager): string[] {
+export function rootOf(state: ManagerState, id: string): WindowState {
+  let win = state.windows[id] as WindowState
+  for (let hops = 0; win.ownerId !== null && hops < state.order.length; hops += 1) {
+    const owner = state.windows[win.ownerId]
+    if (!owner) break
+    win = owner
+  }
+  return win
+}
+
+export function familyGuard(state: ManagerState, id: string): string | undefined {
+  const root = rootOf(state, id).id
+  const ruler = state.order
+    .filter((member) => {
+      const win = state.windows[member]
+      return win?.layer === 'modal' && win.ownerId !== null && rootOf(state, member).id === root
+    })
+    .at(-1)
+  let at: string | null = id
+  for (let hops = 0; at !== null && at !== ruler && hops <= state.order.length; hops += 1) {
+    at = state.windows[at]?.ownerId ?? null
+  }
+  return at === null ? ruler : undefined
+}
+
+export function familyDrift(state: ManagerState): string[] {
   const found: string[] = []
+  for (const id of state.order) {
+    const win = state.windows[id]
+    if (!win || win.ownerId === null) continue
+    const owner = state.windows[win.ownerId]
+    if (!owner) {
+      found.push(`${id} is owned by ${win.ownerId}, which is gone`)
+      continue
+    }
+    let below: string | null = state.order[state.order.indexOf(id) - 1] ?? null
+    for (
+      let hops = 0;
+      below !== null && below !== owner.id && hops < state.order.length;
+      hops += 1
+    ) {
+      below = state.windows[below]?.ownerId ?? null
+    }
+    if (below !== owner.id) found.push(`${id} is cut off from its owner ${owner.id} in the order`)
+    if (owner.workspace !== win.workspace) found.push(`${id} left the workspace of its owner`)
+    if ((owner.stage === 'minimized') !== (win.stage === 'minimized')) {
+      found.push(`${id} is ${win.stage} while its owner is ${owner.stage}`)
+    }
+    if (owner.groupId !== null || win.groupId !== null) {
+      found.push(`${id} and its owner ${owner.id} share a family and a tab group`)
+    }
+  }
+  const focused = state.focusedId
+  const guard = focused !== null && state.windows[focused] ? familyGuard(state, focused) : undefined
+  if (guard) found.push(`focus sits on ${focused} behind ${guard}, the modal of its family`)
+  return found
+}
+
+export function stateDrift(wm: WindowManager): string[] {
   const state = wm.getState()
+  const found = familyDrift(state)
   const ids = Object.keys(state.windows)
   if ([...state.order].sort().join('\n') !== [...ids].sort().join('\n')) {
     found.push('the order lists other windows than the state holds')

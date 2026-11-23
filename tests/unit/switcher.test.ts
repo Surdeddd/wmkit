@@ -236,6 +236,20 @@ describe('a window switcher', () => {
     expect(listed()).toEqual(['m'])
   })
 
+  it('leaves out the windows a modal of their family blocks, and lists the rest of the desktop', () => {
+    const made = mount()
+    open('find', { owner: 'b' })
+    open('ask', { owner: 'b', layer: 'modal' })
+    open('pick', { owner: 'ask' })
+    made.open()
+    expect(listed().sort()).toEqual(['a', 'ask', 'c', 'pick'])
+    made.close()
+    open('m', { layer: 'modal' })
+    open('own', { owner: 'm' })
+    made.open()
+    expect(listed().sort()).toEqual(['m', 'own'])
+  })
+
   it('follows the windows while it is open and closes with the last of them', () => {
     const made = mount()
     made.open()

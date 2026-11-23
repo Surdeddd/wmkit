@@ -50,6 +50,7 @@ export interface WindowState extends WindowFlags {
   layer: WindowLayer
   workspace: number
   groupId: string | null
+  ownerId: string | null
   minSize: Size
   maxSize: Size | null
   aspectRatio: number | null
@@ -72,6 +73,7 @@ export interface WindowInit extends Partial<WindowFlags> {
   stage?: WindowStage
   layer?: WindowLayer
   workspace?: number
+  owner?: string
   meta?: Record<string, unknown>
 }
 
@@ -105,8 +107,9 @@ export interface SerializedMaxSize {
   height: number | null
 }
 
-export interface SerializedWindowState extends Omit<WindowState, 'maxSize'> {
+export interface SerializedWindowState extends Omit<WindowState, 'maxSize' | 'ownerId'> {
   maxSize: SerializedMaxSize | null
+  ownerId?: string | null
 }
 
 export interface SerializedState {
@@ -190,6 +193,7 @@ export interface WindowManager {
   resize(id: string, patch: Partial<Bounds>): boolean
   update(id: string, patch: WindowUpdate): boolean
   get(id: string): WindowState | undefined
+  blockedBy(id: string): string | null
   getState(): ManagerState
   minimized(): readonly WindowState[]
   setViewport(viewport: Size): void

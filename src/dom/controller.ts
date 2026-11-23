@@ -52,6 +52,7 @@ interface AttachedWindow {
   lastTab: boolean
   hidden: boolean
   deep: boolean
+  blocked: boolean
   shield: Map<HTMLElement, string> | null
   cleanup: Array<() => void>
 }
@@ -343,8 +344,12 @@ export function attachDesktop(
     groupDwell,
     groupTarget(clientX, clientY, selfId, local) {
       const state = wm.getState()
-      if (!groupingEnabled || state.windows[selfId]?.layer === 'modal') return null
       const order = state.order
+      const single = (win: WindowState | undefined) =>
+        win?.layer !== 'modal' &&
+        win?.ownerId === null &&
+        !order.some((id) => state.windows[id]?.ownerId === win.id)
+      if (!groupingEnabled || !single(state.windows[selfId])) return null
       for (let i = order.length; i-- > 0; ) {
         const id = order[i] as string
         const attached = registry.get(id)
@@ -354,7 +359,7 @@ export function attachDesktop(
         if (local.x < b.x || local.y < b.y || local.x > b.x + b.width || local.y > b.y + b.height) {
           continue
         }
-        if (win.layer === 'modal' || !attached.handle) return null
+        if (!single(win) || !attached.handle) return null
         if (titlebar?.win !== win) titlebar = { win, box: attached.handle.getBoundingClientRect() }
         const box = titlebar.box
         return clientX >= box.left &&
@@ -485,6 +490,7 @@ export function attachDesktop(
       setData(el, 'wmWorkspace', String(win.workspace))
       setData(el, 'wmVariant', windowVariant(win))
       setData(el, 'wmGroup', win.groupId)
+      setData(el, 'wmOwner', win.ownerId)
       setData(el, 'wmTab', win.groupId === null ? null : activeTab ? 'active' : 'inactive')
       const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace || !activeTab
       if (hide && !el.hidden) rescue(el)
@@ -502,13 +508,13 @@ export function attachDesktop(
       if (attached.title && prev?.title !== win.title) {
         setText(attached.title, win.title, prev?.title ?? win.title)
       }
-      setAttr(el, 'aria-modal', win.layer === 'modal' ? 'true' : null)
+      setAttr(el, 'aria-modal', win.layer === 'modal' && win.ownerId === null ? 'true' : null)
       const display =
         win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
       for (const handle of attached.handles) {
         if (handle.style.display !== display) handle.style.display = display
       }
-      if (shielded || attached.shield) shield(attached, shielded && win.layer !== 'modal')
+      if (attached.blocked || attached.shield) shield(attached, attached.blocked)
       attached.lastState = win
       attached.lastWorkspace = activeWorkspace
       attached.lastTab = activeTab
@@ -616,14 +622,7 @@ export function attachDesktop(
         restyle.push([id, wanted])
       }
       const activeTab = win.groupId === null || state.groups[win.groupId]?.activeId === win.id
-      if (
-        win.layer === 'modal' &&
-        activeTab &&
-        win.stage !== 'minimized' &&
-        win.workspace === state.workspace
-      ) {
-        modal = true
-      }
+      if (win.layer === 'modal') modal = true
       if (
         attached.lastState !== win ||
         attached.lastWorkspace !== state.workspace ||
@@ -647,10 +646,15 @@ export function attachDesktop(
     if (orderChanged) applyStacking(state.order)
     if (deepLimit !== false && (orderChanged || reshown)) markDeep(state.order)
     reshown = false
-    if (modal !== shielded) {
+    if (modal || shielded) {
       shielded = modal
-      for (const attached of registry.values()) {
-        shield(attached, modal && attached.lastState?.layer !== 'modal')
+      for (const [id, attached] of registry) {
+        const blocked = modal && wm.blockedBy(id) !== null
+        if (blocked !== attached.blocked) {
+          attached.blocked = blocked
+          shield(attached, blocked)
+          setData(attached.element, 'wmBlocked', blocked ? '' : null)
+        }
       }
     }
     const wanted = state.focusedId ? (registry.get(state.focusedId)?.element ?? null) : null
@@ -692,7 +696,8 @@ export function attachDesktop(
     seen = active
     const host = active?.matches(FRAMES) ? windowElementOf(active) : null
     const id = host?.dataset.wmWindow
-    if (id && registry.get(id)?.element === host && wm.getState().focusedId !== id && !shielded) {
+    const attached = id ? registry.get(id) : undefined
+    if (id && attached?.element === host && wm.getState().focusedId !== id && !attached.blocked) {
       wm.focus(id)
     }
   }
@@ -761,6 +766,7 @@ export function attachDesktop(
       delete attached.element.dataset.wmFlash
       void attached.element.offsetWidth
       attached.element.dataset.wmFlash = ''
+      pull(attached)
     }),
   )
 
@@ -864,6 +870,7 @@ export function attachDesktop(
       lastTab: true,
       hidden: false,
       deep: false,
+      blocked: false,
       shield: null,
       cleanup: [],
     }
@@ -906,7 +913,7 @@ export function attachDesktop(
     )
 
     const onBlockedInput = (event: Event) => {
-      if (shielded && attached.lastState?.layer !== 'modal') {
+      if (attached.blocked) {
         event.preventDefault()
         event.stopPropagation()
       }
@@ -918,6 +925,7 @@ export function attachDesktop(
 
     const onFocusIn = (event: Event) => {
       attached.last = firedOn(event) as HTMLElement | null
+      if (attached.blocked) wm.focus(id)
     }
     for (const scope of [windowElement, windowElement.shadowRoot]) {
       scope?.addEventListener('focusin', onFocusIn)
@@ -1090,6 +1098,7 @@ export function attachDesktop(
       delete windowElement.dataset.wmTabTarget
       delete windowElement.dataset.wmFlash
       delete windowElement.dataset.wmDeep
+      delete windowElement.dataset.wmBlocked
       delete windowElement.dataset.wmClosing
       if (wm.get(id)) windowElement.hidden = false
       reshown = true

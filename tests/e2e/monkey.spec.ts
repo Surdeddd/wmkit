@@ -339,12 +339,20 @@ function inspect(stage: Stage): string[] {
   if (stage.tasks) {
     const tasks = document.querySelectorAll('[data-task], [data-wm-task]').length
     const state = wm.getState()
-    const listed = new Set(
-      Object.values(state.windows)
-        .filter((win) => win.workspace === state.workspace)
-        .map((win) => (win.groupId === null ? `w${win.id}` : `g${win.groupId}`)),
-    ).size
-    const expected = stage.tasks === 'all' ? listed : wm.minimized().length
+    const buttons = (list: readonly (typeof state.windows)[string][]) =>
+      new Set(
+        list.map((win) => {
+          let top = win
+          for (let owner = top; owner; owner = state.windows[top.ownerId ?? ''] as typeof win) {
+            top = owner
+          }
+          return top.groupId === null ? `w${top.id}` : `g${top.groupId}`
+        }),
+      ).size
+    const expected =
+      stage.tasks === 'all'
+        ? buttons(Object.values(state.windows).filter((win) => win.workspace === state.workspace))
+        : buttons(wm.minimized())
     if (tasks !== expected) {
       found.push(`${tasks} taskbar buttons where ${expected} are due`)
     }

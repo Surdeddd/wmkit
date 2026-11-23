@@ -551,6 +551,7 @@ render(document.getElementById('app')!, <App />).then(() => {
 | `x`, `y`, `width`, `height`, `min-width`, `min-height`, `max-width`, `max-height`, `aspect-ratio`, `workspace` | геометрия и ограничения |
 | `stage` | `normal`, `minimized` или `maximized`; отражает текущую стадию |
 | `layer` | `normal`, `floating` или `modal` |
+| `owner` | `window-id` окна-владельца; читается один раз, когда окно открывается, поэтому ставьте владельца в разметке раньше, чтобы его окно уже существовало. См. [Окна с владельцем](api.ru.md#окна-с-владельцем) |
 | `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | включены по умолчанию; `="false"` выключает любой из них и прячет его кнопку |
 | `closed` | окно закрыто и скрыто; снятие атрибута открывает его снова |
 | `chrome="none"` | скрывает встроенный тайтлбар — для своей разметки с `data-wm-drag` |

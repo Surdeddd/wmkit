@@ -129,6 +129,8 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   let cachedGroups: Record<string, WindowGroup> | null = null
   let cachedOrder: readonly string[] | null = null
   let cachedTabs: Readonly<Record<string, string>> | null = null
+  let ownedOrder: readonly string[] | null = null
+  let owned: Record<string, string[]> = Object.create(null)
   let groupsDirty = false
   let order: string[] = []
   let focusedId: string | null = null
@@ -215,6 +217,10 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     pendingEvents.push(emit)
   }
 
+  function emitOrder(): void {
+    queueEvent(() => emitter.emit('order', { order }))
+  }
+
   function ownWindows(): Record<string, WindowState> {
     if (windowsShared) {
       const copy: Record<string, WindowState> = Object.create(null)
@@ -230,7 +236,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const previous = map[next.id]
     if (!touched.has(next.id)) touched.set(next.id, true)
     const wasModal = previous?.layer === 'modal'
-    if (wasModal !== (next.layer === 'modal')) modalCount += wasModal ? -1 : 1
+    if (next.ownerId === null && wasModal !== (next.layer === 'modal')) {
+      modalCount += wasModal ? -1 : 1
+    }
     if (previous?.groupId !== next.groupId) groupsDirty = true
     map[next.id] = next
   }
@@ -250,7 +258,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function removeWindow(id: string): void {
     const map = ownWindows()
     const previous = map[id]
-    if (previous?.layer === 'modal') modalCount -= 1
+    if (previous?.layer === 'modal' && previous.ownerId === null) modalCount -= 1
     if (previous?.groupId != null) groupsDirty = true
     delete map[id]
     order = order.filter((entry) => entry !== id)
@@ -259,32 +267,73 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function countModals(): number {
     let total = 0
     for (const id of order) {
-      if ((windows[id] as WindowState).layer === 'modal') total += 1
+      const win = windows[id] as WindowState
+      if (win.layer === 'modal' && win.ownerId === null) total += 1
     }
     return total
   }
 
+  function rootOf(id: string): string {
+    let win = windows[id] as WindowState
+    while (win.ownerId !== null) win = windows[win.ownerId] as WindowState
+    return win.id
+  }
+
+  function subtree(top: string, into: string[] = []): string[] {
+    if (ownedOrder !== order) {
+      ownedOrder = order
+      owned = Object.create(null)
+      for (const id of order) {
+        const owner = (windows[id] as WindowState).ownerId
+        if (owner === null) continue
+        owned[owner] ??= []
+        ;(owned[owner] as string[]).push(id)
+      }
+    }
+    into.push(top)
+    for (const child of owned[top] ?? []) subtree(child, into)
+    return into
+  }
+
+  function family(id: string): string[] {
+    return subtree(rootOf(id))
+  }
+
+  function shield(id: string): string | undefined {
+    let top: string | undefined
+    for (const member of family(id)) {
+      const win = windows[member] as WindowState
+      if (win.ownerId !== null && win.layer === 'modal') top = member
+    }
+    let at: string | null = id
+    while (at !== null && at !== top) at = (windows[at] as WindowState).ownerId
+    return at === null ? top : undefined
+  }
+
+  function guardOf(id: string): string | null | undefined {
+    const modal = topModalId()
+    return modal && layerRankOf(id) < 2 ? modal : shield(id)
+  }
+
   function layerRankOf(id: string): number {
-    return LAYER_RANK[(windows[id] as WindowState).layer]
+    return LAYER_RANK[(windows[rootOf(id)] as WindowState).layer]
   }
 
   function sortByLayer(ids: string[]): string[] {
-    return ids
-      .map((id, index) => ({ id, index, rank: layerRankOf(id) }))
-      .sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : a.index - b.index))
-      .map((entry) => entry.id)
+    return [...ids].sort((a, b) => layerRankOf(a) - layerRankOf(b))
   }
 
   function blockOf(id: string): string[] {
     const win = windows[id] as WindowState
-    return win.groupId === null ? [id] : membersOf(win.groupId)
+    return win.groupId === null ? subtree(id) : membersOf(win.groupId)
   }
 
   function raise(id: string): boolean {
-    const win = windows[id] as WindowState
+    const owner = (windows[id] as WindowState).ownerId
+    const lifted = owner !== null && raise(owner)
     const block = blockOf(id)
     const without = order.filter((entry) => !block.includes(entry))
-    const rank = LAYER_RANK[win.layer]
+    const rank = layerRankOf(id)
     let insertAt = without.length
     for (let i = without.length - 1; i >= 0; i -= 1) {
       if (layerRankOf(without[i] as string) > rank) insertAt = i
@@ -293,14 +342,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const next = [...without.slice(0, insertAt), ...block, ...without.slice(insertAt)]
     const changed = next.length !== order.length || next.some((entry, i) => entry !== order[i])
     if (changed) order = next
-    return changed
+    return changed || lifted
   }
 
   function lift(ids: string[]): void {
     const last = ids.at(-1)
     if (last === undefined) return
     const rank = new Map<string, number>()
-    const keyOf = (id: string) => (windows[id] as WindowState).groupId ?? id
+    const keyOf = (id: string) => (windows[id] as WindowState).groupId ?? rootOf(id)
     ids.forEach((id, index) => {
       rank.set(keyOf(id), index)
     })
@@ -310,7 +359,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     )
     if (!equal(next, order, 1)) {
       order = next
-      queueEvent(() => emitter.emit('order', { order }))
+      emitOrder()
       commit()
     }
     focus(topModalId() ?? last, true)
@@ -434,6 +483,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       const win = windows[order[i] as string] as WindowState
       if (
         win.layer === 'modal' &&
+        win.ownerId === null &&
         win.stage !== 'minimized' &&
         onActiveWorkspace(win) &&
         isVisibleTab(win)
@@ -446,31 +496,48 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
   function focusTargets(): string[] {
     const modal = topModalId()
-    return order.filter((id) => {
-      const win = windows[id] as WindowState
-      if (win.stage === 'minimized' || !onActiveWorkspace(win) || !isVisibleTab(win)) return false
-      if (modal && win.layer !== 'modal') return false
-      return true
-    })
+    const seqOf = (id: string) => (windows[id] as WindowState).openedSeq
+    return order
+      .flatMap((top) =>
+        (windows[top] as WindowState).ownerId === null
+          ? subtree(top).sort((a, b) => seqOf(a) - seqOf(b))
+          : [],
+      )
+      .filter((id) => {
+        const win = windows[id] as WindowState
+        if (win.stage === 'minimized' || !onActiveWorkspace(win) || !isVisibleTab(win)) return false
+        return !(modal && layerRankOf(id) < 2) && !shield(id)
+      })
   }
 
   function focusTop(): void {
     for (let i = order.length - 1; i >= 0; i -= 1) {
       const win = windows[order[i] as string] as WindowState
-      if (win.stage === 'minimized' || !onActiveWorkspace(win) || !isVisibleTab(win)) continue
+      if (
+        win.stage === 'minimized' ||
+        !onActiveWorkspace(win) ||
+        !isVisibleTab(win) ||
+        shield(win.id)
+      ) {
+        continue
+      }
       focusedId = win.id
       return
     }
     focusedId = null
   }
 
+  function refocus(): void {
+    const previous = focusedId
+    focusTop()
+    if (focusedId && focusedId !== previous) emitFocus(windows[focusedId] as WindowState, previous)
+  }
+
   function reconcileFocus(): void {
     if (focusedId === null) return
     const win = windows[focusedId]
     if (win && win.stage !== 'minimized' && onActiveWorkspace(win) && isVisibleTab(win)) return
-    const previous = focusedId
-    focusTop()
-    if (focusedId) emitFocus(windows[focusedId] as WindowState, previous)
+    refocus()
   }
 
   function emitFocus(win: WindowState, previous: string | null): void {
@@ -532,8 +599,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     let bounds: Bounds = { ...position, ...size }
     if (keepInViewport) bounds = clampToViewport(bounds, viewport, minVisible)
 
-    const requestedStage = init.stage ?? 'normal'
-    const stage: WindowStage = requestedStage === 'snapped' ? 'normal' : requestedStage
+    const found = windows[text(init.owner)]
+    const owner = found?.groupId === null ? found : undefined
+    const stage: WindowStage =
+      (owner ?? init).stage === 'minimized'
+        ? 'minimized'
+        : init.stage === 'maximized'
+          ? 'maximized'
+          : 'normal'
 
     let win: WindowState = {
       id,
@@ -545,8 +618,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       snapZone: null,
       snapRect: null,
       layer: init.layer && LAYERS.includes(init.layer) ? init.layer : 'normal',
-      workspace: normalizeWorkspace(init.workspace, workspace),
+      workspace: normalizeWorkspace((owner ?? init).workspace, workspace),
       groupId: null,
+      ownerId: owner ? owner.id : null,
       minSize,
       maxSize,
       aspectRatio,
@@ -568,38 +642,39 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
 
     setWindow(win)
     raise(id)
+    const guard = shield(id)
+    if (guard) raise(guard)
     const previous = focusedId
     if (stage !== 'minimized' && onActiveWorkspace(win)) {
-      if (!topModalId() || win.layer === 'modal') focusedId = id
-      else focusTop()
+      if (topModalId() && layerRankOf(id) < 2) focusTop()
+      else focusedId = guard ?? id
     }
     queueEvent(() => emitter.emit('open', { window: win }))
     if (focusedId !== previous) emitFocus(windows[focusedId as string] as WindowState, previous)
-    queueEvent(() => emitter.emit('order', { order }))
+    emitOrder()
     commit()
     return win
   }
 
   function close(id: string): boolean {
-    const win = windows[id]
-    if (!win) return false
-    removeWindow(id)
-    closing.get(id)?.end(true)
-    if (win.groupId !== null) {
-      const remaining = membersOf(win.groupId)
-      const wasActive = activeTabs[win.groupId] === id
-      if (wasActive && remaining[0]) {
-        activeTabs = { ...activeTabs, [win.groupId]: remaining[0] }
+    if (!windows[id]) return false
+    for (const member of subtree(id).reverse()) {
+      const win = windows[member] as WindowState
+      removeWindow(member)
+      closing.get(member)?.end(true)
+      if (win.groupId !== null) {
+        const remaining = membersOf(win.groupId)
+        const wasActive = activeTabs[win.groupId] === member
+        if (wasActive && remaining[0]) {
+          activeTabs = { ...activeTabs, [win.groupId]: remaining[0] }
+        }
+        settleGroup(win.groupId)
+        emitGroup(win.groupId, wasActive && remaining.length > 1 ? member : null)
       }
-      settleGroup(win.groupId)
-      emitGroup(win.groupId, wasActive && remaining.length > 1 ? id : null)
+      queueEvent(() => emitter.emit('close', { window: win }))
     }
-    queueEvent(() => emitter.emit('close', { window: win }))
-    if (focusedId === id) {
-      focusTop()
-      if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
-    }
-    queueEvent(() => emitter.emit('order', { order }))
+    if (focusedId !== null && !windows[focusedId]) refocus()
+    emitOrder()
     commit()
     return true
   }
@@ -609,7 +684,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (waiting) return waiting.promise
     const asked = windows[id]
     if (!asked) return Promise.resolve(false)
-    const queue = [...guards]
+    const queue = subtree(id).flatMap((member) => [...guards].map((guard) => ({ guard, member })))
     let told = false
     let settle!: (closed: boolean) => void
     let reject!: (error: unknown) => void
@@ -633,15 +708,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
     const ask = (): void => {
       while (closing.get(id) === request) {
-        const guard = queue.shift()
-        if (!guard) {
+        const next = queue.shift()
+        if (!next) {
           transact(() => close(id))
           return
         }
-        if (!guards.has(guard)) continue
+        const about = windows[next.member]
+        if (!about || !guards.has(next.guard)) continue
         let answer: ReturnType<CloseGuard>
         try {
-          answer = guard.ask(windows[id] as WindowState)
+          answer = next.guard.ask(about)
         } catch (error) {
           finish(() => reject(error))
           return
@@ -682,10 +758,11 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const win = windows[id]
     if (!win) return false
     if (!onActiveWorkspace(win)) setWorkspace(win.workspace)
-    const modal = topModalId()
-    if (modal && win.layer !== 'modal') {
-      const modalWin = windows[modal] as WindowState
+    const guard = guardOf(id)
+    if (guard) {
+      const modalWin = windows[guard] as WindowState
       if (!quiet) queueEvent(() => emitter.emit('modalblocked', { window: modalWin }))
+      if (modalWin.ownerId !== null) focus(guard, true)
       return false
     }
     if (!isVisibleTab(win)) activateTab(id)
@@ -697,7 +774,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const raised = raise(id)
     focusedId = id
     if (previous !== id) emitFocus(win, previous)
-    if (raised) queueEvent(() => emitter.emit('order', { order }))
+    if (raised) emitOrder()
     if (raised || previous !== id) commit()
     return true
   }
@@ -759,13 +836,14 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (
       modal &&
       modal !== focusedId &&
-      (blockOf(id).includes(modal) ||
-        (focusedId !== null && (windows[focusedId] as WindowState).layer !== 'modal'))
+      (blockOf(id).includes(modal) || (focusedId !== null && layerRankOf(focusedId) < 2))
     ) {
       const previous = focusedId
       focusedId = modal
       emitFocus(windows[modal] as WindowState, previous)
     }
+    const guard = focusedId !== null && shield(focusedId)
+    if (guard) focus(guard, true)
   }
 
   function applyStage(
@@ -782,6 +860,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     syncGroup(next)
     if (granular) emitDiff(win, next)
     else queueEvent(() => emitter.emit('stage', { window: next, previous: win.stage }))
+    const hide = next.stage === 'minimized'
+    if (hide !== (win.stage === 'minimized')) {
+      for (const other of family(id)) {
+        if (hide) minimize(other)
+        else if ((windows[other] as WindowState).stage === 'minimized') unminimize(other)
+      }
+    }
     if (next.groupId !== null) reconcileFocus()
     commit()
     return true
@@ -793,9 +878,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       return { ...win, stage: 'minimized', restoreStage: win.stage }
     })
     if (result && focusedId === id) {
-      const previous = focusedId
-      focusTop()
-      if (focusedId) emitFocus(windows[focusedId] as WindowState, previous)
+      refocus()
       commit()
     }
     return result
@@ -1015,7 +1098,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     syncGroup(finalWin)
     if (patch.layer && patch.layer !== win.layer) {
       order = sortByLayer(order)
-      queueEvent(() => emitter.emit('order', { order }))
+      emitOrder()
       handOff(id)
     }
     queueEvent(() => emitter.emit('update', { window: finalWin }))
@@ -1048,11 +1131,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const target = normalizeWorkspace(next, workspace)
     if (target === workspace) return false
     switchWorkspace(target)
-    const previousFocus = focusedId
-    focusTop()
-    if (focusedId && focusedId !== previousFocus) {
-      emitFocus(windows[focusedId] as WindowState, previousFocus)
-    }
+    refocus()
     commit()
     return true
   }
@@ -1062,18 +1141,16 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     if (!win) return false
     const target = normalizeWorkspace(next, win.workspace)
     if (target === win.workspace) return false
-    const updated = { ...win, workspace: target }
-    setWindow(updated)
-    syncGroup(updated)
-    if (!onActiveWorkspace(updated) && focusedId === id) {
-      focusTop()
-      if (focusedId) emitFocus(windows[focusedId] as WindowState, id)
-    } else if (updated.groupId !== null && !onActiveWorkspace(updated)) {
-      reconcileFocus()
-    } else {
-      handOff(id)
+    let updated = win
+    for (const member of family(id)) {
+      const moved = { ...(windows[member] as WindowState), workspace: target }
+      setWindow(moved)
+      queueEvent(() => emitter.emit('update', { window: moved }))
+      if (member === id) updated = moved
     }
-    queueEvent(() => emitter.emit('update', { window: updated }))
+    syncGroup(updated)
+    if (onActiveWorkspace(updated)) handOff(id)
+    else reconcileFocus()
     commit()
     return true
   }
@@ -1094,7 +1171,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       const siblings = win.groupId === null ? [id] : membersOf(win.groupId)
       for (const entry of siblings) if (!expanded.includes(entry)) expanded.push(entry)
     }
-    if (expanded.length < 2) return null
+    if (expanded.length < 2 || expanded.some((id) => family(id).length > 1)) return null
     const hostVisible = onActiveWorkspace(host) && host.stage !== 'minimized'
     const current = host.groupId
     if (current !== null && expanded.length === membersOf(current).length) {
@@ -1128,7 +1205,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     activeTabs = next
     raise(host.id)
     emitGroup(groupId, null)
-    queueEvent(() => emitter.emit('order', { order }))
+    emitOrder()
     commit()
     if (hostVisible) focus(host.id, true)
     reconcileFocus()
@@ -1149,7 +1226,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const next = [...without.slice(0, at), id, ...without.slice(at)]
     if (next.some((entry, i) => entry !== order[i])) {
       order = next
-      queueEvent(() => emitter.emit('order', { order }))
+      emitOrder()
     }
     settleGroup(groupId)
     emitGroup(groupId, wasActive && remaining.length > 1 ? id : null)
@@ -1193,7 +1270,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     }
     order = next
     emitGroup(win.groupId, null)
-    queueEvent(() => emitter.emit('order', { order }))
+    emitOrder()
     commit()
     return true
   }
@@ -1214,7 +1291,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   }
 
   function lower(id: string): boolean {
-    const block = blockOf(id)
+    const block = blockOf(rootOf(id))
     const without = order.filter((entry) => !block.includes(entry))
     const rank = layerRankOf(id)
     let insertAt = 0
@@ -1225,16 +1302,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const next = [...without.slice(0, insertAt), ...block, ...without.slice(insertAt)]
     if (next.every((entry, i) => entry === order[i])) return false
     order = next
-    queueEvent(() => emitter.emit('order', { order }))
+    emitOrder()
     return true
   }
 
   function sendToBack(id: string): boolean {
     if (!windows[id] || !lower(id)) return false
-    if (focusedId === id) {
-      focusTop()
-      if (focusedId !== id) emitFocus(windows[focusedId as string] as WindowState, id)
-    }
+    if (focusedId === id) refocus()
     commit()
     return true
   }
@@ -1378,7 +1452,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         const win = windows[id] as WindowState
         if (!before.windows[id]) queueEvent(() => emitter.emit('open', { window: win }))
       }
-      if (!equal(order, before.order, 1)) queueEvent(() => emitter.emit('order', { order }))
+      if (!equal(order, before.order, 1)) emitOrder()
       const next = buildGroups()
       for (const groupId in { ...groups, ...next }) {
         const old = groups[groupId]
@@ -1543,7 +1617,13 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
   function minimizeAll(): void {
     for (const id of [...order]) {
       const win = windows[id] as WindowState
-      if (win.minimizable && onActiveWorkspace(win) && isVisibleTab(win)) minimize(id)
+      if (
+        (windows[rootOf(id)] as WindowState).minimizable &&
+        onActiveWorkspace(win) &&
+        isVisibleTab(win)
+      ) {
+        minimize(id)
+      }
     }
   }
 
@@ -1551,7 +1631,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     lift(
       minimized()
         .map((win) => win.id)
-        .filter(unminimize),
+        .filter((id) => (windows[id] as WindowState).stage === 'minimized' && unminimize(id)),
     )
   }
 
@@ -1645,6 +1725,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         layer: raw.layer,
         workspace: normalizeWorkspace(raw.workspace, 0),
         groupId: typeof raw.groupId === 'string' && raw.groupId.length > 0 ? raw.groupId : null,
+        ownerId: typeof raw.ownerId === 'string' ? raw.ownerId : null,
         minSize: { width: num(minSize.width, 0) ?? 160, height: num(minSize.height, 0) ?? 100 },
         maxSize: capped(maxSize.width, maxSize.height),
         aspectRatio: num(raw.aspectRatio, TINY) ?? null,
@@ -1661,7 +1742,17 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
       maxSeq = Math.max(maxSeq, win.openedSeq)
       built.push(win)
     }
-    for (const win of built.sort((a, b) => a.openedSeq - b.openedSeq)) nextWindows[win.id] = win
+    for (const win of built.sort((a, b) => a.openedSeq - b.openedSeq)) {
+      const owner = nextWindows[win.ownerId as string]
+      nextWindows[win.id] =
+        win.ownerId === null ||
+        (owner?.groupId === null &&
+          win.groupId === null &&
+          owner.workspace === win.workspace &&
+          (owner.stage === 'minimized') === (win.stage === 'minimized'))
+          ? win
+          : { ...win, ownerId: null }
+    }
 
     const requestedOrder = Array.isArray(data.order) ? data.order : []
     const seen = new Set<string>()
@@ -1697,7 +1788,9 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     const raw = data.extensions
     extensions = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
     for (const groupId of Object.keys(restoredTabs)) settleGroup(groupId)
-    order = sortByLayer(order)
+    order = sortByLayer(
+      order.filter((id) => (windows[id] as WindowState).ownerId === null),
+    ).flatMap((id) => subtree(id))
 
     const candidate = typeof data.focusedId === 'string' ? windows[data.focusedId] : undefined
     focusedId =
@@ -1708,10 +1801,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
         ? candidate.id
         : null
     if (!focusedId && data.focusedId !== null) focusTop()
-    const modal = topModalId()
-    if (modal && focusedId && (windows[focusedId] as WindowState).layer !== 'modal') {
-      focusedId = modal
-    }
+    if (focusedId) focusedId = guardOf(focusedId) ?? focusedId
     done()
     commit()
     clearHistory()
@@ -1760,6 +1850,7 @@ export function createWindowManager(options: ManagerOptions = {}): WindowManager
     resize: by(resize),
     update: by(update),
     get: (id) => windows[text(id)],
+    blockedBy: (id) => (windows[text(id)] && guardOf(text(id))) || null,
     getState,
     minimized,
     setViewport: (next) => transact(() => setViewport(next)),

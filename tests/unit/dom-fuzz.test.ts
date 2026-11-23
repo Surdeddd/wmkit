@@ -124,6 +124,9 @@ function violations(h: Harness, label: string): string[] {
     previousZ = z
   }
 
+  const drawn = nodes.some(
+    (node) => state.windows[node.dataset.wmWindow as string]?.layer === 'modal',
+  )
   for (const node of nodes) {
     const id = node.dataset.wmWindow as string
     const win = state.windows[id]
@@ -145,6 +148,16 @@ function violations(h: Harness, label: string): string[] {
     }
     if ((node.dataset.wmGroup ?? null) !== win.groupId) {
       found.push(`${label}: ${id} group ${node.dataset.wmGroup} want ${win.groupId}`)
+    }
+    if ((node.dataset.wmOwner ?? null) !== win.ownerId) {
+      found.push(`${label}: ${id} owner ${node.dataset.wmOwner} want ${win.ownerId}`)
+    }
+    const blocked = drawn && h.wm.blockedBy(id) !== null
+    if ((node.dataset.wmBlocked !== undefined) !== blocked) {
+      found.push(`${label}: ${id} blocked mark ${node.dataset.wmBlocked} want ${blocked}`)
+    }
+    if ((node.getAttribute('aria-modal') === 'true') !== (win.layer === 'modal' && !win.ownerId)) {
+      found.push(`${label}: ${id} aria-modal ${node.getAttribute('aria-modal')}`)
     }
     const wanted = `translate3d(${win.bounds.x}px, ${win.bounds.y}px, 0)`
     if (node.style.transform !== wanted) {
@@ -192,7 +205,13 @@ function drive(h: Harness, seed: number, steps: number): string[] {
 
     if (action === 0 || list.length === 0) {
       const next = `w${opened++}`
-      h.wm.open({ id: next, width: 200 + Math.floor(random() * 300), height: 160 })
+      h.wm.open({
+        id: next,
+        width: 200 + Math.floor(random() * 300),
+        height: 160,
+        owner: id !== null && random() < 0.4 ? id : undefined,
+        layer: random() < 0.2 ? 'modal' : 'normal',
+      })
       h.add(next)
     } else if (action === 1 && id) {
       const node = nodeOf(id)

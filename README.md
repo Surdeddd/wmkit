@@ -31,6 +31,7 @@
 - 🗔 **Taskbar, switcher and overview** — a ready, unstyled taskbar (`/taskbar`, also `<wm-taskbar>`), window switching on Alt+backquote and an overview of every open window (`/switcher`)
 - ▦ **Snap layouts** — a layout menu on the maximize button, snapped neighbours that resize together by their shared edge (`/layouts`) and an optional grid for drag and resize
 - 🔁 **Sync across tabs** — one desktop in every tab of the browser over a `BroadcastChannel` (`/sync`)
+- 🪟 **Owned windows** — a dialog or a palette opened with `owner` stays above its window, minimizes and closes with it, and a modal one blocks that window alone while the rest of the desktop works
 - 🛑 **Ask before closing** — `wm.onBeforeClose(guard)` and `wm.requestClose(id)` keep a window with unsaved changes open, with an answer now or later
 - 🛡️ **Strict CSP ready** — injected styles carry the page nonce and markup goes through one Trusted Types policy
 - 🤖 **Written for coding agents too** — an [`llms.txt`](./llms.txt) with the entry points and the rules ships inside the package

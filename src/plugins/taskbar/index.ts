@@ -29,10 +29,20 @@ const PREVIOUS = ['ArrowLeft', 'ArrowUp']
 const keyOf = (win: WindowState): string =>
   win.groupId === null ? `w${win.id}` : `g${win.groupId}`
 
+function rootOf(state: ManagerState, win: WindowState): WindowState {
+  const owner = win.ownerId === null ? undefined : state.windows[win.ownerId]
+  return owner ? rootOf(state, owner) : win
+}
+
+function leadOf(state: ManagerState): string | null {
+  const focused = state.focusedId === null ? undefined : state.windows[state.focusedId]
+  return focused ? rootOf(state, focused).id : null
+}
+
 function entriesOf(state: ManagerState, options: TaskbarOptions): Entry[] {
   const found = new Map<string, Entry>()
   for (const id of Object.keys(state.windows)) {
-    const member = state.windows[id] as WindowState
+    const member = rootOf(state, state.windows[id] as WindowState)
     const group = member.groupId === null ? undefined : state.groups[member.groupId]
     const win = group ? (state.windows[group.activeId] as WindowState) : member
     if (options.workspace !== 'all' && win.workspace !== state.workspace) continue
@@ -95,6 +105,7 @@ export function createTaskbar(
     const kept = new Set<string>()
     let cursor = element.firstElementChild
     let pressed: HTMLButtonElement | null = null
+    const lead = leadOf(state)
     for (const entry of entriesOf(state, options)) {
       let button = buttons.get(entry.key)
       if (!button) {
@@ -109,7 +120,7 @@ export function createTaskbar(
       kept.add(entry.key)
       if (button === cursor) cursor = cursor.nextElementSibling
       else element.insertBefore(button, cursor)
-      const focused = state.focusedId === entry.win.id
+      const focused = lead === entry.win.id
       if (focused) pressed = button
       paint(button, entry, focused)
     }
@@ -143,7 +154,7 @@ export function createTaskbar(
     const id = taskOf(event)?.dataset.wmTask
     const win = id === undefined ? undefined : wm.get(id)
     if (!win) return
-    if (win.stage !== 'minimized' && wm.getState().focusedId === win.id) {
+    if (win.stage !== 'minimized' && leadOf(wm.getState()) === win.id) {
       if (win.minimizable) wm.minimize(win.id)
     } else wm.focus(win.id)
   }
@@ -191,7 +202,7 @@ export function createTaskbar(
     targetOf(win) {
       if (!unsubscribe) return null
       sync()
-      return buttons.get(keyOf(wm.get(win.id) ?? win)) ?? null
+      return buttons.get(keyOf(rootOf(wm.getState(), wm.get(win.id) ?? win))) ?? null
     },
     destroy() {
       if (!unsubscribe) return

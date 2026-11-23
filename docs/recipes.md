@@ -97,6 +97,38 @@ Notes:
 - `maximize`, `snap`, `restore` and the other stage calls that focus a window bring its workspace forward but skip the focus silently while a modal blocks it; `modalblocked` means a blocked `focus()` call.
 - A window that becomes the top modal through `update(…, { layer })` or `moveToWorkspace` takes focus; demoting the focused modal hands focus to the next visible modal.
 
+## A dialog that belongs to one window
+
+Give a dialog an `owner` and it stays with that window: above it, on its workspace, minimized and closed with it. With `layer: 'modal'` it blocks its owner and the other windows of that family only, so the rest of the desktop keeps working, which is what a "Save changes?" question about one document wants.
+
+```js
+wm.open({ id: 'report', title: 'Report.md' })
+
+function askToSave() {
+  wm.open({
+    id: 'report-unsaved',
+    title: 'Save changes?',
+    owner: 'report',
+    layer: 'modal',
+    width: 360,
+    height: 180,
+    minimizable: false,
+    maximizable: false,
+  })
+}
+
+wm.on('modalblocked', ({ window: modal }) => {
+  console.log(modal.id, 'has to be answered first')
+})
+```
+
+Notes:
+
+- A press on the blocked `report` window flashes the dialog and gives it the focus, and `wm.blockedBy('report')` names it. On the page the blocked windows carry `data-wm-blocked`: `[data-wm-blocked] { filter: saturate(0.6) }` dims them.
+- Leave `layer` out for a palette or an inspector: it floats above its owner without blocking anything.
+- The taskbar shows a family as the one button of its root, and closing the root closes the dialog with it. `requestClose` on the root asks the guards about the dialog too.
+- A window in a tab group cannot own windows, and a member of a family cannot be tabbed or share a dock panel. Open the dialog without `owner` there; it is then modal for the whole desktop.
+
 ## Persistence and migrations
 
 ```js

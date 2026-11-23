@@ -338,6 +338,63 @@ describe('a taskbar', () => {
   })
 })
 
+describe('the button of a tab group', () => {
+  it('keeps its count while the active tab is renamed and follows it when a tab leaves', () => {
+    mount()
+    wm.group(['a', 'b', 'c'])
+    const count = () => button('a').querySelector('[data-wm-task-count]')?.textContent
+    expect(count()).toBe('3')
+    wm.update('a', { title: 'Renamed' })
+    expect(count()).toBe('3')
+    expect(button('a').getAttribute('aria-label')).toBe(taskbarMessages.tabs('Renamed', 3))
+    wm.ungroup('c')
+    expect(count()).toBe('2')
+  })
+})
+
+describe('a taskbar and windows that own windows', () => {
+  it('shows one button for a family, pressed while any member has the focus', () => {
+    mount()
+    wm.open({ id: 'find', title: 'Find', owner: 'b' })
+    wm.open({ id: 'regex', title: 'Regex', owner: 'find' })
+    expect(ids()).toEqual(['a', 'b', 'c'])
+    expect(button('b').getAttribute('aria-pressed')).toBe('true')
+    expect(button('b').textContent).toBe('Beta')
+    wm.focus('a')
+    expect(button('b').getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('minimizes the family from its button while a child has the focus, and brings it back', () => {
+    mount()
+    wm.open({ id: 'find', title: 'Find', owner: 'b' })
+    click('b')
+    expect([wm.get('b')?.stage, wm.get('find')?.stage]).toEqual(['minimized', 'minimized'])
+    expect(button('b').dataset.wmStage).toBe('minimized')
+    click('b')
+    expect([wm.get('b')?.stage, wm.get('find')?.stage]).toEqual(['normal', 'normal'])
+    expect(wm.getState().focusedId).toBe('b')
+  })
+
+  it('hands the focus to the modal of the family when its button is pressed', () => {
+    mount()
+    wm.open({ id: 'ask', title: 'Ask', owner: 'b', layer: 'modal' })
+    wm.focus('a')
+    click('b')
+    expect(wm.getState().focusedId).toBe('ask')
+    expect(button('b').getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('gives the button of the family for any member, also for one that just closed', () => {
+    mount({ show: 'minimized' })
+    const find = wm.open({ id: 'find', title: 'Find', owner: 'b' })
+    wm.minimize('b')
+    expect(ids()).toEqual(['b'])
+    expect(taskbar.targetOf(find)).toBe(button('b'))
+    wm.close('b')
+    expect(taskbar.targetOf(find)).toBeNull()
+  })
+})
+
 describe('a taskbar in less usual circumstances', () => {
   it('gives the first button the tab stop when no window has the focus', () => {
     wm = createWindowManager({ viewport: { width: 1200, height: 800 } })

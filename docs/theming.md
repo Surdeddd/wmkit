@@ -95,6 +95,8 @@ Controls work through delegation, so they can be nested anywhere inside the wind
 | `data-wm-overview` | window | present while the overview of the switcher plugin shows the window scaled down |
 | `data-wm-variant` | window | the variant name, when the window has one |
 | `data-wm-group` | window | the id of its tab group, on grouped windows |
+| `data-wm-owner` | window | the id of the window that owns it, on owned windows |
+| `data-wm-blocked` | window | present while a modal keeps the window from being used: a modal of the desktop, or the modal of its family |
 | `data-wm-tab` | window | `active` or `inactive`, on grouped windows |
 | `data-wm-tab-target` | window | present on the window a drag would group with, once the gesture is armed |
 | `data-wm-live` | window | present while the desktop is being resized, and on docked windows while a dock separator is dragged; see [below](#large-desktops-and-live-resizing) |

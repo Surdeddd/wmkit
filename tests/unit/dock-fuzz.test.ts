@@ -11,6 +11,7 @@ import {
   type DockStack,
   dockLayout,
 } from '../../src/plugins/dock'
+import { familyDrift } from './support/dom-state'
 import { breathe, patience, seedCount } from './support/fuzz'
 import { trackResources } from './support/resources'
 
@@ -91,6 +92,8 @@ function check({ wm, dock, element, panels }: World): string | null {
   const layout = dock.layout()
   if (!dockLayout.validate(layout)) return 'tree fails validate'
   const state = wm.getState()
+  const [drift] = familyDrift(state)
+  if (drift) return drift
   const known = state.viewport.width > 0
   const tiling = dockLayout.rects(
     layout,
@@ -229,7 +232,9 @@ const OPS: Op[] = [
     'reopen',
     (w, r) => {
       const id = pick(r, POOL)
-      if (!w.wm.get(id)) w.wm.open({ id, title: id, x: 40, y: 40, width: 300, height: 200 })
+      if (w.wm.get(id)) return
+      const owner = r() < 0.5 ? pick(r, POOL) : undefined
+      w.wm.open({ id, title: id, x: 40, y: 40, width: 300, height: 200, owner })
     },
   ],
   [

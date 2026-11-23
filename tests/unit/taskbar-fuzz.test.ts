@@ -4,7 +4,7 @@ import { afterEach, describe, it } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { ManagerState, WindowManager, WindowState } from '../../src/core/types'
 import { createTaskbar, type TaskbarOptions, taskbarMessages } from '../../src/plugins/taskbar'
-import { stateDrift } from './support/dom-state'
+import { rootOf, stateDrift } from './support/dom-state'
 import { fuzz, patience } from './support/fuzz'
 import { trackResources } from './support/resources'
 
@@ -12,7 +12,7 @@ const IDS = ['a', 'b', 'c', '7', '3'] as const
 type Id = (typeof IDS)[number]
 
 type Action =
-  | { do: 'open'; id: Id; workspace: number; minimized: boolean }
+  | { do: 'open'; id: Id; workspace: number; minimized: boolean; owner: Id | null }
   | {
       do: 'close' | 'focus' | 'minimize' | 'restore' | 'maximize' | 'ungroup' | 'tab' | 'rename'
       id: Id
@@ -47,6 +47,7 @@ const action: fc.Arbitrary<Action> = fc.oneof(
       id,
       workspace: fc.constantFrom(0, 0, 0, 1, 2),
       minimized: fc.boolean(),
+      owner: fc.option(id, { nil: null }),
     }),
   },
   {
@@ -107,18 +108,24 @@ const action: fc.Arbitrary<Action> = fc.oneof(
 function expected(state: ManagerState, options: TaskbarOptions): Shown[] {
   const families = new Map<string, WindowState[]>()
   for (const win of Object.values(state.windows)) {
-    const family = families.get(win.groupId ?? win.id) ?? []
+    const key = win.groupId ?? rootOf(state, win.id).id
+    const family = families.get(key) ?? []
     family.push(win)
-    families.set(win.groupId ?? win.id, family)
+    families.set(key, family)
   }
+  const lead = state.focusedId === null ? null : rootOf(state, state.focusedId).id
   return [...families.values()]
     .map((family) => {
       const groupId = (family[0] as WindowState).groupId
       const face =
         groupId === null
-          ? (family[0] as WindowState)
+          ? rootOf(state, (family[0] as WindowState).id)
           : (state.windows[state.groups[groupId]?.activeId as string] as WindowState)
-      return { face, count: family.length, born: Math.min(...family.map((win) => win.openedSeq)) }
+      return {
+        face,
+        count: groupId === null ? 1 : family.length,
+        born: Math.min(...family.map((win) => win.openedSeq)),
+      }
     })
     .filter(({ face }) => options.workspace === 'all' || face.workspace === state.workspace)
     .filter(({ face }) => options.show !== 'minimized' || face.stage === 'minimized')
@@ -127,7 +134,7 @@ function expected(state: ManagerState, options: TaskbarOptions): Shown[] {
       id: face.id,
       title: face.title,
       count,
-      focused: state.focusedId === face.id,
+      focused: lead === face.id,
       stage: face.stage,
     }))
 }
@@ -191,6 +198,7 @@ function run(options: TaskbarOptions, actions: Action[]): void {
               title: next.id,
               workspace: next.workspace,
               stage: next.minimized ? 'minimized' : 'normal',
+              owner: next.owner ?? undefined,
             })
           }
           break
@@ -219,7 +227,9 @@ function run(options: TaskbarOptions, actions: Action[]): void {
           if (next.do === 'enter') button.focus()
           button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
           const after = wm.get(target.id)
-          const front = state.focusedId === target.id && target.stage !== 'minimized'
+          const leadOf = (now: ManagerState) =>
+            now.focusedId === null ? null : rootOf(now, now.focusedId).id
+          const front = leadOf(state) === target.id && target.stage !== 'minimized'
           if (front && target.minimizable && after?.stage !== 'minimized') {
             throw new Error(`a click on the focused ${target.id} did not minimize it`)
           }

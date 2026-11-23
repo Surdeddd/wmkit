@@ -551,6 +551,7 @@ render(document.getElementById('app')!, <App />).then(() => {
 | `x`, `y`, `width`, `height`, `min-width`, `min-height`, `max-width`, `max-height`, `aspect-ratio`, `workspace` | geometry and constraints |
 | `stage` | `normal`, `minimized` or `maximized`; reflects the current stage back |
 | `layer` | `normal`, `floating` or `modal` |
+| `owner` | the `window-id` of the window that owns this one, read once when the window opens; put the owner earlier in the markup, so that its window is already there. See [Owned windows](api.md#owned-windows) |
 | `closable`, `minimizable`, `maximizable`, `resizable`, `draggable`, `snappable` | on by default; `="false"` turns one off and hides its button |
 | `closed` | the window is closed and hidden; removing the attribute reopens it |
 | `chrome="none"` | hides the built-in titlebar, for your own `data-wm-drag` markup |

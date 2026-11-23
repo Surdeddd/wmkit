@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { boundsEqual, clampToViewport } from '../../src/core/geometry'
 import { createWindowManager } from '../../src/core/manager'
 import type { ManagerState, SnapZone, WindowManager, WindowState } from '../../src/core/types'
+import { familyDrift, familyGuard, rootOf } from './support/dom-state'
 import { breathe, patience, seedCount } from './support/fuzz'
 
 const LAYER_RANK = { normal: 0, floating: 1, modal: 2 } as const
@@ -84,7 +85,18 @@ function visibleIds(state: ManagerState): string[] {
 }
 
 function modalsOf(state: ManagerState, ids: string[]): string[] {
-  return ids.filter((id) => state.windows[id]?.layer === 'modal')
+  return ids.filter((id) => {
+    const win = state.windows[id]
+    return win?.layer === 'modal' && win.ownerId === null
+  })
+}
+
+function focusable(state: ManagerState): string[] {
+  const visible = visibleIds(state)
+  const ruled = modalsOf(state, visible).length > 0
+  return visible.filter(
+    (id) => (!ruled || rootOf(state, id).layer === 'modal') && !familyGuard(state, id),
+  )
 }
 
 function unreachable(wm: WindowManager, label: string): string[] {
@@ -92,9 +104,7 @@ function unreachable(wm: WindowManager, label: string): string[] {
   for (const direction of [1, -1] as const) {
     const copy = createWindowManager({ viewport: wm.getState().viewport })
     copy.hydrate(wm.serialize())
-    const visible = visibleIds(copy.getState())
-    const modals = modalsOf(copy.getState(), visible)
-    const targets = modals.length > 0 ? modals : visible
+    const targets = focusable(copy.getState())
     const seen = new Set(
       targets.flatMap(() => [copy.cycleFocus(direction), copy.cycleFocus(direction)]),
     )
@@ -123,7 +133,7 @@ function violations(state: ManagerState, label: string): string[] {
   for (const id of state.order) {
     const win = state.windows[id]
     if (!win) continue
-    const next = LAYER_RANK[win.layer]
+    const next = LAYER_RANK[rootOf(state, id).layer]
     if (next < rank) found.push(`${label}: ${id} (${win.layer}) sits above a higher layer`)
     rank = Math.max(rank, next)
   }
@@ -160,9 +170,10 @@ function violations(state: ManagerState, label: string): string[] {
 
   const modal = modalsOf(state, visibleIds(state))[0]
   const focused = state.focusedId ? state.windows[state.focusedId] : undefined
-  if (modal && focused && focused.layer !== 'modal') {
+  if (modal && focused && rootOf(state, focused.id).layer !== 'modal') {
     found.push(`${label}: focus sits on ${focused.id} behind modal ${modal}`)
   }
+  for (const message of familyDrift(state)) found.push(`${label}: ${message}`)
 
   if (state.focusedId !== null) {
     const win = state.windows[state.focusedId]
@@ -285,6 +296,7 @@ function drive(wm: WindowManager, seed: number, steps: number): string[] {
           minHeight: 80 + Math.floor(random() * 120),
           layer: pick(['normal', 'floating', 'modal'] as const),
           workspace: Math.floor(random() * 3),
+          owner: id !== null && random() < 0.4 ? id : undefined,
         })
         break
       case 1:
@@ -572,6 +584,7 @@ function audit(seed: number, steps: number, report: string[]): void {
           layer: pick(['normal', 'normal', 'floating', 'modal'] as const),
           workspace: Math.floor(random() * 3),
           stage: pick(['normal', 'normal', 'normal', 'minimized', 'maximized'] as const),
+          owner: id !== null && random() < 0.4 ? id : undefined,
         })
         break
       case 'group': {

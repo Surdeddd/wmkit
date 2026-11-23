@@ -916,6 +916,55 @@ function activeOf(wm: WindowManager, id: string): string | undefined {
   return wm.getState().groups[wm.get(id)?.groupId as string]?.activeId
 }
 
+describe('windows that own windows', () => {
+  function drag(h: Harness, id: string, to: [number, number]) {
+    const handle = h.element.querySelector(`[data-wm-window="${id}"] [data-wm-drag]`) as HTMLElement
+    handle.dispatchEvent(pointer('pointerdown', 100, 50))
+    handle.dispatchEvent(pointer('pointermove', to[0], to[1]))
+    h.flush()
+    return handle
+  }
+
+  it('dock into a panel of their own and keep their family on top', () => {
+    const h = setup()
+    h.add('doc')
+    h.add('find', { owner: 'doc' })
+    expect(h.dock.dock('doc')).toBe(true)
+    expect(h.wm.get('doc')?.stage).toBe('snapped')
+    expect(h.wm.getState().order).toEqual(['doc', 'find'])
+    expect(h.dock.dock('find', { side: 'right' })).toBe(true)
+    expect(h.wm.get('find')?.bounds.x).toBe(503)
+  })
+
+  it('never share a panel with another window, by a call, a layout or a drop', () => {
+    const h = setup()
+    h.add('doc')
+    h.add('find', { owner: 'doc' })
+    h.add('free')
+    h.add('other')
+    h.dock.dock('doc')
+    const stack = dockLayout.stackOf(h.dock.layout(), 'doc') as DockStack
+    expect(h.dock.dock('free', { stackId: stack.id })).toBe(false)
+    expect(h.dock.dock('find', { stackId: stack.id })).toBe(false)
+    expect(dockLayout.windowsOf(h.dock.layout())).toEqual(['doc'])
+    expect(
+      h.dock.setLayout({
+        root: { kind: 'stack', id: 's', windows: ['find', 'free'], active: 'free' },
+      }),
+    ).toBe(false)
+
+    drag(h, 'free', [250, 300])
+    expect(h.element.querySelector('[data-wm-snap-preview][data-wm-drop]')).toBeNull()
+    drag(h, 'free', [250, 300]).dispatchEvent(pointer('pointerup', 250, 300))
+    expect(h.wm.get('free')?.groupId).toBeNull()
+
+    expect(h.dock.dock('free', { side: 'right' })).toBe(true)
+    const right = dockLayout.stackOf(h.dock.layout(), 'free') as DockStack
+    expect(h.dock.dock('other', { stackId: right.id })).toBe(true)
+    expect(h.wm.get('other')?.groupId).toBe(h.wm.get('free')?.groupId)
+  })
+})
+
 describe('every docked window in its own panel', () => {
   it('moving a tab out of its stack puts both windows where their panels are', () => {
     const h = setup()

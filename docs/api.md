@@ -78,6 +78,7 @@ interface WindowState extends WindowFlags {
   layer: WindowLayer
   workspace: number
   groupId: string | null          // the tab group it belongs to
+  ownerId: string | null          // the window that owns it, see Owned windows
   minSize: Size
   maxSize: Size | null           // Infinity on an axis means unbounded
   aspectRatio: number | null     // width / height
@@ -106,6 +107,7 @@ interface WindowInit extends Partial<WindowFlags> {
   stage?: WindowStage  // 'snapped' is downgraded to 'normal' (no zone to snap to yet)
   layer?: WindowLayer  // 'normal' when omitted or unknown
   workspace?: number   // active workspace; non-integers and negatives fall back
+  owner?: string       // id of the window that owns it, see Owned windows
   meta?: Record<string, unknown>
 }
 ```
@@ -135,7 +137,7 @@ The keys of `windows` are in opening order, also after `hydrate` and `loadLayout
 ```ts
 interface SerializedState {
   version: 1
-  windows: SerializedWindowState[]   // WindowState with maxSize as { width: number | null; height: number | null } | null
+  windows: SerializedWindowState[]   // WindowState with maxSize as { width: number | null; height: number | null } | null, ownerId optional
   order: string[]
   focusedId: string | null
   workspace: number
@@ -151,6 +153,7 @@ interface SerializedState {
 - a `restoreBounds` that is not a valid rectangle becomes `null`; `snapRect` is treated the way `snapTo` treats its rectangle: clamped, or dropped when `snapTo` would refuse it, and a window left `'snapped'` with nothing to snap to becomes `'normal'`
 - `stage: 'snapped'` with neither a known `snapZone` nor a `snapRect` becomes `'normal'`
 - an `openedSeq` that is not finite gets a new one, and any other unknown per-window field takes its default
+- an `ownerId` that cannot be honoured becomes `null`, as [Owned windows](#owned-windows) describes; a snapshot saved before windows had owners reads as a desktop without them
 
 `meta` is copied, and group members are re-synced to their active tab (an `activeTabs` entry that names no member falls back to the group's first); the frame of a group honours the limits of all its members, as below. `focusedId: null` keeps the desktop blurred; only a missing or invalid id falls back to the top window.
 
@@ -184,8 +187,8 @@ A call that changes nothing is a no-op: the state object stays the same, no even
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `open(init?)` | `WindowState` | throws on a duplicate id; cascades when `x`/`y` are omitted; focuses unless minimized or on another workspace |
-| `close(id)` | `boolean` | `false` for unknown ids; focus moves to the next eligible window. Never asks the guards |
+| `open(init?)` | `WindowState` | throws on a duplicate id; cascades when `x`/`y` are omitted; focuses unless minimized or on another workspace. With `owner` the window joins the family of that window, see [Owned windows](#owned-windows) |
+| `close(id)` | `boolean` | `false` for unknown ids; closes the windows it owns as well; focus moves to the next eligible window. Never asks the guards |
 | `requestClose(id)` | `Promise<boolean>` | asks the guards and closes the window unless one of them says no; `true` once the window is closed. See [below](#asking-before-a-window-closes) |
 | `onBeforeClose(guard)` | `() => void` | adds a guard and returns the function that removes it. Subscribing the same function twice gives two guards, and each returned function removes only its own |
 | `closeAll()` | `void` | every workspace, one transaction. Emits `close` for each window in opening order, one `order`, then `group` for each group that dissolved, and no `focus`. Never asks the guards |
@@ -214,7 +217,7 @@ If the window goes away while it is being asked — `close`, `closeAll`, `undo`,
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `focus(id)` | `boolean` | switches to the window's workspace first; restores it if minimized; `false` when a modal blocks it (emits `modalblocked`). Emits `focus` only when `focusedId` changes; focusing the focused window only raises it |
+| `focus(id)` | `boolean` | switches to the window's workspace first; restores it if minimized; `false` when a modal blocks it (emits `modalblocked`; a modal of its own family then takes the focus). Emits `focus` only when `focusedId` changes; focusing the focused window only raises it |
 | `blur()` | `void` | clears `focusedId` without touching order |
 | `cycleFocus(direction?)` | `string \| null` | `1` (default) or `-1`, wraps, skips minimized and other workspaces. `1` raises the bottom-most focusable window; `-1` sends the focused window to the back of its layer and focuses the one now on top, so the directions undo each other and both reach every window |
 | `sendToBack(id)` | `boolean` | bottom of the window's own layer band; hands focus over if it was focused |
@@ -223,7 +226,7 @@ If the window goes away while it is being asked — `close`, `closeAll`, `undo`,
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `minimize(id)` | `boolean` | remembers the stage it came from |
+| `minimize(id)` | `boolean` | remembers the stage it came from; takes the whole family of an owned or owning window along, and so does the way back |
 | `maximize(id)` | `boolean` | fills the viewport; keeps geometry in `restoreBounds` |
 | `toggleMaximize(id)` | `boolean` | maximize, or restore when already maximized |
 | `restore(id)` | `boolean` | from minimized returns to the remembered stage (a window returning to `normal` is re-clamped against the viewport when `keepInViewport` is on); from maximized/snapped returns to `restoreBounds`, re-clamped against min/max and the viewport — except a maximized window that carries a `snapRect`, which goes back to that rectangle |
@@ -258,7 +261,7 @@ An id is a string. Every method that takes one also accepts a number and reads i
 | --- | --- | --- |
 | `workspace()` | `number` | active index |
 | `setWorkspace(n)` | `boolean` | `false` when unchanged or invalid; refocuses the top window of the target |
-| `moveToWorkspace(id, n)` | `boolean` | `false` for unknown ids or a no-op move |
+| `moveToWorkspace(id, n)` | `boolean` | `false` for unknown ids or a no-op move; moves the whole family of an owned or owning window |
 
 Windows outside the active workspace are hidden by the DOM layer, skipped by `focusTargets`, `minimized()`, `arrange()`, `minimizeAll()` and drag magnetism.
 
@@ -269,7 +272,7 @@ share geometry; exactly one member is visible at a time and the rest behave like
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `group(ids)` | `string \| null` | `null` for fewer than two known windows; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them; when the ids already form one group, its id is returned and the first id becomes the active tab |
+| `group(ids)` | `string \| null` | `null` for fewer than two known windows, and when one of them owns a window or is owned; the first id is the host whose geometry and stage the group adopts, and it becomes the active tab. Windows that already belong to a group bring their whole group with them; when the ids already form one group, its id is returned and the first id becomes the active tab |
 | `ungroup(id)` | `boolean` | detaches one member, the rest stay contiguous in `order` (emits `order`); a group left with a single member dissolves entirely |
 | `activateTab(id)` | `boolean` | makes a member the visible tab; `false` when it is already active or not grouped. Focus follows the tab, but only when the member going hidden was the focused window |
 | `moveTab(id, index)` | `boolean` | moves a member to another slot in the tab order; the index is clamped, and `false` means nothing moved. The active tab, the focus and the geometry stay put |
@@ -321,6 +324,32 @@ interface WindowGroup {
 The `group` event fires on creation, activation and membership changes, including when a member closes and when a group dissolves (`members: []`, `activeId: ''`), with
 `{ groupId, members, activeId, previous }`.
 
+### Owned windows
+
+A window opened with `owner` belongs to that window: `open({ id: 'find', owner: 'editor' })`. An owner, the windows it owns and whatever those own in turn make a family, and a family behaves as one piece of the desktop:
+
+- it stays together in `order`, in the layer of its root (the member that has no owner), with every owner below the windows it owns. `focus` raises the whole family and puts the window you named, with what it owns, on top of it; `sendToBack` sends the whole family back
+- closing a window closes what it owns in the same undo step, children first, with a `close` event each. `requestClose` shows every guard the window and then each window it owns, and one `false` keeps them all
+- it is minimized and restored together, whichever member the call names, and moves to another workspace together
+- a member never joins a tab group: `group()` gives `null` when one of its ids owns a window or is owned
+
+`ownerId` is set when the window opens and never changes. An `owner` that names no window, or a window that sits in a tab group, is ignored, and the window opens with `ownerId: null`. A window opens on the workspace of its owner, and minimized under a minimized owner, whatever `workspace` and `stage` it asks for.
+
+`layer: 'modal'` on a window that has an owner makes it modal for its family and for nothing else. The topmost such window rules the family: only it and the windows it owns take the focus, while the rest of the desktop stays usable. `focus()` on a member it blocks returns `false`, emits `modalblocked` with the modal and hands the focus to the modal, which brings the family to the front. A window opened into a family that a modal rules, outside what the modal owns, goes under the modal and leaves the focus with it. A modal without an owner works as before, for the whole desktop, and the windows it owns stay usable with it.
+
+```js
+wm.open({ id: 'editor', title: 'notes.txt' })
+wm.open({ id: 'unsaved', title: 'Save changes?', owner: 'editor', layer: 'modal' })
+
+wm.focus('editor')        // false, and 'unsaved' takes the focus
+wm.blockedBy('editor')    // 'unsaved'
+wm.close('editor')        // closes 'unsaved' as well
+```
+
+`cycleFocus` walks the members of a family in the order they opened and leaves out the ones a modal blocks, so a round still visits every window once. `minimizeAll` leaves a family alone when its root has `minimizable: false`.
+
+`hydrate` keeps an owner only when it can honour it. An `ownerId` that names no window, the window itself or a window that opened later (which is how a circle is cut), and one that ties together windows on different workspaces, in different minimized states or inside a tab group, becomes `null`. The order is then put back so that every family is in one piece.
+
 ### History
 
 | Method | Returns | Notes |
@@ -345,7 +374,7 @@ Steps that change only focus and stacking order collapse when they follow each o
 | `setLayout(name, data)` | `boolean` | validates like `hydrate` |
 | `deleteLayout(name)` / `layoutNames()` | `boolean` / `string[]` | |
 | `arrange(mode)` | `void` | `'cascade'` staggers from `cascadeOrigin`; `'tile'` fills a `ceil(sqrt(n))` grid. Both skip minimized windows and other workspaces, and leave a window placed with `snapTo` where it is; see below |
-| `minimizeAll()` / `restoreAll()` | `void` | active workspace, one history entry. `minimizeAll` skips windows with `minimizable: false`; `restoreAll` emits at most one `order` |
+| `minimizeAll()` / `restoreAll()` | `void` | active workspace, one history entry. `minimizeAll` skips windows with `minimizable: false`, and families whose root has it; `restoreAll` emits at most one `order` |
 
 A window placed with `snapTo` stays where it is, whoever placed it — the dock plugin or your own layout code; `restore()` it first to have it arranged. `arrange` emits `move` and `resize` for each window it places, raises the arranged windows once and focuses the last of them, or the top modal when one is up; calling it again with nothing changed is a no-op. `arrange`, `minimizeAll`, `restoreAll` and `closeAll` take time linear in the number of windows when no tab groups are involved.
 
@@ -356,6 +385,7 @@ Layout storage is in-memory. Persist it yourself with `getLayout`/`setLayout`, o
 | Method | Returns | Notes |
 | --- | --- | --- |
 | `get(id)` | `WindowState \| undefined` | |
+| `blockedBy(id)` | `string \| null` | the id of the modal that keeps the window from taking the focus: the top modal of the desktop for a window outside the modal layer, otherwise the modal that rules its family. `null` when nothing blocks it and for an unknown id |
 | `getState()` | `ManagerState` | cached until the next change |
 | `minimized()` | `readonly WindowState[]` | active workspace, ordered by `openedSeq` — taskbar order |
 | `serialize()` | `SerializedState` | |
@@ -614,7 +644,7 @@ A skin's `destroy` runs exactly once: after a rebuild swap, on close, on `detach
 
 ### What the controller writes
 
-On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `data-wm-variant` (when `windowVariant` names one), `data-wm-group` and `data-wm-tab` (on grouped windows), `data-wm-tab-target` (on the window a drag would group with), `data-wm-live`, `data-wm-deep`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on modal layers, plus inline `transform`, `width`, `height`, `z-index`. The first sync briefly sets `transition: none`, and an inline `transition` your app set is restored afterwards. [Theming](theming.md#the-attribute-contract) lists the values; plugins add their own attributes (`data-wm-pinching`, `data-wm-docked`, `data-wm-skin`).
+On the window element: `data-wm-window`, `data-wm-stage`, `data-wm-layer`, `data-wm-workspace`, `data-wm-focused`, `data-wm-dragging`, `data-wm-resizing`, `data-wm-flash`, `data-wm-variant` (when `windowVariant` names one), `data-wm-group` and `data-wm-tab` (on grouped windows), `data-wm-owner` (the id of its owner, on owned windows), `data-wm-blocked` (while a modal blocks it), `data-wm-tab-target` (on the window a drag would group with), `data-wm-live`, `data-wm-deep`, `hidden`, `role="dialog"`, `tabindex="-1"`, `aria-label`, `aria-labelledby` (when `[data-wm-title]` sits in the same root as the window; a title inside a shadow root is carried by `aria-label` instead), `aria-modal` on a modal that has no owner, plus inline `transform`, `width`, `height`, `z-index`. The first sync briefly sets `transition: none`, and an inline `transition` your app set is restored afterwards. [Theming](theming.md#the-attribute-contract) lists the values; plugins add their own attributes (`data-wm-pinching`, `data-wm-docked`, `data-wm-skin`).
 
 In `[data-wm-title]` the controller replaces the previous title where it stands — in a direct text child of the node first, then deeper inside, as in `<b>{{title}}</b>` — so an icon or static text around it stays: `<span data-wm-title><i class="icon"></i> {{title}}</span>`. When the previous title cannot be found, the controller writes into a direct text child of the node, or appends one, and never into a child element, so a ligature icon keeps its glyph; a title that reads the same as such an icon is still written. One case is left out: when the window is attached with markup whose only text is such an icon and its title already reads the same, the node gets no title text. The previous title is found by its text, so static text in the node that contains the same string can be replaced in its place.
 
@@ -626,15 +656,15 @@ In `[data-wm-title]` the controller replaces the previous title where it stands 
 
 The controller moves keyboard focus into a window when the manager focuses it, or when its titlebar or a grip is pressed, returning it to the control that last had focus in that window; a press into the content is left to the browser. It parks focus on the desktop when its window closes or hides. The other way round, giving DOM focus to a window element or a control in it — by `.focus()` or Tab — does not change the manager's focused window by itself; a pointer press or `wm.focus(id)` does, and so does a frame that takes the focus, as described below. Generated title ids are `wmkit-title-<id>-<n>`, unique per page.
 
-Under a visible modal the DOM layer refuses pointer interaction on the lower windows: presses, drags, resizes, double and middle clicks, action attributes and the titlebar menu. A blocked press flashes the modal. Keyboard input into lower windows is not blocked: Tab arriving from outside the desktop, or typing in a control that already had focus. Tab inside a modal cycles through its controls, `position: fixed` ones included. An `iframe` as the first or last stop of a modal lets Tab leave from inside the frame, because key events inside a frame do not reach the parent document.
+While a modal is drawn the DOM layer refuses pointer interaction on the windows it blocks — every window outside the modal layer for a modal of the desktop, the rest of its family for a modal that has an owner: presses, drags, resizes, double and middle clicks, action attributes and the titlebar menu. A blocked press flashes the modal, and those windows carry `data-wm-blocked`, so a style sheet can dim them. Keyboard focus that lands in a blocked window, by Tab from outside the desktop or by `.focus()`, is handed to the modal as well. Tab inside a modal cycles through its controls, `position: fixed` ones included. An `iframe` as the first or last stop of a modal lets Tab leave from inside the frame, because key events inside a frame do not reach the parent document.
 
-Frames inside windows (`iframe`, `object`, `embed`) never send their pointer or key events to the page, so the controller watches where focus goes instead: while the pointer is over a frame, and once whenever the page loses focus, a frame that has just taken focus raises and focuses its window. The watch stops when the pointer leaves the frame, and a frame that already had focus does not pull it back after `wm.blur()` or when another window opens. Under a visible modal the frames in the lower windows get `pointer-events: none` until the modal goes away, so a click cannot reach their content; that includes windows attached while the modal is up, a frame added to a lower window is covered from that window's next state change, and the `pointer-events` value the application had set comes back afterwards.
+Frames inside windows (`iframe`, `object`, `embed`) never send their pointer or key events to the page, so the controller watches where focus goes instead: while the pointer is over a frame, and once whenever the page loses focus, a frame that has just taken focus raises and focuses its window. The watch stops when the pointer leaves the frame, and a frame that already had focus does not pull it back after `wm.blur()` or when another window opens. While a modal is drawn the frames in the windows it blocks get `pointer-events: none` until the modal goes away, so a click cannot reach their content; that includes windows attached while the modal is up, a frame added to a lower window is covered from that window's next state change, and the `pointer-events` value the application had set comes back afterwards.
 
 ### Touch
 
 Every gesture is driven by pointer events, so a finger and a mouse take the same path. The drag handle and the resize grips are given `touch-action: none`, which is what stops the browser from panning the page out from under a drag, and hit areas grow on coarse pointers — the defaults above show both figures. Only one gesture runs at a time: a second finger landing on another titlebar mid-drag is ignored entirely, so it neither starts a competing drag nor focuses or raises that window. A drag or resize whose `setPointerCapture` throws does not start. Losing pointer capture cancels the gesture like `pointercancel`, except while the button is still held, which is what Chromium does when a second mouse button is let go in the middle of a gesture: the handle then asks for the capture back and the gesture goes on, and it is cancelled only when the capture cannot be had, as for a handle that has left the page. Pointer moves are followed on the document, so the gesture keeps up with the pointer either way. A press on a control inside a web component in the titlebar does not start a drag (the inner target is read through `composedPath()`). A long press produces a `contextmenu` event like anywhere else, which is where `onTitlebarContextMenu` is called from, with the browser's own menu suppressed for you. Once a drag is moving a window, and from the press on for a resize grip or a dock separator, a context menu does not open: the event is cancelled and stops at the document, so neither the browser's menu nor `onTitlebarContextMenu` cuts into the gesture. A second mouse button pressed mid-drag therefore changes nothing, and Safari, which stops sending pointer events while its menu is up, cannot leave the gesture hanging. A press that has not moved yet still lets the event through.
 
-Drop-to-group finds its target from the window bounds rather than by hit-testing the page: the topmost visible window of this desktop under the pointer, and only while the pointer is over that window's drag handle. Elements of the page lying over a titlebar do not block it, and a modal window is never grouped, neither as the dragged window nor as the target. Resizing a tab group honours the same combined limits as the manager — the largest minimum, the smallest maximum and the smallest aspect ratio of its members — and keeps the opposite edge still when one of them stops a resize from the left or top.
+Drop-to-group finds its target from the window bounds rather than by hit-testing the page: the topmost visible window of this desktop under the pointer, and only while the pointer is over that window's drag handle. Elements of the page lying over a titlebar do not block it, and a modal window is never grouped, neither as the dragged window nor as the target; the same goes for a window that owns windows or is owned. Resizing a tab group honours the same combined limits as the manager — the largest minimum, the smallest maximum and the smallest aspect ratio of its members — and keeps the opposite edge still when one of them stops a resize from the left or top.
 
 The end of a drag or resize (`pointerup`, `pointercancel`, `lostpointercapture`) is heard on the document in the capture phase, so the gesture also ends cleanly when its handle is removed from the page halfway through. A release the page never hears — the button let go outside the browser, or while another application had the pointer — does not leave the gesture running: it ends, keeping what it did, as soon as the same pointer presses again or the mouse that started it moves with no button held. Escape restores exactly the state the gesture started from — stage, bounds, restore bounds, snap zone and `snapRect`, also for a window that was maximized over a `snapRect` — and the key does not reach the page's own handlers. Closing the window in the middle of its own drag or resize, or from a drop target's `commit`, ends the gesture as committed: one undo step brings the window back where it was before the gesture.
 
@@ -1034,7 +1064,7 @@ Tiles windows into a layout of panels, dockview style, while the other windows k
 
 After `dock()` or `setLayout()` returns, every docked window sits in its own panel, whatever regrouping the change needed, such as moving a tab out of a stack or splitting a stack apart. All three calls work inside `wm.batch()`, also after windows were closed or restored earlier in the same batch. A layout that cannot be placed yet because the viewport is still unknown — given to `setLayout` or `dock`, or stored, when a script runs before the stylesheet has given the desktop its size — is kept, with `waiting: true` in `extensions.dock` meanwhile, and placed when the size arrives.
 
-Dragging a window over the area previews where it would land and docks it there on release. Near a panel edge it splits that panel, at the panel's centre it tabs in, and inside the edge band of the area it docks to the root. Windows on the `floating` or `modal` layer never dock by drag, and neither does a drop outside `area`. Drop targeting works in desktop coordinates, so it respects the desktop's scroll, border and scale. The first drag frame of a docked window tears it out and the panels close the gap; dragging a panel of several tabs by its titlebar tears out the whole tab group, which stays grouped. Escape or another cancelled drag puts it back.
+Dragging a window over the area previews where it would land and docks it there on release. Near a panel edge it splits that panel, at the panel's centre it tabs in, and inside the edge band of the area it docks to the root. Windows on the `floating` or `modal` layer never dock by drag, and neither does a drop outside `area`. A window that owns windows or is owned docks into a panel of its own only: `dock()` and `setLayout()` return `false`, and a drag shows no preview, when it would share a panel with another window, because the tabs of a panel are a tab group and a family never joins one. Drop targeting works in desktop coordinates, so it respects the desktop's scroll, border and scale. The first drag frame of a docked window tears it out and the panels close the gap; dragging a panel of several tabs by its titlebar tears out the whole tab group, which stays grouped. Escape or another cancelled drag puts it back.
 
 `float` is asked on every pointer move over the desktop. While it returns `true` — by default while Shift is held — a dragged window stays floating: no preview, no docking. A touch screen has no Shift, so wire it to a control of your own:
 
@@ -1178,7 +1208,7 @@ const switcher = createSwitcher(desktop)
 document.querySelector('#show-all').addEventListener('click', () => switcher.overview())
 ```
 
-Two ways to get to a window, one element: `[data-wm-switcher][role=listbox]` inside the desktop, with a `[role=option][data-wm-switch="<id>"]` per window and `aria-activedescendant` on the choice. Both offer the windows of the active workspace, one entry for a tab group, and only the modal windows while a modal is open.
+Two ways to get to a window, one element: `[data-wm-switcher][role=listbox]` inside the desktop, with a `[role=option][data-wm-switch="<id>"]` per window and `aria-activedescendant` on the choice. Both offer the windows of the active workspace, one entry for a tab group, and leave out the windows a modal blocks: everything outside the modal layer while a modal of the desktop is open, and the rest of a family while a modal with an owner rules it.
 
 **The list** is what Alt+Tab is to an operating system. Hold the modifier and press the key — Alt and the backquote by default, since the browser keeps Tab for itself — and the windows are listed from the most recently used, with the one before the current picked. Every further press moves on, with Shift back, and letting the modifier go focuses the choice; a minimized window comes back. The arrow keys, Home and End move the choice as well, Enter and Space take it, a click takes the window it lands on, and Escape leaves everything as it was. `switcher.open()` shows the same list from your own code; it then stays until a choice is made.
 
@@ -1223,7 +1253,7 @@ attachDesktop(wm, document.querySelector('#desktop'), {
 })
 ```
 
-The buttons stand in the order the windows were opened, whatever their stacking, so a button never moves when its window comes to the front. A tab group is one button: it shows the active tab and sits where the oldest tab of the group stood. `show: 'minimized'` lists only minimized windows, `workspace: 'all'` lists the windows of every workspace instead of the active one.
+The buttons stand in the order the windows were opened, whatever their stacking, so a button never moves when its window comes to the front. A tab group is one button: it shows the active tab and sits where the oldest tab of the group stood. A window with its owned windows is one button too, the one of the window that has no owner: it is pressed while any of them has the focus, a click on it minimizes or brings back all of them, and `targetOf` gives it for each. `show: 'minimized'` lists only minimized windows, `workspace: 'all'` lists the windows of every workspace instead of the active one.
 
 A click on a button focuses its window: a minimized one comes back as it was before, and one on another workspace takes you there. A click on the button of the window that already has the focus minimizes it, when it is `minimizable`. A middle click asks the window to close through [`wm.requestClose`](#asking-before-a-window-closes), when it is `closable`, so the guards are asked.
 

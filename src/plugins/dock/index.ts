@@ -404,12 +404,23 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     }
   }
 
+  function tied(layout: DockLayout, id: string): boolean {
+    const all = Object.values(wm.getState().windows)
+    const members = (stackOf(layout, id) as DockStack).windows
+    return (
+      members.length > 1 &&
+      all.some(
+        (win) => members.includes(win.ownerId ?? '') || (win.ownerId && members.includes(win.id)),
+      )
+    )
+  }
+
   function dock(id: string, target: DockTarget = {}): boolean {
     const win = wm.get(id)
     const [base, out, loose] = follow()
     if (!win || (base.root && win.workspace !== base.workspace)) return false
     const next = insert(base, id, target)
-    if (next.root === base.root) return false
+    if (next.root === base.root || tied(next, id)) return false
     const workspace = base.root ? base.workspace : win.workspace
     guard(() => {
       if (win.stage === 'minimized') wm.restore(id)
@@ -437,7 +448,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const ids = windowsOf(layout)
     const [base, out, loose] = follow()
     const workspace = base.root ? base.workspace : wm.workspace()
-    if (!ids.every((id) => wm.get(id)?.workspace === workspace)) return false
+    if (!ids.every((id) => wm.get(id)?.workspace === workspace && !tied(layout, id))) return false
     const leaving = windowsOf(base).filter((id) => !ids.includes(id))
     guard(() => {
       for (const id of ids) if (wm.get(id)?.stage === 'minimized') wm.restore(id)
@@ -705,6 +716,7 @@ export function createDock(desktop: DesktopController, options: DockOptions = {}
     const target = targetAt(local.x, local.y)
     if (!target) return null
     const next = insert(state, id, target)
+    if (tied(next, id)) return null
     const stack = stackOf(next, id) as DockStack
     const placed = rects(next, areaOf(), geometry).stacks.find((rect) => rect.id === stack.id)
     return { preview: (placed as StackRect).bounds, commit: () => void dock(id, target) }

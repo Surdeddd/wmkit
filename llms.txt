@@ -41,7 +41,7 @@ desktop.attachWindow(win.id, el, { removeOnClose: true })
 - State is one JSON-safe object: `wm.serialize()` and `wm.hydrate(data)`, or `persist(wm, { key })` to store it.
 - A whole drag or resize is one undo step. `wm.undo()` and `wm.redo()` return whether anything changed.
 - Create the manager anywhere, also on a server. Call `attachDesktop` only in the browser; the adapters do that for you.
-- A dialog is a window with `layer: "modal"`: it traps focus and blocks the windows below.
+- A dialog is a window with `layer: "modal"`: it traps focus and blocks the windows below. Open it with `owner: id` and it belongs to that window: it stays above it, closes with it and blocks only that window and what else it owns.
 - To confirm a close, register `wm.onBeforeClose(guard)`; the guard returns `false` or a promise of it to keep the window. The close button and `wm.requestClose(id)` ask the guards, `wm.close(id)` does not.
 - Import a theme (`@surdeddd/wmkit/themes/glass.css`) or style the `data-wm-*` attributes yourself: the core positions windows and leaves their look to CSS.
 

@@ -419,6 +419,7 @@ export class WmWindowElement extends Base {
         title: this.getAttribute('label') ?? '',
         stage: (this.getAttribute('stage') ?? undefined) as WindowInit['stage'],
         layer: (this.getAttribute('layer') ?? undefined) as WindowInit['layer'],
+        owner: this.getAttribute('owner') ?? undefined,
       }
       for (const [attribute, key] of Object.entries(NUMBERS)) {
         const value = numberAt(this, attribute)

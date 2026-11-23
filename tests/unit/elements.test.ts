@@ -144,6 +144,24 @@ describe('a desktop', () => {
 })
 
 describe('a window', () => {
+  it('joins the family of the window its owner attribute names, and closes with it', () => {
+    const desktop = mount(`<wm-desktop>
+      <wm-window window-id="doc" label="Doc"></wm-window>
+      <wm-window window-id="ask" label="Ask" owner="doc" layer="modal"></wm-window>
+      <wm-window window-id="lost" label="Lost" owner="nobody"></wm-window>
+    </wm-desktop>`)
+    const wm = desktop.manager
+    expect(wm?.get('ask')?.ownerId).toBe('doc')
+    expect(wm?.get('lost')?.ownerId).toBeNull()
+    const [doc, ask] = [...desktop.querySelectorAll<WmWindowElement>('wm-window')]
+    expect(ask?.dataset.wmOwner).toBe('doc')
+    expect(ask?.getAttribute('aria-modal')).toBeNull()
+    expect(doc?.hasAttribute('data-wm-blocked')).toBe(true)
+    wm?.close('doc')
+    expect(ask?.hasAttribute('closed')).toBe(true)
+    expect(wm?.get('ask')).toBeUndefined()
+  })
+
   it('opens from its attributes and wears a chrome with parts', () => {
     const desktop = mount(`<wm-desktop>
       <wm-window window-id="a" label="Alpha" x="10" y="20" width="300" height="200"

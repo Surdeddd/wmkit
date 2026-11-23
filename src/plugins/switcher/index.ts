@@ -103,8 +103,7 @@ export function createSwitcher(
           (win.groupId === null || state.groups[win.groupId]?.activeId === win.id) &&
           (wanted === 'list' || win.stage !== 'minimized'),
       )
-    const modal = visible.some((win) => win.layer === 'modal' && win.stage !== 'minimized')
-    const open = visible.filter((win) => !modal || win.layer === 'modal')
+    const open = visible.filter((win) => wm.blockedBy(win.id) === null)
     return wanted === 'list'
       ? open.reverse()
       : open.sort((left, right) => left.openedSeq - right.openedSeq)
