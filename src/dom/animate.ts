@@ -14,7 +14,8 @@ export function measureFlip(
   options: FlipGhostOptions,
   back: boolean,
 ): (() => void) | undefined {
-  const view = source.ownerDocument.defaultView
+  const doc = source.ownerDocument
+  const view = doc.defaultView
   if (!view || prefersReducedMotion(view)) return
   if (typeof source.animate !== 'function') return
 
@@ -35,13 +36,13 @@ export function measureFlip(
   }
 
   return () => {
-    const ghost = source.ownerDocument.createElement('div')
+    const ghost = doc.createElement('div')
     ghost.style.cssText = css
     const animation = ghost.animate(back ? [moved, still] : [still, moved], {
       duration: options.duration ?? 260,
       easing: options.easing ?? 'cubic-bezier(0.32, 0.72, 0, 1)',
     })
-    source.ownerDocument.body.append(ghost)
+    doc.body.append(ghost)
     animation.onfinish = () => ghost.remove()
     animation.oncancel = () => ghost.remove()
   }

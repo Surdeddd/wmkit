@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
-import { flipFromTarget, flipToTarget, prefersReducedMotion } from '../../src/dom/animate'
+import {
+  flipFromTarget,
+  flipToTarget,
+  measureFlip,
+  prefersReducedMotion,
+} from '../../src/dom/animate'
 import { createAnnouncer, defaultMessages } from '../../src/dom/announcer'
 
 const VIEWPORT = { viewport: { width: 800, height: 600 } }
@@ -279,6 +284,23 @@ describe('flip animations', () => {
     flipToTarget(orphan, target)
     flipFromTarget(orphan, target)
     expect(document.body.children).toHaveLength(2)
+  })
+
+  it('needs the window only to measure it, so a window that is gone is not held until the ghost ends', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target, animate } = setup()
+    const play = measureFlip(source, target, {}, false)
+    Object.defineProperty(source, 'ownerDocument', {
+      configurable: true,
+      get() {
+        throw new Error('the window was read after it was measured')
+      },
+    })
+    source.remove()
+
+    expect(() => play?.()).not.toThrow()
+    expect(animate).toHaveBeenCalledTimes(1)
+    expect((document.body.lastElementChild as HTMLElement).style.position).toBe('fixed')
   })
 
   it('runs the reverse ghost with the default duration and easing', () => {

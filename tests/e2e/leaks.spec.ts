@@ -214,4 +214,44 @@ test.describe('nothing is left behind', () => {
     expect(growth.listeners, 'event listeners stayed registered').toBeLessThanOrEqual(2)
     expect(growth.heap, 'the heap grew, in kB').toBeLessThanOrEqual(2048)
   })
+
+  test('by a window closed while its minimize ghost is still on the way', async ({
+    page,
+    context,
+  }) => {
+    const cdp = await context.newCDPSession(page)
+    await cdp.send('Performance.enable')
+    await page.goto('test/vanilla.html')
+    await expect(page.locator('#desktop')).toBeVisible()
+    const fly = (hold: boolean) =>
+      page.evaluate(async (held) => {
+        const frame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+        const desktop = document.querySelector('#desktop') as HTMLElement
+        window.__wm.open({ id: 'ghost', title: 'ghost', x: 40, y: 40, width: 320, height: 240 })
+        const el = document.createElement('section')
+        el.innerHTML = `<header data-wm-drag><span data-wm-title></span></header><div data-wm-content>${'<p>text</p>'.repeat(2000)}</div>`
+        desktop.append(el)
+        window.__desktop.attachWindow('ghost', el, { removeOnClose: true })
+        await frame()
+        window.__wm.minimize('ghost')
+        await Promise.resolve()
+        const ghost = [...document.body.children].find(
+          (node) => (node as HTMLElement).style.zIndex === '2147483647',
+        )
+        const flights = ghost?.getAnimations() ?? []
+        if (held) for (const flight of flights) flight.pause()
+        window.__wm.close('ghost')
+        window.__wm.clearHistory()
+        await frame()
+        await frame()
+        return flights.length
+      }, hold)
+
+    await fly(false)
+    await settle(page)
+    const before = await footprint(cdp)
+    expect(await fly(true), 'no ghost was on its way, so nothing was tested').toBe(1)
+    const growth = grown(before, await footprint(cdp))
+    expect(growth.nodes, 'the closed window stayed alive behind its ghost').toBeLessThanOrEqual(20)
+  })
 })
