@@ -1,8 +1,14 @@
 import { expect, type Page, test } from './fixtures'
 
 const SIZES = [
+  { name: 'tiny phone', width: 320, height: 460 },
+  { name: 'short phone', width: 360, height: 560 },
   { name: 'phone', width: 390, height: 844 },
+  { name: 'phone on its side', width: 740, height: 360 },
   { name: 'tablet', width: 768, height: 1024 },
+  { name: 'tablet on its side', width: 1024, height: 768 },
+  { name: 'link preview', width: 1200, height: 630 },
+  { name: 'short laptop', width: 1366, height: 650 },
   { name: 'laptop', width: 1280, height: 800 },
   { name: 'wide', width: 1920, height: 1080 },
 ]

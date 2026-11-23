@@ -5,6 +5,13 @@ export async function openVanilla(page: Page): Promise<void> {
   await expect(page.locator('#desktop')).toBeVisible()
 }
 
+export async function launchApp(page: Page, app: string): Promise<void> {
+  const toggle = page.locator('#apps-toggle')
+  const closed = (await toggle.getAttribute('aria-expanded')) !== 'true'
+  if (closed && (await toggle.isVisible())) await toggle.click()
+  await page.locator(`#launcher button[data-app="${app}"]`).click()
+}
+
 export function win(page: Page, id: string): Locator {
   return page.locator(`[data-testid="window-${id}"]`)
 }

@@ -1,14 +1,14 @@
 import { expect, type Page, test } from './fixtures'
-import { boxOf } from './utils'
+import { boxOf, launchApp } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
 async function grouped(page: Page) {
   await page.goto('?lang=en')
   await expect(page.locator(readme)).toBeVisible()
-  await page.click('#launcher button[data-app="layouts"]')
+  await launchApp(page, 'layouts')
   await expect(page.locator('[data-testid="window-layouts"]')).toBeVisible()
-  await page.click('#launcher button[data-app="terminal"]')
+  await launchApp(page, 'terminal')
   await expect(page.locator('[data-testid="window-terminal"]')).toBeVisible()
 
   await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts', 'terminal']))

@@ -97,6 +97,10 @@ const bootLog = must(document.querySelector<HTMLElement>('#boot-log'), '#boot-lo
 const statWin = must(document.querySelector<HTMLElement>('#stat-win'), '#stat-win')
 const statFps = must(document.querySelector<HTMLElement>('#stat-fps'), '#stat-fps')
 const themeChip = must(document.querySelector<HTMLElement>('#theme-chip'), '#theme-chip')
+const menuToggle = must(document.querySelector<HTMLElement>('#menu-toggle'), '#menu-toggle')
+const appsToggle = must(document.querySelector<HTMLElement>('#apps-toggle'), '#apps-toggle')
+const sheetQuery = window.matchMedia('(max-width: 1100px)')
+const drawerQuery = window.matchMedia('(max-width: 720px)')
 
 function readStored(key: string): string | null {
   try {
@@ -419,14 +423,20 @@ function safeArea(): { x: number; y: number; width: number; height: number } {
 
   const stage = desktopEl.getBoundingClientRect()
   const box = hero.getBoundingClientRect()
-  const area =
-    width >= 1100
-      ? { x: box.right - stage.left + 24, y: 0, width: 0, height }
-      : { x: 0, y: box.bottom - stage.top + 16, width, height: 0 }
+  const beside = box.width < width * 0.7
+  if (!beside && desktopEl.hasAttribute('data-covered')) return full
+  const area = beside
+    ? { x: box.right - stage.left + 24, y: 0, width: 0, height }
+    : { x: 0, y: box.bottom - stage.top + 16, width, height: 0 }
   area.width = area.width || width - area.x
   area.height = area.height || height - area.y
 
-  return area.width < 260 || area.height < 200 ? full : area
+  return area.width < 260 || area.height < 140 ? full : area
+}
+
+function fitHero(): void {
+  const height = desktopEl.clientHeight
+  desktopEl.dataset.fit = height < 430 ? 'tight' : height < 600 ? 'snug' : 'roomy'
 }
 
 function remountDesktop(): void {
@@ -751,10 +761,11 @@ function resetDesktop(): void {
 
 function openDefaults(): void {
   const width = desktopEl.clientWidth
+  const rows = width >= 720 && (width >= 1100 || safeArea().height >= 420)
   openApp('readme')
   if (width >= 1440) openApp('tour')
-  if (width >= 720) openApp('terminal')
-  wm.focus(width >= 720 ? 'terminal' : 'readme')
+  if (rows) openApp('terminal')
+  wm.focus(rows ? 'terminal' : 'readme')
 }
 
 type Scene = 'studio' | 'board' | 'retro' | 'clean'
@@ -785,11 +796,16 @@ function build(name: Exclude<Scene, 'clean'>): void {
     for (const id of ['code', 'inspector', 'terminal'] as const) openApp(id)
     dock = startDock()
     dock.dock('code')
-    dock.dock('inspector', { side: 'left' })
+    dock.dock('inspector', drawerQuery.matches ? {} : { side: 'left' })
     dock.dock('terminal', { side: 'bottom' })
     const root = dock.layout().root
     if (root) dock.setLayout({ root: proportion(root) })
     wm.focus('code')
+    return
+  }
+  if (name === 'board' && drawerQuery.matches) {
+    for (const id of ['layouts', 'inspector'] as const) openApp(id)
+    split('layouts', 'inspector')
     return
   }
   if (name === 'board') {
@@ -805,15 +821,26 @@ function build(name: Exclude<Scene, 'clean'>): void {
   }
   ctx.setTheme('retro')
   for (const id of ['readme', 'paint', 'terminal'] as const) openApp(id)
-  wm.arrange('cascade')
+  if (!drawerQuery.matches) wm.arrange('cascade')
 }
 
-function pair(): [string, string] {
-  for (const id of ['readme', 'terminal'] as const) {
+function pair(second: AppId = 'terminal'): [string, string] {
+  for (const id of ['readme', second] as const) {
     if (!wm.get(id)) openApp(id)
     if (wm.get(id)?.stage === 'minimized') wm.restore(id)
   }
-  return ['readme', 'terminal']
+  return ['readme', second]
+}
+
+function split(first: string, second: string): void {
+  const upright = drawerQuery.matches
+  wm.batch(() => {
+    for (const id of [first, second]) {
+      if (wm.get(id)?.groupId) wm.ungroup(id)
+    }
+    wm.snap(first, upright ? 'top' : 'left')
+    wm.snap(second, upright ? 'bottom' : 'right')
+  })
 }
 
 function subject(): string | null {
@@ -831,12 +858,7 @@ const tourActions: Record<TourStep, () => void> = {
     if (id) plugins.picker.open(id)
   },
   seams() {
-    const [left, right] = pair()
-    wm.batch(() => {
-      if (wm.get(left)?.groupId) wm.ungroup(left)
-      wm.snap(left, 'left')
-      wm.snap(right, 'right')
-    })
+    split(...pair())
     const seam = desktopEl.querySelector<HTMLElement>('[data-wm-seam]')
     if (!seam) return
     seam.dataset.pulse = ''
@@ -966,7 +988,10 @@ function renderLauncher(): void {
         label.textContent = copy.title
         node.title = copy.title
         node.append(icon, label)
-        node.addEventListener('click', () => openApp(spec.id))
+        node.addEventListener('click', () => {
+          openApp(spec.id)
+          setDrawer(false)
+        })
         return node
       }),
   )
@@ -1047,6 +1072,7 @@ const menuActions: Record<string, () => void> = {
   sceneBoard: () => scene('board'),
   sceneRetro: () => scene('retro'),
   sceneClean: () => scene('clean'),
+  theme: () => tourActions.themes(),
   tour: () => openApp('tour'),
   shortcuts: () => openApp('shortcuts'),
   readme: () => openApp('readme'),
@@ -1059,51 +1085,74 @@ function closeMenus(): void {
   for (const trigger of menusEl.querySelectorAll<HTMLButtonElement>('.menu-trigger')) {
     trigger.setAttribute('aria-expanded', 'false')
   }
+  delete menusEl.dataset.open
+  menuToggle.setAttribute('aria-expanded', 'false')
+}
+
+function setDrawer(open: boolean): void {
+  launcherEl.toggleAttribute('data-open', open)
+  appsToggle.setAttribute('aria-expanded', String(open))
 }
 
 function renderMenus(): void {
-  menusEl.replaceChildren(
-    ...dict().menus.map((menu) => {
-      const wrap = document.createElement('div')
-      wrap.className = 'menu'
-      const trigger = document.createElement('button')
-      trigger.type = 'button'
-      trigger.className = 'menu-trigger'
-      trigger.textContent = menu.label
-      trigger.setAttribute('aria-expanded', 'false')
-      trigger.setAttribute('aria-haspopup', 'true')
-      const pop = document.createElement('div')
-      pop.className = 'menu-pop'
-      for (const item of menu.items) {
-        const node = document.createElement('button')
-        node.type = 'button'
-        node.dataset.action = item.id
-        node.append(document.createTextNode(item.label))
-        if (item.key) {
-          const key = document.createElement('kbd')
-          key.textContent = item.key
-          node.append(key)
-        }
-        node.addEventListener('click', () => {
-          closeMenus()
-          menuActions[item.id]?.()
-        })
-        pop.append(node)
+  const sheet = sheetQuery.matches
+  const groups = dict().menus.map((menu) => {
+    const wrap = document.createElement('div')
+    wrap.className = 'menu'
+    const pop = document.createElement('div')
+    pop.className = 'menu-pop'
+    for (const item of menu.items) {
+      const node = document.createElement('button')
+      node.type = 'button'
+      node.dataset.action = item.id
+      node.append(document.createTextNode(item.label))
+      if (item.key) {
+        const key = document.createElement('kbd')
+        key.textContent = item.key
+        node.append(key)
       }
-      trigger.addEventListener('click', (event) => {
-        event.stopPropagation()
-        const open = pop.dataset.open !== undefined
+      node.addEventListener('click', () => {
         closeMenus()
-        if (!open) {
-          pop.dataset.open = ''
-          trigger.setAttribute('aria-expanded', 'true')
-          syncMenus()
-        }
+        menuActions[item.id]?.()
       })
-      wrap.append(trigger, pop)
+      pop.append(node)
+    }
+    if (sheet) {
+      const title = document.createElement('p')
+      title.className = 'menu-title'
+      title.textContent = menu.label
+      wrap.setAttribute('role', 'group')
+      wrap.setAttribute('aria-label', menu.label)
+      wrap.append(title, pop)
       return wrap
-    }),
-  )
+    }
+    const trigger = document.createElement('button')
+    trigger.type = 'button'
+    trigger.className = 'menu-trigger'
+    trigger.textContent = menu.label
+    trigger.setAttribute('aria-expanded', 'false')
+    trigger.setAttribute('aria-haspopup', 'true')
+    trigger.addEventListener('click', (event) => {
+      event.stopPropagation()
+      const open = pop.dataset.open !== undefined
+      closeMenus()
+      if (!open) {
+        pop.dataset.open = ''
+        trigger.setAttribute('aria-expanded', 'true')
+        syncMenus()
+      }
+    })
+    wrap.append(trigger, pop)
+    return wrap
+  })
+  if (!sheet) {
+    menusEl.replaceChildren(...groups)
+    return
+  }
+  const inner = document.createElement('div')
+  inner.className = 'menu-sheet'
+  inner.append(...groups)
+  menusEl.replaceChildren(inner)
 }
 
 function syncMenus(): void {
@@ -1147,8 +1196,12 @@ function renderFrameworks(): void {
   )
 }
 
+const compareEl = must(document.querySelector<HTMLElement>('#compare-table'), '#compare-table')
+compareEl.setAttribute('role', 'region')
+compareEl.setAttribute('aria-labelledby', 'cmp-title')
+compareEl.tabIndex = 0
+
 function renderCompare(): void {
-  const wrap = must(document.querySelector<HTMLElement>('#compare-table'), '#compare-table')
   const data = dict()
   const table = document.createElement('table')
   const thead = document.createElement('thead')
@@ -1179,7 +1232,7 @@ function renderCompare(): void {
     tbody.append(tr)
   }
   table.append(thead, tbody)
-  wrap.replaceChildren(table)
+  compareEl.replaceChildren(table)
 }
 
 function applyStaticI18n(): void {
@@ -1264,9 +1317,51 @@ themeChip.addEventListener('click', (event) => {
   ctx.setTheme(THEME_NAMES[(THEME_NAMES.indexOf(theme) + step) % THEME_NAMES.length] ?? 'glass')
 })
 
-document.addEventListener('click', closeMenus)
+menuToggle.addEventListener('click', (event) => {
+  event.stopPropagation()
+  const open = menusEl.dataset.open !== undefined
+  closeMenus()
+  setDrawer(false)
+  if (open) return
+  menusEl.dataset.open = ''
+  menuToggle.setAttribute('aria-expanded', 'true')
+  syncMenus()
+})
+
+appsToggle.addEventListener('click', (event) => {
+  event.stopPropagation()
+  closeMenus()
+  setDrawer(!launcherEl.hasAttribute('data-open'))
+})
+
+menusEl.addEventListener('click', (event) => {
+  if (sheetQuery.matches) event.stopPropagation()
+})
+
+sheetQuery.addEventListener('change', () => {
+  closeMenus()
+  renderMenus()
+  syncMenus()
+})
+
+drawerQuery.addEventListener('change', () => setDrawer(false))
+
+function dismiss(): void {
+  const active = elementOf(document.activeElement)
+  if (menusEl.dataset.open !== undefined && active && menusEl.contains(active)) menuToggle.focus()
+  if (launcherEl.hasAttribute('data-open') && active && launcherEl.contains(active)) {
+    appsToggle.focus()
+  }
+  closeMenus()
+  setDrawer(false)
+}
+
+document.addEventListener('click', () => {
+  closeMenus()
+  setDrawer(false)
+})
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') closeMenus()
+  if (event.key === 'Escape') dismiss()
   const target = elementOf(event.target)
   if (target?.closest('input, textarea, [contenteditable]')) return
   if (event.key === '?') {
@@ -1300,7 +1395,11 @@ document.querySelector('#wall-launch')?.addEventListener('click', () => {
     const win = state.windows[id]
     return win && win.workspace === state.workspace && win.stage !== 'minimized'
   })
-  if (visible.length === 0) openDefaults()
+  if (drawerQuery.matches) {
+    const [first, second] = pair('tour')
+    split(first, second)
+    wm.focus(second)
+  } else if (visible.length === 0) openDefaults()
   else wm.arrange('tile')
 })
 
@@ -1376,7 +1475,10 @@ function whenSized(run: () => void): void {
 }
 
 function start(): void {
-  whenSized(openDefaults)
+  whenSized(() => {
+    fitHero()
+    openDefaults()
+  })
   startFpsMeter(statFps, window, (listener) => wm.subscribe(listener))
   loadShadowTheme(theme).catch(() => {})
 }

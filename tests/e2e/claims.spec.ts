@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { launchApp } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
@@ -11,7 +12,7 @@ test.describe('the landing tells the truth', () => {
     const region = page.locator('[data-wm-announcer]')
     await expect(region).toHaveAttribute('aria-live', 'polite')
 
-    await page.click('#launcher button[data-app="layouts"]')
+    await launchApp(page, 'layouts')
     await expect(page.locator('[data-testid="window-layouts"]')).toBeVisible()
     await expect(region).not.toBeEmpty()
   })

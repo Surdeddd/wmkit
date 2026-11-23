@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { launchApp } from './utils'
 
 const panel = '[data-wm-devtools]'
 const rows = `${panel} [data-wm-devtools-row]`
@@ -6,7 +7,7 @@ const rows = `${panel} [data-wm-devtools-row]`
 test.beforeEach(async ({ page }) => {
   await page.goto('?lang=en')
   await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
-  await page.click('#launcher button[data-app="devtools"]')
+  await launchApp(page, 'devtools')
   await expect(page.locator(panel)).toBeVisible()
 })
 
@@ -14,7 +15,7 @@ test('the panel lists the desktop and follows it', async ({ page }) => {
   const before = await page.locator(rows).count()
   expect(before).toBeGreaterThan(0)
 
-  await page.click('#launcher button[data-app="layouts"]')
+  await launchApp(page, 'layouts')
   await expect(page.locator(rows)).toHaveCount(before + 1)
 
   await page.click(

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from './fixtures'
-import { settle } from './utils'
+import { launchApp, settle } from './utils'
 
 const CUSTOM =
   '<section data-testid="window-{{id}}">' +
@@ -48,7 +48,7 @@ function shadowRules(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.goto('?lang=en')
   await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
-  await page.click('#launcher button[data-app="skins"]')
+  await launchApp(page, 'skins')
   await expect(page.locator('[data-testid="window-skins"]')).toBeVisible()
   await settle(page.locator('[data-testid="window-skins"]'))
 })
@@ -163,7 +163,7 @@ test('a layout or reset takes every window off a custom template', async ({ page
 
 test('a window opened after a shadow skin is dressed like the others', async ({ page }) => {
   await applyShadow(page)
-  await page.click('#launcher button[data-app="paint"]')
+  await launchApp(page, 'paint')
   await expect(page.locator('[data-wm-window="paint"]')).toBeVisible()
 
   const skins = await dressOf(page, 'skins')
@@ -172,7 +172,7 @@ test('a window opened after a shadow skin is dressed like the others', async ({ 
 })
 
 test('a grouped shadow window still shows its tabs', async ({ page }) => {
-  await page.click('#launcher button[data-app="paint"]')
+  await launchApp(page, 'paint')
   await expect(page.locator('[data-testid="window-paint"]')).toBeVisible()
   await settle(page.locator('[data-testid="window-paint"]'))
   await applyShadow(page)

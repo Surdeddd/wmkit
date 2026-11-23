@@ -1,5 +1,6 @@
 import type { CDPSession, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
+import { launchApp } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
@@ -65,7 +66,7 @@ test.describe('touch input', () => {
     const cdp = await context.newCDPSession(page)
     await page.goto('?lang=en')
     await expect(page.locator(readme)).toBeVisible()
-    await page.click('#launcher button[data-app="layouts"]')
+    await launchApp(page, 'layouts')
     const other = page.locator('[data-testid="window-layouts"]')
     await expect(other).toBeVisible()
 
@@ -121,7 +122,7 @@ test.describe('touch input', () => {
   test('the context menu a long press raises reaches the titlebar hook', async ({ page }) => {
     await page.goto('?lang=en')
     await expect(page.locator(readme)).toBeVisible()
-    await page.click('#launcher button[data-app="layouts"]')
+    await launchApp(page, 'layouts')
     await expect(page.locator('[data-testid="window-layouts"]')).toBeVisible()
     await settle(page)
 

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, type Page, test } from './fixtures'
+import { launchApp } from './utils'
 
 async function scan(page: Page): Promise<string[]> {
   await page.evaluate(() =>
@@ -28,8 +29,8 @@ test.describe('landing accessibility', () => {
   test('axe finds no violations with the desktop populated', async ({ page }) => {
     await page.goto('?lang=en')
     await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
-    await page.click('#launcher button[data-app="layouts"]')
-    await page.click('#launcher button[data-app="settings"]')
+    await launchApp(page, 'layouts')
+    await launchApp(page, 'settings')
     await expect(page.locator('[data-testid="window-settings"]')).toBeVisible()
     expect(await scan(page)).toEqual([])
   })
@@ -37,7 +38,7 @@ test.describe('landing accessibility', () => {
   test('axe finds no violations with a tab group on the desktop', async ({ page }) => {
     await page.goto('?lang=en')
     await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
-    await page.click('#launcher button[data-app="layouts"]')
+    await launchApp(page, 'layouts')
     await expect(page.locator('[data-testid="window-layouts"]')).toBeVisible()
     await page.evaluate(() => window.__wmDemo.wm.group(['readme', 'layouts']))
     await expect(page.locator('[data-testid="window-readme"] .win-tab')).toHaveCount(2)
@@ -60,6 +61,26 @@ test.describe('landing accessibility', () => {
     await files.locator('[data-file="LICENSE"]').dispatchEvent('click')
     await files.locator('[data-files="info"]').dispatchEvent('click')
     await expect(page.locator('[data-testid="window-file-info"]')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+  })
+
+  test('axe finds no violations on a phone, with the menu sheet and the app drawer open', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 664 })
+    await page.goto('?lang=en')
+    await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+    await page.locator('#menu-toggle').click()
+    await expect(page.locator('#menus')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+    await page.locator('#menu-toggle').click()
+    await page.locator('#apps-toggle').click()
+    await expect(page.locator('#launcher')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+    await page.locator('#apps-toggle').click()
+    await page.locator('#wall-launch').click()
+    await expect(page.locator('[data-testid="window-tour"]')).toBeVisible()
     expect(await scan(page)).toEqual([])
   })
 

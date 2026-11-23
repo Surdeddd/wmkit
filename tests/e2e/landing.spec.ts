@@ -1,5 +1,5 @@
 import { expect, type Page, test } from './fixtures'
-import { boxOf, closeAllBut, dragBy, settle } from './utils'
+import { boxOf, closeAllBut, dragBy, launchApp, settle } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 
@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function launch(page: Page, app: string) {
-  await page.click(`#launcher button[data-app="${app}"]`)
+  await launchApp(page, app)
   const window = page.locator(`[data-testid="window-${app}"]`)
   await expect(window).toBeVisible()
   await settle(window)
@@ -153,8 +153,9 @@ test('a tab can be dragged out of its group', async ({ page, isMobile }) => {
 
   const tab = host.locator('.win-tab[data-tab="layouts"]')
   const box = await boxOf(tab)
-  const dropX = box.x + 220
-  const dropY = box.y + 320
+  const body = await boxOf(page.locator('[data-testid="window-terminal"] [data-wm-content]'))
+  const dropX = body.x + body.width / 2
+  const dropY = body.y + body.height / 2
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.down()
   await page.mouse.move(box.x + 80, box.y + 60, { steps: 6 })

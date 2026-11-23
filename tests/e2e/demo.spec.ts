@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, type Page, test } from './fixtures'
-import { settle } from './utils'
+import { launchApp, settle } from './utils'
 
 const readme = '[data-testid="window-readme"]'
 const latin = /[A-Za-z]/
@@ -11,7 +11,7 @@ async function boot(page: Page, lang: 'en' | 'ru' = 'en'): Promise<void> {
 }
 
 async function launch(page: Page, app: string) {
-  await page.click(`#launcher button[data-app="${app}"]`)
+  await launchApp(page, app)
   const window = page.locator(`[data-testid="window-${app}"]`)
   await expect(window).toBeVisible()
   await settle(window)
@@ -114,12 +114,12 @@ test('a variant lands on the window the user focused', async ({ page }) => {
 test('the desktop narrates itself in the language of the page', async ({ page }) => {
   await boot(page, 'ru')
   const region = page.locator('#desktop [data-wm-announcer]')
-  await page.click('#launcher button[data-app="paint"]')
+  await launchApp(page, 'paint')
   await expect(region).toHaveText(/рисовалка/)
   expect(await region.textContent()).not.toMatch(latin)
 
   await page.click('#lang button[data-lang="en"]')
-  await page.click('#launcher button[data-app="layouts"]')
+  await launchApp(page, 'layouts')
   await expect(region).toHaveText('layouts window opened')
 })
 

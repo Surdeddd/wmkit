@@ -194,13 +194,17 @@ const en: Dict = {
     'hero.eyebrow': 'headless window manager · 0 dependencies',
     'hero.line1': 'WINDOWS',
     'hero.line2': 'in your web app',
-    'hero.lede':
-      'Drag, resize, snap, minimize, undo — a real desktop inside the page. Every window you see is the library doing its job. Grab one.',
+    'hero.lede': 'Drag, resize, snap, minimize, undo — a real desktop inside the page.',
+    'hero.lede.more': 'Every window you see is the library doing its job. Grab one.',
     'hero.launch': 'Open the desktop',
     'hero.build': 'Build a window',
     'hero.docs': 'Read the docs',
     'hero.hint':
       'drag a titlebar to a screen edge to snap · rest on a maximize button for layouts · Alt+` switch · ⌘Z undo · ? help',
+    'hero.hint.touch':
+      'drag a window by its title · it snaps at the edge · pinch resizes · two-finger swipe switches desktops',
+    'menu.toggle': 'Menu',
+    'dock.apps': 'apps',
     'builder.kicker': '01 — build a window',
     'builder.title': 'Your markup, our engine',
     'builder.sub':
@@ -268,6 +272,7 @@ const en: Dict = {
         { id: 'sceneBoard', label: 'Board — tiles and seams' },
         { id: 'sceneRetro', label: 'Retro — 1995' },
         { id: 'sceneClean', label: 'Clean desk' },
+        { id: 'theme', label: 'Next theme' },
       ],
     },
     {
@@ -754,12 +759,17 @@ const ru: Dict = {
     'hero.line1': 'ОКНА',
     'hero.line2': 'в вашем веб-приложении',
     'hero.lede':
-      'Тащить, растягивать, прилипать, сворачивать, отменять — настоящий рабочий стол внутри страницы. Каждое окно здесь это работа самой библиотеки. Возьмите любое.',
+      'Тащить, растягивать, прилипать, сворачивать, отменять — настоящий рабочий стол внутри страницы.',
+    'hero.lede.more': 'Каждое окно здесь это работа самой библиотеки. Возьмите любое.',
     'hero.launch': 'Открыть рабочий стол',
     'hero.build': 'Собрать окно',
     'hero.docs': 'Документация',
     'hero.hint':
       'тащите заголовок к краю для прилипания · задержитесь на кнопке разворачивания ради раскладок · Alt+` переключение · ⌘Z отмена · ? помощь',
+    'hero.hint.touch':
+      'тащите окно за заголовок · у края прилипнет · щипок меняет размер · два пальца вбок — другой стол',
+    'menu.toggle': 'Меню',
+    'dock.apps': 'приложения',
     'builder.kicker': '01 — собери окно',
     'builder.title': 'Ваша разметка, наш движок',
     'builder.sub':
@@ -840,6 +850,7 @@ const ru: Dict = {
         { id: 'sceneBoard', label: 'Плитка — раскладка и швы' },
         { id: 'sceneRetro', label: 'Ретро — 1995' },
         { id: 'sceneClean', label: 'Чистый стол' },
+        { id: 'theme', label: 'Следующая тема' },
       ],
     },
     {

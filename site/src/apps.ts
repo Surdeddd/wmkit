@@ -122,17 +122,18 @@ function place(
   height: number,
   right: number,
   top: number,
-  row = 0,
+  boot?: 0 | 1,
 ): Slot {
+  const row = boot ?? 0
   const box = ctx.size()
   const area = ctx.safeArea()
 
   if (box.width < 1100) {
-    const rows = box.width >= 720 ? 2 : 1
+    const rows = box.width >= 720 && area.height >= 420 ? 2 : 1
     const slot = Math.floor((area.height - 12 * (rows + 1)) / rows)
     const step = rows === 1 ? Math.min(ctx.wm.getState().order.length, 4) * 14 : 0
     const w = Math.max(220, area.width - 24 - step)
-    const h = Math.max(160, slot - step)
+    const h = Math.max(rows === 1 ? 120 : 160, slot - step)
     return {
       width: w,
       height: h,
@@ -142,12 +143,17 @@ function place(
   }
 
   const column = area.width < 780
+  const squeeze = boot === undefined ? 1 : Math.min(1, area.height / 720)
   const w = column ? area.width - 24 : Math.min(width, Math.max(220, area.width - 24))
-  const capped = Math.min(height, Math.max(160, area.height - 24))
+  const capped = Math.min(Math.round(height * squeeze), Math.max(160, area.height - 24))
   const x = column
     ? area.x + 12
     : clamp(box.width - right, area.x + 12, area.x + area.width - w - 12)
-  const y = clamp(area.y + top, area.y + 12, area.y + area.height - capped - 12)
+  const y = clamp(
+    area.y + Math.round(top * squeeze),
+    area.y + 12,
+    area.y + area.height - capped - 12,
+  )
   const h = row > 0 ? Math.max(capped, area.y + area.height - y - 12) : capped
   return { width: w, height: h, x: Math.round(x), y: Math.round(y) }
 }
@@ -167,7 +173,7 @@ function centred(ctx: AppContext, width: number, height: number): Slot {
 const readme: AppSpec = {
   id: 'readme',
   init(ctx) {
-    return { title: 'readme.md', ...place(ctx, 384, 314, 800, 30), minWidth: 260 }
+    return { title: 'readme.md', ...place(ctx, 384, 336, 800, 30, 0), minWidth: 260 }
   },
   render(body, ctx) {
     const draw = () => {
@@ -203,7 +209,7 @@ const terminal: AppSpec = {
   init(ctx) {
     return {
       title: 'terminal',
-      ...place(ctx, 748, 322, 800, 364, 1),
+      ...place(ctx, 748, 322, 800, 386, 1),
       minWidth: 260,
       minHeight: 150,
     }
@@ -1083,7 +1089,7 @@ const tour: AppSpec = {
   init(ctx) {
     return {
       title: 'tour',
-      ...place(ctx, 340, 314, 392, 30),
+      ...place(ctx, 340, 336, 392, 30, 0),
       minWidth: 260,
       minHeight: 200,
       layer: 'floating',

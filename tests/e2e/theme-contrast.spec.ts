@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { launchApp } from './utils'
 
 const THEMES = [
   'glass',
@@ -119,8 +120,8 @@ function probe(): Finding[] {
 test('every shipped theme keeps the demo readable', async ({ page }) => {
   test.slow()
   await page.goto('?lang=en')
-  await page.click('#launcher button[data-app="terminal"]')
-  await page.click('#launcher button[data-app="skins"]')
+  await launchApp(page, 'terminal')
+  await launchApp(page, 'skins')
   await expect(page.locator('[data-testid="window-skins"]')).toBeVisible()
 
   const failures: string[] = []
