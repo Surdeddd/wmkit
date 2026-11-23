@@ -1,5 +1,6 @@
 ## [0.14.1](https://github.com/Surdeddd/wmkit/compare/v0.14.0...v0.14.1) (2026-11-23)
 
+This version was tagged but never reached npm: the release run failed after the tag was pushed. Its fix ships in 0.14.2.
 
 ### Bug Fixes
 
