@@ -1,3 +1,16 @@
+# [0.15.0](https://github.com/Surdeddd/wmkit/compare/v0.14.2...v0.15.0) (2026-11-23)
+
+
+### Bug Fixes
+
+* **dom:** the minimize ghost lands on its target and no longer covers the window it brings back ([ab7e7c8](https://github.com/Surdeddd/wmkit/commit/ab7e7c88a89de65065c335b197671a2776ea5e56))
+
+
+### Features
+
+* a window can own windows, and a modal with an owner is modal for its family only ([1a86ac3](https://github.com/Surdeddd/wmkit/commit/1a86ac33298e41993eb606653519fe3688be2867))
+* **popout:** a window that owns windows or is owned stays in place while it is popped out ([dbc7c8e](https://github.com/Surdeddd/wmkit/commit/dbc7c8eea9a5c3b1bc263b49e8e78dc2e36fa869))
+
 ## [0.14.2](https://github.com/Surdeddd/wmkit/compare/v0.14.1...v0.14.2) (2026-11-23)
 
 
