@@ -1,3 +1,10 @@
+## [0.14.2](https://github.com/Surdeddd/wmkit/compare/v0.14.1...v0.14.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* **dom:** a window closed while its minimize ghost flies is released at once ([23eca26](https://github.com/Surdeddd/wmkit/commit/23eca262112640801ca182cdd0ee73d12bf392ee))
+
 ## [0.14.1](https://github.com/Surdeddd/wmkit/compare/v0.14.0...v0.14.1) (2026-11-23)
 
 This version was tagged but never reached npm: the release run failed after the tag was pushed. Its fix ships in 0.14.2.

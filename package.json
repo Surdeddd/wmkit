@@ -1,6 +1,6 @@
 {
   "name": "@surdeddd/wmkit",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Headless window manager for the web: draggable, resizable, snappable, dockable and tabbed windows with a taskbar, snap layouts, workspaces, undo and keyboard accessibility. For React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik, web components and vanilla JS",
   "keywords": [
     "window-manager",
