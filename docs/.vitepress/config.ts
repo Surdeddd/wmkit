@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { type DefaultTheme, defineConfig, type MarkdownOptions, type SiteConfig } from 'vitepress'
 import { llmsText } from '../../scripts/llms.mjs'
 import { rawInlineCode } from './markdown'
-import { alternates, HOST, LANDING, landingSitemap, pageUrl, robots } from './seo'
+import { alternates, article, HOST, LANDING, landingSitemap, pageUrl, robots } from './seo'
 
 const base = process.env.VERCEL ? '/docs/' : '/wmkit/docs/'
 const docs = fileURLToPath(new URL('..', import.meta.url))
@@ -169,6 +169,7 @@ export default defineConfig({
     pageData.frontmatter.head.push(
       ['link', { rel: 'canonical', href: pageUrl(pageData.relativePath) }],
       ...alternates(pageData.relativePath, served),
+      article(pageData.relativePath, pageData.title, pageData.description),
     )
   },
   buildEnd: writeLlms,

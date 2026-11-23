@@ -3,6 +3,7 @@ export const HOST = 'https://wmkit.vercel.app'
 export const LANDING = { en: `${HOST}/`, ru: `${HOST}/ru/` } as const
 
 type HeadTag = [string, Record<string, string>]
+type HeadTag3 = [string, Record<string, string>, string]
 
 export function pageUrl(relativePath: string): string {
   const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html')
@@ -22,6 +23,25 @@ export function alternates(relativePath: string, served: ReadonlySet<string>): H
     ['link', { rel: 'alternate', hreflang: 'ru', href: pageUrl(ru) }],
     ['link', { rel: 'alternate', hreflang: 'x-default', href: pageUrl(en) }],
   ]
+}
+
+export function article(relativePath: string, title: string, description: string): HeadTag3 {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: title,
+    description,
+    url: pageUrl(relativePath),
+    inLanguage: relativePath.startsWith('ru/') ? 'ru' : 'en',
+    isPartOf: { '@type': 'WebSite', '@id': `${HOST}/#site`, url: `${HOST}/`, name: 'wmkit' },
+    about: {
+      '@type': 'SoftwareSourceCode',
+      '@id': `${HOST}/#library`,
+      name: 'wmkit',
+      codeRepository: 'https://github.com/Surdeddd/wmkit',
+    },
+  }
+  return ['script', { type: 'application/ld+json' }, JSON.stringify(data).replace(/</g, '\\u003c')]
 }
 
 export function landingSitemap(): string {

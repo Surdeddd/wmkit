@@ -87,6 +87,41 @@ function comparison(dict: Dict): string {
   return `<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`
 }
 
+function structured(dict: Dict, lang: Lang): string {
+  const url = `${HOST}${LANDING_PATHS[lang]}`
+  const data = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${HOST}/#site`,
+        url: `${HOST}/`,
+        name: 'wmkit',
+        inLanguage: ['en', 'ru'],
+      },
+      {
+        '@type': 'SoftwareSourceCode',
+        '@id': `${HOST}/#library`,
+        name: 'wmkit',
+        alternateName: '@surdeddd/wmkit',
+        headline: dict.meta.title,
+        description: dict.meta.description,
+        url,
+        inLanguage: lang,
+        isPartOf: { '@id': `${HOST}/#site` },
+        codeRepository: 'https://github.com/Surdeddd/wmkit',
+        programmingLanguage: 'TypeScript',
+        runtimePlatform: 'Web browser',
+        license: 'https://opensource.org/licenses/MIT',
+        version: '%WMKIT_VERSION%',
+        downloadUrl: 'https://www.npmjs.com/package/@surdeddd/wmkit',
+        author: { '@type': 'Person', name: 'Surdeddd', url: 'https://github.com/Surdeddd' },
+      },
+    ],
+  }
+  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
+}
+
 function headTags(dict: Dict, lang: Lang): string[] {
   const url = (which: Lang) => `${HOST}${LANDING_PATHS[which]}`
   const image = `${HOST}/og.png`
@@ -109,6 +144,7 @@ function headTags(dict: Dict, lang: Lang): string[] {
     `<meta name="twitter:description" content="${escapeHtml(dict.meta.og)}" />`,
     `<meta name="twitter:image" content="${image}" />`,
     `<meta name="twitter:image:alt" content="${alt}" />`,
+    structured(dict, lang),
   ]
 }
 

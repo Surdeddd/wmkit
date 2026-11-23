@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { rawInlineCode } from '../../docs/.vitepress/markdown'
 import {
   alternates,
+  article,
   HOST,
   LANDING,
   landingSitemap,
@@ -286,6 +287,21 @@ describe('what the docs tell search engines', () => {
     expect(pageUrl('ru/guides/windows-95-desktop-react.md')).toBe(
       `${HOST}/docs/ru/guides/windows-95-desktop-react.html`,
     )
+  })
+
+  it('describes a page as a technical article in its own language, safe to put into a script', () => {
+    const [tag, attributes, text] = article('ru/api.md', 'API', 'Каждый экспорт </script> пакета')
+    expect([tag, attributes]).toEqual(['script', { type: 'application/ld+json' }])
+    expect(text).not.toContain('<')
+    expect(JSON.parse(text)).toMatchObject({
+      '@type': 'TechArticle',
+      headline: 'API',
+      description: 'Каждый экспорт </script> пакета',
+      url: `${HOST}/docs/ru/api.html`,
+      inLanguage: 'ru',
+      about: { '@type': 'SoftwareSourceCode', name: 'wmkit' },
+    })
+    expect(JSON.parse(article('guides/x.md', 'X', 'y')[2])).toMatchObject({ inLanguage: 'en' })
   })
 
   it('lists the landing in both languages in a sitemap that robots.txt points to', () => {

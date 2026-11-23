@@ -96,3 +96,30 @@ test('llms.txt, the sitemap and robots.txt list the docs', async ({ request }) =
   const robots = await (await request.get('robots.txt')).text()
   expect(robots).toContain('Sitemap: https://wmkit.vercel.app/docs/sitemap.xml')
 })
+
+test('llms.txt names the entry points, and the pages describe themselves as structured data', async ({
+  request,
+}) => {
+  const llms = await (await request.get('llms.txt')).text()
+  expect(llms).toMatch(/for the web, version \d+\.\d+\.\d+:/)
+  expect(llms).toContain('- `@surdeddd/wmkit/dock`: ')
+  expect(llms).toContain('## Rules that prevent the usual mistakes')
+
+  const structured = async (path: string) => {
+    const html = await (await request.get(path)).text()
+    const found = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)]
+    expect(found, path).toHaveLength(1)
+    return JSON.parse(found[0]?.[1] ?? '') as Record<string, unknown>
+  }
+  const landing = (await structured('')) as { '@graph': Array<Record<string, unknown>> }
+  expect(landing['@graph'][1]).toMatchObject({ '@type': 'SoftwareSourceCode', inLanguage: 'en' })
+  expect(String(landing['@graph'][1]?.version)).toMatch(/^\d+\.\d+\.\d+$/)
+  const russian = (await structured('ru/')) as { '@graph': Array<Record<string, unknown>> }
+  expect(russian['@graph'][1]).toMatchObject({ inLanguage: 'ru' })
+  expect(await structured('docs/guides/ai-coding-agents.html')).toMatchObject({
+    '@type': 'TechArticle',
+    inLanguage: 'en',
+    url: 'https://wmkit.vercel.app/docs/guides/ai-coding-agents.html',
+  })
+  expect(await structured('docs/ru/api.html')).toMatchObject({ inLanguage: 'ru' })
+})

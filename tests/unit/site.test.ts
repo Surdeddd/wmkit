@@ -113,6 +113,28 @@ describe('the landing page as the build writes it', () => {
       expect(attribute(doc, 'meta[name="twitter:image"]', 'content')).toBe(`${HOST}/og.png`)
     })
 
+    it(`describes the library in ${lang} as structured data a crawler can read`, () => {
+      const scripts = [...built(lang).querySelectorAll('script[type="application/ld+json"]')]
+      expect(scripts).toHaveLength(1)
+      const text = scripts[0]?.textContent ?? ''
+      expect(text).not.toContain('<')
+      const data = JSON.parse(text) as { '@context': string; '@graph': unknown[] }
+      expect(data['@context']).toBe('https://schema.org')
+      const [site, library] = data['@graph']
+      expect(site).toMatchObject({ '@type': 'WebSite', url: `${HOST}/`, name: 'wmkit' })
+      expect(library).toMatchObject({
+        '@type': 'SoftwareSourceCode',
+        name: 'wmkit',
+        alternateName: '@surdeddd/wmkit',
+        description: dict.meta.description,
+        url: `${HOST}${LANDING_PATHS[lang]}`,
+        inLanguage: lang,
+        codeRepository: 'https://github.com/Surdeddd/wmkit',
+        license: 'https://opensource.org/licenses/MIT',
+        version: '%WMKIT_VERSION%',
+      })
+    })
+
     it(`points the ${lang} docs link at the docs of the same language under any base`, () => {
       for (const base of ['/', '/wmkit/']) {
         const link = built(lang, base).querySelector('[data-i18n-href="link.docs"]')
