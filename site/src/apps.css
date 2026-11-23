@@ -857,3 +857,90 @@
   max-height: none;
   box-shadow: none;
 }
+
+.tour {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.tour li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.tour strong {
+  font-size: 13px;
+}
+
+.tour .app-note {
+  margin: 2px 0 0;
+}
+
+.tour button {
+  padding: 6px 11px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 2px;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 140ms var(--ease);
+}
+
+.tour button:hover,
+.tour button:focus-visible {
+  background: var(--wm-accent);
+  border-color: var(--wm-accent-ink, var(--wm-accent));
+  color: var(--signal-ink);
+}
+
+.notes-text {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  height: calc(100% - 52px);
+  box-sizing: border-box;
+  padding: 8px 10px;
+  resize: none;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 2px;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.notes-text:focus-visible {
+  outline: 2px solid var(--wm-accent);
+  outline-offset: 1px;
+}
+
+.app-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+[data-wm-seam][data-pulse] {
+  animation: seam-pulse 900ms ease-in-out 2;
+}
+
+@keyframes seam-pulse {
+  50% {
+    background: var(--wm-accent, #4c8dff);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wm-seam][data-pulse] {
+    animation: none;
+    background: var(--wm-accent, #4c8dff);
+  }
+}

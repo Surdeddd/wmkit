@@ -4,7 +4,7 @@ import {
   type DevtoolsController,
   devtoolsMessagesRu,
 } from '@surdeddd/wmkit/devtools'
-import type { AppId, Dict } from './i18n'
+import type { AppId, Dict, TourStep } from './i18n'
 import { highlight, snippets } from './snippets'
 
 export const THEME_NAMES = [
@@ -32,6 +32,10 @@ export function isThemeName(value: string): value is ThemeName {
   return (THEME_NAMES as readonly string[]).includes(value)
 }
 
+export type OptionName = 'magnetism' | 'snap' | 'announce' | 'grid' | 'sync'
+
+export const OPTION_NAMES: readonly OptionName[] = ['magnetism', 'snap', 'announce', 'grid', 'sync']
+
 export interface AppContext {
   wm: WindowManager
   dict(): Dict
@@ -39,8 +43,11 @@ export interface AppContext {
   reset(): void
   theme(): ThemeName
   setTheme(theme: ThemeName): void
-  option(name: 'magnetism' | 'snap' | 'announce'): boolean
-  setOption(name: 'magnetism' | 'snap' | 'announce', value: boolean): void
+  option(name: OptionName): boolean
+  setOption(name: OptionName, value: boolean): void
+  show(step: TourStep): void
+  unsaved(dirty: boolean): void
+  answer(discard: boolean): void
   size(): { width: number; height: number }
   safeArea(): { x: number; y: number; width: number; height: number }
   workspaces: number
@@ -61,6 +68,7 @@ export interface AppInstance {
 
 export interface AppSpec {
   id: AppId
+  hidden?: boolean
   init(ctx: AppContext): WindowInit
   render(body: HTMLElement, ctx: AppContext): AppInstance | undefined
 }
@@ -759,13 +767,13 @@ const settings: AppSpec = {
       },
     })
 
-    const toggles: Array<'magnetism' | 'snap' | 'announce'> = ['magnetism', 'snap', 'announce']
-    const toggleRows = toggles.map((name) => {
+    const toggleRows = OPTION_NAMES.map((name) => {
       const row = el('div', 'setting')
       const label = el('span')
       const seg = el('div', 'seg')
       const on = button('', () => ctx.setOption(name, true))
       const off = button('', () => ctx.setOption(name, false))
+      row.dataset.option = name
       seg.append(on, off)
       row.append(label, seg)
       return {
@@ -1070,7 +1078,116 @@ const devtools: AppSpec = {
   },
 }
 
+const tour: AppSpec = {
+  id: 'tour',
+  init(ctx) {
+    return {
+      title: 'tour',
+      ...place(ctx, 340, 314, 392, 30),
+      minWidth: 260,
+      minHeight: 200,
+      layer: 'floating',
+    }
+  },
+  render(body, ctx) {
+    const draw = () => {
+      const copy = ctx.dict().tour
+      const list = el('ol', 'tour')
+      for (const step of copy.steps) {
+        const item = el('li')
+        const words = el('div')
+        words.append(el('strong', undefined, step.title), el('p', 'app-note', step.text))
+        const run = button(copy.show, () => ctx.show(step.id))
+        run.dataset.tour = step.id
+        run.setAttribute('aria-label', `${copy.show}: ${step.title}`)
+        item.append(words, run)
+        list.append(item)
+      }
+      body.replaceChildren(el('p', 'app-note', copy.lead), list)
+    }
+    draw()
+    return { relabel: draw }
+  },
+}
+
+const notes: AppSpec = {
+  id: 'notes',
+  init(ctx) {
+    return { title: 'notes.txt', ...place(ctx, 320, 240, 760, 300), minWidth: 220, minHeight: 160 }
+  },
+  render(body, ctx) {
+    const area = el('textarea', 'notes-text')
+    const status = el('span', 'app-note')
+    let saved = ''
+    const sync = () => {
+      const copy = ctx.dict().notes
+      const dirty = area.value !== saved
+      ctx.unsaved(dirty)
+      status.textContent = dirty ? copy.unsaved : saved === '' ? '' : copy.saved
+      save.disabled = !dirty
+    }
+    const save = button('', () => {
+      saved = area.value
+      sync()
+    })
+    save.dataset.notes = 'save'
+    area.addEventListener('input', sync)
+    const row = el('div', 'app-actions')
+    row.append(save, status)
+    body.replaceChildren(area, row)
+    const relabel = () => {
+      const copy = ctx.dict().notes
+      area.placeholder = copy.placeholder
+      area.setAttribute('aria-label', copy.label)
+      save.textContent = copy.save
+      sync()
+    }
+    relabel()
+    return {
+      relabel,
+      destroy() {
+        ctx.unsaved(false)
+      },
+    }
+  },
+}
+
+const confirm: AppSpec = {
+  id: 'confirm',
+  hidden: true,
+  init(ctx) {
+    return {
+      title: 'confirm',
+      ...centred(ctx, 348, 168),
+      layer: 'modal',
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+    }
+  },
+  render(body, ctx) {
+    const text = el('p')
+    const keep = button('', () => ctx.answer(false))
+    const discard = button('', () => ctx.answer(true))
+    keep.dataset.answer = 'keep'
+    discard.dataset.answer = 'discard'
+    const row = el('div', 'app-actions')
+    row.append(keep, discard)
+    body.replaceChildren(text, row)
+    const relabel = () => {
+      const copy = ctx.dict().confirm
+      text.textContent = copy.text
+      keep.textContent = copy.keep
+      discard.textContent = copy.discard
+    }
+    relabel()
+    queueMicrotask(() => keep.focus())
+    return { relabel }
+  },
+}
+
 export const apps: AppSpec[] = [
+  tour,
   readme,
   terminal,
   inspector,
@@ -1082,4 +1199,6 @@ export const apps: AppSpec[] = [
   skins,
   devtools,
   shortcuts,
+  notes,
+  confirm,
 ]

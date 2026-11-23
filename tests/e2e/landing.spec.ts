@@ -19,7 +19,7 @@ async function launch(page: Page, app: string) {
 }
 
 test('the desktop boots with a live launcher', async ({ page }) => {
-  await expect(page.locator('#launcher button')).toHaveCount(11)
+  await expect(page.locator('#launcher button')).toHaveCount(13)
   await expect(page.locator(`${readme} [data-wm-title]`)).toHaveText('readme.md')
   await expect(page.locator('#stat-win')).not.toHaveText('0')
 })
@@ -48,10 +48,11 @@ test('minimize parks a window in the dock and restores it', async ({ page }) => 
   const window = page.locator(readme)
   await window.locator('[data-wm-minimize]').click()
   await expect(window).toBeHidden()
-  const task = page.locator('#dock [data-task="readme"]')
-  await expect(task).toBeVisible()
+  const task = page.locator('#dock [data-wm-task="readme"]')
+  await expect(task).toHaveAttribute('data-wm-stage', 'minimized')
   await task.click()
   await expect(window).toBeVisible()
+  await expect(task).toHaveAttribute('data-wm-focused', '')
 })
 
 test('the launcher opens an app and marks it as running', async ({ page }) => {
@@ -108,8 +109,8 @@ test('the window menu tiles the desktop and edit undoes it', async ({ page, isMo
 })
 
 test('documentation sections render below the desktop', async ({ page }) => {
-  await expect(page.locator('.feature')).toHaveCount(8)
-  await expect(page.locator('#fw-row > div')).toHaveCount(6)
+  await expect(page.locator('.feature')).toHaveCount(12)
+  await expect(page.locator('#fw-row > div')).toHaveCount(10)
   const table = page.locator('#compare-table table')
   await expect(table.locator('thead .col-wmkit')).toHaveText('wmkit')
   await expect(table.locator('tbody tr')).toHaveCount(11)

@@ -18,7 +18,7 @@ interface Stage {
   closing: boolean
   gestures: boolean
   reloads: boolean
-  tasks: boolean
+  tasks: boolean | 'all'
   dress: Dress
 }
 
@@ -93,7 +93,7 @@ const STAGES: Stage[] = [
     opener: 'button[data-app]',
     ready: '#boot[data-done]',
     gestures: true,
-    tasks: true,
+    tasks: 'all',
   },
 ]
 
@@ -338,8 +338,15 @@ function inspect(stage: Stage): string[] {
   }
   if (stage.tasks) {
     const tasks = document.querySelectorAll('[data-task], [data-wm-task]').length
-    if (tasks !== wm.minimized().length) {
-      found.push(`${tasks} taskbar buttons for ${wm.minimized().length} minimized windows`)
+    const state = wm.getState()
+    const listed = new Set(
+      Object.values(state.windows)
+        .filter((win) => win.workspace === state.workspace)
+        .map((win) => (win.groupId === null ? `w${win.id}` : `g${win.groupId}`)),
+    ).size
+    const expected = stage.tasks === 'all' ? listed : wm.minimized().length
+    if (tasks !== expected) {
+      found.push(`${tasks} taskbar buttons where ${expected} are due`)
     }
   }
   const overflow = getComputedStyle(desktop)

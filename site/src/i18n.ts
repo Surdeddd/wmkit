@@ -14,6 +14,22 @@ export type AppId =
   | 'skins'
   | 'devtools'
   | 'shortcuts'
+  | 'tour'
+  | 'notes'
+  | 'confirm'
+
+export type TourStep =
+  | 'layouts'
+  | 'seams'
+  | 'overview'
+  | 'switcher'
+  | 'tabs'
+  | 'dock'
+  | 'guard'
+  | 'grid'
+  | 'sync'
+  | 'undo'
+  | 'themes'
 
 export interface CompareCell {
   text: string
@@ -82,10 +98,19 @@ export interface Dict {
     magnetism: string
     snap: string
     announce: string
+    grid: string
+    sync: string
     on: string
     off: string
   }
   devtools: { lead: string }
+  tour: {
+    lead: string
+    show: string
+    steps: Array<{ id: TourStep; title: string; text: string }>
+  }
+  notes: { placeholder: string; label: string; save: string; saved: string; unsaved: string }
+  confirm: { text: string; discard: string; keep: string }
   skins: {
     lead: string
     theme: string
@@ -147,7 +172,7 @@ const en: Dict = {
     'hero.build': 'Build a window',
     'hero.docs': 'Read the docs',
     'hero.hint':
-      'drag a titlebar to a screen edge to snap · ⌘⌥← / → snap · ⌘Z undo · F6 cycle · ? help',
+      'drag a titlebar to a screen edge to snap · rest on a maximize button for layouts · Alt+` switch · ⌘Z undo · ? help',
     'builder.kicker': '01 — build a window',
     'builder.title': 'Your markup, our engine',
     'builder.sub':
@@ -157,7 +182,7 @@ const en: Dict = {
     'features.sub':
       'The core keeps state, the DOM layer moves pixels, your framework renders content. Each piece is replaceable.',
     'fw.kicker': '03 — adapters',
-    'fw.title': 'One core, six ways to hold it',
+    'fw.title': 'One core, ten ways to hold it',
     'fw.sub':
       'Window content always lives in your own component tree — no innerHTML, no portals into the void. Adapters are thin sugar over the same state machine.',
     'fw.open': 'Open code.ts in the desktop ↗',
@@ -187,6 +212,8 @@ const en: Dict = {
         { id: 'new', label: 'New window' },
         { id: 'tile', label: 'Tile' },
         { id: 'cascade', label: 'Cascade' },
+        { id: 'overview', label: 'Overview' },
+        { id: 'switch', label: 'Switch window', key: 'Alt `' },
         { id: 'center', label: 'Center active' },
         { id: 'back', label: 'Send to back' },
         { id: 'minimizeAll', label: 'Minimize all' },
@@ -205,9 +232,20 @@ const en: Dict = {
       ],
     },
     {
+      id: 'scenes',
+      label: 'Scenes',
+      items: [
+        { id: 'sceneStudio', label: 'Studio — dock and tabs' },
+        { id: 'sceneBoard', label: 'Board — tiles and seams' },
+        { id: 'sceneRetro', label: 'Retro — 1995' },
+        { id: 'sceneClean', label: 'Clean desk' },
+      ],
+    },
+    {
       id: 'help',
       label: 'Help',
       items: [
+        { id: 'tour', label: 'Take the tour' },
         { id: 'shortcuts', label: 'Keyboard shortcuts', key: '?' },
         { id: 'readme', label: 'About wmkit' },
         { id: 'github', label: 'GitHub ↗' },
@@ -227,6 +265,9 @@ const en: Dict = {
     skins: { title: 'skins', icon: '◈' },
     devtools: { title: 'devtools', icon: '⌥' },
     shortcuts: { title: 'shortcuts', icon: '⌘' },
+    tour: { title: 'tour', icon: '★' },
+    notes: { title: 'notes.txt', icon: '¶' },
+    confirm: { title: 'close notes.txt?', icon: '!' },
   },
   readme: {
     lead: 'A window manager with no opinion about your UI.',
@@ -296,8 +337,83 @@ const en: Dict = {
     magnetism: 'edge magnetism',
     snap: 'snap zones',
     announce: 'screen reader announcements',
+    grid: 'grid, 16 px',
+    sync: 'sync across tabs',
     on: 'on',
     off: 'off',
+  },
+  tour: {
+    lead: 'Eleven things to try. Each button does it on the desktop around this window.',
+    show: 'show',
+    steps: [
+      {
+        id: 'layouts',
+        title: 'Snap layouts',
+        text: 'Rest the mouse on a maximize button, or press ⌘⌥L, and pick a tile for the window.',
+      },
+      {
+        id: 'seams',
+        title: 'Linked resize',
+        text: 'Two windows side by side share a separator. Drag it and both resize.',
+      },
+      {
+        id: 'overview',
+        title: 'Overview',
+        text: 'Every window shrinks into a grid. Pick one with the pointer or the arrows.',
+      },
+      {
+        id: 'switcher',
+        title: 'Window switcher',
+        text: 'Alt + ` walks the windows from the most recent one, like Alt+Tab.',
+      },
+      {
+        id: 'tabs',
+        title: 'Tab groups',
+        text: 'Drop a titlebar onto another and the windows share one frame.',
+      },
+      {
+        id: 'dock',
+        title: 'Docking',
+        text: 'The Studio scene tiles windows into panels with separators. Tear one out and it floats.',
+      },
+      {
+        id: 'guard',
+        title: 'Ask before closing',
+        text: 'Type in notes.txt and close it. A modal window asks first.',
+      },
+      {
+        id: 'grid',
+        title: 'Grid',
+        text: 'Windows land on a 16 px step. Hold Alt to drag freely.',
+      },
+      {
+        id: 'sync',
+        title: 'Sync across tabs',
+        text: 'Open this page in a second tab and both show one desktop.',
+      },
+      {
+        id: 'undo',
+        title: 'Undo',
+        text: 'Every step above is one entry in history. ⌘Z takes it back.',
+      },
+      {
+        id: 'themes',
+        title: 'Themes',
+        text: 'Sixteen themes. The next one, please.',
+      },
+    ],
+  },
+  notes: {
+    placeholder: 'Type something, then try to close this window.',
+    label: 'Note text',
+    save: 'save',
+    saved: 'saved',
+    unsaved: 'unsaved changes',
+  },
+  confirm: {
+    text: 'notes.txt has unsaved changes. Close it anyway?',
+    discard: 'close without saving',
+    keep: 'keep editing',
   },
   devtools: {
     lead: 'The panel below is @surdeddd/wmkit/devtools, the same 2.9 kB entry point you can drop into your own app. It follows the manager, not this page.',
@@ -403,6 +519,22 @@ const en: Dict = {
       title: 'Themeable',
       text: 'Sixteen CSS themes ship with it — every value is a custom property, and a per-window variant overrides them for one window.',
     },
+    {
+      title: 'Docking and tabs',
+      text: 'Tile windows into split panels with separators, or drop one titlebar onto another for tabs. The rest keep floating.',
+    },
+    {
+      title: 'Layouts, taskbar, switcher',
+      text: 'A snap layout menu on the maximize button, neighbours that resize together, a taskbar and a window switcher with an overview.',
+    },
+    {
+      title: 'Sync and close guards',
+      text: 'One desktop in every browser tab over a BroadcastChannel, and a guard that asks before unsaved work is closed.',
+    },
+    {
+      title: 'Every framework',
+      text: 'React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik and web components over the same core, and none of them required.',
+    },
   ],
   frameworks: [
     ['vanilla', 'attachDesktop + attachWindow'],
@@ -411,6 +543,10 @@ const en: Dict = {
     ['svelte', 'use:desktop actions'],
     ['solid', 'signals and ref callbacks'],
     ['angular', 'signals and DestroyRef'],
+    ['preact', 'the same hooks as React'],
+    ['lit', 'directives and controllers'],
+    ['qwik', 'components and context'],
+    ['web components', 'wm-desktop and wm-window'],
   ],
   compareHead: ['', 'wmkit', 'react-rnd', 'dockview', 'winbox.js'],
   compareRows: [
@@ -551,7 +687,7 @@ const ru: Dict = {
     'hero.build': 'Собрать окно',
     'hero.docs': 'Документация',
     'hero.hint':
-      'тащите заголовок к краю для прилипания · ⌘⌥← / → прилипание · ⌘Z отмена · F6 обход · ? помощь',
+      'тащите заголовок к краю для прилипания · задержитесь на кнопке разворачивания ради раскладок · Alt+` переключение · ⌘Z отмена · ? помощь',
     'builder.kicker': '01 — собери окно',
     'builder.title': 'Ваша разметка, наш движок',
     'builder.sub':
@@ -561,7 +697,7 @@ const ru: Dict = {
     'features.sub':
       'Ядро хранит состояние, DOM-слой двигает пиксели, ваш фреймворк рисует содержимое. Любую часть можно заменить.',
     'fw.kicker': '03 — адаптеры',
-    'fw.title': 'Одно ядро, шесть способов взять его в руки',
+    'fw.title': 'Одно ядро, десять способов взять его в руки',
     'fw.sub':
       'Содержимое окна всегда живёт в вашем дереве компонентов — никакого innerHTML и порталов в пустоту. Адаптеры это тонкий сахар над одной и той же машиной состояний.',
     'fw.open': 'Открыть код.ts на рабочем столе ↗',
@@ -604,6 +740,8 @@ const ru: Dict = {
         { id: 'new', label: 'Новое окно' },
         { id: 'tile', label: 'Плиткой' },
         { id: 'cascade', label: 'Каскадом' },
+        { id: 'overview', label: 'Обзор' },
+        { id: 'switch', label: 'Переключить окно', key: 'Alt `' },
         { id: 'center', label: 'По центру' },
         { id: 'back', label: 'На задний план' },
         { id: 'minimizeAll', label: 'Свернуть все' },
@@ -622,9 +760,20 @@ const ru: Dict = {
       ],
     },
     {
+      id: 'scenes',
+      label: 'Сцены',
+      items: [
+        { id: 'sceneStudio', label: 'Студия — док и вкладки' },
+        { id: 'sceneBoard', label: 'Плитка — раскладка и швы' },
+        { id: 'sceneRetro', label: 'Ретро — 1995' },
+        { id: 'sceneClean', label: 'Чистый стол' },
+      ],
+    },
+    {
       id: 'help',
       label: 'Помощь',
       items: [
+        { id: 'tour', label: 'Пройти тур' },
         { id: 'shortcuts', label: 'Горячие клавиши', key: '?' },
         { id: 'readme', label: 'О wmkit' },
         { id: 'github', label: 'GitHub ↗' },
@@ -644,6 +793,9 @@ const ru: Dict = {
     skins: { title: 'оформление', icon: '◈' },
     devtools: { title: 'девтулы', icon: '⌥' },
     shortcuts: { title: 'клавиши', icon: '⌘' },
+    tour: { title: 'тур', icon: '★' },
+    notes: { title: 'notes.txt', icon: '¶' },
+    confirm: { title: 'закрыть notes.txt?', icon: '!' },
   },
   readme: {
     lead: 'Оконный менеджер без единого мнения о вашем интерфейсе.',
@@ -713,8 +865,83 @@ const ru: Dict = {
     magnetism: 'магнетизм краёв',
     snap: 'зоны прилипания',
     announce: 'объявления для скринридера',
+    grid: 'сетка, 16 px',
+    sync: 'синхронизация вкладок',
     on: 'вкл',
     off: 'выкл',
+  },
+  tour: {
+    lead: 'Одиннадцать вещей, которые стоит попробовать. Каждая кнопка делает это на рабочем столе вокруг окна.',
+    show: 'показать',
+    steps: [
+      {
+        id: 'layouts',
+        title: 'Раскладки',
+        text: 'Задержите мышь на кнопке разворачивания или нажмите ⌘⌥L и выберите место для окна.',
+      },
+      {
+        id: 'seams',
+        title: 'Связанный ресайз',
+        text: 'У двух окон бок о бок общий разделитель. Потяните его, и размер поменяют оба.',
+      },
+      {
+        id: 'overview',
+        title: 'Обзор',
+        text: 'Все окна уменьшаются в сетку. Выберите одно указателем или стрелками.',
+      },
+      {
+        id: 'switcher',
+        title: 'Переключатель окон',
+        text: 'Alt + ` идёт по окнам от последнего использованного, как Alt+Tab.',
+      },
+      {
+        id: 'tabs',
+        title: 'Группы вкладок',
+        text: 'Бросьте тайтлбар на другой, и окна разделят одну рамку.',
+      },
+      {
+        id: 'dock',
+        title: 'Докинг',
+        text: 'Сцена «Студия» раскладывает окна по панелям с разделителями. Оторвите одно, и оно поплывёт.',
+      },
+      {
+        id: 'guard',
+        title: 'Вопрос перед закрытием',
+        text: 'Наберите что-нибудь в notes.txt и закройте его. Сначала спросит модальное окно.',
+      },
+      {
+        id: 'grid',
+        title: 'Сетка',
+        text: 'Окна встают на шаг 16 px. С зажатым Alt тащатся свободно.',
+      },
+      {
+        id: 'sync',
+        title: 'Синхронизация вкладок',
+        text: 'Откройте эту страницу во второй вкладке, и в обеих будет один рабочий стол.',
+      },
+      {
+        id: 'undo',
+        title: 'Отмена',
+        text: 'Каждый шаг выше — одна запись в истории. ⌘Z возвращает её.',
+      },
+      {
+        id: 'themes',
+        title: 'Темы',
+        text: 'Шестнадцать тем. Следующую, пожалуйста.',
+      },
+    ],
+  },
+  notes: {
+    placeholder: 'Наберите что-нибудь и попробуйте закрыть это окно.',
+    label: 'Текст заметки',
+    save: 'сохранить',
+    saved: 'сохранено',
+    unsaved: 'есть несохранённые изменения',
+  },
+  confirm: {
+    text: 'В notes.txt есть несохранённые изменения. Всё равно закрыть?',
+    discard: 'закрыть без сохранения',
+    keep: 'вернуться к правке',
   },
   devtools: {
     lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 2.9 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',
@@ -820,6 +1047,22 @@ const ru: Dict = {
       title: 'Темы',
       text: 'В комплекте шестнадцать CSS-тем — каждое значение это custom property, а вариант окна переопределяет их для одного окна.',
     },
+    {
+      title: 'Докинг и вкладки',
+      text: 'Окна раскладываются по панелям с разделителями, а тайтлбар, брошенный на другой, даёт вкладки. Остальные продолжают плавать.',
+    },
+    {
+      title: 'Раскладки, панель задач, переключатель',
+      text: 'Меню раскладок на кнопке разворачивания, соседи с общим ресайзом, панель задач и переключатель окон с обзором.',
+    },
+    {
+      title: 'Синхронизация и вопрос перед закрытием',
+      text: 'Один рабочий стол во всех вкладках браузера через BroadcastChannel и охранник, который спрашивает, прежде чем закрыть несохранённое.',
+    },
+    {
+      title: 'Любой фреймворк',
+      text: 'React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik и веб-компоненты над одним ядром, и ни один из них не обязателен.',
+    },
   ],
   frameworks: [
     ['vanilla', 'attachDesktop + attachWindow'],
@@ -828,6 +1071,10 @@ const ru: Dict = {
     ['svelte', 'экшены use:desktop'],
     ['solid', 'сигналы и ref-колбэки'],
     ['angular', 'сигналы и DestroyRef'],
+    ['preact', 'те же хуки, что у React'],
+    ['lit', 'директивы и контроллеры'],
+    ['qwik', 'компоненты и контекст'],
+    ['веб-компоненты', 'wm-desktop и wm-window'],
   ],
   compareHead: ['', 'wmkit', 'react-rnd', 'dockview', 'winbox.js'],
   compareRows: [

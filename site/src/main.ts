@@ -12,7 +12,17 @@ import {
   type WindowState,
 } from '@surdeddd/wmkit'
 import { skin } from '@surdeddd/wmkit/chrome'
+import { createDock, type Dock, type DockNode, dockMessagesRu } from '@surdeddd/wmkit/dock'
 import { touchGestures } from '@surdeddd/wmkit/gestures'
+import {
+  createLayoutPicker,
+  layoutMessagesRu,
+  linkSnapped,
+  snapLayouts,
+} from '@surdeddd/wmkit/layouts'
+import { createSwitcher, switcherMessagesRu } from '@surdeddd/wmkit/switcher'
+import { sync as shareDesktop } from '@surdeddd/wmkit/sync'
+import { createTaskbar, taskbarMessagesRu } from '@surdeddd/wmkit/taskbar'
 import amberUrl from '@surdeddd/wmkit/themes/amber.css?url'
 import aquaUrl from '@surdeddd/wmkit/themes/aqua.css?url'
 import blueprintUrl from '@surdeddd/wmkit/themes/blueprint.css?url'
@@ -29,11 +39,11 @@ import paperUrl from '@surdeddd/wmkit/themes/paper.css?url'
 import retroUrl from '@surdeddd/wmkit/themes/retro.css?url'
 import synthUrl from '@surdeddd/wmkit/themes/synth.css?url'
 import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
-import type { AppContext, AppInstance, AppSpec, SkinLayout, ThemeName } from './apps'
-import { apps, isThemeName } from './apps'
+import type { AppContext, AppInstance, AppSpec, OptionName, SkinLayout, ThemeName } from './apps'
+import { apps, isThemeName, THEME_NAMES } from './apps'
 import { initBuilder } from './builder'
 import { startFpsMeter } from './fps'
-import { type AppId, type Dict, dictionaries, type Lang } from './i18n'
+import { type AppId, type Dict, dictionaries, type Lang, type TourStep } from './i18n'
 import './os.css'
 import './apps.css'
 
@@ -118,7 +128,13 @@ let lang: Lang = resolveLang()
 let theme: ThemeName = resolveTheme()
 const dict = (): Dict => dictionaries[lang]
 
-const options = { magnetism: true, snap: true, announce: true }
+const options: Record<OptionName, boolean> = {
+  magnetism: true,
+  snap: true,
+  announce: true,
+  grid: false,
+  sync: readStored('wmkit-sync') === '1',
+}
 const wm = createWindowManager({ historyLimit: 60 })
 
 interface Mounted {
@@ -291,16 +307,50 @@ function desktopOptions(): DesktopOptions {
     magnetism: options.magnetism,
     snap: options.snap,
     announce: options.announce && narration,
+    grid: options.grid ? 16 : 0,
     gestures: [touchGestures({ swipe: { workspaces: WORKSPACES } })],
     skins: demoSkins,
-    minimizeTarget: (win) => dockEl.querySelector(`[data-task="${win.id}"]`) ?? dockEl,
+    minimizeTarget: (win) => taskbar.targetOf(win) ?? dockEl,
     onTitlebarContextMenu: (win) => {
       wm.sendToBack(win.id)
     },
   }
 }
 
+let taskbar = createTaskbar(wm, dockEl, lang === 'ru' ? { messages: taskbarMessagesRu } : {})
 let desktop: DesktopController = attachDesktop(wm, desktopEl, desktopOptions())
+let dock: Dock | null = null
+let shared: { destroy(): void } | null = null
+let dirtyNotes = false
+let answerClose: ((discard: boolean) => void) | null = null
+
+function plug() {
+  const ru = lang === 'ru'
+  const picker = createLayoutPicker(desktop, ru ? { messages: layoutMessagesRu } : {})
+  const seams = linkSnapped(desktop, ru ? { messages: layoutMessagesRu } : {})
+  const switcher = createSwitcher(desktop, ru ? { messages: switcherMessagesRu } : {})
+  return {
+    picker,
+    switcher,
+    destroy() {
+      picker.destroy()
+      seams.destroy()
+      switcher.destroy()
+    },
+  }
+}
+
+let plugins = plug()
+
+function startDock(): Dock {
+  return createDock(desktop, lang === 'ru' ? { messages: dockMessagesRu } : {})
+}
+
+function share(on: boolean): void {
+  shared?.destroy()
+  shared = on ? shareDesktop(wm, { channel: 'wmkit-demo' }) : null
+  writeStored('wmkit-sync', on ? '1' : '0')
+}
 
 const ctx: AppContext = {
   wm,
@@ -332,8 +382,19 @@ const ctx: AppContext = {
   setOption(name, value) {
     if (options[name] === value) return
     options[name] = value
-    remountDesktop()
+    if (name === 'sync') share(value)
+    else remountDesktop()
     relabelAll()
+  },
+  show: (step) => tourActions[step](),
+  unsaved(dirty) {
+    dirtyNotes = dirty
+  },
+  answer(discard) {
+    const done = answerClose
+    answerClose = null
+    if (wm.get('confirm')) wm.close('confirm')
+    done?.(discard)
   },
   size: () => ({ width: desktopEl.clientWidth, height: desktopEl.clientHeight }),
   safeArea,
@@ -371,13 +432,22 @@ function remountDesktop(): void {
     contents.set(id, entry.window ? [...entry.window.content.childNodes] : [])
     entry.window = null
   }
+  const docked = dock?.layout()
+  dock?.destroy()
+  dock = null
+  plugins.destroy()
   desktop.destroy()
   for (const node of [...desktopEl.children]) {
     if (!node.classList.contains('wallpaper')) node.remove()
   }
   desktop = attachDesktop(wm, desktopEl, desktopOptions())
+  plugins = plug()
   for (const [id, entry] of mounted) {
     if (wm.get(id)) activate(id, entry, contents.get(id))
+  }
+  if (docked?.root) {
+    dock = startDock()
+    dock.setLayout(docked)
   }
 }
 
@@ -430,6 +500,8 @@ function release(id: string): void {
 wm.on('open', ({ window: win }) => adopt(win.id))
 
 wm.on('close', ({ window: win }) => {
+  if (win.id === 'confirm') ctx.answer(false)
+  if (win.id === 'notes' && wm.get('confirm')) wm.close('confirm')
   const entry = mounted.get(win.id)
   if (!entry) return
   entry.instance?.destroy?.()
@@ -656,21 +728,173 @@ function reconcile(): void {
   }
 }
 
-function resetDesktop(): void {
+function clearDesktop(): void {
+  dock?.destroy()
+  dock = null
   wm.batch(() => {
     wm.closeAll()
     wm.setWorkspace(0)
   })
+}
+
+function resetDesktop(): void {
+  clearDesktop()
   openDefaults()
 }
 
 function openDefaults(): void {
   const width = desktopEl.clientWidth
   openApp('readme')
-  if (width >= 1440) openApp('inspector')
+  if (width >= 1440) openApp('tour')
   if (width >= 720) openApp('terminal')
   wm.focus(width >= 720 ? 'terminal' : 'readme')
 }
+
+type Scene = 'studio' | 'board' | 'retro' | 'clean'
+
+function proportion(node: DockNode): DockNode {
+  if (node.kind === 'stack') return node
+  const sizes = node.axis === 'column' ? [0.64, 0.36] : [0.3, 0.7]
+  return {
+    ...node,
+    sizes: node.children.length === 2 ? sizes : node.sizes,
+    children: node.children.map(proportion),
+  }
+}
+
+function scene(name: Scene): void {
+  const guided = wm.get('tour') !== undefined
+  clearDesktop()
+  if (name === 'clean') {
+    openDefaults()
+    return
+  }
+  build(name)
+  if (guided) openApp('tour')
+}
+
+function build(name: Exclude<Scene, 'clean'>): void {
+  if (name === 'studio') {
+    for (const id of ['code', 'inspector', 'terminal'] as const) openApp(id)
+    dock = startDock()
+    dock.dock('code')
+    dock.dock('inspector', { side: 'left' })
+    dock.dock('terminal', { side: 'bottom' })
+    const root = dock.layout().root
+    if (root) dock.setLayout({ root: proportion(root) })
+    wm.focus('code')
+    return
+  }
+  if (name === 'board') {
+    const tiles = ['inspector', 'layouts', 'terminal', 'bench'] as const
+    for (const id of tiles) openApp(id)
+    wm.batch(() => {
+      tiles.forEach((id, index) => {
+        const rect = snapLayouts.quarters[index]
+        if (rect) wm.snapTo(id, rect)
+      })
+    })
+    return
+  }
+  ctx.setTheme('retro')
+  for (const id of ['readme', 'paint', 'terminal'] as const) openApp(id)
+  wm.arrange('cascade')
+}
+
+function pair(): [string, string] {
+  for (const id of ['readme', 'terminal'] as const) {
+    if (!wm.get(id)) openApp(id)
+    if (wm.get(id)?.stage === 'minimized') wm.restore(id)
+  }
+  return ['readme', 'terminal']
+}
+
+function subject(): string | null {
+  const state = wm.getState()
+  const open = [...state.order].reverse().filter((id) => {
+    const win = state.windows[id]
+    return win && win.workspace === state.workspace && win.stage !== 'minimized'
+  })
+  return open.find((id) => id !== 'tour') ?? open[0] ?? null
+}
+
+const tourActions: Record<TourStep, () => void> = {
+  layouts() {
+    const id = subject()
+    if (id) plugins.picker.open(id)
+  },
+  seams() {
+    const [left, right] = pair()
+    wm.batch(() => {
+      if (wm.get(left)?.groupId) wm.ungroup(left)
+      wm.snap(left, 'left')
+      wm.snap(right, 'right')
+    })
+    const seam = desktopEl.querySelector<HTMLElement>('[data-wm-seam]')
+    if (!seam) return
+    seam.dataset.pulse = ''
+    seam.addEventListener('animationend', () => delete seam.dataset.pulse, { once: true })
+  },
+  overview: () => {
+    plugins.switcher.overview()
+  },
+  switcher: () => {
+    plugins.switcher.open()
+  },
+  tabs() {
+    const [first, second] = pair()
+    wm.batch(() => {
+      wm.restore(first)
+      wm.restore(second)
+      wm.group([first, second])
+    })
+  },
+  dock: () => scene('studio'),
+  guard() {
+    openApp('notes')
+    const area = mounted.get('notes')?.window?.content.querySelector('textarea')
+    if (area && area.value === '') {
+      area.value = dict().notes.unsaved
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    void wm.requestClose('notes')
+  },
+  grid() {
+    ctx.setOption('grid', true)
+    openApp('settings')
+  },
+  sync() {
+    ctx.setOption('sync', true)
+    window.open(location.href, '_blank')
+  },
+  undo() {
+    const shape = () =>
+      JSON.stringify(
+        Object.values(wm.getState().windows).map((win) => [
+          win.id,
+          win.stage,
+          win.bounds,
+          win.groupId,
+          win.workspace,
+        ]),
+      )
+    const before = shape()
+    while (wm.undo() && shape() === before);
+  },
+  themes() {
+    const at = THEME_NAMES.indexOf(theme)
+    ctx.setTheme(THEME_NAMES[(at + 1) % THEME_NAMES.length] ?? 'glass')
+  },
+}
+
+wm.onBeforeClose((win) => {
+  if (win.id !== 'notes' || !dirtyNotes) return true
+  return new Promise<boolean>((resolve) => {
+    answerClose?.(false)
+    answerClose = resolve
+    openApp('confirm')
+  })
+})
 
 const builder = initBuilder({
   dict,
@@ -689,43 +913,57 @@ wallSkinsEl.addEventListener('click', () => {
   wm.focus('skins')
 })
 
-function renderDock(): void {
-  const minimized = wm.minimized()
-  dockEl.replaceChildren(
-    ...minimized.map((win) => {
-      const node = document.createElement('button')
-      node.type = 'button'
-      node.dataset.task = win.id
-      const spec = specById.get(win.id as AppId)
-      if (spec) {
-        const icon = document.createElement('span')
-        icon.className = 'ico'
-        icon.textContent = dict().apps[win.id as AppId].icon
-        node.append(icon)
-      }
-      node.append(document.createTextNode(win.title))
-      node.addEventListener('click', () => wm.focus(win.id))
-      return node
-    }),
-  )
-  statWin.textContent = String(wm.getState().order.length)
+const taskIcons = document.head.appendChild(document.createElement('style'))
+
+function paintTaskIcons(): void {
+  const quote = (icon: string) => `"${icon.replace(/[\\"]/g, '\\$&')} "`
+  taskIcons.textContent = apps
+    .map((spec) => {
+      const icon = quote(dict().apps[spec.id].icon)
+      return `#dock [data-wm-task="${spec.id}"] [data-wm-task-title]::before{content:${icon}}`
+    })
+    .join('\n')
+}
+
+function syncStats(): void {
+  const state = wm.getState()
+  statWin.textContent = String(state.order.length)
+  const covered = state.order.some((id) => {
+    const win = state.windows[id]
+    return (
+      win?.workspace === state.workspace && (win.stage === 'snapped' || win.stage === 'maximized')
+    )
+  })
+  desktopEl.toggleAttribute('data-covered', covered)
+}
+
+function relocalize(): void {
+  taskbar.destroy()
+  taskbar = createTaskbar(wm, dockEl, lang === 'ru' ? { messages: taskbarMessagesRu } : {})
+  remountDesktop()
+  paintTaskIcons()
 }
 
 function renderLauncher(): void {
   launcherEl.replaceChildren(
-    ...apps.map((spec) => {
-      const copy = dict().apps[spec.id]
-      const node = document.createElement('button')
-      node.type = 'button'
-      node.dataset.app = spec.id
-      const icon = document.createElement('span')
-      icon.className = 'ico'
-      icon.textContent = copy.icon
-      node.append(icon, document.createTextNode(copy.title))
-      node.addEventListener('click', () => openApp(spec.id))
-      launcherEl.append(node)
-      return node
-    }),
+    ...apps
+      .filter((spec) => !spec.hidden)
+      .map((spec) => {
+        const copy = dict().apps[spec.id]
+        const node = document.createElement('button')
+        node.type = 'button'
+        node.dataset.app = spec.id
+        const icon = document.createElement('span')
+        icon.className = 'ico'
+        icon.textContent = copy.icon
+        const label = document.createElement('span')
+        label.className = 'lbl'
+        label.textContent = copy.title
+        node.title = copy.title
+        node.append(icon, label)
+        node.addEventListener('click', () => openApp(spec.id))
+        return node
+      }),
   )
   syncLauncher()
 }
@@ -794,6 +1032,17 @@ const menuActions: Record<string, () => void> = {
     mounted.get('layouts')?.instance?.relabel?.()
   },
   reset: () => resetDesktop(),
+  overview: () => {
+    plugins.switcher.overview()
+  },
+  switch: () => {
+    plugins.switcher.open()
+  },
+  sceneStudio: () => scene('studio'),
+  sceneBoard: () => scene('board'),
+  sceneRetro: () => scene('retro'),
+  sceneClean: () => scene('clean'),
+  tour: () => openApp('tour'),
   shortcuts: () => openApp('shortcuts'),
   readme: () => openApp('readme'),
   github: () => window.open('https://github.com/Surdeddd/wmkit', '_blank', 'noreferrer'),
@@ -989,14 +1238,14 @@ function setLang(next: Lang): void {
   renderFrameworks()
   renderCompare()
   relabelAll()
-  renderDock()
+  relocalize()
   builder.relabel()
 }
 
 wm.subscribe(() => {
   reconcile()
   syncTabs()
-  renderDock()
+  syncStats()
   syncLauncher()
   syncWorkspaces()
   syncMenus()
@@ -1130,7 +1379,9 @@ renderWorkspaces()
 renderFeatures()
 renderFrameworks()
 renderCompare()
-renderDock()
+paintTaskIcons()
+syncStats()
+if (options.sync) share(true)
 boot()
 
 declare global {
