@@ -270,3 +270,39 @@ describe('bulk commands', () => {
     }
   })
 })
+
+describe('the order event', () => {
+  function watched() {
+    const wm = createWindowManager({ viewport: VIEWPORT })
+    wm.open({ id: 'a' })
+    wm.open({ id: 'b' })
+    wm.open({ id: 'c' })
+    const seen: string[] = []
+    wm.on('order', ({ order }) => seen.push(order.join()))
+    return { wm, seen }
+  }
+
+  it('stays silent, and the order keeps its array, when an update changes no layer', () => {
+    const { wm, seen } = watched()
+    const before = wm.getState().order
+    wm.update('a', { title: 'renamed', minSize: { width: 200, height: 120 } })
+    wm.update('a', { layer: 'normal' })
+    expect(seen).toEqual([])
+    expect(wm.getState().order).toBe(before)
+    wm.update('a', { layer: 'floating' })
+    expect(seen).toEqual(['b,c,a'])
+  })
+
+  it('reports a tab that moves, and nothing for a tab moved onto its own place', () => {
+    const { wm, seen } = watched()
+    wm.group(['a', 'b', 'c'])
+    seen.length = 0
+    const before = wm.getState()
+    expect(wm.moveTab('a', 0)).toBe(false)
+    expect(wm.moveTab('c', 7)).toBe(false)
+    expect(seen).toEqual([])
+    expect(wm.getState()).toBe(before)
+    expect(wm.moveTab('a', 2)).toBe(true)
+    expect(seen).toEqual(['b,c,a'])
+  })
+})
