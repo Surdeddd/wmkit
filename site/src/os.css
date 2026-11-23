@@ -534,6 +534,10 @@ body {
   pointer-events: auto;
 }
 
+#desktop.desktop [data-wm-window][data-wm-blocked] > * {
+  opacity: 0.55;
+}
+
 .dock {
   display: flex;
   align-items: center;

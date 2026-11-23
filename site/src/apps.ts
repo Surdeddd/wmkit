@@ -1156,9 +1156,16 @@ const confirm: AppSpec = {
   id: 'confirm',
   hidden: true,
   init(ctx) {
+    const slot = centred(ctx, 348, 168)
+    const host = ctx.wm.get('notes')?.bounds
     return {
       title: 'confirm',
-      ...centred(ctx, 348, 168),
+      ...slot,
+      ...(host && {
+        x: host.x + Math.round((host.width - slot.width) / 2),
+        y: host.y + Math.min(72, Math.max(0, host.height - slot.height)),
+      }),
+      owner: 'notes',
       layer: 'modal',
       resizable: false,
       maximizable: false,

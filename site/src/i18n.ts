@@ -380,7 +380,7 @@ const en: Dict = {
       {
         id: 'guard',
         title: 'Ask before closing',
-        text: 'Type in notes.txt and close it. A modal window asks first.',
+        text: 'Type in notes.txt and close it. A dialog that belongs to that window asks first, and the rest of the desktop keeps working.',
       },
       {
         id: 'grid',
@@ -909,7 +909,7 @@ const ru: Dict = {
       {
         id: 'guard',
         title: 'Вопрос перед закрытием',
-        text: 'Наберите что-нибудь в notes.txt и закройте его. Сначала спросит модальное окно.',
+        text: 'Наберите что-нибудь в notes.txt и закройте его. Сначала спросит диалог этого окна, а остальной рабочий стол продолжит работать.',
       },
       {
         id: 'grid',
