@@ -164,6 +164,59 @@ test('the scenes build a docked studio and a tiled board, and the clean desk com
   await expect(page.locator('.wallpaper')).toBeVisible()
 })
 
+test('a minimized window flies into its taskbar button and comes back out of it without covering itself', async ({
+  page,
+}) => {
+  const seen = await page.evaluate(async () => {
+    const { wm } = window.__wmDemo
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect()
+      return [rect.left, rect.top, rect.width, rect.height]
+    }
+    const flights: Array<{ first: number[]; last: number[]; fade: number }> = []
+    const watch = new MutationObserver((records) => {
+      for (const node of records.flatMap((record) => [...record.addedNodes])) {
+        if (!(node instanceof HTMLElement) || node.style.zIndex !== '2147483647') continue
+        const flight = node.getAnimations()[0]
+        if (!flight) continue
+        flight.pause()
+        flight.currentTime = 0
+        const first = box(node)
+        flight.currentTime = Number(flight.effect?.getComputedTiming().endTime) - 0.01
+        flights.push({ first, last: box(node), fade: Number(getComputedStyle(node).opacity) })
+        flight.finish()
+      }
+    })
+    watch.observe(document.body, { childList: true })
+    const frames = () =>
+      new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const button = document.querySelector('#dock [data-wm-task="readme"]') as HTMLElement
+    wm.minimize('readme')
+    await frames()
+    const target = box(button)
+    button.click()
+    await frames()
+    await frames()
+    watch.disconnect()
+    return { flights, target }
+  })
+
+  expect(seen.flights, 'one ghost down and one back').toHaveLength(2)
+  const [down, up] = seen.flights as [(typeof seen.flights)[number], (typeof seen.flights)[number]]
+  for (const [index, edge] of seen.target.entries()) {
+    expect(
+      Math.abs((down.last[index] as number) - edge),
+      'the way down ends on the button',
+    ).toBeLessThan(2)
+    expect(
+      Math.abs((up.first[index] as number) - edge),
+      'the way back starts on the button',
+    ).toBeLessThan(2)
+  }
+  expect(up.fade, 'the ghost has faded out by the time it reaches the window').toBeLessThan(0.05)
+  expect(down.fade).toBeGreaterThan(0.15)
+})
+
 test('a file opens in a window of the file list, and its info dialog blocks that family alone', async ({
   page,
   isMobile,

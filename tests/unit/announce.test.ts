@@ -224,8 +224,11 @@ describe('flip animations', () => {
     expect(ghost.style.position).toBe('fixed')
     const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
     expect(call[1].duration).toBe(260)
-    expect(call[0][0]?.transform).toBe('translate(0, 0) scale(1, 1)')
-    expect(call[0][1]?.transform).toBe('translate(210px, 340px) scale(0.2, 0.2)')
+    expect(call[0][0]).toEqual({ transform: 'translate(0, 0) scale(1, 1)', opacity: 0.9 })
+    expect(call[0][1]).toEqual({
+      transform: 'translate(290px, 380px) scale(0.2, 0.2)',
+      opacity: 0.2,
+    })
 
     expect(ghost.isConnected).toBe(true)
     anim.onfinish?.()
@@ -239,12 +242,24 @@ describe('flip animations', () => {
 
     const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
     expect(call[1]).toMatchObject({ duration: 120, easing: 'linear' })
-    expect(call[0][0]?.transform).toBe('translate(210px, 340px) scale(0.2, 0.2)')
-    expect(call[0][1]?.transform).toBe('translate(0, 0) scale(1, 1)')
+    expect(call[0][0]).toEqual({
+      transform: 'translate(290px, 380px) scale(0.2, 0.2)',
+      opacity: 0.9,
+    })
+    expect(call[0][1]).toEqual({ transform: 'translate(0, 0) scale(1, 1)', opacity: 0 })
 
     const ghost = document.body.lastElementChild as HTMLElement
     anim.oncancel?.()
     expect(ghost.isConnected).toBe(false)
+  })
+
+  it('lands on the middle of a target that is smaller than a twentieth of the window', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { source, target, animate } = setup(4000)
+    flipToTarget(source, target)
+
+    const call = animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions]
+    expect(call[0][1]?.transform).toBe('translate(210px, 380px) scale(0.05, 0.2)')
   })
 
   it('skips the ghost under reduced motion or a collapsed rect', () => {

@@ -756,7 +756,7 @@ flipFromTarget(source: HTMLElement, target: Element, options?: FlipGhostOptions)
 interface FlipGhostOptions { duration?: number; easing?: string }
 ```
 
-Both flips render a throwaway ghost element and remove it on finish or cancel. They no-op under reduced motion, without `Element.animate`, or when either rect has zero width. `attachDesktop` calls them for you when `minimizeTarget` is set, for every stage change into or out of `minimized`, including those made by undo, redo, `hydrate` and `loadLayout`.
+Both flips render a throwaway ghost element and remove it on finish or cancel. On the way to the target the ghost shrinks onto it; on the way back it starts on the target and fades out as it reaches the window, so it never lies over the window that has just come back. They no-op under reduced motion, without `Element.animate`, or when either rect has zero width. `attachDesktop` calls them for you when `minimizeTarget` is set, for every stage change into or out of `minimized`, including those made by undo, redo, `hydrate` and `loadLayout`.
 
 ## Announcer
 
