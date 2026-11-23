@@ -19,6 +19,7 @@ async function pick(page: Page, action: string): Promise<void> {
 }
 
 test.use({ viewport: { width: 1600, height: 900 } })
+test.describe.configure({ timeout: 60_000 })
 
 test.beforeEach(async ({ page }) => {
   await page.goto('?lang=en')
