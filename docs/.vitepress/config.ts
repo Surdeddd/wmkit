@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type DefaultTheme, defineConfig, type MarkdownOptions, type SiteConfig } from 'vitepress'
+import { llmsText } from '../../scripts/llms.mjs'
 import { rawInlineCode } from './markdown'
 import { alternates, HOST, LANDING, landingSitemap, pageUrl, robots } from './seo'
 
@@ -80,31 +81,13 @@ function sidebar(locale: 'en' | 'ru'): DefaultTheme.SidebarItem[] {
 function writeLlms(config: SiteConfig): void {
   const served = (page: string) => config.rewrites.map[page] ?? page
   const english = config.pages.filter((page) => !served(page).startsWith('ru/')).sort()
-  const read = (page: string) => readFileSync(join(config.srcDir, page), 'utf8')
-  const meta = (text: string) => {
-    const title = /^title:\s*(.+)$/m.exec(text)?.[1] ?? /^#\s+(.+)$/m.exec(text)?.[1] ?? 'wmkit'
-    const description = /^description:\s*(.+)$/m.exec(text)?.[1] ?? ''
-    return { title: title.trim(), description: description.trim() }
-  }
-  const lines = [
-    '# wmkit',
-    '',
-    `> Headless window manager for the web, version ${pkg.version}: a serializable state machine, a DOM controller and adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik and web components. Drag, resize, snap, tabs, docking, workspaces, undo, persistence, keyboard and screen-reader support.`,
-    '',
-    '## Docs',
-    '',
-  ]
   const full: string[] = []
   for (const page of english) {
-    const text = read(page)
-    const { title, description } = meta(text)
-    const url = pageUrl(served(page))
-    lines.push(`- [${title}](${url})${description ? `: ${description}` : ''}`)
-    full.push(`<!-- ${url} -->`, text.replace(/^---[\s\S]*?---\n/, ''), '')
+    const text = readFileSync(join(config.srcDir, page), 'utf8')
+    full.push(`<!-- ${pageUrl(served(page))} -->`, text.replace(/^---[\s\S]*?---\n/, ''), '')
   }
-  lines.push('', '## Optional', '', `- [Source on GitHub](https://github.com/Surdeddd/wmkit)`, '')
   const root = resolve(config.outDir, '..')
-  writeFileSync(join(root, 'llms.txt'), lines.join('\n'))
+  writeFileSync(join(root, 'llms.txt'), llmsText({ version: pkg.version }))
   writeFileSync(join(root, 'llms-full.txt'), full.join('\n'))
   writeFileSync(join(root, 'robots.txt'), robots())
   writeFileSync(join(root, 'sitemap.xml'), landingSitemap())

@@ -1,16 +1,16 @@
 # wmkit
 
-**Headless window manager for the web.** Draggable, resizable, snappable windows with a taskbar model, keyboard accessibility and state persistence — for vanilla JS and every major framework.
+**Headless window manager for the web.** Draggable, resizable, snappable, dockable and tabbed windows — a whole desktop inside your page, with a taskbar, snap layouts, workspaces, undo and keyboard accessibility. Works with React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik, web components and vanilla JS.
 
-[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [Docs](https://wmkit.vercel.app/docs/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[Русская версия](./README.ru.md) · [Live demo](https://wmkit.vercel.app) · [Mirror (Pages)](https://surdeddd.github.io/wmkit/) · [Docs](https://wmkit.vercel.app/docs/) · [llms.txt](https://wmkit.vercel.app/llms.txt) · [GitHub](https://github.com/Surdeddd/wmkit)
 
 [![CI](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/wmkit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@surdeddd/wmkit)](https://www.npmjs.com/package/@surdeddd/wmkit)
 [![license](https://img.shields.io/badge/license-MIT-2dd4a8)](./LICENSE)
 
-[![wmkit — live demo desktop](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
+[![wmkit — live demo desktop](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://wmkit.vercel.app)
 
-<p align="center"><em>Every window above is real — <a href="https://surdeddd.github.io/wmkit/">open the demo</a> and drag one.</em></p>
+<p align="center"><em>Every window above is real — <a href="https://wmkit.vercel.app">open the demo</a> and drag one.</em></p>
 
 - 🪟 **Full window lifecycle** — open, close, focus, minimize, maximize, restore, drag, 8-direction resize
 - 🧠 **Headless core** — a serializable state machine plus a DOM controller; bring your own markup or use the glass theme
@@ -28,6 +28,12 @@
 - 🎨 **Sixteen themes** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — or bring your own CSS
 - 🖼️ **Popout** — send a window into Picture-in-Picture or a popup on another monitor
 - 🧩 **Docking** — tile windows into split panels with tabs and draggable separators, dockview style, while the rest keep floating; undoable and persisted
+- 🗔 **Taskbar, switcher and overview** — a ready, unstyled taskbar (`/taskbar`, also `<wm-taskbar>`), window switching on Alt+backquote and an overview of every open window (`/switcher`)
+- ▦ **Snap layouts** — a layout menu on the maximize button, snapped neighbours that resize together by their shared edge (`/layouts`) and an optional grid for drag and resize
+- 🔁 **Sync across tabs** — one desktop in every tab of the browser over a `BroadcastChannel` (`/sync`)
+- 🛑 **Ask before closing** — `wm.onBeforeClose(guard)` and `wm.requestClose(id)` keep a window with unsaved changes open, with an answer now or later
+- 🛡️ **Strict CSP ready** — injected styles carry the page nonce and markup goes through one Trusted Types policy
+- 🤖 **Written for coding agents too** — an [`llms.txt`](./llms.txt) with the entry points and the rules ships inside the package
 - 📦 **WinBox compatible** — `@surdeddd/wmkit/winbox` speaks the WinBox.js API; [migrate in one import](docs/winbox-migration.md)
 - 📦 **Zero dependencies**, strict TypeScript, ESM + CJS, under 20 kB brotli core
 

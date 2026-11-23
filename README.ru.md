@@ -1,12 +1,12 @@
 # wmkit
 
-**Headless оконный менеджер для веба.** Перетаскиваемые окна с ресайзом, снэпом, таскбаром, клавиатурной доступностью и персистом состояния — для vanilla JS и всех основных фреймворков.
+**Headless оконный менеджер для веба.** Перетаскиваемые окна с ресайзом, снэпом, докингом и вкладками — целый рабочий стол внутри страницы: панель задач, раскладки, рабочие столы, undo и клавиатурная доступность. Работает с React, Vue, Svelte, Solid, Angular, Preact, Lit, Qwik, веб-компонентами и vanilla JS.
 
-[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [Документация](https://wmkit.vercel.app/docs/ru/) · [GitHub](https://github.com/Surdeddd/wmkit)
+[English version](./README.md) · [Живое демо](https://wmkit.vercel.app) · [Зеркало (Pages)](https://surdeddd.github.io/wmkit/) · [Документация](https://wmkit.vercel.app/docs/ru/) · [llms.txt](https://wmkit.vercel.app/llms.txt) · [GitHub](https://github.com/Surdeddd/wmkit)
 
-[![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://surdeddd.github.io/wmkit/)
+[![wmkit — живой демо-десктоп](https://raw.githubusercontent.com/Surdeddd/wmkit/main/.github/assets/hero.png)](https://wmkit.vercel.app/ru/)
 
-<p align="center"><em>Все окна выше настоящие — <a href="https://surdeddd.github.io/wmkit/">откройте демо</a> и потаскайте.</em></p>
+<p align="center"><em>Все окна выше настоящие — <a href="https://wmkit.vercel.app/ru/">откройте демо</a> и потаскайте.</em></p>
 
 - 🪟 **Полный жизненный цикл окна** — открытие, закрытие, фокус, сворачивание, разворачивание, восстановление, drag, ресайз в 8 направлениях
 - 🧠 **Headless-ядро** — сериализуемая стейт-машина плюс DOM-контроллер; своя разметка или готовая стеклянная тема
@@ -24,6 +24,12 @@
 - 🎨 **Шестнадцать тем** — glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth — либо полностью свой CSS
 - 🖼️ **Popout** — вынос окна в Picture-in-Picture или во всплывающее окно на другом мониторе
 - 🧩 **Докинг** — окна раскладываются по панелям со вкладками и перетаскиваемыми разделителями, как в dockview, а остальные продолжают плавать; отменяется и сохраняется
+- 🗔 **Панель задач, переключатель и обзор** — готовая панель задач без стилей (`/taskbar`, она же `<wm-taskbar>`), переключение окон по Alt и обратному апострофу и обзор всех открытых окон (`/switcher`)
+- ▦ **Раскладки** — меню раскладок на кнопке разворачивания, прилипшие соседи меняют размер вместе за общую границу (`/layouts`), по желанию — сетка для перетаскивания и ресайза
+- 🔁 **Синхронизация вкладок** — один рабочий стол во всех вкладках браузера через `BroadcastChannel` (`/sync`)
+- 🛑 **Вопрос перед закрытием** — `wm.onBeforeClose(guard)` и `wm.requestClose(id)` не дают закрыть окно с несохранёнными изменениями; ответ можно дать сразу или позже
+- 🛡️ **Готов к строгому CSP** — вставляемые стили несут nonce страницы, а разметка проходит через одну политику Trusted Types
+- 🤖 **Написан и для ИИ-агентов** — в пакете лежит [`llms.txt`](./llms.txt) с точками входа и правилами
 - 📦 **Совместим с WinBox** — `@surdeddd/wmkit/winbox` говорит на API WinBox.js; [переезд одним импортом](docs/winbox-migration.ru.md)
 - 📦 **Ноль зависимостей**, строгий TypeScript, ESM + CJS, ядро меньше 20 кБ в brotli
 

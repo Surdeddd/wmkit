@@ -1,0 +1,95 @@
+# wmkit
+
+> Headless window manager for the web: a serializable state machine, a DOM controller for your own markup, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, and plugins for docking, tab groups, snap layouts, a taskbar, a window switcher, persistence and sync across tabs. Zero dependencies, ESM and CommonJS, TypeScript types included.
+
+Package: `@surdeddd/wmkit`. Docs: https://wmkit.vercel.app/docs/ . The whole documentation as one file: https://wmkit.vercel.app/llms-full.txt . Live demo: https://wmkit.vercel.app/ . Source: https://github.com/Surdeddd/wmkit
+
+## Quick start
+
+```js
+import { createWindowManager, attachDesktop } from '@surdeddd/wmkit'
+import '@surdeddd/wmkit/themes/glass.css'
+
+const wm = createWindowManager()
+const desktop = attachDesktop(wm, document.querySelector('#desktop'))
+
+const win = wm.open({ title: 'Hello', width: 420, height: 280 })
+
+const el = document.createElement('section')
+el.innerHTML = `
+  <header data-wm-drag>
+    <span data-wm-title>Hello</span>
+    <span data-wm-controls>
+      <button data-wm-minimize aria-label="Minimize"></button>
+      <button data-wm-maximize aria-label="Maximize"></button>
+      <button data-wm-close aria-label="Close"></button>
+    </span>
+  </header>
+  <div data-wm-content>Anything you want.</div>
+`
+document.querySelector('#desktop').append(el)
+desktop.attachWindow(win.id, el, { removeOnClose: true })
+```
+
+## Rules that prevent the usual mistakes
+
+- The desktop element is the coordinate space. Give it a size; `attachDesktop` makes it `position: relative` when it is static.
+- `wm.open()` only creates state. A window shows once an element is bound: `desktop.attachWindow(win.id, element)`, or the hook of an adapter.
+- Mark your markup with attributes: `data-wm-drag` on the titlebar, `data-wm-title`, `data-wm-content`, and `data-wm-close`, `data-wm-minimize`, `data-wm-maximize` on buttons. Do not add your own click handlers for them.
+- Do not position windows with CSS. The controller writes `transform` and size; read geometry from `win.bounds`.
+- Window ids are strings. `open` throws on an id that is taken; most other methods return `false` when refused.
+- State is one JSON-safe object: `wm.serialize()` and `wm.hydrate(data)`, or `persist(wm, { key })` to store it.
+- A whole drag or resize is one undo step. `wm.undo()` and `wm.redo()` return whether anything changed.
+- Create the manager anywhere, also on a server. Call `attachDesktop` only in the browser; the adapters do that for you.
+- A dialog is a window with `layer: "modal"`: it traps focus and blocks the windows below.
+- To confirm a close, register `wm.onBeforeClose(guard)`; the guard returns `false` or a promise of it to keep the window. The close button and `wm.requestClose(id)` ask the guards, `wm.close(id)` does not.
+- Import a theme (`@surdeddd/wmkit/themes/glass.css`) or style the `data-wm-*` attributes yourself: the core positions windows and leaves their look to CSS.
+
+## Entry points
+
+- `@surdeddd/wmkit`: `createWindowManager(options?)` is the state machine and needs no DOM: `open`, `close`, `requestClose`, `focus`, `minimize`, `maximize`, `restore`, `snap`, `snapTo`, `move`, `resize`, `update`, `group`, `setWorkspace`, `undo`, `redo`, `serialize`, `hydrate`, `subscribe`, `on`. `attachDesktop(wm, element, options?)` adds pointer, touch and keyboard handling, snapping, magnetism and ARIA to your own markup; `desktop.attachWindow(id, element)` binds one window. Also `createDesktopBinder`, `createAnnouncer`, `setStyleNonce` and the geometry helpers `zoneBounds`, `clampToViewport`, `magnetize`.
+- `@surdeddd/wmkit/react`: React 18 and later: `useWindowManager`, `useDesktop`, `useWmState`, `useWmWindow`, `useWmWindowRef`. Window content stays in your component tree.
+- `@surdeddd/wmkit/vue`: Vue 3.3 and later: `useWindowManager`, `useDesktop`, `useWmState`, `useWmWindow`, `useWmWindowEl`.
+- `@surdeddd/wmkit/svelte`: Svelte 4 and 5: `createManager`, `createDesktop`, `wmStore`, `wmWindowStore`.
+- `@surdeddd/wmkit/solid`: Solid 1.8 and later: `useWindowManager`, `createDesktop`, `useWmState`, `useWmWindow`.
+- `@surdeddd/wmkit/angular`: Angular 16 and later, signals: `useWindowManager`, `createDesktop`, `useWmState`, `useWmWindow`.
+- `@surdeddd/wmkit/preact`: Preact 10: `useWindowManager`, `useDesktop`, `useWmState`, `useWmWindow`, `useWmWindowRef`.
+- `@surdeddd/wmkit/lit`: Lit 3: the directives `wmDesktop` and `wmWindow`, the controllers `WmStateController` and `WmWindowController`.
+- `@surdeddd/wmkit/qwik`: Qwik 1.5 and later: `WmDesktop`, `WmWindow`, `WmContext`, `useWm`, `useWmState`.
+- `@surdeddd/wmkit/persist`: `persist(wm, options?)`: save the desktop to `localStorage` or any storage and restore it, with versioned migrations.
+- `@surdeddd/wmkit/persist/idb`: `idbStorage(options?)`: an IndexedDB storage for `persist`.
+- `@surdeddd/wmkit/popout`: `popout(wm, id, contentEl, options?)`: move a window into Picture-in-Picture or a popup on another screen. `isPopoutSupported`, `listScreens`.
+- `@surdeddd/wmkit/gestures`: `pinch`, `swipe` and `touchGestures`: pinch a window with two fingers to resize it, swipe two fingers sideways to change workspace.
+- `@surdeddd/wmkit/devtools`: `createDevtools(wm, options?)`: a panel with the live window table, an event log and the manager controls.
+- `@surdeddd/wmkit/chrome`: `skin(spec)`, `defaultSkin`, `barebones`, `windowChrome`: build the whole window frame from a template string and swap it on a live window.
+- `@surdeddd/wmkit/winbox`: `WinBox`: a drop-in for the WinBox.js API on top of the manager. Use to migrate a WinBox app by changing one import.
+- `@surdeddd/wmkit/dock`: `createDock(desktop, options?)`: tile windows into split panels with tabs and draggable separators next to floating windows, the IDE layout. `dockLayout` holds the pure operations for building a layout.
+- `@surdeddd/wmkit/elements`: `defineWmElements()` registers the web components `<wm-desktop>` and `<wm-window>`: windows declared in markup with attributes, shadow DOM chrome, `wm-*` events. Use when there is no framework or several.
+- `@surdeddd/wmkit/elements/define`: Side-effect import that registers `<wm-desktop>` and `<wm-window>`.
+- `@surdeddd/wmkit/ru`: `announcerMessagesRu`: the Russian catalogue for the screen reader announcer.
+- `@surdeddd/wmkit/taskbar`: `createTaskbar(wm, element, options?)`: a keyboard accessible taskbar that follows the manager, unstyled. `defineWmTaskbar()` registers `<wm-taskbar>`.
+- `@surdeddd/wmkit/taskbar/define`: Side-effect import that registers `<wm-taskbar>`.
+- `@surdeddd/wmkit/layouts`: `createLayoutPicker(desktop, options?)`: a snap layout menu on the maximize button. `linkSnapped(desktop, options?)`: snapped neighbours resize together by their shared edge. `snapLayouts` holds the built-in layouts.
+- `@surdeddd/wmkit/switcher`: `createSwitcher(desktop, options?)`: a window switcher on Alt+backquote and an overview of every window.
+- `@surdeddd/wmkit/sync`: `sync(wm, options?)`: keep one desktop in step across browser tabs over a `BroadcastChannel`.
+- `@surdeddd/wmkit/testing`: `stubFrames`, `stubPointerCapture`, `pointer`, `drag`, `resize`, `press`: helpers for testing your own windows in jsdom.
+- `@surdeddd/wmkit/themes`: Every theme as a string, as `glassTheme` and `glassShadowTheme`, for shadow roots and style injection.
+- `@surdeddd/wmkit/themes/*`: Sixteen CSS themes, as `@surdeddd/wmkit/themes/glass.css`: glass, light, retro, terminal, paper, neon, aqua, frost, candy, carbon, brutalist, blueprint, amber, noir, forest, synth.
+
+## Docs
+
+- [Adapters](https://wmkit.vercel.app/docs/adapters.html): Complete wmkit integrations for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, and the wm-desktop and wm-window web components, with the contract they share.
+- [API reference](https://wmkit.vercel.app/docs/api.html): Every export of @surdeddd/wmkit and its subpaths — the window manager with its methods, events and types, the DOM controller, geometry and animation helpers, persist, popout and devtools.
+- [Browser support](https://wmkit.vercel.app/docs/browser-support.html): Which browsers each wmkit entry point supports — Chrome, Safari and Firefox baselines per import, the platform APIs that set them and what degrades where.
+- [A WinBox alternative](https://wmkit.vercel.app/docs/compare/winbox-alternative.html): Looking for a WinBox.js alternative? wmkit keeps the WinBox API through a compatibility entry and adds snapping, keyboard control, undo, persistence and framework adapters.
+- [React draggable resizable window](https://wmkit.vercel.app/docs/guides/react-draggable-resizable-window.html): Build a draggable, resizable window in React with wmkit — snapping, keyboard control, focus and z-order, minimum sizes and persistence, in about thirty lines of your own markup.
+- [Windows 95 desktop in React](https://wmkit.vercel.app/docs/guides/windows-95-desktop-react.html): Recreate a Windows 95 desktop in React with wmkit — overlapping windows, a taskbar with minimized programs, a start menu and the retro theme, all keyboard accessible.
+- [wmkit documentation](https://wmkit.vercel.app/docs/): Reference documentation for wmkit, a headless window manager for the web — the three layers, the API, the framework adapters, theming, recipes and browser support.
+- [Recipes](https://wmkit.vercel.app/docs/recipes.html): Working wmkit patterns — a taskbar, minimizing into it, modal dialogs, persistence with migrations, aspect-ratio windows, custom snap layouts, server-side rendering, testing and performance.
+- [Theming](https://wmkit.vercel.app/docs/theming.html): How a wmkit theme works — the data-wm-* attributes it styles, the CSS custom properties, the sixteen shipped themes and writing your own theme from scratch.
+- [Migrating from WinBox](https://wmkit.vercel.app/docs/winbox-migration.html): Move an app from WinBox.js to wmkit by changing one import — what maps to what, what behaves differently and what the wmkit manager adds underneath.
+
+## Optional
+
+- [Source on GitHub](https://github.com/Surdeddd/wmkit)
+- [Changelog](https://github.com/Surdeddd/wmkit/blob/main/CHANGELOG.md)

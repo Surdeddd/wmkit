@@ -1,0 +1,33 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "wmkit",
+  "description": "Headless window manager for the web: a serializable state machine, a DOM controller for your own markup, adapters for React, Vue, Svelte, Solid, Angular, Preact, Lit and Qwik, web components, and plugins for docking, tab groups, snap layouts, a taskbar, a window switcher, persistence and sync across tabs. Zero dependencies, ESM and CommonJS, TypeScript types included.",
+  "folders": ["docs"],
+  "excludeFolders": ["docs/.vitepress", "docs/superpowers"],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "README.ru.md",
+    "adapters.ru.md",
+    "api.ru.md",
+    "browser-support.ru.md",
+    "react-draggable-resizable-window.ru.md",
+    "recipes.ru.md",
+    "theming.ru.md",
+    "winbox-alternative.ru.md",
+    "winbox-migration.ru.md",
+    "windows-95-desktop-react.ru.md"
+  ],
+  "rules": [
+    "The desktop element is the coordinate space. Give it a size; `attachDesktop` makes it `position: relative` when it is static.",
+    "`wm.open()` only creates state. A window shows once an element is bound: `desktop.attachWindow(win.id, element)`, or the hook of an adapter.",
+    "Mark your markup with attributes: `data-wm-drag` on the titlebar, `data-wm-title`, `data-wm-content`, and `data-wm-close`, `data-wm-minimize`, `data-wm-maximize` on buttons. Do not add your own click handlers for them.",
+    "Do not position windows with CSS. The controller writes `transform` and size; read geometry from `win.bounds`.",
+    "Window ids are strings. `open` throws on an id that is taken; most other methods return `false` when refused.",
+    "State is one JSON-safe object: `wm.serialize()` and `wm.hydrate(data)`, or `persist(wm, { key })` to store it.",
+    "A whole drag or resize is one undo step. `wm.undo()` and `wm.redo()` return whether anything changed.",
+    "Create the manager anywhere, also on a server. Call `attachDesktop` only in the browser; the adapters do that for you.",
+    "A dialog is a window with `layer: \"modal\"`: it traps focus and blocks the windows below.",
+    "To confirm a close, register `wm.onBeforeClose(guard)`; the guard returns `false` or a promise of it to keep the window. The close button and `wm.requestClose(id)` ask the guards, `wm.close(id)` does not.",
+    "Import a theme (`@surdeddd/wmkit/themes/glass.css`) or style the `data-wm-*` attributes yourself: the core positions windows and leaves their look to CSS."
+  ]
+}
