@@ -171,7 +171,7 @@ test('the grid setting lands a dragged window on a sixteen pixel step', async ({
   test.skip(!!isMobile, 'the drag is done with a mouse')
   await page.evaluate(() => window.__wmDemo.open('settings'))
   const row = win(page, 'settings').locator('[data-option="grid"]')
-  await row.locator('button').first().click()
+  await row.locator('button').first().dispatchEvent('click')
   await expect(row.locator('button').first()).toHaveAttribute('aria-pressed', 'true')
   await closeAllBut(page, 'readme')
   await settle(win(page, 'readme'))
