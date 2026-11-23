@@ -481,6 +481,9 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 `@surdeddd/wmkit/gestures` экспортирует три фабрики: `pinch(options?)`,
 `swipe(options?)` и `touchGestures({ pinch, swipe })` — если нужны оба жеста от
 одного слушателя. Их опции описаны типами `PinchOptions` и `SwipeOptions`.
+Щипок масштабирует окно пропорционально и останавливается, когда оно становится
+шириной или высотой с рабочий стол; окно, которое уже больше, не растёт, но
+уменьшить его можно.
 
 | Опция | По умолчанию | Смысл |
 | --- | --- | --- |

@@ -135,7 +135,9 @@ function start(ctx: GestureContext, options: Settings): () => void {
 
   function applyPinch(active: PinchSession, win: WindowState, spread: number): void {
     const start = active.startBounds
-    const ratio = spread / startSpread
+    const { width, height } = wm.getState().viewport
+    const room = Math.max(1, Math.min(width / start.width, height / start.height))
+    const ratio = Math.min(spread / startSpread, room)
     const raw: Size = { width: start.width * ratio, height: start.height * ratio }
     const size =
       win.aspectRatio === null

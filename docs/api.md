@@ -481,6 +481,8 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 `@surdeddd/wmkit/gestures` exports three factories: `pinch(options?)`,
 `swipe(options?)` and `touchGestures({ pinch, swipe })` when you want both from
 one listener. Their options are the types `PinchOptions` and `SwipeOptions`.
+A pinch scales the window in proportion and stops when it is as wide or as tall
+as the desktop; a window that is already larger does not grow, but it can shrink.
 
 | Option | Default | Meaning |
 | --- | --- | --- |

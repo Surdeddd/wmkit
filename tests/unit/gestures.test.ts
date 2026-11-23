@@ -167,6 +167,30 @@ describe('pinch to resize', () => {
     expect(harness.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100, width: 200 })
   })
 
+  it('stops growing when the window is as large as the desktop, and keeps its proportions', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 400, height: 200 })
+
+    pinch(harness, root, [250, 200, 350, 200], [-350, 200, 950, 200])
+
+    const bounds = harness.wm.get('a')?.bounds as { width: number; height: number }
+    expect(bounds.width).toBe(VIEWPORT.width)
+    expect(bounds.height).toBe(VIEWPORT.width / 2)
+  })
+
+  it('never grows a window that is already larger than the desktop, yet lets it shrink', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 0, y: 0, width: 1600, height: 900 })
+
+    pinch(harness, root, [300, 300, 400, 300], [200, 300, 500, 300])
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ width: 1600, height: 900 })
+
+    root.dispatchEvent(touchEvent('pointermove', 1, 325, 300))
+    root.dispatchEvent(touchEvent('pointermove', 2, 375, 300))
+    harness.flushFrames()
+    expect(harness.wm.get('a')?.bounds).toMatchObject({ width: 800, height: 450 })
+  })
+
   it('refuses to pinch while a drag is in flight', () => {
     const harness = makeHarness({ magnetism: false, snap: false })
     const { root, handle } = harness.add({ id: 'a', x: 100, y: 100, width: 200, height: 200 })
