@@ -44,6 +44,25 @@ test.describe('landing accessibility', () => {
     expect(await scan(page)).toEqual([])
   })
 
+  test('axe finds no violations with a file list, its windows and the activity window open', async ({
+    page,
+  }) => {
+    await page.goto('?lang=en')
+    await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()
+    await page.evaluate(() => {
+      window.__wmDemo.open('monitor')
+      window.__wmDemo.open('files')
+    })
+    const files = page.locator('[data-testid="window-files"]')
+    await files.locator('[data-file="README.md"]').dispatchEvent('dblclick')
+    await expect(page.locator('[data-testid="window-file:README.md"]')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+    await files.locator('[data-file="LICENSE"]').dispatchEvent('click')
+    await files.locator('[data-files="info"]').dispatchEvent('click')
+    await expect(page.locator('[data-testid="window-file-info"]')).toBeVisible()
+    expect(await scan(page)).toEqual([])
+  })
+
   test('axe finds no violations in russian', async ({ page }) => {
     await page.goto('?lang=ru')
     await expect(page.locator('[data-testid="window-readme"]')).toBeVisible()

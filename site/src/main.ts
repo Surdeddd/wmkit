@@ -40,7 +40,7 @@ import retroUrl from '@surdeddd/wmkit/themes/retro.css?url'
 import synthUrl from '@surdeddd/wmkit/themes/synth.css?url'
 import terminalUrl from '@surdeddd/wmkit/themes/terminal.css?url'
 import type { AppContext, AppInstance, AppSpec, OptionName, SkinLayout, ThemeName } from './apps'
-import { apps, isThemeName, THEME_NAMES } from './apps'
+import { apps, childSpecs, isThemeName, showFile, THEME_NAMES } from './apps'
 import { initBuilder } from './builder'
 import { startFpsMeter } from './fps'
 import { type AppId, type Dict, dictionaries, type Lang, type TourStep } from './i18n'
@@ -485,8 +485,12 @@ function adopt(id: string): void {
   const spec = specById.get(id as AppId) ?? null
   const entry = mount(id, spec)
   activate(id, entry)
-  if (!spec) {
-    entry.window?.content.append(
+  if (spec || !entry.window) return
+  const win = wm.get(id)
+  const child = childSpecs[String(win?.meta.kind)]
+  if (child && win) entry.instance = child.render(entry.window.content, ctx, win) ?? null
+  else {
+    entry.window.content.append(
       Object.assign(document.createElement('p'), { className: 'app-note', textContent: id }),
     )
   }
@@ -862,6 +866,10 @@ const tourActions: Record<TourStep, () => void> = {
     }
     void wm.requestClose('notes')
   },
+  family() {
+    openApp('files')
+    showFile(ctx, 'README.md')
+  },
   grid() {
     ctx.setOption('grid', true)
     openApp('settings')
@@ -1205,7 +1213,10 @@ function relabelAll(): void {
 function relabelEach(): void {
   for (const [id, entry] of mounted) {
     const spec = entry.spec
-    if (!spec) continue
+    if (!spec) {
+      entry.instance?.relabel?.()
+      continue
+    }
     const title = dict().apps[spec.id].title
     if (wm.get(id)?.title !== title) wm.update(id, { title })
     const titleEl = part(entry, '[data-wm-title]')

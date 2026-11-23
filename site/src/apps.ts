@@ -1,4 +1,4 @@
-import type { SnapZone, WindowInit, WindowManager } from '@surdeddd/wmkit'
+import type { SnapZone, WindowInit, WindowManager, WindowState } from '@surdeddd/wmkit'
 import {
   createDevtools,
   type DevtoolsController,
@@ -1193,6 +1193,410 @@ const confirm: AppSpec = {
   },
 }
 
+type FileKind = 'folder' | 'markdown' | 'json' | 'typescript' | 'text'
+
+interface FileEntry {
+  name: string
+  kind: FileKind
+  size: string
+  text?: string
+  entries?: FileEntry[]
+}
+
+const TREE: FileEntry[] = [
+  {
+    name: 'src',
+    kind: 'folder',
+    size: '',
+    entries: [
+      {
+        name: 'manager.ts',
+        kind: 'typescript',
+        size: '62 kB',
+        text: 'export function createWindowManager(options: ManagerOptions = {}): WindowManager {\n  const emitter = createEmitter<ManagerEvents>()\n  let windows: Readonly<Record<string, WindowState>> = Object.create(null)\n  let order: string[] = []\n  let focusedId: string | null = null\n  …\n}',
+      },
+      {
+        name: 'controller.ts',
+        kind: 'typescript',
+        size: '41 kB',
+        text: 'export function attachDesktop(\n  wm: WindowManager,\n  element: HTMLElement,\n  options: DesktopOptions = {},\n): DesktopController {\n  const registry = new Map<string, AttachedWindow>()\n  …\n}',
+      },
+    ],
+  },
+  {
+    name: 'docs',
+    kind: 'folder',
+    size: '',
+    entries: [
+      {
+        name: 'api.md',
+        kind: 'markdown',
+        size: '114 kB',
+        text: '# API reference\n\nEverything exported from `@surdeddd/wmkit` and its subpaths.\n\n- Core types\n- createWindowManager\n- WindowManager methods\n- Events',
+      },
+      {
+        name: 'recipes.md',
+        kind: 'markdown',
+        size: '26 kB',
+        text: '# Recipes\n\nWorking patterns for the things people build with a window manager.\n\n- Taskbar\n- Modal dialogs\n- A dialog that belongs to one window',
+      },
+    ],
+  },
+  {
+    name: 'README.md',
+    kind: 'markdown',
+    size: '33 kB',
+    text: '# wmkit\n\n**Headless window manager for the web.** Draggable, resizable, snappable, dockable and tabbed windows: a whole desktop inside your page.\n\n```bash\nnpm install @surdeddd/wmkit\n```',
+  },
+  {
+    name: 'package.json',
+    kind: 'json',
+    size: '16 kB',
+    text: '{\n  "name": "@surdeddd/wmkit",\n  "type": "module",\n  "license": "MIT",\n  "sideEffects": ["**/*.css"],\n  "dependencies": {}\n}',
+  },
+  {
+    name: 'LICENSE',
+    kind: 'text',
+    size: '1 kB',
+    text: 'MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction.',
+  },
+]
+
+function findFile(path: string): FileEntry | undefined {
+  let found: FileEntry | undefined
+  let level: FileEntry[] | undefined = TREE
+  for (const name of path.split('/')) {
+    found = level?.find((entry) => entry.name === name)
+    level = found?.entries
+  }
+  return found
+}
+
+function overFiles(ctx: AppContext, slot: Slot, step: number): { x: number; y: number } {
+  const host = ctx.wm.get('files')?.bounds ?? { x: slot.x - 36, y: slot.y - 52 }
+  const box = ctx.size()
+  return {
+    x: clamp(host.x + 36 + step * 22, 12, box.width - slot.width - 12),
+    y: clamp(host.y + 52 + step * 22, 12, box.height - slot.height - 12),
+  }
+}
+
+export function showFile(ctx: AppContext, path: string): void {
+  const entry = findFile(path)
+  if (!entry || entry.kind === 'folder') return
+  const id = `file:${path}`
+  if (ctx.wm.get(id)) {
+    ctx.wm.focus(id)
+    return
+  }
+  const slot = centred(ctx, 360, 220)
+  const open = ctx.wm.getState().order.filter((other) => other.startsWith('file:')).length
+  ctx.wm.open({
+    id,
+    title: `~/${path}`,
+    owner: 'files',
+    ...slot,
+    ...overFiles(ctx, slot, open % 5),
+    minWidth: 220,
+    minHeight: 140,
+    meta: { kind: 'preview', path },
+  })
+}
+
+function showInfo(ctx: AppContext, path: string): void {
+  const entry = findFile(path)
+  if (!entry) return
+  ctx.wm.batch(() => {
+    ctx.wm.close('file-info')
+    const slot = centred(ctx, 300, 204)
+    ctx.wm.open({
+      id: 'file-info',
+      title: `${ctx.dict().files.info}: ${entry.name}`,
+      owner: 'files',
+      layer: 'modal',
+      ...slot,
+      ...overFiles(ctx, slot, 1),
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      meta: { kind: 'info', path },
+    })
+  })
+}
+
+const files: AppSpec = {
+  id: 'files',
+  init(ctx) {
+    return { title: 'files', ...place(ctx, 380, 300, 820, 150), minWidth: 260, minHeight: 200 }
+  },
+  render(body, ctx) {
+    let folder: string | null = null
+    let picked: string | null = null
+    const where = el('span', 'files-path')
+    const list = el('div', 'files-list')
+    list.setAttribute('role', 'group')
+    const up = button('', () => {
+      folder = null
+      picked = null
+      draw()
+    })
+    const open = button('', () => act(picked))
+    const info = button('', () => picked !== null && showInfo(ctx, picked))
+    up.dataset.files = 'up'
+    open.dataset.files = 'open'
+    info.dataset.files = 'info'
+    const bar = el('div', 'app-actions files-bar')
+    bar.append(up, open, info, where)
+    body.replaceChildren(bar, list)
+
+    const act = (path: string | null) => {
+      const entry = path === null ? undefined : findFile(path)
+      if (!entry || path === null) return
+      if (entry.kind === 'folder') {
+        folder = path
+        picked = null
+        draw()
+      } else showFile(ctx, path)
+    }
+    const mark = () => {
+      for (const row of list.querySelectorAll<HTMLElement>('[data-file]')) {
+        row.setAttribute('aria-pressed', String(row.dataset.file === picked))
+      }
+      up.disabled = folder === null
+      open.disabled = picked === null
+      info.disabled = picked === null
+    }
+    const draw = () => {
+      const copy = ctx.dict().files
+      up.textContent = copy.up
+      open.textContent = copy.open
+      info.textContent = copy.info
+      where.textContent = folder === null ? '~/wmkit' : `~/wmkit/${folder}`
+      list.setAttribute('aria-label', copy.list)
+      const entries = folder === null ? TREE : (findFile(folder)?.entries ?? [])
+      list.replaceChildren(
+        ...entries.map((entry) => {
+          const at = folder === null ? entry.name : `${folder}/${entry.name}`
+          const row = el('button', 'file-row')
+          row.type = 'button'
+          row.dataset.file = at
+          row.dataset.kind = entry.kind
+          row.append(
+            el('span', 'file-name', entry.kind === 'folder' ? `${entry.name}/` : entry.name),
+            el('span', 'file-kind', copy.kinds[entry.kind]),
+            el('span', 'file-size', entry.size),
+          )
+          row.addEventListener('click', () => {
+            picked = at
+            mark()
+          })
+          row.addEventListener('dblclick', () => act(at))
+          row.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            picked = at
+            mark()
+            act(at)
+          })
+          return row
+        }),
+      )
+      mark()
+    }
+    draw()
+    return { relabel: draw }
+  },
+}
+
+const STAGE_NAMES = ['normal', 'snapped', 'maximized', 'minimized'] as const
+const HISTORY = 36
+
+const monitor: AppSpec = {
+  id: 'monitor',
+  init(ctx) {
+    return { title: 'activity', ...place(ctx, 340, 396, 392, 364), minWidth: 260, minHeight: 240 }
+  },
+  render(body, ctx) {
+    const lead = el('p', 'app-note')
+    const figures = el('dl', 'monitor-figures')
+    const changesTitle = el('p', 'monitor-title')
+    const changes = el('div', 'monitor-bars')
+    const stagesTitle = el('p', 'monitor-title')
+    const stages = el('div', 'monitor-stages')
+    const legend = el('ul', 'monitor-legend')
+    const stackTitle = el('p', 'monitor-title')
+    const stack = el('div', 'monitor-stack')
+    for (const chart of [changes, stages, stack]) chart.setAttribute('role', 'img')
+    body.replaceChildren(
+      lead,
+      figures,
+      changesTitle,
+      changes,
+      stagesTitle,
+      stages,
+      legend,
+      stackTitle,
+      stack,
+    )
+
+    const history: number[] = []
+    let seen = ctx.wm.getState()
+
+    const draw = () => {
+      const copy = ctx.dict().monitor
+      const state = ctx.wm.getState()
+      const all = state.order.map((id) => state.windows[id] as WindowState)
+      const rootOf = (win: WindowState): string => {
+        const owner = win.ownerId === null ? undefined : state.windows[win.ownerId]
+        return owner ? rootOf(owner) : win.id
+      }
+      const focused = state.focusedId === null ? undefined : state.windows[state.focusedId]
+
+      lead.textContent = copy.lead
+      const numbers: Array<[string, string]> = [
+        [copy.windows, String(all.length)],
+        [
+          copy.families,
+          String(new Set(all.filter((win) => win.ownerId !== null).map(rootOf)).size),
+        ],
+        [copy.focus, focused?.title ?? copy.none],
+      ]
+      figures.replaceChildren(
+        ...numbers.flatMap(([term, value]) => [
+          el('dt', undefined, term),
+          el('dd', undefined, value),
+        ]),
+      )
+
+      changesTitle.textContent = copy.changes
+      changes.setAttribute('aria-label', `${copy.changed}: ${history.slice(-8).join(', ')}`)
+      changes.replaceChildren(
+        ...Array.from({ length: HISTORY }, (_, index) => {
+          const value = history[index - (HISTORY - history.length)]
+          const bar = el('span', 'monitor-bar')
+          if (value !== undefined)
+            bar.style.setProperty('--fill', String(Math.min(1, 0.14 + value * 0.2)))
+          if (index === HISTORY - 1 && value !== undefined) bar.dataset.last = ''
+          return bar
+        }),
+      )
+
+      const counts = STAGE_NAMES.map((name) => all.filter((win) => win.stage === name).length)
+      stagesTitle.textContent = copy.stages
+      stages.setAttribute(
+        'aria-label',
+        STAGE_NAMES.map((name, index) => `${copy.names[name]} ${counts[index]}`).join(', '),
+      )
+      stages.replaceChildren(
+        ...STAGE_NAMES.flatMap((name, index) => {
+          if (!counts[index]) return []
+          const part = el('span', 'monitor-stage')
+          part.dataset.stage = name
+          part.style.setProperty('--share', String(counts[index]))
+          return [part]
+        }),
+      )
+      legend.replaceChildren(
+        ...STAGE_NAMES.map((name, index) => {
+          const item = el('li')
+          item.dataset.stage = name
+          item.append(
+            el('span', undefined, copy.names[name]),
+            el('b', undefined, String(counts[index])),
+          )
+          return item
+        }),
+      )
+
+      const here = all.filter((win) => win.workspace === state.workspace)
+      stackTitle.textContent = copy.stack
+      stack.setAttribute('aria-label', `${copy.stack}: ${here.map((win) => win.title).join(', ')}`)
+      const groups = new Map<string, HTMLElement>()
+      const tiles: HTMLElement[] = []
+      for (const win of here) {
+        const tile = el('span', 'monitor-tile')
+        tile.title = ctx.wm.blockedBy(win.id) ? `${win.title} (${copy.blocked})` : win.title
+        tile.dataset.layer = win.layer
+        if (win.stage === 'minimized') tile.dataset.hidden = ''
+        if (win.id === state.focusedId) tile.dataset.focused = ''
+        if (ctx.wm.blockedBy(win.id)) tile.dataset.blocked = ''
+        const root = rootOf(win)
+        const single = root === win.id && !here.some((other) => other.ownerId === win.id)
+        if (single) {
+          tiles.push(tile)
+          continue
+        }
+        let kin = groups.get(root)
+        if (!kin) {
+          kin = el('span', 'monitor-kin')
+          groups.set(root, kin)
+          tiles.push(kin)
+        }
+        kin.append(tile)
+      }
+      stack.replaceChildren(...tiles)
+    }
+
+    const stop = ctx.wm.subscribe((state) => {
+      let touched = 0
+      for (const id of state.order) if (state.windows[id] !== seen.windows[id]) touched += 1
+      for (const id of seen.order) if (!state.windows[id]) touched += 1
+      history.push(touched)
+      if (history.length > HISTORY) history.shift()
+      seen = state
+      draw()
+    })
+    draw()
+    return { relabel: draw, destroy: stop }
+  },
+}
+
+export interface ChildSpec {
+  render(body: HTMLElement, ctx: AppContext, win: WindowState): AppInstance | undefined
+}
+
+export const childSpecs: Record<string, ChildSpec> = {
+  preview: {
+    render(body, _ctx, win) {
+      const text = el('pre', 'preview-text', findFile(String(win.meta.path))?.text ?? '')
+      text.tabIndex = 0
+      body.replaceChildren(text)
+      return undefined
+    },
+  },
+  info: {
+    render(body, ctx, win) {
+      const at = String(win.meta.path)
+      const entry = findFile(at)
+      const list = el('dl', 'info-list')
+      const ok = button('', () => ctx.wm.close(win.id))
+      ok.dataset.info = 'ok'
+      const row = el('div', 'app-actions')
+      row.append(ok)
+      body.replaceChildren(list, row)
+      const relabel = () => {
+        const copy = ctx.dict().files
+        const rows: Array<[string, string]> = [
+          [copy.name, entry?.name ?? at],
+          [copy.kind, entry ? copy.kinds[entry.kind] : ''],
+          [copy.size, entry?.size || '0'],
+          [copy.where, `~/wmkit/${at}`],
+        ]
+        list.replaceChildren(
+          ...rows.flatMap(([term, value]) => [
+            el('dt', undefined, term),
+            el('dd', undefined, value),
+          ]),
+        )
+        ok.textContent = copy.ok
+      }
+      relabel()
+      queueMicrotask(() => ok.focus({ preventScroll: true }))
+      return { relabel }
+    },
+  },
+}
+
 export const apps: AppSpec[] = [
   tour,
   readme,
@@ -1207,5 +1611,7 @@ export const apps: AppSpec[] = [
   devtools,
   shortcuts,
   notes,
+  files,
+  monitor,
   confirm,
 ]

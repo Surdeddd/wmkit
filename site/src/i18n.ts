@@ -17,6 +17,8 @@ export type AppId =
   | 'tour'
   | 'notes'
   | 'confirm'
+  | 'files'
+  | 'monitor'
 
 export type TourStep =
   | 'layouts'
@@ -26,6 +28,7 @@ export type TourStep =
   | 'tabs'
   | 'dock'
   | 'guard'
+  | 'family'
   | 'grid'
   | 'sync'
   | 'undo'
@@ -111,6 +114,31 @@ export interface Dict {
   }
   notes: { placeholder: string; label: string; save: string; saved: string; unsaved: string }
   confirm: { text: string; discard: string; keep: string }
+  files: {
+    open: string
+    info: string
+    up: string
+    list: string
+    name: string
+    kind: string
+    size: string
+    where: string
+    ok: string
+    kinds: Record<'folder' | 'markdown' | 'json' | 'typescript' | 'text', string>
+  }
+  monitor: {
+    lead: string
+    changes: string
+    changed: string
+    stages: string
+    stack: string
+    windows: string
+    families: string
+    focus: string
+    none: string
+    blocked: string
+    names: Record<'normal' | 'snapped' | 'maximized' | 'minimized', string>
+  }
   skins: {
     lead: string
     theme: string
@@ -269,6 +297,8 @@ const en: Dict = {
     tour: { title: 'tour' },
     notes: { title: 'notes.txt' },
     confirm: { title: 'close notes.txt?' },
+    files: { title: 'files' },
+    monitor: { title: 'activity' },
   },
   readme: {
     lead: 'A window manager with no opinion about your UI.',
@@ -344,7 +374,7 @@ const en: Dict = {
     off: 'off',
   },
   tour: {
-    lead: 'Eleven things to try. Each button does it on the desktop around this window.',
+    lead: 'Twelve things to try. Each button does it on the desktop around this window.',
     show: 'show',
     steps: [
       {
@@ -383,6 +413,11 @@ const en: Dict = {
         text: 'Type in notes.txt and close it. A dialog that belongs to that window asks first, and the rest of the desktop keeps working.',
       },
       {
+        id: 'family',
+        title: 'Windows that own windows',
+        text: 'A file opens in a window that belongs to the file list: above it, minimized and closed with it. Its info dialog blocks that family alone.',
+      },
+      {
         id: 'grid',
         title: 'Grid',
         text: 'Windows land on a 16 px step. Hold Alt to drag freely.',
@@ -415,6 +450,42 @@ const en: Dict = {
     text: 'notes.txt has unsaved changes. Close it anyway?',
     discard: 'close without saving',
     keep: 'keep editing',
+  },
+  files: {
+    open: 'open',
+    info: 'info',
+    up: 'up',
+    list: 'Files',
+    name: 'name',
+    kind: 'kind',
+    size: 'size',
+    where: 'where',
+    ok: 'ok',
+    kinds: {
+      folder: 'folder',
+      markdown: 'markdown',
+      json: 'json',
+      typescript: 'typescript',
+      text: 'text',
+    },
+  },
+  monitor: {
+    lead: 'Drawn from wm.subscribe: nothing here runs while the desktop is still.',
+    changes: 'last changes',
+    changed: 'windows touched by each of the last changes',
+    stages: 'stages',
+    stack: 'stack, back to front',
+    windows: 'windows',
+    families: 'families',
+    focus: 'focus',
+    none: 'none',
+    blocked: 'blocked by a modal',
+    names: {
+      normal: 'normal',
+      snapped: 'snapped',
+      maximized: 'maximized',
+      minimized: 'minimized',
+    },
   },
   devtools: {
     lead: 'The panel below is @surdeddd/wmkit/devtools, the same 3.1 kB entry point you can drop into your own app. It follows the manager, not this page.',
@@ -798,6 +869,8 @@ const ru: Dict = {
     tour: { title: 'тур' },
     notes: { title: 'notes.txt' },
     confirm: { title: 'закрыть notes.txt?' },
+    files: { title: 'файлы' },
+    monitor: { title: 'активность' },
   },
   readme: {
     lead: 'Оконный менеджер без единого мнения о вашем интерфейсе.',
@@ -873,7 +946,7 @@ const ru: Dict = {
     off: 'выкл',
   },
   tour: {
-    lead: 'Одиннадцать вещей, которые стоит попробовать. Каждая кнопка делает это на рабочем столе вокруг окна.',
+    lead: 'Двенадцать вещей, которые стоит попробовать. Каждая кнопка делает это на рабочем столе вокруг окна.',
     show: 'показать',
     steps: [
       {
@@ -912,6 +985,11 @@ const ru: Dict = {
         text: 'Наберите что-нибудь в notes.txt и закройте его. Сначала спросит диалог этого окна, а остальной рабочий стол продолжит работать.',
       },
       {
+        id: 'family',
+        title: 'Окна, у которых есть свои окна',
+        text: 'Файл открывается в окне, которое принадлежит списку файлов: лежит над ним, сворачивается и закрывается вместе с ним. Диалог свойств блокирует только эту семью.',
+      },
+      {
         id: 'grid',
         title: 'Сетка',
         text: 'Окна встают на шаг 16 px. С зажатым Alt тащатся свободно.',
@@ -944,6 +1022,42 @@ const ru: Dict = {
     text: 'В notes.txt есть несохранённые изменения. Всё равно закрыть?',
     discard: 'закрыть без сохранения',
     keep: 'вернуться к правке',
+  },
+  files: {
+    open: 'открыть',
+    info: 'свойства',
+    up: 'наверх',
+    list: 'Файлы',
+    name: 'имя',
+    kind: 'тип',
+    size: 'размер',
+    where: 'где',
+    ok: 'ок',
+    kinds: {
+      folder: 'папка',
+      markdown: 'markdown',
+      json: 'json',
+      typescript: 'typescript',
+      text: 'текст',
+    },
+  },
+  monitor: {
+    lead: 'Нарисовано по wm.subscribe: пока рабочий стол неподвижен, здесь ничего не работает.',
+    changes: 'последние изменения',
+    changed: 'сколько окон задело каждое из последних изменений',
+    stages: 'стадии',
+    stack: 'стопка, от нижнего к верхнему',
+    windows: 'окна',
+    families: 'семьи',
+    focus: 'фокус',
+    none: 'нет',
+    blocked: 'заблокировано модалкой',
+    names: {
+      normal: 'обычные',
+      snapped: 'прилипшие',
+      maximized: 'развёрнутые',
+      minimized: 'свёрнутые',
+    },
   },
   devtools: {
     lead: 'Панель ниже — это @surdeddd/wmkit/devtools, тот же entry point на 3.1 кБ, который можно подключить у себя. Она следит за менеджером, а не за этой страницей.',

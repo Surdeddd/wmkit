@@ -164,6 +164,67 @@ test('the scenes build a docked studio and a tiled board, and the clean desk com
   await expect(page.locator('.wallpaper')).toBeVisible()
 })
 
+test('a file opens in a window of the file list, and its info dialog blocks that family alone', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, 'the tour buttons need room beside the windows')
+  await show(page, 'family')
+  const files = win(page, 'files')
+  const preview = win(page, 'file:README.md')
+  await expect(preview).toBeVisible()
+  await expect(preview).toHaveAttribute('data-wm-owner', 'files')
+  await expect(preview.locator('.preview-text')).toContainText('wmkit')
+  await expect(task(page, 'files')).toHaveAttribute('aria-pressed', 'true')
+  await expect(task(page, 'file:README.md')).toHaveCount(0)
+
+  await files.locator('[data-file="docs"]').dispatchEvent('dblclick')
+  await expect(files.locator('.files-path')).toHaveText('~/wmkit/docs')
+  await files.locator('[data-file="docs/api.md"]').dispatchEvent('click')
+  await files.locator('[data-files="info"]').dispatchEvent('click')
+  const info = win(page, 'file-info')
+  await expect(info).toBeVisible()
+  await expect(info).toHaveAttribute('data-wm-layer', 'modal')
+  await expect(info.locator('[data-info="ok"]')).toBeFocused()
+  await expect(info.locator('dd').first()).toHaveText('api.md')
+  await expect(files).toHaveAttribute('data-wm-blocked', '')
+  await expect(preview).toHaveAttribute('data-wm-blocked', '')
+  await expect(win(page, 'readme')).not.toHaveAttribute('data-wm-blocked', '')
+  expect(await page.evaluate(() => window.__wmDemo.wm.focus('files'))).toBe(false)
+  await info.locator('[data-info="ok"]').click()
+  await expect(info).toBeHidden()
+  await expect(files).not.toHaveAttribute('data-wm-blocked', '')
+
+  await page.evaluate(() => window.__wmDemo.wm.minimize('file:README.md'))
+  expect([await stageOf(page, 'files'), await stageOf(page, 'file:README.md')]).toEqual([
+    'minimized',
+    'minimized',
+  ])
+  await task(page, 'files').click()
+  await expect(preview).toBeVisible()
+  await page.evaluate(() => window.__wmDemo.wm.close('files'))
+  await expect(preview).toBeHidden()
+  expect(await order(page)).not.toContain('file:README.md')
+})
+
+test('the activity window draws the desktop from its changes', async ({ page }) => {
+  await page.evaluate(() => window.__wmDemo.open('monitor'))
+  const monitor = win(page, 'monitor')
+  await expect(monitor.locator('.monitor-tile')).toHaveCount((await order(page)).length)
+  await expect(monitor.locator('.monitor-tile[data-focused]')).toHaveCount(1)
+  await page.evaluate(() => window.__wmDemo.wm.minimize('readme'))
+  await expect(monitor.locator('.monitor-legend [data-stage="minimized"] b')).toHaveText('1')
+  await expect(monitor.locator('.monitor-tile[data-hidden]')).toHaveCount(1)
+  await expect(monitor.locator('.monitor-bar[data-last]')).toHaveCount(1)
+
+  await page.evaluate(() => {
+    const { wm } = window.__wmDemo
+    wm.open({ id: 'pal', title: 'palette', owner: 'monitor' })
+  })
+  await expect(monitor.locator('.monitor-kin .monitor-tile')).toHaveCount(2)
+  await expect(monitor.locator('.monitor-figures dd').nth(1)).toHaveText('1')
+})
+
 test('the grid setting lands a dragged window on a sixteen pixel step', async ({
   page,
   isMobile,
