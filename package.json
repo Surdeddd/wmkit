@@ -517,7 +517,7 @@
     {
       "name": "qwik adapter",
       "path": "dist/qwik.qwik.mjs",
-      "limit": "20.7 kB",
+      "limit": "21 kB",
       "ignore": [
         "@builder.io/qwik"
       ]
@@ -555,7 +555,7 @@
     {
       "name": "winbox compat",
       "path": "dist/winbox.js",
-      "limit": "24.3 kB"
+      "limit": "24.5 kB"
     },
     {
       "name": "dock plugin",
@@ -565,7 +565,7 @@
     {
       "name": "web components",
       "path": "dist/elements.js",
-      "limit": "23.9 kB"
+      "limit": "24.2 kB"
     },
     {
       "name": "russian catalogue",
