@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { createWindowManager } from '../../src/core/manager'
 import type { WindowManager } from '../../src/core/types'
 import { attachDesktop } from '../../src/dom/controller'
@@ -28,7 +28,7 @@ let wm: WindowManager
 let desktop: DesktopController
 let element: HTMLElement
 let frames: Frames
-let heard: ReturnType<typeof vi.fn>
+let heard: Mock<(event: Event) => void>
 
 function mount(hook?: () => void): { root: HTMLElement; handle: HTMLElement; grip: HTMLElement } {
   element = document.createElement('div')
@@ -58,7 +58,7 @@ beforeEach(() => {
   Element.prototype.setPointerCapture = () => {}
   Element.prototype.releasePointerCapture = () => {}
   Element.prototype.hasPointerCapture = () => false
-  heard = vi.fn()
+  heard = vi.fn<(event: Event) => void>()
   document.body.addEventListener('contextmenu', heard)
 })
 

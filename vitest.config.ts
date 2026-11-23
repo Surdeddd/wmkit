@@ -44,7 +44,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/adapters/qwik.ts'],
+      exclude: ['src/adapters/qwik.ts', 'site/**'],
       thresholds: { statements: 100, lines: 100, functions: 100, branches: 100 },
       reporter: ['text', 'html'],
     },
