@@ -36,8 +36,20 @@ const PAGES = {
       'Walkthroughs',
       [
         ['Draggable, resizable window in React', '/guides/react-draggable-resizable-window'],
+        ['Draggable, resizable window in Vue', '/guides/vue-draggable-resizable-window'],
+        ['Windows in plain HTML', '/guides/web-components-window-manager'],
+        ['Dockable panels like an IDE', '/guides/dockable-panels-ide-layout'],
+        ['Taskbar, snap layouts and Alt+Tab', '/guides/taskbar-snap-layouts-window-switcher'],
         ['Windows 95 desktop in React', '/guides/windows-95-desktop-react'],
+        ['For AI coding agents', '/guides/ai-coding-agents'],
+      ],
+    ],
+    [
+      'Comparisons',
+      [
         ['A WinBox alternative', '/compare/winbox-alternative'],
+        ['dockview or wmkit', '/compare/dockview-alternative'],
+        ['react-rnd or wmkit', '/compare/react-rnd-alternative'],
       ],
     ],
   ],
@@ -63,8 +75,20 @@ const PAGES = {
       'Пошагово',
       [
         ['Окно с ресайзом на React', '/guides/react-draggable-resizable-window'],
+        ['Окно с ресайзом на Vue', '/guides/vue-draggable-resizable-window'],
+        ['Окна на чистом HTML', '/guides/web-components-window-manager'],
+        ['Закрепляемые панели как в IDE', '/guides/dockable-panels-ide-layout'],
+        ['Панель задач, раскладки и Alt+Tab', '/guides/taskbar-snap-layouts-window-switcher'],
         ['Рабочий стол Windows 95 на React', '/guides/windows-95-desktop-react'],
+        ['Для ИИ-агентов', '/guides/ai-coding-agents'],
+      ],
+    ],
+    [
+      'Сравнения',
+      [
         ['Альтернатива WinBox', '/compare/winbox-alternative'],
+        ['dockview или wmkit', '/compare/dockview-alternative'],
+        ['react-rnd или wmkit', '/compare/react-rnd-alternative'],
       ],
     ],
   ],

@@ -102,6 +102,12 @@ describe('llms.txt', () => {
     expect(manifest.files).toContain('llms.txt')
   })
 
+  it('gives the page for coding agents the same rules, word for word', async () => {
+    const { RULES } = await load()
+    const page = read('docs/guides/ai-coding-agents.md')
+    for (const rule of RULES) expect(page, rule.slice(0, 40)).toContain(`- ${rule}\n`)
+  })
+
   it('starts with code, because the docs build bundles the generator and puts its own code first', () => {
     expect(read('scripts/llms.mjs').startsWith('#!')).toBe(false)
     expect(read('docs/.vitepress/config.ts')).toContain("from '../../scripts/llms.mjs'")
