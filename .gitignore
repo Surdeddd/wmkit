@@ -18,6 +18,7 @@ reports/
 
 # ai working context (kept local by design)
 memory-bank/
+.tastemaker/
 .remember/
 .claude/
 .playwright-mcp/
