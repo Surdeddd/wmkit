@@ -537,3 +537,28 @@ describe('a page whose HTMLElement is missing when the module loads', () => {
     }
   })
 })
+
+describe('a closed window the desktop cannot name', () => {
+  it('skips an entry of the stored closed list that is not an id', () => {
+    const seed = createWindowManager({ viewport: { width: 800, height: 600 } })
+    const state = seed.serialize() as unknown as { extensions: Record<string, unknown> }
+    state.extensions = { elements: { closed: ['gone', 7, null] } }
+    storage.setItem('desk', JSON.stringify({ version: 0, state }))
+    const desktop = mount(
+      '<wm-desktop persist="desk"><wm-window window-id="gone"></wm-window><wm-window window-id="here"></wm-window></wm-desktop>',
+    )
+    expect(desktop.manager?.get('gone')).toBeUndefined()
+    expect(desktop.manager?.get('here')).toBeDefined()
+    const gone = desktop.querySelector('[window-id="gone"]') as WmWindowElement
+    expect(gone.hasAttribute('closed')).toBe(true)
+  })
+
+  it('keeps a window without an id closed when its markup says so, and stores nothing for it', () => {
+    const desktop = mount(
+      '<wm-desktop><wm-window closed label="Hidden"></wm-window><wm-window label="Shown"></wm-window></wm-desktop>',
+    )
+    expect(desktop.manager?.getState().order).toHaveLength(1)
+    expect(desktop.querySelector('wm-window[closed]')?.getAttribute('label')).toBe('Hidden')
+    expect(closedList(desktop)).toBeUndefined()
+  })
+})

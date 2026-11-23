@@ -1815,3 +1815,41 @@ describe('a window leaving a stack it shared', () => {
     }
   })
 })
+
+describe('a dock that changes in the same batch as its windows', () => {
+  it('lets go of a panel that left for another desktop while a new layout comes in', () => {
+    const h = setup()
+    h.add('a')
+    const b = h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    let applied = false
+    h.wm.batch(() => {
+      h.wm.moveToWorkspace('b', 1)
+      applied = h.dock.setLayout({
+        root: { kind: 'stack', id: 'only', windows: ['a'], active: 'a' },
+      })
+    })
+    expect(applied).toBe(true)
+    expect(JSON.stringify(h.dock.layout())).not.toContain('"b"')
+    expect(h.wm.get('b')).toMatchObject({ workspace: 1, resizable: true })
+    expect(b.hasAttribute('data-wm-docked')).toBe(false)
+    expect(h.wm.get('a')?.stage).toBe('snapped')
+  })
+
+  it('is destroyed quietly in the batch that closes one of its panels', () => {
+    const h = setup()
+    h.add('a')
+    h.add('b')
+    h.dock.dock('a')
+    h.dock.dock('b', { side: 'right' })
+    expect(() =>
+      h.wm.batch(() => {
+        h.wm.close('b')
+        h.dock.destroy()
+      }),
+    ).not.toThrow()
+    expect(h.wm.get('b')).toBeUndefined()
+    expect(h.wm.get('a')).toMatchObject({ resizable: true, snappable: true })
+  })
+})

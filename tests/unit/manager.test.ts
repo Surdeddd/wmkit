@@ -3654,3 +3654,15 @@ describe('a batch that ends where it began', () => {
     expect(wm.get('a')?.title).toBe('Again')
   })
 })
+
+describe('a manager that lets windows leave the viewport', () => {
+  it('moves a window to the very place it is told, however far outside', () => {
+    const wm = createWindowManager({
+      viewport: { width: 800, height: 600 },
+      keepInViewport: false,
+    })
+    wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    expect(wm.move('a', -900, 4000)).toBe(true)
+    expect(wm.get('a')?.bounds).toMatchObject({ x: -900, y: 4000, width: 200, height: 150 })
+  })
+})

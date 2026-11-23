@@ -499,3 +499,18 @@ describe('devtools painting', () => {
     panel.destroy()
   })
 })
+
+describe('a press inside the devtools panel', () => {
+  it('does nothing on a button that names neither an action nor a window', () => {
+    const wm = createWindowManager(VIEWPORT)
+    wm.open({ id: 'a', title: 'First' })
+    const panel = createDevtools(wm)
+    flush()
+    const stray = document.createElement('button')
+    panel.element.append(stray)
+    const before = wm.getState()
+    stray.click()
+    expect(wm.getState()).toBe(before)
+    panel.destroy()
+  })
+})

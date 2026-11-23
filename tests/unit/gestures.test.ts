@@ -844,3 +844,46 @@ describe('separate gesture factories on one desktop', () => {
     expect(harness.wm.get('w')?.bounds.width).toBeLessThan(420)
   })
 })
+
+describe('a pinch that has no element to mark', () => {
+  it('resizes a window whose id an unbound element carries', () => {
+    const harness = makeHarness()
+    harness.wm.open({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    const decoy = document.createElement('div')
+    decoy.dataset.wmWindow = 'a'
+    harness.element.append(decoy)
+
+    pinch(harness, decoy, [200, 200, 260, 200], [150, 200, 310, 200])
+    expect(harness.wm.get('a')?.bounds.width).toBeGreaterThan(300)
+    expect(decoy.dataset.wmPinching).toBeUndefined()
+
+    decoy.dispatchEvent(touchEvent('pointerup', 1, 150, 200))
+    decoy.dispatchEvent(touchEvent('pointerup', 2, 310, 200))
+    expect(harness.wm.get('a')?.bounds.width).toBeGreaterThan(300)
+    expect(decoy.dataset.wmPinching).toBeUndefined()
+  })
+
+  it('lets go of a window that closes under the fingers, bound to an element or not', () => {
+    const harness = makeHarness()
+    const { root } = harness.add({ id: 'a', x: 100, y: 100, width: 300, height: 200 })
+    harness.wm.open({ id: 'b', x: 450, y: 100, width: 300, height: 200 })
+    const decoy = document.createElement('div')
+    decoy.dataset.wmWindow = 'b'
+    harness.element.append(decoy)
+
+    for (const [target, id] of [
+      [root, 'a'],
+      [decoy, 'b'],
+    ] as const) {
+      pinch(harness, target, [200, 200, 260, 200], [150, 200, 310, 200])
+      harness.wm.close(id)
+      expect(() => {
+        target.dispatchEvent(touchEvent('pointermove', 2, 360, 200))
+        harness.flushFrames()
+        target.dispatchEvent(touchEvent('pointerup', 1, 150, 200))
+        target.dispatchEvent(touchEvent('pointerup', 2, 360, 200))
+      }).not.toThrow()
+      expect(harness.wm.get(id)).toBeUndefined()
+    }
+  })
+})

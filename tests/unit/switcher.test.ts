@@ -559,3 +559,32 @@ describe('a switcher asked for less usual things', () => {
     expect(picked()?.dataset.wmSwitch).toBe('b')
   })
 })
+
+describe('a window switcher that is left in an unusual way', () => {
+  it('does not hand the focus back to an element that left the page meanwhile', () => {
+    const made = mount()
+    const input = windowEl('c').querySelector('input') as HTMLElement
+    input.focus()
+    made.open()
+    expect(made.element.contains(document.activeElement)).toBe(true)
+    input.remove()
+    key(document.activeElement as Element, 'keydown', 'Escape')
+    expect(made.element.hidden).toBe(true)
+    expect(document.activeElement).not.toBe(input)
+  })
+
+  it('focuses nothing on the page when the app closes the chosen window as it comes back', () => {
+    const made = mount()
+    wm.minimize('a')
+    wm.on('stage', ({ window: win }) => {
+      if (win.id === 'a' && win.stage === 'normal') wm.close('a')
+    })
+    made.open()
+    const choice = options().find((option) => option.dataset.wmSwitch === 'a')
+    expect(choice).toBeDefined()
+    expect(() => choice?.dispatchEvent(new MouseEvent('click', { bubbles: true }))).not.toThrow()
+    expect(wm.get('a')).toBeUndefined()
+    expect(made.element.hidden).toBe(true)
+    expect(wm.getState().focusedId).not.toBe('a')
+  })
+})

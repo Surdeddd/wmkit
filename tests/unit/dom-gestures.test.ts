@@ -702,3 +702,125 @@ describe('a maximized window dragged out in one move', () => {
     expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', snapZone: 'left' })
   })
 })
+
+describe('a gesture plugin that holds the desktop', () => {
+  function hooked() {
+    let gestures: GestureContext | null = null
+    const h = makeHarness({
+      gestures: [
+        (ctx) => {
+          gestures = ctx
+          return () => {}
+        },
+      ],
+    })
+    return { h, gestures: gestures as unknown as GestureContext }
+  }
+
+  it('is not cancelled by claiming the desktop it already holds', () => {
+    const { h, gestures } = hooked()
+    h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const pinch = { id: 'a', finish: vi.fn() }
+    gestures.claim(pinch)
+    gestures.claim(pinch)
+    expect(pinch.finish).not.toHaveBeenCalled()
+    expect(gestures.busy()).toBe(true)
+  })
+
+  it('keeps the desktop when a gesture that lost it lets go late', () => {
+    const { h, gestures } = hooked()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    const first = { id: 'a', finish: vi.fn() }
+    const second = { id: 'a', finish: vi.fn() }
+    gestures.claim(first)
+    gestures.claim(second)
+    expect(first.finish).toHaveBeenCalledWith(true)
+
+    gestures.release(first)
+    expect(gestures.busy()).toBe(true)
+    dragTo(h, a.handle, [150, 110], [250, 210])
+    expect(h.wm.get('a')?.bounds).toMatchObject({ x: 100, y: 100 })
+
+    gestures.release(second)
+    expect(gestures.busy()).toBe(false)
+  })
+})
+
+describe('a drag that the desktop answers in its own way', () => {
+  it('ends quietly when the app closes a maximized window on its way out of the stage', () => {
+    const h = makeHarness()
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    h.wm.maximize('a')
+    h.wm.on('stage', ({ window: win }) => {
+      if (win.stage === 'normal') h.wm.close('a')
+    })
+
+    a.handle.dispatchEvent(pointerEvent('pointerdown', 150, 10))
+    expect(() => {
+      a.handle.dispatchEvent(pointerEvent('pointermove', 300, 200))
+      h.flush()
+    }).not.toThrow()
+    expect(h.wm.get('a')).toBeUndefined()
+    a.handle.dispatchEvent(pointerEvent('pointerup', 300, 200))
+    expect(a.root.dataset.wmDragging).toBeUndefined()
+  })
+
+  it('snaps to the top half when the top edge is told to snap there', () => {
+    const h = makeHarness({ snap: { topEdge: 'top' } })
+    const a = h.add({ id: 'a', x: 100, y: 100, width: 200, height: 150 })
+    dragTo(h, a.handle, [150, 110], [400, 2])
+    a.handle.dispatchEvent(pointerEvent('pointerup', 400, 2))
+    expect(h.wm.get('a')).toMatchObject({ stage: 'snapped', snapZone: 'top' })
+  })
+
+  it('leaves the window alone when the tab target can no longer take it at the drop', () => {
+    const h = makeHarness({ grouping: { dwell: 0 } })
+    const target = h.add({ id: 'target', x: 400, y: 400, width: 200, height: 150 })
+    const moving = h.add({ id: 'moving', x: 10, y: 10, width: 200, height: 150 })
+    placeTitlebar(target.handle, 400, 400)
+    moving.handle.dispatchEvent(pointerEvent('pointerdown', 60, 20))
+    moving.handle.dispatchEvent(pointerEvent('pointermove', 450, 410))
+    h.flush()
+    expect(target.root.dataset.wmTabTarget).toBe('')
+
+    h.wm.open({ id: 'child', owner: 'target' })
+    moving.handle.dispatchEvent(pointerEvent('pointerup', 450, 410))
+    expect(h.wm.get('moving')?.groupId).toBeNull()
+    expect(h.wm.get('target')?.groupId).toBeNull()
+    expect(target.root.dataset.wmTabTarget).toBeUndefined()
+  })
+})
+
+describe('two windows that change their skin at once', () => {
+  it('skips the one that the skin of the other detached on the way', () => {
+    const builds: string[] = []
+    let drop: (() => void) | null = null
+    const skin =
+      (tag: string): WindowSkin =>
+      ({ doc, id }) => {
+        builds.push(`${tag}:${id}`)
+        if (tag === 'article') {
+          drop?.()
+          drop = null
+        }
+        const element = doc.createElement(tag)
+        element.innerHTML = '<header data-wm-drag></header><div data-wm-content></div>'
+        return { element, content: element.lastElementChild as HTMLElement }
+      }
+    const h = makeHarness({ skins: { plain: skin('section'), compact: skin('article') } })
+    h.wm.open({ id: 'a', x: 100, y: 100, width: 200, height: 150, meta: { skin: 'plain' } })
+    h.wm.open({ id: 'b', x: 400, y: 100, width: 200, height: 150, meta: { skin: 'plain' } })
+    const a = h.desktop.mountWindow('a', 'plain')
+    const b = h.desktop.mountWindow('b', 'plain')
+    drop = () => b.detach()
+
+    h.wm.batch(() => {
+      h.wm.update('a', { meta: { skin: 'compact' } })
+      h.wm.update('b', { meta: { skin: 'compact' } })
+    })
+
+    expect(a.element.localName).toBe('article')
+    expect(builds).toEqual(['section:a', 'section:b', 'article:a'])
+    expect(h.wm.get('b')?.meta.skin).toBe('compact')
+  })
+})

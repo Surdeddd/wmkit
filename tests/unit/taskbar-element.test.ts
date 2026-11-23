@@ -154,3 +154,23 @@ describe('<wm-taskbar>', () => {
     expect(() => defineWmTaskbar({ prefix: 'none' })).not.toThrow()
   })
 })
+
+describe('<wm-taskbar> that got a manager while it waited', () => {
+  it('keeps the taskbar it has when the desktop it waited for is defined later', async () => {
+    const page = mount(
+      '<wm-taskbar for="tardy"></wm-taskbar><tardy-desktop id="tardy"></tardy-desktop>',
+    )
+    const bar = page.querySelector('wm-taskbar') as WmTaskbarElement
+    expect(bar.controller).toBeNull()
+    const wm = createWindowManager({ viewport: { width: 800, height: 600 } })
+    wm.open({ id: 'a', title: 'Alpha' })
+    bar.manager = wm
+    const bound = bar.controller
+    expect(bound).not.toBeNull()
+
+    defineWmElements({ prefix: 'tardy' })
+    await settle()
+    expect(bar.controller).toBe(bound)
+    expect(tasks(bar)).toEqual(['Alpha'])
+  })
+})

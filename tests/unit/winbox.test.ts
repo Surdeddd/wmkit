@@ -870,3 +870,28 @@ describe('the desktop around the windows', () => {
     expect(WinBox.manager().get(made.id)).toBeDefined()
   })
 })
+
+describe('a window that is snapped to a side', () => {
+  it('calls no stage hook on the way there or back', () => {
+    const calls: string[] = []
+    const made = box('Side', {
+      onminimize: () => calls.push('minimize'),
+      onmaximize: () => calls.push('maximize'),
+      onrestore: () => calls.push('restore'),
+    })
+    const wm = WinBox.manager(root)
+    expect(wm.snap(made.id, 'left')).toBe(true)
+    expect(wm.get(made.id)?.stage).toBe('snapped')
+    expect(wm.restore(made.id)).toBe(true)
+    expect(calls).toEqual([])
+  })
+})
+
+describe('a window whose markup the page changed', () => {
+  it('sets no icon when the page took the icon node away', () => {
+    const made = box('Plain')
+    made.window.querySelector('.wb-icon')?.remove()
+    expect(made.setIcon('x.png')).toBe(made)
+    expect(made.window.querySelector('.wb-icon')).toBeNull()
+  })
+})

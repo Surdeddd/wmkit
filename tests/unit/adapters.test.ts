@@ -1237,3 +1237,18 @@ describe('titlebar context menu hook', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 })
+
+describe('the svelte store of one window', () => {
+  it('stays quiet when another window changes', () => {
+    const wm = createWindowManager({ viewport: { width: 800, height: 600 } })
+    wm.open({ id: 'a', x: 10, y: 10, width: 200, height: 150 })
+    wm.open({ id: 'b', x: 300, y: 10, width: 200, height: 150 })
+    const seen: Array<number | undefined> = []
+    const stop = wmWindowStore(wm, 'a').subscribe((win) => seen.push(win?.bounds.x))
+    wm.move('b', 320, 40)
+    expect(seen).toEqual([10])
+    wm.move('a', 50, 60)
+    expect(seen).toEqual([10, 50])
+    stop()
+  })
+})

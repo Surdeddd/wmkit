@@ -516,3 +516,17 @@ describe('a layout picker asked for less usual things', () => {
     expect(wm.get('a')?.stage).toBe('normal')
   })
 })
+
+describe('a layout picker whose window goes as the menu closes', () => {
+  it('snaps nothing and focuses nothing when the page closes the window on the way', () => {
+    mount()
+    wm.focus('b')
+    picker.open('a')
+    cells()[0]?.focus()
+    windowEl('a').addEventListener('focus', () => wm.close('a'))
+    expect(() => cells()[5]?.click()).not.toThrow()
+    expect(wm.get('a')).toBeUndefined()
+    expect(wm.getState().focusedId).toBe('b')
+    expect(picker.element.hidden).toBe(true)
+  })
+})
