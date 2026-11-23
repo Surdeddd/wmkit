@@ -135,15 +135,14 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const
 
 const runtimes = new WeakMap<HTMLElement, Map<string, Runtime>>()
 const boxes = new Map<string, WinBox>()
-const history: WinBox[] = []
+const history = new Set<WinBox>()
 const watchedDocs = new WeakSet<Document>()
 let config: WinBoxConfig = {}
 let counter = 0
 
 function moveToEnd(box: WinBox): void {
-  const index = history.indexOf(box)
-  if (index !== -1) history.splice(index, 1)
-  history.push(box)
+  history.delete(box)
+  history.add(box)
 }
 
 function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Runtime {
@@ -335,8 +334,7 @@ function runtimeFor(root: HTMLElement, insets: number[], overflow: boolean): Run
       boxes.delete(win.id)
       seen.delete(win.id)
       gone.add(win.id)
-      const index = history.indexOf(box)
-      if (index !== -1) history.splice(index, 1)
+      history.delete(box)
       runtime.boxes -= 1
       doomed = true
     }),
@@ -519,7 +517,7 @@ export class WinBox {
     } else if (settings.url) this.setUrl(settings.url)
 
     boxes.set(id, this)
-    history.push(this)
+    history.add(this)
     this.runtime.sync()
     if (settings.autosize) {
       const header = this.window.firstElementChild as HTMLElement

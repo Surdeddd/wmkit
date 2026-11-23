@@ -197,7 +197,7 @@ export function persist(wm: WindowManager, options: PersistOptions = {}): Persis
     if (timer === undefined) return
     cancel()
     if (loading) held = true
-    else if (storage) write(push)
+    else write(push)
   }
 
   function clear(): void {

@@ -116,7 +116,7 @@ abstract class BindingDirective<A extends unknown[]> extends AsyncDirective {
   }
 
   protected override reconnected(): void {
-    if (this.element && this.args) this.release = this.bind(this.element, ...this.args)
+    this.release = this.bind(this.element as HTMLElement, ...(this.args as A))
   }
 }
 

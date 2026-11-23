@@ -114,7 +114,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
     else wm.endInteraction()
   }
 
-  function beginPinch(win: WindowState, mid: Point): void {
+  function beginPinch(win: WindowState, mid: Point): PinchSession {
     const { id } = win
     const claimed: PinchSession = {
       id,
@@ -131,6 +131,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
     ctx.claim(claimed)
     wm.beginInteraction()
     if (claimed.host) claimed.host.dataset.wmPinching = ''
+    return claimed
   }
 
   function applyPinch(active: PinchSession, win: WindowState, spread: number): void {
@@ -170,8 +171,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
     if (pinch !== null && target !== null && Math.abs(spread - startSpread) > pinch.threshold) {
       const win = wm.get(target)
       if (!win) return
-      beginPinch(win, startMid)
-      if (session) applyPinch(session, win, spread)
+      applyPinch(beginPinch(win, startMid), win, spread)
       return
     }
     const swipe = options.swipe
@@ -238,10 +238,7 @@ function start(ctx: GestureContext, options: Settings): () => void {
   function onRelease(event: PointerEvent): void {
     if (!forget(event.pointerId)) return
     if (pending) {
-      if (raf !== 0) {
-        view.cancelAnimationFrame(raf)
-        raf = 0
-      }
+      view.cancelAnimationFrame(raf)
       flush()
     }
     if (session) endPinch(false)

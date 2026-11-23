@@ -62,8 +62,7 @@ function open(name: string): SyncChannel | null {
       host.addEventListener?.('storage', relay)
     },
     removeEventListener(_type, listener) {
-      const relay = relays.get(listener)
-      if (relay) host.removeEventListener?.('storage', relay)
+      host.removeEventListener?.('storage', relays.get(listener) as (event: StorageEvent) => void)
       relays.delete(listener)
     },
   }

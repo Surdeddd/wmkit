@@ -72,8 +72,8 @@ export function createResizeStarter(ctx: SessionContext) {
     let free = false
     const edgeX = direction.includes('e') ? start.x + start.width : start.x
     const edgeY = direction.includes('s') ? start.y + start.height : start.y
-    const el = ctx.windowElement(id)
-    if (el) el.dataset.wmResizing = direction
+    const el = ctx.windowElement(id) as HTMLElement
+    el.dataset.wmResizing = direction
 
     function flush(): void {
       if (!hasPending) return
@@ -160,7 +160,7 @@ export function createResizeStarter(ctx: SessionContext) {
         if (handleEl.hasPointerCapture(event.pointerId)) {
           handleEl.releasePointerCapture(event.pointerId)
         }
-        if (el) delete el.dataset.wmResizing
+        delete el.dataset.wmResizing
         if (cancelled) wm.abortInteraction()
         else wm.endInteraction()
       }

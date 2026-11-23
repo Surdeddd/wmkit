@@ -474,51 +474,45 @@ export function attachDesktop(
     const prev = attached.lastState
     const transition = prev ? null : el.style.transition
     if (transition !== null) el.style.transition = 'none'
-    if (
-      prev !== win ||
-      attached.lastWorkspace !== activeWorkspace ||
-      attached.lastTab !== activeTab
-    ) {
-      const b = win.bounds
-      if (prev === null || prev.bounds.x !== b.x || prev.bounds.y !== b.y) {
-        el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`
-      }
-      if (prev === null || prev.bounds.width !== b.width) el.style.width = `${b.width}px`
-      if (prev === null || prev.bounds.height !== b.height) el.style.height = `${b.height}px`
-      setData(el, 'wmStage', win.stage)
-      setData(el, 'wmLayer', win.layer)
-      setData(el, 'wmWorkspace', String(win.workspace))
-      setData(el, 'wmVariant', windowVariant(win))
-      setData(el, 'wmGroup', win.groupId)
-      setData(el, 'wmOwner', win.ownerId)
-      setData(el, 'wmTab', win.groupId === null ? null : activeTab ? 'active' : 'inactive')
-      const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace || !activeTab
-      if (hide && !el.hidden) rescue(el)
-      if (!hide && el.hidden && wm.getState().focusedId === win.id) {
-        queueMicrotask(() => {
-          if (!destroyed && !el.hidden && wm.getState().focusedId === win.id) pull(attached)
-        })
-      }
-      if (el.hidden !== hide) el.hidden = hide
-      if (attached.hidden !== hide) {
-        attached.hidden = hide
-        reshown = true
-      }
-      setAttr(el, 'aria-label', win.title)
-      if (attached.title && prev?.title !== win.title) {
-        setText(attached.title, win.title, prev?.title ?? win.title)
-      }
-      setAttr(el, 'aria-modal', win.layer === 'modal' && win.ownerId === null ? 'true' : null)
-      const display =
-        win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
-      for (const handle of attached.handles) {
-        if (handle.style.display !== display) handle.style.display = display
-      }
-      if (attached.blocked || attached.shield) shield(attached, attached.blocked)
-      attached.lastState = win
-      attached.lastWorkspace = activeWorkspace
-      attached.lastTab = activeTab
+    const b = win.bounds
+    if (prev === null || prev.bounds.x !== b.x || prev.bounds.y !== b.y) {
+      el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`
     }
+    if (prev === null || prev.bounds.width !== b.width) el.style.width = `${b.width}px`
+    if (prev === null || prev.bounds.height !== b.height) el.style.height = `${b.height}px`
+    setData(el, 'wmStage', win.stage)
+    setData(el, 'wmLayer', win.layer)
+    setData(el, 'wmWorkspace', String(win.workspace))
+    setData(el, 'wmVariant', windowVariant(win))
+    setData(el, 'wmGroup', win.groupId)
+    setData(el, 'wmOwner', win.ownerId)
+    setData(el, 'wmTab', win.groupId === null ? null : activeTab ? 'active' : 'inactive')
+    const hide = win.stage === 'minimized' || win.workspace !== activeWorkspace || !activeTab
+    if (hide && !el.hidden) rescue(el)
+    if (!hide && el.hidden && wm.getState().focusedId === win.id) {
+      queueMicrotask(() => {
+        if (!destroyed && !el.hidden && wm.getState().focusedId === win.id) pull(attached)
+      })
+    }
+    if (el.hidden !== hide) el.hidden = hide
+    if (attached.hidden !== hide) {
+      attached.hidden = hide
+      reshown = true
+    }
+    setAttr(el, 'aria-label', win.title)
+    if (attached.title && prev?.title !== win.title) {
+      setText(attached.title, win.title, prev?.title ?? win.title)
+    }
+    setAttr(el, 'aria-modal', win.layer === 'modal' && win.ownerId === null ? 'true' : null)
+    const display =
+      win.resizable && (win.stage === 'normal' || win.stage === 'snapped') ? '' : 'none'
+    for (const handle of attached.handles) {
+      if (handle.style.display !== display) handle.style.display = display
+    }
+    if (attached.blocked || attached.shield) shield(attached, attached.blocked)
+    attached.lastState = win
+    attached.lastWorkspace = activeWorkspace
+    attached.lastTab = activeTab
     if (transition !== null) {
       void el.offsetWidth
       el.style.transition = transition

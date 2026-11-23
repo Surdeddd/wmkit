@@ -225,10 +225,8 @@ export function createDragStarter(ctx: SessionContext) {
           Math.abs(movePoint.y - (session.startBounds.y + session.grabDY))
         if (travelled < 3) return
         session.moved = true
-        if (el) {
-          el.dataset.wmDragging = ''
-          el.style.willChange = 'transform'
-        }
+        el?.setAttribute('data-wm-dragging', '')
+        el?.style.setProperty('will-change', 'transform')
       }
       session.pendingX = movePoint.x
       session.pendingY = movePoint.y
@@ -299,10 +297,8 @@ export function createDragStarter(ctx: SessionContext) {
         if (handle.hasPointerCapture(session.pointerId)) {
           handle.releasePointerCapture(session.pointerId)
         }
-        if (el) {
-          delete el.dataset.wmDragging
-          el.style.willChange = ''
-        }
+        el?.removeAttribute('data-wm-dragging')
+        el?.style.removeProperty('will-change')
         ctx.hidePreview()
         if (session.hoverTimer !== 0) view.clearTimeout(session.hoverTimer)
         ctx.markGroupTarget(null)
