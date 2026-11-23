@@ -96,6 +96,7 @@ const bootEl = must(document.querySelector<HTMLElement>('#boot'), '#boot')
 const bootLog = must(document.querySelector<HTMLElement>('#boot-log'), '#boot-log')
 const statWin = must(document.querySelector<HTMLElement>('#stat-win'), '#stat-win')
 const statFps = must(document.querySelector<HTMLElement>('#stat-fps'), '#stat-fps')
+const themeChip = must(document.querySelector<HTMLElement>('#theme-chip'), '#theme-chip')
 
 function readStored(key: string): string | null {
   try {
@@ -164,6 +165,7 @@ function applyTheme(): void {
   next.addEventListener('error', () => next.remove())
   document.head.append(next)
   desktopEl.dataset.theme = theme
+  themeChip.textContent = theme
   builder.syncTheme(theme)
   writeStored('wmkit-theme', theme)
 }
@@ -1244,6 +1246,11 @@ wm.subscribe(() => {
   syncLauncher()
   syncWorkspaces()
   syncMenus()
+})
+
+themeChip.addEventListener('click', (event) => {
+  const step = event.shiftKey ? THEME_NAMES.length - 1 : 1
+  ctx.setTheme(THEME_NAMES[(THEME_NAMES.indexOf(theme) + step) % THEME_NAMES.length] ?? 'glass')
 })
 
 document.addEventListener('click', closeMenus)

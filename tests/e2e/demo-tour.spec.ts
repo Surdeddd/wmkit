@@ -204,6 +204,20 @@ test('with sync on, a second tab joins the same desktop and follows it', async (
   await second.close()
 })
 
+test('the theme button in the menubar steps through the themes and names the current one', async ({
+  page,
+}) => {
+  const chip = page.locator('#theme-chip')
+  await expect(chip).toHaveText('glass')
+  await expect(chip).toHaveAttribute('aria-label', 'Next theme')
+  await chip.click()
+  await expect(chip).toHaveText('light')
+  await expect(page.locator('#desktop')).toHaveAttribute('data-theme', 'light')
+  await chip.click({ modifiers: ['Shift'] })
+  await expect(chip).toHaveText('glass')
+  await expect(page.locator('#desktop')).toHaveAttribute('data-theme', 'glass')
+})
+
 test('the taskbar and the menus speak Russian on the Russian page', async ({ page }) => {
   await page.goto('?lang=ru')
   await expect(win(page, 'readme')).toBeVisible()

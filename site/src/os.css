@@ -1219,3 +1219,41 @@ body {
     opacity 220ms var(--ease),
     visibility 0s linear 220ms;
 }
+
+.theme-chip {
+  align-self: center;
+  height: 22px;
+  margin-right: 10px;
+  padding: 0 9px;
+  background: none;
+  border: 1px solid var(--line-hi);
+  color: var(--fg-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    border-color 140ms var(--ease),
+    color 140ms var(--ease);
+}
+
+.theme-chip::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  background: var(--signal);
+}
+
+.theme-chip:hover,
+.theme-chip:focus-visible {
+  border-color: var(--signal);
+  color: var(--fg);
+}
+
+@media (max-width: 720px) {
+  .theme-chip {
+    display: none;
+  }
+}

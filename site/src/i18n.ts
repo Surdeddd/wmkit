@@ -201,6 +201,7 @@ const en: Dict = {
     'aria.demo': 'Live wmkit desktop',
     'aria.launcher': 'Launcher',
     'aria.dock': 'Taskbar',
+    'aria.theme': 'Next theme',
     'ws.tab': 'workspace',
   },
   announce: defaultMessages,
@@ -716,6 +717,7 @@ const ru: Dict = {
     'aria.demo': 'Живой рабочий стол wmkit',
     'aria.launcher': 'Запуск приложений',
     'aria.dock': 'Панель задач',
+    'aria.theme': 'Следующая тема',
     'ws.tab': 'рабочий стол',
   },
   announce: {
