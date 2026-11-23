@@ -393,7 +393,7 @@ dock.dock('files', { side: 'left' })
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.66 kB brotlied.
+Two-finger gestures, opt-in so the core never pays for them: pinch a window to resize it around the point between your fingers, swipe two fingers sideways to change workspace. 1.76 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -406,7 +406,7 @@ A gesture is just a function that takes a `GestureContext` and returns its teard
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 2.46 kB brotlied.
+Builds the window itself from a markup string, so a consumer can ship their own chrome and their own buttons without writing a single listener. 2.65 kB brotlied.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'

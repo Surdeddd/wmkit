@@ -328,7 +328,7 @@ dock.dock('files', { side: 'left' })
 
 ### `pinch(options?)`, `swipe(options?)`, `touchGestures(options?)` — `@surdeddd/wmkit/gestures`
 
-Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.66 кБ в brotli.
+Жесты двумя пальцами, подключаются по желанию — ядро за них не платит: пинч растягивает окно вокруг точки между пальцами, свайп двумя пальцами вбок переключает рабочий стол. 1.76 кБ в brotli.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'
@@ -341,7 +341,7 @@ attachDesktop(wm, root, { gestures: [touchGestures({ swipe: { workspaces: 4 } })
 
 ### `skin(spec)`, `defaultSkin`, `barebones` — `@surdeddd/wmkit/chrome`
 
-Собирает само окно из строки разметки: можно принести свою обвязку и свои кнопки, не написав ни одного обработчика. 2.46 кБ в brotli.
+Собирает само окно из строки разметки: можно принести свою обвязку и свои кнопки, не написав ни одного обработчика. 2.65 кБ в brotli.
 
 ```js
 import { attachDesktop } from '@surdeddd/wmkit'

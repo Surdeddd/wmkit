@@ -55,7 +55,7 @@ The state classes and the callbacks follow the manager rather than the call that
 - **`top`/`right`/`bottom`/`left` belong to a desktop, not a window.** Windows created with the same set share one desktop; another set gets its own. Positions are measured inside that area.
 - **`index`** is ignored: stacking is the manager's job.
 - **`html`** writes `innerHTML`, as in WinBox. Pages that enforce Trusted Types or a strict CSP should pass `mount` instead.
-- **Size.** The compat entry is about 22 kB brotli with the manager inside it; `winbox.bundle.min.js` 0.2.82 is 5.4 kB. The difference pays for snapping, undo, persistence, keyboard control, focus management and the screen-reader layer — if you need none of those, WinBox stays the lighter choice.
+- **Size.** The compat entry is about 24 kB brotli with the manager inside it; `winbox.bundle.min.js` 0.2.82 is 5.4 kB. The difference pays for snapping, undo, persistence, keyboard control, focus management and the screen-reader layer — if you need none of those, WinBox stays the lighter choice.
 
 ## Going further
 
