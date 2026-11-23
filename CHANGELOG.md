@@ -1,3 +1,21 @@
+# [0.14.0](https://github.com/Surdeddd/wmkit/compare/v0.13.1...v0.14.0) (2026-11-23)
+
+
+### Features
+
+* **announcer:** the announcer speaks Russian with the catalogue from @surdeddd/wmkit/ru ([5ddbfc7](https://github.com/Surdeddd/wmkit/commit/5ddbfc786bc1189dc14060609b0b111fc6cc454f))
+* **core:** requestClose asks guards, which may answer later, before it closes a window ([d5df406](https://github.com/Surdeddd/wmkit/commit/d5df406220153b090eb0f386d49c9739183b21f9))
+* **csp:** plugin stylesheets carry the page nonce and html goes through a Trusted Types policy ([00dd57a](https://github.com/Surdeddd/wmkit/commit/00dd57ad4361f70e3849a4091b1d68ec7f811c1b))
+* **desktop:** a grid option lands dragged windows and pulled edges on a step ([92807bd](https://github.com/Surdeddd/wmkit/commit/92807bdb8c965a50ff2502ef45ff1767e58d59f6))
+* **dock:** Ctrl or Cmd with Alt, Shift and Backspace undocks the focused docked window ([618b4b0](https://github.com/Surdeddd/wmkit/commit/618b4b0b9ff28755b74933313612c4066db6aebf))
+* **layouts:** a snap layout picker and linked resize of snapped neighbours from @surdeddd/wmkit/layouts ([0f74392](https://github.com/Surdeddd/wmkit/commit/0f743920ddc0a9530188989451ff779cf11031b5))
+* **persist:** a storage may answer with promises, and idbStorage keeps the desktop in IndexedDB ([1142ab1](https://github.com/Surdeddd/wmkit/commit/1142ab1ff02a304fca66fbcf5290be8bf35ccde1))
+* **switcher:** a window switcher and an overview from @surdeddd/wmkit/switcher ([acf185d](https://github.com/Surdeddd/wmkit/commit/acf185d976f7872d13136db8b7f192deb4c6e7fe))
+* **sync:** one desktop across tabs over a BroadcastChannel from @surdeddd/wmkit/sync ([0d38379](https://github.com/Surdeddd/wmkit/commit/0d38379f9d1a010f2b71fd47747b3b9e67436cd1))
+* **taskbar:** a ready taskbar and a wm-taskbar element from @surdeddd/wmkit/taskbar ([3a15e5c](https://github.com/Surdeddd/wmkit/commit/3a15e5c97db8a3c6fe84335fce80bba1ee86ba9e))
+* **testing:** helpers for consumer tests from @surdeddd/wmkit/testing ([2c7eb7c](https://github.com/Surdeddd/wmkit/commit/2c7eb7c3459bbaab4f7cd133c94c109bae68f5c4))
+* **themes:** see-through themes paint their windows solid under prefers-reduced-transparency ([191b7b3](https://github.com/Surdeddd/wmkit/commit/191b7b325e4ed6ae94224befbd1b13ebd4601699))
+
 ## [0.13.1](https://github.com/Surdeddd/wmkit/compare/v0.13.0...v0.13.1) (2026-11-15)
 
 
